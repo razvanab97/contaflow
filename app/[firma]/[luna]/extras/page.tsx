@@ -13,19 +13,13 @@ async function get(path: string) {
   return r.json()
 }
 
-export default async function ExtrasPage({
-  params,
-}: {
-  params: Promise<{ firma: string; luna: string }>
-}) {
+export default async function ExtrasPage({ params }: { params: Promise<{ firma: string; luna: string }> }) {
   const { firma: slug, luna } = await params
 
-  // Get firma
   const firme = await get(`firme?slug=eq.${encodeURIComponent(slug)}&select=*`)
   const firma = firme[0]
   if (!firma) notFound()
 
-  // Get luna
   const luni = await get(`luni_contabile?firma_id=eq.${firma.id}&select=*&order=luna.desc`)
   const lunaData = luni.find((l: { luna: string }) => l.luna.startsWith(luna))
   if (!lunaData) notFound()
@@ -33,16 +27,20 @@ export default async function ExtrasPage({
   // Get extrase
   const extrase = await get(`extrase?luna_id=eq.${lunaData.id}&select=*&order=valuta`)
 
-  // Get tranzactii pentru fiecare extras
+  // Get ALL tranzactii pentru firma + luna (prin extras_id IN)
   let tranzactii: any[] = []
-  for (const extras of extrase) {
-    const txs = await get(
-      `tranzactii?extras_id=eq.${extras.id}&select=*,documente(id,tip_document,furnizor,numar_document,fisier_nume)&order=data_tranzactie`
-    )
-    tranzactii = [...tranzactii, ...txs]
+  if (extrase.length > 0) {
+    const ids = extrase.map((e: any) => e.id)
+    // Fetch pentru fiecare extras separat ca sa evitam probleme cu IN()
+    for (const id of ids) {
+      const txs = await get(
+        `tranzactii?extras_id=eq.${id}&select=id,extras_id,data_tranzactie,descriere,descriere_curatata,tip,suma,valuta,categorie,document_id,note,documente(id,tip_document,furnizor,numar_document,fisier_nume)&order=data_tranzactie`
+      )
+      tranzactii = [...tranzactii, ...txs]
+    }
   }
 
-  // Sort: nerezolvate primul, rezolvate la final
+  // Sort: nerezolvate primul
   tranzactii.sort((a, b) => {
     const aR = !!a.document_id || a.note === 'na'
     const bR = !!b.document_id || b.note === 'na'
@@ -56,9 +54,10 @@ export default async function ExtrasPage({
   const rez = tranzactii.filter(t => !!t.document_id || t.note === 'na').length
   const pct = tranzactii.length > 0 ? Math.round((rez / tranzactii.length) * 100) : 0
 
+  const CULOARE = firma.culoare || '#F27A1A'
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0A0A0A' }}>
-      {/* Sidebar */}
       <aside style={{ width: '220px', flexShrink: 0, background: '#0D0D0D', borderRight: '1px solid #1E1E1E', display: 'flex', flexDirection: 'column', padding: '20px 0', position: 'sticky', top: 0, height: '100vh' }}>
         <div style={{ padding: '4px 18px 24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '28px', height: '28px', background: '#FFF', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -75,20 +74,16 @@ export default async function ExtrasPage({
         {extrase.map((e: any) => (
           <div key={e.id} style={{ padding: '3px 18px 3px 28px', display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '12px', color: '#777' }}>{e.valuta}</span>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: e.procesat_ai ? '#4ADE80' : '#555' }}>
-              {e.procesat_ai ? `${e.nr_tranzactii} tx` : '—'}
-            </span>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#4ADE80' }}>{e.nr_tranzactii} tx</span>
           </div>
         ))}
         {tranzactii.length > 0 && (
           <>
             <div style={{ height: '1px', background: '#1E1E1E', margin: '12px 14px' }} />
             <div style={{ padding: '0 18px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: '#555', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '.08em' }}>
-                Progres
-              </div>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#555', marginBottom: '6px', textTransform: 'uppercase' as const, letterSpacing: '.08em' }}>Progres</div>
               <div style={{ height: '3px', background: '#1E1E1E', borderRadius: '2px', marginBottom: '6px' }}>
-                <div style={{ height: '3px', background: firma.culoare, borderRadius: '2px', width: `${pct}%` }} />
+                <div style={{ height: '3px', background: CULOARE, borderRadius: '2px', width: `${pct}%` }} />
               </div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFF' }}>{rez}/{tranzactii.length}</div>
               <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{pct}% rezolvate</div>
@@ -98,47 +93,29 @@ export default async function ExtrasPage({
         <div style={{ marginTop: 'auto', padding: '12px 18px', fontSize: '11px', color: '#555' }}>{ll}</div>
       </aside>
 
-      {/* Main */}
       <main style={{ flex: 1, padding: '40px 44px', background: '#0F0F0F' }}>
         <div style={{ marginBottom: '28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: firma.culoare }} />
+            <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: CULOARE }} />
             <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#FFF' }}>Extras de cont</h1>
           </div>
           <p style={{ fontSize: '13px', color: '#888', marginLeft: '17px' }}>{firma.nume} · {ll}</p>
         </div>
 
-        {/* Upload cards */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '40px' }}>
           {['RON', 'EUR'].map(v => (
-            <UploadExtras
-              key={v}
-              valuta={v}
-              firmaId={firma.id}
-              lunaId={lunaData.id}
-              extras={extrase.find((x: any) => x.valuta === v) || null}
-              culoare={firma.culoare}
-            />
+            <UploadExtras key={v} valuta={v} firmaId={firma.id} lunaId={lunaData.id}
+              extras={extrase.find((x: any) => x.valuta === v) || null} culoare={CULOARE} />
           ))}
         </div>
 
-        {/* Tranzactii */}
         {tranzactii.length > 0 ? (
-          <TranzactiiSection
-            tranzactii={tranzactii}
-            firmaId={firma.id}
-            lunaId={lunaData.id}
-            culoare={firma.culoare}
-          />
-        ) : extrase.length > 0 ? (
-          <div style={{ padding: '32px', background: '#161616', border: '1px solid #242424', borderRadius: '12px', textAlign: 'center' }}>
-            <p style={{ fontSize: '14px', fontWeight: 600, color: '#FFF', marginBottom: '8px' }}>
-              Extrasul e încărcat — apasă &quot;Reîncarcă PDF&quot; pentru a extrage tranzacțiile
-            </p>
-          </div>
+          <TranzactiiSection tranzactii={tranzactii} firmaId={firma.id} lunaId={lunaData.id} culoare={CULOARE} />
         ) : (
           <div style={{ padding: '32px', background: '#161616', border: '1px solid #242424', borderRadius: '12px', textAlign: 'center' }}>
-            <p style={{ fontSize: '13px', color: '#888' }}>Încarcă un extras PDF mai sus</p>
+            <p style={{ fontSize: '13px', color: '#888' }}>
+              {extrase.length > 0 ? 'Importă un CSV sau încarcă un PDF pentru a vedea tranzacțiile.' : 'Importă CSV sau PDF mai sus.'}
+            </p>
           </div>
         )}
       </main>
