@@ -1,28 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServiceSupabase } from '@/lib/supabase/server'
+
+const SB = 'https://aqlmuoaaipbanjdptleg.supabase.co'
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxbG11b2FhaXBiYW5qZHB0bGVnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDY2NzE2OCwiZXhwIjoyMDk2MjQzMTY4fQ.VCnFDYSfxcbS9Hb9g12di7npy5plSvHpMrb6E2FEdfU'
+const H = { 'apikey': KEY, 'Authorization': `Bearer ${KEY}` }
+
 export async function POST(req: NextRequest) {
   const { itemId, titlu } = await req.json()
-  const sb = getServiceSupabase()
-  const { data: docs } = await sb.from('documente').select('*').eq('checklist_item_id', itemId).order('created_at')
-  if (!docs?.length) return NextResponse.json({ error: 'no docs' }, { status: 400 })
+  const r = await fetch(`${SB}/rest/v1/documente?checklist_item_id=eq.${itemId}&select=*&order=created_at`, { headers: H })
+  const docs = r.ok ? await r.json() : []
+  if (!docs.length) return NextResponse.json({ error: 'no docs' }, { status: 400 })
+
   const { PDFDocument } = await import('pdf-lib')
   const merged = await PDFDocument.create()
+
   for (const doc of docs) {
-    const { data: blob } = await sb.storage.from('documente').download(doc.fisier_path)
-    if (!blob) continue
-    const buf = Buffer.from(await blob.arrayBuffer())
-    if (doc.fisier_tip==='application/pdf'||doc.fisier_nume?.endsWith('.pdf')) {
-      try { const pdf=await PDFDocument.load(buf); const pages=await merged.copyPages(pdf,pdf.getPageIndices()); pages.forEach(p=>merged.addPage(p)) } catch {}
+    const dlRes = await fetch(`${SB}/storage/v1/object/documente/${doc.fisier_path}`, { headers: H })
+    if (!dlRes.ok) continue
+    const buf = Buffer.from(await dlRes.arrayBuffer())
+    if (doc.fisier_tip === 'application/pdf' || doc.fisier_nume?.endsWith('.pdf')) {
+      try { const pdf = await PDFDocument.load(buf); const pages = await merged.copyPages(pdf, pdf.getPageIndices()); pages.forEach(p => merged.addPage(p)) } catch {}
     } else if (doc.fisier_tip?.startsWith('image/')) {
       try {
-        const pg=merged.addPage(); const img=doc.fisier_tip==='image/png'?await merged.embedPng(buf):await merged.embedJpg(buf)
-        const {width:w,height:h}=img.scale(1); const pw=pg.getWidth(),ph=pg.getHeight(); const s=Math.min(pw/w,ph/h,1)
-        pg.drawImage(img,{x:(pw-w*s)/2,y:(ph-h*s)/2,width:w*s,height:h*s})
+        const pg = merged.addPage()
+        const img = doc.fisier_tip === 'image/png' ? await merged.embedPng(buf) : await merged.embedJpg(buf)
+        const { width: w, height: h } = img.scale(1)
+        const pw = pg.getWidth(), ph = pg.getHeight(), s = Math.min(pw/w, ph/h, 1)
+        pg.drawImage(img, { x:(pw-w*s)/2, y:(ph-h*s)/2, width:w*s, height:h*s })
       } catch {}
     }
   }
+
   const bytes = await merged.save()
   return new NextResponse(Buffer.from(bytes), {
-    headers: { 'Content-Type':'application/pdf', 'Content-Disposition':`attachment; filename="${(titlu||'doc').replace(/[^a-zA-Z0-9]/g,'_')}.pdf"` }
+    headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${(titlu||'doc').replace(/[^a-zA-Z0-9]/g,'_')}.pdf"` }
   })
 }
