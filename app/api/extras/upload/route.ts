@@ -10,9 +10,9 @@ async function sbPost(path: string, body: object) {
     method: 'POST', headers: { ...SBH, 'Prefer': 'return=representation' },
     body: JSON.stringify(body)
   })
-  const text = await r.text()
-  try { const d = JSON.parse(text); return { ok: r.ok, data: Array.isArray(d) ? d[0] : d } }
-  catch { return { ok: false, data: text } }
+  const t = await r.text()
+  try { const d = JSON.parse(t); return { ok: r.ok, data: Array.isArray(d) ? d[0] : d } }
+  catch { return { ok: false, data: t } }
 }
 
 async function sbDelete(path: string) {
@@ -24,63 +24,27 @@ async function sbGet(path: string) {
   return r.ok ? r.json() : []
 }
 
-async function storageUpload(bucket: string, path: string, buf: Buffer, ct: string) {
-  const r = await fetch(`${SB}/storage/v1/object/${bucket}/${path}`, {
-    method: 'POST',
-    headers: { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': ct, 'x-upsert': 'true' },
-    body: buf
-  })
-  return r.ok ? null : await r.text()
-}
-
-async function extractChunk(client: Anthropic, pdfBase64: string, pageHint: string): Promise<any[]> {
-  const resp = await client.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: 4096,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
-        {
-          type: 'text',
-          text: `Din acest extras de cont bancar românesc, extrage DOAR tranzacțiile de pe ${pageHint}.
-Returnează DOAR un array JSON valid, fără text extra, fără markdown.
-Format exact:
-[{"data_tranzactie":"2026-05-04","descriere":"descriere originala","descriere_curatata":"Trendyol plata","tip":"credit","suma":300.15,"valuta":"RON","referinta":"REF123","categorie":"client"}]
-Categorii: client|furnizor|taxa|angajat|transfer|comision|banca|altele
-NU include RULAJ ZI, SOLD FINAL, SOLD ANTERIOR.
-Dacă nu există tranzacții pe aceste pagini, returnează [].`
-        }
-      ]
-    }]
-  })
-
-  const text = resp.content.filter(b => b.type === 'text').map(b => (b as any).text).join('')
-  const match = text.match(/\[[\s\S]*\]/)
-  if (!match) return []
-  try { return JSON.parse(match[0]) } catch { return [] }
-}
-
-async function extractHeader(client: Anthropic, pdfBase64: string): Promise<any> {
-  const resp = await client.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: 512,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
-        {
-          type: 'text',
-          text: `Din acest extras de cont, extrage DOAR informațiile de header (nu tranzacțiile).
-Returnează DOAR JSON valid:
-{"iban":"RO...","valuta":"RON","numar_extras":"5","perioada_start":"2026-05-01","perioada_end":"2026-05-31","sold_initial":24.80,"sold_final":275.54,"total_debit":21489.36,"total_credit":21740.10}`
-        }
-      ]
-    }]
-  })
-  const text = resp.content.filter(b => b.type === 'text').map(b => (b as any).text).join('')
-  const match = text.match(/\{[\s\S]*?\}/)
-  try { return match ? JSON.parse(match[0]) : {} } catch { return {} }
+// Extrage obiecte JSON complete dintr-un text partial
+function extractObjects(text: string): any[] {
+  const results: any[] = []
+  let i = 0
+  while (i < text.length) {
+    if (text[i] !== '{') { i++; continue }
+    let depth = 0, j = i
+    while (j < text.length) {
+      if (text[j] === '{') depth++
+      else if (text[j] === '}') { depth--; if (depth === 0) break }
+      j++
+    }
+    if (depth === 0) {
+      try {
+        const obj = JSON.parse(text.slice(i, j + 1))
+        if (obj.data_tranzactie && obj.suma !== undefined && obj.tip) results.push(obj)
+      } catch {}
+      i = j + 1
+    } else break
+  }
+  return results
 }
 
 export async function POST(req: NextRequest) {
@@ -91,103 +55,104 @@ export async function POST(req: NextRequest) {
     const lunaId = fd.get('lunaId') as string
     const valuta = fd.get('valuta') as string
 
-    if (!file || !firmaId || !lunaId || !valuta) {
+    if (!file || !firmaId || !lunaId || !valuta)
       return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
-    }
 
     const buf = Buffer.from(await file.arrayBuffer())
     const storagePath = `${firmaId}/${lunaId}/${valuta}_${Date.now()}.pdf`
 
-    // 1. Upload PDF
-    const upErr = await storageUpload('extrase-pdf', storagePath, buf, 'application/pdf')
-    if (upErr) return NextResponse.json({ error: `Storage: ${upErr}` }, { status: 500 })
+    // Upload PDF
+    const upRes = await fetch(`${SB}/storage/v1/object/extrase-pdf/${storagePath}`, {
+      method: 'POST',
+      headers: { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
+      body: buf
+    })
+    if (!upRes.ok) return NextResponse.json({ error: 'Storage: ' + await upRes.text() }, { status: 500 })
 
-    const pdfBase64 = buf.toString('base64')
+    // AI - folosim Haiku (de 10x mai ieftin decat Opus)
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-    // 2. Extract header
-    const header = await extractHeader(client, pdfBase64)
-
-    // 3. Extract tranzactii in chunks by page groups
-    // Extrag pagina cu pagina pentru a evita depasirea max_tokens
-    const allTx: any[] = []
-    const pageGroups = [
-      'pagina 1',
-      'pagina 2',
-      'pagina 3',
-      'pagina 4',
-      'pagina 5',
-      'paginile 6-10',
-    ]
-
-    for (const pageHint of pageGroups) {
-      const chunk = await extractChunk(client, pdfBase64, pageHint)
-      allTx.push(...chunk)
-      // Dacă un chunk returneaza 0 rezultate si am deja tranzactii, ne oprim
-      if (chunk.length === 0 && allTx.length > 0) break
-    }
-
-    // Deduplica dupa referinta sau combinatie data+suma+tip
-    const seen = new Set<string>()
-    const uniqueTx = allTx.filter(t => {
-      const key = t.referinta || `${t.data_tranzactie}_${t.suma}_${t.tip}_${t.descriere?.slice(0,20)}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 16000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buf.toString('base64') } },
+          { type: 'text', text: `Extrage TOATE tranzactiile din acest extras de cont bancar roman.
+Returneaza DOAR JSON, fara text extra, fara markdown:
+{"iban":"RO...","valuta":"RON","sold_final":275.54,"tranzactii":[{"data_tranzactie":"2026-05-04","descriere_curatata":"Trendyol plata","tip":"credit","suma":300.15,"valuta":"RON","categorie":"client"}]}
+Categorii: client|furnizor|taxa|angajat|transfer|comision|banca|altele
+Exclude randurile: RULAJ ZI, SOLD FINAL, SOLD ANTERIOR, SOLD INITIAL.` }
+        ]
+      }]
     })
 
-    // 4. Delete old
-    const oldExtrase = await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${valuta}&select=id`)
-    for (const e of oldExtrase) await sbDelete(`tranzactii?extras_id=eq.${e.id}`)
-    if (oldExtrase.length > 0) {
-      await sbDelete(`extrase?id=in.(${oldExtrase.map((e: any) => e.id).join(',')})`)
+    const raw = response.content.filter(b => b.type === 'text').map(b => (b as any).text).join('')
+
+    // Parse robust - functioneaza si daca JSON e trunchiat
+    let tranzactii: any[] = []
+    let iban = '', soldFinal = null
+
+    // Incearca parse complet
+    const fullMatch = raw.match(/\{[\s\S]*\}/)
+    if (fullMatch) {
+      try {
+        const parsed = JSON.parse(fullMatch[0])
+        tranzactii = parsed.tranzactii || []
+        iban = parsed.iban || ''
+        soldFinal = parsed.sold_final || null
+      } catch {
+        // JSON trunchiat - extrage obiectele complete manual
+        tranzactii = extractObjects(raw)
+        const ibanM = raw.match(/"iban"\s*:\s*"([^"]+)"/)
+        if (ibanM) iban = ibanM[1]
+        const soldM = raw.match(/"sold_final"\s*:\s*([\d.]+)/)
+        if (soldM) soldFinal = parseFloat(soldM[1])
+      }
     }
 
-    // 5. Insert extras
+    if (tranzactii.length === 0)
+      return NextResponse.json({ error: `Nicio tranzactie extrasa. Preview AI: ${raw.slice(0, 200)}` }, { status: 500 })
+
+    // Sterge vechi
+    const old = await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${valuta}&select=id`)
+    for (const e of old) await sbDelete(`tranzactii?extras_id=eq.${e.id}`)
+    if (old.length > 0) await sbDelete(`extrase?id=in.(${old.map((e: any) => e.id).join(',')})`)
+
+    // Insereaza extras
     const { ok: eOk, data: extras } = await sbPost('extrase', {
       firma_id: firmaId, luna_id: lunaId,
-      valuta: header.valuta || valuta,
-      iban: header.iban || null,
-      numar_extras: header.numar_extras || null,
-      perioada_start: header.perioada_start || null,
-      perioada_end: header.perioada_end || null,
-      sold_initial: header.sold_initial || null,
-      sold_final: header.sold_final || null,
-      total_debit: header.total_debit || null,
-      total_credit: header.total_credit || null,
+      valuta: valuta, iban: iban || null, sold_final: soldFinal,
       pdf_path: storagePath, pdf_nume: file.name,
-      procesat_ai: true,
-      nr_tranzactii: uniqueTx.length,
-      nr_documentate: 0,
+      procesat_ai: true, nr_tranzactii: tranzactii.length, nr_documentate: 0,
     })
 
-    if (!eOk || !extras?.id) {
+    if (!eOk || !extras?.id)
       return NextResponse.json({ error: 'DB extras: ' + JSON.stringify(extras) }, { status: 500 })
-    }
 
-    // 6. Insert tranzactii in batches of 20
-    for (let i = 0; i < uniqueTx.length; i += 20) {
-      const batch = uniqueTx.slice(i, i + 20).map((t: any) => ({
+    // Insereaza tranzactii in batches de 25
+    for (let i = 0; i < tranzactii.length; i += 25) {
+      const batch = tranzactii.slice(i, i + 25).map((t: any) => ({
         extras_id: extras.id, firma_id: firmaId,
         data_tranzactie: t.data_tranzactie,
-        descriere: t.descriere,
-        descriere_curatata: t.descriere_curatata,
-        tip: t.tip, suma: t.suma,
-        valuta: t.valuta || header.valuta || valuta,
+        descriere: t.descriere || t.descriere_curatata || '',
+        descriere_curatata: t.descriere_curatata || t.descriere || '',
+        tip: t.tip, suma: Number(t.suma),
+        valuta: t.valuta || valuta,
         referinta: t.referinta || null,
         categorie: t.categorie || 'altele',
       }))
       const r = await fetch(`${SB}/rest/v1/tranzactii`, {
-        method: 'POST',
-        headers: { ...SBH, 'Prefer': 'return=minimal' },
+        method: 'POST', headers: { ...SBH, 'Prefer': 'return=minimal' },
         body: JSON.stringify(batch)
       })
       if (!r.ok) return NextResponse.json({ error: `Batch ${i}: ${await r.text()}` }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true, extrasId: extras.id, count: uniqueTx.length })
+    return NextResponse.json({ ok: true, extrasId: extras.id, count: tranzactii.length })
 
   } catch (e: any) {
-    return NextResponse.json({ error: 'Eroare: ' + String(e) }, { status: 500 })
+    return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
