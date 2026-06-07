@@ -27,7 +27,7 @@ export default function ChecklistClient({ firma, lunaId, lunaStatus, progresPct,
   async function handleExport() {
     setExportLoading(true)
     const res = await fetch('/api/export/zip', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ firmaId:firma.id, firmaNume:firma.nume, lunaId, luna }) })
-    if (res.ok) { const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`${firma.nome}_${luna}.zip`; a.click(); URL.revokeObjectURL(url) }
+    if (res.ok) { const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`${firma.nume}_${luna}.zip`; a.click(); URL.revokeObjectURL(url) }
     setExportLoading(false)
   }
 

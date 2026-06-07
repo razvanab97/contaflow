@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 
-interface Extras { id: string; nr_tranzactii: number; nr_documentate: number; procesat_ai: boolean; sold_final?: number }
+interface Extras { id: string; nr_tranzactii: number; nr_documentate: number; procesat_ai?: boolean; sold_final?: number; valuta?: string }
 
 export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare, onDone }: {
   valuta: string; firmaId: string; lunaId: string
