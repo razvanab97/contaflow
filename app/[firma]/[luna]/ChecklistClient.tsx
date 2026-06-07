@@ -50,7 +50,7 @@ export default function ChecklistClient({ firma, lunaId, lunaStatus, progresPct,
         {extrase.length>0 && extrase.map(e=>(
           <div key={e.id} style={{ padding:'3px 18px 3px 36px', display:'flex', justifyContent:'space-between' }}>
             <span style={{ fontSize:'11px', color:'#666' }}>{e.valuta}</span>
-            <span style={{ fontSize:'11px', color:e.procesat_ai?'#4ADE80':'#555' }}>{e.procesat_ai?`${e.nr_tranzactii} tx`:'—'}</span>
+            <span style={{ fontSize:'11px', color:e.nr_tranzactii>0?'#4ADE80':'#555' }}>{e.nr_tranzactii>0?`${e.nr_tranzactii} tx`:'—'}</span>
           </div>
         ))}
         <div style={{ marginTop:'auto', padding:'12px 18px', fontSize:'11px', color:'#555' }}>{lunaLabel}</div>
