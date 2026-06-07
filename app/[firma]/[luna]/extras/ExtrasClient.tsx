@@ -35,6 +35,8 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<'all'|'lipsa'|'ok'|'na'>('all')
   const [page, setPage] = useState(1)
+  const [viewMode, setViewMode] = useState<'list'|'workspace'>('workspace')
+  const [activeTxIndex, setActiveTxIndex] = useState(0)
   const c = firma.culoare || '#F27A1A'
 
   const load = useCallback(async () => {
@@ -84,7 +86,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const rez = counts.ok + counts.na
   const pct = txs.length > 0 ? Math.round((rez/txs.length)*100) : 0
 
-  function setF(f: typeof filter) { setFilter(f); setPage(1) }
+  function setF(f: typeof filter) { setFilter(f); setPage(1); setActiveTxIndex(0) }
 
   async function markNA(id: string) {
     await fetch('/api/tranzactii/note', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, note:'na'}) })
@@ -94,6 +96,28 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     await fetch('/api/tranzactii/note', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, note:null}) })
     load()
   }
+
+  const onUploadSuccess = useCallback((uploadedTxId: string) => {
+    let nextIdx = -1
+    for (let i = activeTxIndex + 1; i < filtered.length; i++) {
+      if (!filtered[i].document_id && filtered[i].note !== 'na' && filtered[i].id !== uploadedTxId) {
+        nextIdx = i
+        break
+      }
+    }
+    if (nextIdx === -1) {
+      for (let i = 0; i < activeTxIndex; i++) {
+        if (!filtered[i].document_id && filtered[i].note !== 'na' && filtered[i].id !== uploadedTxId) {
+          nextIdx = i
+          break
+        }
+      }
+    }
+    if (nextIdx !== -1) {
+      setActiveTxIndex(nextIdx)
+    }
+    load()
+  }, [activeTxIndex, filtered, load])
 
   const PB = (dis: boolean, act=false): React.CSSProperties => ({
     fontSize:'12px', fontWeight:600, padding:'5px 11px', borderRadius:'7px',
@@ -173,44 +197,84 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           <>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px', flexWrap:'wrap', gap:'10px' }}>
               <h2 style={{ fontSize:'16px', fontWeight:700, color:'#FFF' }}>
-                Tranzacții <span style={{ color:'#666', fontWeight:400 }}>({txs.length})</span>
+                Tranzacții <span style={{ color:'#666', fontWeight:400 }}>({filtered.length})</span>
               </h2>
-              <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
-                {([['all',`Toate (${counts.all})`],['lipsa',`Fără doc (${counts.lipsa})`],['ok',`Cu doc (${counts.ok})`],['na',`N/A (${counts.na})`]] as const).map(([f,l])=>(
-                  <button key={f} onClick={()=>setF(f)} style={PB(false,filter===f)}>{l}</button>
-                ))}
+              <div style={{ display:'flex', gap:'16px', alignItems:'center' }}>
+                {/* View Mode Toggle */}
+                <div style={{ display:'flex', background:'#161616', border:'1px solid #242424', padding:'3px', borderRadius:'10px' }}>
+                  <button 
+                    onClick={()=>setViewMode('workspace')}
+                    style={{
+                      fontSize:'12px', fontWeight:600, padding:'6px 14px', borderRadius:'7px', border:'none',
+                      background:viewMode==='workspace'?c:'transparent', color:viewMode==='workspace'?'#fff':'#888', cursor:'pointer'
+                    }}
+                  >
+                    Workspace App
+                  </button>
+                  <button 
+                    onClick={()=>setViewMode('list')}
+                    style={{
+                      fontSize:'12px', fontWeight:600, padding:'6px 14px', borderRadius:'7px', border:'none',
+                      background:viewMode==='list'?c:'transparent', color:viewMode==='list'?'#fff':'#888', cursor:'pointer'
+                    }}
+                  >
+                    Listă
+                  </button>
+                </div>
+
+                <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
+                  {([['all',`Toate (${counts.all})`],['lipsa',`Fără doc (${counts.lipsa})`],['ok',`Cu doc (${counts.ok})`],['na',`N/A (${counts.na})`]] as const).map(([f,l])=>(
+                    <button key={f} onClick={()=>setF(f)} style={PB(false,filter===f)}>{l}</button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-              {pageItems.map(tx => (
-                <TxCard key={tx.id} tx={tx} firmaId={firma.id} lunaId={lunaId} culoare={c}
-                  onNA={()=>markNA(tx.id)} onClearNA={()=>clearNA(tx.id)} onDone={load}/>
-              ))}
-              {pageItems.length===0 && (
-                <div style={{ padding:'32px', background:'#161616', border:'1px solid #242424', borderRadius:'12px', textAlign:'center' }}>
-                  <p style={{ fontSize:'13px', color:'#666' }}>Nicio tranzacție în această categorie.</p>
+            {viewMode === 'workspace' ? (
+              <WorkspaceView 
+                txs={filtered} 
+                activeTxIndex={activeTxIndex} 
+                setActiveTxIndex={setActiveTxIndex} 
+                firmaId={firma.id} 
+                lunaId={lunaId} 
+                culoare={c}
+                onNA={(id)=>markNA(id)} 
+                onClearNA={(id)=>clearNA(id)} 
+                onUploadSuccess={onUploadSuccess}
+              />
+            ) : (
+              <>
+                <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                  {pageItems.map(tx => (
+                    <TxCard key={tx.id} tx={tx} firmaId={firma.id} lunaId={lunaId} culoare={c}
+                      onNA={()=>markNA(tx.id)} onClearNA={()=>clearNA(tx.id)} onDone={load}/>
+                  ))}
+                  {pageItems.length===0 && (
+                    <div style={{ padding:'32px', background:'#161616', border:'1px solid #242424', borderRadius:'12px', textAlign:'center' }}>
+                      <p style={{ fontSize:'13px', color:'#666' }}>Nicio tranzacție în această categorie.</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {pages > 1 && (
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'16px', padding:'12px 18px', background:'#161616', border:'1px solid #242424', borderRadius:'12px' }}>
-                <span style={{ fontSize:'12px', color:'#888' }}>Pagina {page}/{pages} · {filtered.length} total</span>
-                <div style={{ display:'flex', gap:'5px' }}>
-                  <button onClick={()=>setPage(1)} disabled={page===1} style={PB(page===1)}>«</button>
-                  <button onClick={()=>setPage(p=>p-1)} disabled={page===1} style={PB(page===1)}>‹</button>
-                  {Array.from({length:pages},(_,i)=>i+1).filter(p=>p===1||p===pages||Math.abs(p-page)<=1)
-                    .reduce<(number|string)[]>((a,p,i,arr)=>{if(i>0&&(p as number)-(arr[i-1] as number)>1)a.push('…');a.push(p);return a},[])
-                    .map((p,i)=>typeof p==='string'
-                      ?<span key={`e${i}`} style={{fontSize:'12px',color:'#555',padding:'0 4px'}}>…</span>
-                      :<button key={p} onClick={()=>setPage(p as number)} style={PB(false,page===p)}>{p}</button>
-                    )
-                  }
-                  <button onClick={()=>setPage(p=>p+1)} disabled={page===pages} style={PB(page===pages)}>›</button>
-                  <button onClick={()=>setPage(pages)} disabled={page===pages} style={PB(page===pages)}>»</button>
-                </div>
-              </div>
+                {pages > 1 && (
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'16px', padding:'12px 18px', background:'#161616', border:'1px solid #242424', borderRadius:'12px' }}>
+                    <span style={{ fontSize:'12px', color:'#888' }}>Pagina {page}/{pages} · {filtered.length} total</span>
+                    <div style={{ display:'flex', gap:'5px' }}>
+                      <button onClick={()=>setPage(1)} disabled={page===1} style={PB(page===1)}>«</button>
+                      <button onClick={()=>setPage(p=>p-1)} disabled={page===1} style={PB(page===1)}>‹</button>
+                      {Array.from({length:pages},(_,i)=>i+1).filter(p=>p===1||p===pages||Math.abs(p-page)<=1)
+                        .reduce<(number|string)[]>((a,p,i,arr)=>{if(i>0&&(p as number)-(arr[i-1] as number)>1)a.push('…');a.push(p);return a},[])
+                        .map((p,i)=>typeof p==='string'
+                          ?<span key={`e${i}`} style={{fontSize:'12px',color:'#555',padding:'0 4px'}}>…</span>
+                          :<button key={p} onClick={()=>setPage(p as number)} style={PB(false,page===p)}>{p}</button>
+                        )
+                      }
+                      <button onClick={()=>setPage(p=>p+1)} disabled={page===pages} style={PB(page===pages)}>›</button>
+                      <button onClick={()=>setPage(pages)} disabled={page===pages} style={PB(page===pages)}>»</button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -313,6 +377,347 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
           {tx.documente.numar_document&&<span style={{fontSize:'11px',color:'#555'}}>· {tx.documente.numar_document}</span>}
         </div>
       )}
+    </div>
+  )
+}
+
+interface WorkspaceViewProps {
+  txs: Tx[]
+  activeTxIndex: number
+  setActiveTxIndex: (idx: number) => void
+  firmaId: string
+  lunaId: string
+  culoare: string
+  onNA: (id: string) => void
+  onClearNA: (id: string) => void
+  onUploadSuccess: (id: string) => void
+}
+
+function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, culoare, onNA, onClearNA, onUploadSuccess }: WorkspaceViewProps) {
+  const activeTx = txs[activeTxIndex]
+
+  if (!activeTx) {
+    return (
+      <div style={{ padding:'60px', background:'#161616', border:'1px solid #242424', borderRadius:'16px', textAlign:'center' }}>
+        <p style={{ fontSize:'14px', color:'#888' }}>Nicio tranzacție în această categorie.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Horizontal Tabs Bar */}
+      <div style={{ display:'flex', gap:'8px', overflowX:'auto', paddingBottom:'14px', marginBottom:'24px', scrollbarWidth:'thin' }}>
+        {txs.map((tx, idx) => {
+          const isCurrent = idx === activeTxIndex
+          const isDone = !!tx.document_id
+          const isNA = tx.note === 'na'
+          
+          let borderCol = '#2A2A2A'
+          let bgCol = '#161616'
+          let txtCol = '#888'
+          
+          if (isCurrent) {
+            borderCol = culoare
+            bgCol = culoare
+            txtCol = '#fff'
+          } else if (isDone) {
+            borderCol = 'rgba(74,222,128,.15)'
+            bgCol = 'rgba(74,222,128,.05)'
+            txtCol = '#4ADE80'
+          } else if (isNA) {
+            borderCol = '#222'
+            bgCol = '#121212'
+            txtCol = '#555'
+          }
+
+          return (
+            <button
+              key={tx.id}
+              onClick={() => setActiveTxIndex(idx)}
+              style={{
+                padding:'8px 16px',
+                borderRadius:'9px',
+                fontSize:'12px',
+                fontWeight:600,
+                cursor:'pointer',
+                border:`1px solid ${borderCol}`,
+                background:bgCol,
+                color:txtCol,
+                whiteSpace:'nowrap',
+                transition:'all .2s ease',
+                display:'flex',
+                alignItems:'center',
+                gap:'6px'
+              }}
+            >
+              <span>#{idx + 1}</span>
+              {isDone && <span style={{ fontSize:'10px' }}>✓</span>}
+              {isNA && <span style={{ fontSize:'10px' }}>✕</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Active Transaction Workspace Card */}
+      <WorkspaceCard 
+        tx={activeTx} 
+        index={activeTxIndex} 
+        total={txs.length} 
+        firmaId={firmaId} 
+        lunaId={lunaId} 
+        culoare={culoare}
+        onPrev={activeTxIndex > 0 ? () => setActiveTxIndex(activeTxIndex - 1) : undefined}
+        onNext={activeTxIndex < txs.length - 1 ? () => setActiveTxIndex(activeTxIndex + 1) : undefined}
+        onNA={() => onNA(activeTx.id)}
+        onClearNA={() => onClearNA(activeTx.id)}
+        onUploadSuccess={() => onUploadSuccess(activeTx.id)}
+      />
+    </div>
+  )
+}
+
+function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onNext, onNA, onClearNA, onUploadSuccess }: {
+  tx: Tx
+  index: number
+  total: number
+  firmaId: string
+  lunaId: string
+  culoare: string
+  onPrev?: () => void
+  onNext?: () => void
+  onNA: () => void
+  onClearNA: () => void
+  onUploadSuccess: () => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [editDoc, setEditDoc] = useState(false)
+  const [tip, setTip] = useState('factura')
+  const [furnizor, setFurnizor] = useState('')
+  const [numDoc, setNumDoc] = useState('')
+  const [drag, setDrag] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const isNA = tx.note==='na', isDone=!!tx.document_id
+  const cat = tx.categorie ? CAT[tx.categorie]||CAT.altele : CAT.altele
+  const data = new Date(tx.data_tranzactie).toLocaleDateString('ro-RO',{day:'2-digit',month:'long',year:'numeric'})
+  const r = `${parseInt(culoare.slice(1,3),16)},${parseInt(culoare.slice(3,5),16)},${parseInt(culoare.slice(5,7),16)}`
+
+  // Reset fields when active transaction changes
+  useEffect(() => {
+    setFurnizor(tx.documente?.furnizor || '')
+    setNumDoc(tx.documente?.numar_document || '')
+    setTip(tx.documente?.tip_document || 'factura')
+    setEditDoc(false)
+  }, [tx])
+
+  async function upload(files: FileList) {
+    if (!files.length) return
+    setUploading(true)
+    const fd = new FormData()
+    fd.append('file', files[0]); fd.append('txId', tx.id)
+    fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
+    fd.append('tip', tip); fd.append('furnizor', furnizor); fd.append('numDoc', numDoc)
+    const res = await fetch('/api/tranzactii/doc', { method:'POST', body:fd })
+    setUploading(false)
+    if (res.ok) {
+      onUploadSuccess()
+    }
+  }
+
+  const INP: React.CSSProperties = { fontSize:'13px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'10px 14px', color:'#BBB', outline:'none', width:'100%' }
+  
+  const BTN: React.CSSProperties = {
+    fontSize:'13px', fontWeight:700, padding:'10px 20px', borderRadius:'8px', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', transition:'all .2s'
+  }
+
+  return (
+    <div style={{ background:'#141414', border:'1px solid #222', borderRadius:'16px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'32px', padding:'32px', minHeight:'420px', position:'relative', overflow:'hidden' }}>
+      {/* Background radial highlight */}
+      <div style={{ position:'absolute', width:'300px', height:'300px', background:`radial-gradient(circle, rgba(${r},0.04) 0%, rgba(0,0,0,0) 70%)`, top:'-100px', left:'-100px', pointerEvents:'none' }} />
+
+      {/* Left Column: Details & Nav */}
+      <div style={{ display:'flex', flexDirection:'column', justifyContent:'space-between', zIndex:1 }}>
+        <div>
+          {/* Header */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px' }}>
+            <span style={{ fontSize:'12px', fontWeight:700, color:'#555', textTransform:'uppercase', letterSpacing:'.08em' }}>Tranzacția {index + 1} din {total}</span>
+            <span style={{ fontSize:'11px', fontWeight:600, padding:'3px 9px', borderRadius:'20px', background:cat.bg, color:cat.c }}>{tx.categorie||'altele'}</span>
+          </div>
+
+          {/* Amount & Currency */}
+          <div style={{ fontSize:'36px', fontWeight:800, color:tx.tip==='credit'?'#4ADE80':'#F87171', letterSpacing:'-0.5px', marginBottom:'16px' }}>
+            {tx.tip==='credit'?'+':'-'}{tx.suma?.toFixed(2)} {tx.valuta}
+          </div>
+
+          {/* Info Rows */}
+          <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+            <div>
+              <div style={{ fontSize:'10px', fontWeight:600, color:'#444', textTransform:'uppercase', marginBottom:'2px' }}>Data tranzacție</div>
+              <div style={{ fontSize:'14px', color:'#DDD', fontWeight:500 }}>{data}</div>
+            </div>
+            
+            <div>
+              <div style={{ fontSize:'10px', fontWeight:600, color:'#444', textTransform:'uppercase', marginBottom:'2px' }}>Descriere</div>
+              <div style={{ fontSize:'14px', color:'#BBB', lineHeight:'1.4', wordBreak:'break-word' }}>{tx.descriere_curatata || tx.descriere}</div>
+            </div>
+
+            {tx.referinta && (
+              <div>
+                <div style={{ fontSize:'10px', fontWeight:600, color:'#444', textTransform:'uppercase', marginBottom:'2px' }}>Referință</div>
+                <div style={{ fontSize:'13px', color:'#777', fontFamily:'monospace' }}>{tx.referinta}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Navigation Buttons */}
+        <div style={{ display:'flex', gap:'8px', marginTop:'24px' }}>
+          <button 
+            disabled={!onPrev} 
+            onClick={onPrev} 
+            style={{ ...BTN, background:'#1F1F1F', border:'1px solid #2A2A2A', color:onPrev?'#DDD':'#444', cursor:onPrev?'pointer':'not-allowed' }}
+          >
+            ← Înapoi
+          </button>
+          
+          {!isDone && (
+            isNA ? (
+              <button onClick={onClearNA} style={{ ...BTN, background:'#1A1A1A', border:'1px solid #2A2A2A', color:'#888' }}>
+                Re-activează
+              </button>
+            ) : (
+              <button onClick={onNA} style={{ ...BTN, background:'#1A1A1A', border:'1px solid #2A2A2A', color:'#666' }}>
+                N/A (Sari)
+              </button>
+            )
+          )}
+
+          <button 
+            disabled={!onNext} 
+            onClick={onNext} 
+            style={{ ...BTN, background:'#1F1F1F', border:'1px solid #2A2A2A', color:onNext?'#DDD':'#444', cursor:onNext?'pointer':'not-allowed' }}
+          >
+            Înainte →
+          </button>
+        </div>
+      </div>
+
+      {/* Right Column: Upload / Success */}
+      <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', borderLeft:'1px solid #1E1E1E', paddingLeft:'32px', zIndex:1 }}>
+        {isDone && !editDoc ? (
+          /* Success Card */
+          <div style={{ textAlign:'center', padding:'20px 0' }}>
+            <div style={{ width:'48px', height:'48px', borderRadius:'50%', background:'rgba(74,222,128,.1)', border:'1px solid rgba(74,222,128,.2)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
+              <svg width="22" height="22" fill="none" stroke="#4ADE80" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <h3 style={{ fontSize:'16px', fontWeight:700, color:'#FFF', marginBottom:'8px' }}>Tranzacție Rezolvată</h3>
+            <p style={{ fontSize:'13px', color:'#888', marginBottom:'20px' }}>Documentul a fost asociat cu succes în arhivă.</p>
+            
+            {/* Associated Doc Details */}
+            <div style={{ background:'#0D0D0D', border:'1px solid #1A1A1A', borderRadius:'10px', padding:'12px 16px', display:'flex', flexDirection:'column', gap:'6px', textAlign:'left', marginBottom:'24px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                <svg width="14" height="14" fill="none" stroke="#4ADE80" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                <span style={{ fontSize:'12px', fontWeight:600, color:'#4ADE80', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tx.documente?.fisier_nume}</span>
+              </div>
+              <div style={{ fontSize:'11px', color:'#666' }}>
+                Tip: <span style={{ color:'#888', fontWeight:500 }}>{tx.documente?.tip_document || '—'}</span>
+              </div>
+              {tx.documente?.furnizor && (
+                <div style={{ fontSize:'11px', color:'#666' }}>
+                  Furnizor: <span style={{ color:'#888', fontWeight:500 }}>{tx.documente.furnizor}</span>
+                </div>
+              )}
+              {tx.documente?.numar_document && (
+                <div style={{ fontSize:'11px', color:'#666' }}>
+                  Număr doc: <span style={{ color:'#888', fontWeight:500 }}>{tx.documente.numar_document}</span>
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => setEditDoc(true)} style={{ ...BTN, background:'transparent', border:`1px solid rgba(${r},.3)`, color:culoare, margin:'0 auto' }}>
+              Schimbă Documentul
+            </button>
+          </div>
+        ) : isNA ? (
+          /* N/A Card */
+          <div style={{ textAlign:'center', padding:'20px 0' }}>
+            <div style={{ width:'48px', height:'48px', borderRadius:'50%', background:'rgba(255,255,255,.03)', border:'1px solid #222', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
+              <svg width="20" height="20" fill="none" stroke="#555" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </div>
+            <h3 style={{ fontSize:'16px', fontWeight:700, color:'#DDD', marginBottom:'8px' }}>Tranzacție ignorată (N/A)</h3>
+            <p style={{ fontSize:'13px', color:'#666', marginBottom:'24px' }}>Această tranzacție a fost marcată ca N/A (nu necesită document).</p>
+            <button onClick={onClearNA} style={{ ...BTN, background:culoare, color:'#fff', margin:'0 auto' }}>
+              Activează pentru adăugare doc
+            </button>
+          </div>
+        ) : (
+          /* Upload Form */
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
+              <h3 style={{ fontSize:'14px', fontWeight:700, color:'#FFF' }}>Asociază Document</h3>
+              {editDoc && (
+                <button onClick={() => setEditDoc(false)} style={{ background:'transparent', border:'none', color:'#666', fontSize:'11px', fontWeight:600, cursor:'pointer' }}>
+                  Anulează
+                </button>
+              )}
+            </div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'14px' }}>
+              <div>
+                <label style={{ fontSize:'10px', color:'#555', fontWeight:700, textTransform:'uppercase', display:'block', marginBottom:'4px' }}>Tip Document</label>
+                <select value={tip} onChange={e=>setTip(e.target.value)} style={INP}>
+                  <option value="factura">Factură</option>
+                  <option value="aviz_plata">Aviz plată</option>
+                  <option value="chitanta">Chitanță</option>
+                  <option value="ordin_plata">Ordin plată</option>
+                  <option value="contract">Contract</option>
+                  <option value="dispozitie_plata">Dispoziție plată</option>
+                  <option value="altul">Altul</option>
+                </select>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
+                <div>
+                  <label style={{ fontSize:'10px', color:'#555', fontWeight:700, textTransform:'uppercase', display:'block', marginBottom:'4px' }}>Furnizor / Client</label>
+                  <input type="text" placeholder="Nume firmă" value={furnizor} onChange={e=>setFurnizor(e.target.value)} style={INP}/>
+                </div>
+                <div>
+                  <label style={{ fontSize:'10px', color:'#555', fontWeight:700, textTransform:'uppercase', display:'block', marginBottom:'4px' }}>Număr Document</label>
+                  <input type="text" placeholder="Ex: 10243" value={numDoc} onChange={e=>setNumDoc(e.target.value)} style={INP}/>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              onClick={()=>fileRef.current?.click()}
+              onDragOver={e=>{e.preventDefault();setDrag(true)}} 
+              onDragLeave={()=>setDrag(false)}
+              onDrop={e=>{e.preventDefault();setDrag(false);e.dataTransfer.files.length&&upload(e.dataTransfer.files)}}
+              style={{ 
+                border:`1.5px dashed ${drag?culoare:'#2A2A2A'}`, 
+                borderRadius:'10px', 
+                padding:'24px', 
+                textAlign:'center', 
+                cursor:'pointer', 
+                background:drag?`rgba(${r},.06)`:'#0D0D0D',
+                transition:'all .2s'
+              }}
+            >
+              {uploading ? (
+                <p style={{fontSize:'12px',color:'#777'}}>Se încarcă...</p>
+              ) : (
+                <div>
+                  <svg width="20" height="20" fill="none" stroke={culoare} strokeWidth="2.5" viewBox="0 0 24 24" style={{ margin:'0 auto 8px' }}><path d="M12 4v16m8-8H4"/></svg>
+                  <p style={{fontSize:'12px',fontWeight:600,color:'#888',marginBottom:'4px'}}>Adaugă fișier (PDF / JPG / PNG)</p>
+                  <p style={{fontSize:'10px',color:'#555'}}>drag & drop sau click pentru navigare</p>
+                </div>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{display:'none'}} onChange={e=>e.target.files&&upload(e.target.files)}/>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
