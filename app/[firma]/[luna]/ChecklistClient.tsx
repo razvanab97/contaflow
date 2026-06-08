@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -13,12 +13,13 @@ function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slic
 interface Firma {
   id:string; slug:string; nume:string; culoare:string
   cif?:string; cui?:string; nr_reg_com?:string; nr_registru_comertului?:string; adresa?:string
+  luna_id?:string
 }
 interface Item { id:string; completat:boolean; checklist_templates?:{ titlu:string; descriere?:string; modul:string; necesita_semnatura:boolean; spre_proiect:boolean; ordine:number } }
 interface Extras { id:string; valuta:string; nr_tranzactii:number; nr_documentate:number; procesat_ai:boolean }
 
-export default function ChecklistClient({ firma, lunaId, lunaStatus, progresPct, items, extrase, slug, luna, lunaLabel }:
-  { firma:Firma; lunaId:string; lunaStatus:string; progresPct:number; items:Item[]; extrase:Extras[]; slug:string; luna:string; lunaLabel:string }
+export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaStatus, progresPct, items, extrase, slug, luna, lunaLabel }:
+  { firma:Firma; firmeDisponibile:Firma[]; lunaId:string; lunaStatus:string; progresPct:number; items:Item[]; extrase:Extras[]; slug:string; luna:string; lunaLabel:string }
 ) {
   const sorted = [...items].sort((a,b)=>(a.checklist_templates?.ordine||0)-(b.checklist_templates?.ordine||0))
   const byMod: Record<string,Item[]> = {}
@@ -116,7 +117,9 @@ export default function ChecklistClient({ firma, lunaId, lunaStatus, progresPct,
           })}
         </div>
 
-        <CashReceiptsPanel firma={firma} lunaId={lunaId} culoare={firma.culoare} />
+        <DispositionPanel firme={firmeDisponibile} firmaInitiala={firma} lunaIdInitial={lunaId} culoare={firma.culoare} />
+        <InvoiceDocumentsPanel title="Facturi + chitanță" description="Asociază separat factura și chitanța pentru aceeași plată cash." section="facturi-chitanta" firma={firma} lunaId={lunaId} culoare={firma.culoare} />
+        <InvoiceDocumentsPanel title="Facturi restante" description="Facturi care trebuiau plătite, dar nu au fost încă achitate." section="facturi-restante" firma={firma} lunaId={lunaId} culoare={firma.culoare} />
 
         <div style={{ display:'flex', gap:'10px', marginTop:'28px' }}>
           <Link href={`/${slug}/${luna}/extras`} style={{ fontSize:'13px', fontWeight:600, padding:'9px 18px', borderRadius:'9px', border:'1px solid #282828', color:'#999', background:'#161616' }}>
@@ -137,6 +140,166 @@ interface CashDocument {
   tip_document:string
   furnizor:string
   modul:string
+}
+
+interface TransactionSuggestion {
+  id:string; data_tranzactie:string; descriere:string; descriere_curatata:string
+  referinta:string|null; suma:number; valuta:string
+}
+
+function InvoiceDocumentsPanel({ title, description, section, firma, lunaId, culoare }: {
+  title:string; description:string; section:'facturi-chitanta'|'facturi-restante'; firma:Firma; lunaId:string; culoare:string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [docs, setDocs] = useState<CashDocument[]>([])
+  const [supplier, setSupplier] = useState('')
+  const [descriptionValue, setDescriptionValue] = useState('')
+  const [reference, setReference] = useState('')
+  const [documentType, setDocumentType] = useState('factura')
+  const [category, setCategory] = useState('altul')
+  const [sourceUrl, setSourceUrl] = useState('')
+  const [suggestions, setSuggestions] = useState<TransactionSuggestion[]>([])
+  const [transactionId, setTransactionId] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const r = rgb(culoare)
+  const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'9px 12px', color:'#BBB', outline:'none', width:'100%' }
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/chitante?lunaId=${encodeURIComponent(lunaId)}&section=${section}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) setDocs(data.docs || [])
+  }, [lunaId, section])
+
+  async function toggle() {
+    if (!expanded) await load()
+    setExpanded(value => !value)
+  }
+
+  async function searchSupplier() {
+    setError('')
+    const res = await fetch(`/api/chitante/sugestii?lunaId=${encodeURIComponent(lunaId)}&supplier=${encodeURIComponent(supplier)}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) setSuggestions(data.suggestions || [])
+    else setError(data.error || 'Căutarea în extras nu a reușit')
+  }
+
+  function useSuggestion(suggestion: TransactionSuggestion) {
+    setDescriptionValue(suggestion.descriere_curatata || suggestion.descriere || '')
+    setReference(suggestion.referinta || '')
+    setTransactionId(suggestion.id)
+    setSuggestions([])
+  }
+
+  async function uploadFiles(files: FileList) {
+    setBusy(true); setError('')
+    for (const file of Array.from(files)) {
+      const fd = new FormData()
+      Object.entries({ firmaId:firma.id, lunaId, section, supplier, description:descriptionValue, reference, documentType, category, transactionId }).forEach(([key,value]) => fd.append(key,value))
+      fd.append('file', file)
+      const res = await fetch('/api/chitante', { method:'POST', body:fd })
+      if (!res.ok) { const data = await res.json().catch(() => ({})); setError(data.error || 'Încărcarea nu a reușit'); break }
+    }
+    await load(); setBusy(false)
+  }
+
+  async function importUrl() {
+    setBusy(true); setError('')
+    const res = await fetch('/api/chitante/import-url', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ url:sourceUrl, firmaId:firma.id, lunaId, section, supplier, description:descriptionValue, reference, transactionId }) })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setError(data.error || 'Importul din link nu a reușit')
+    else { setSourceUrl(''); await load() }
+    setBusy(false)
+  }
+
+  return (
+    <div style={{ marginTop:'10px', background:'#161616', border:'1px solid #242424', borderRadius:'14px', overflow:'hidden' }}>
+      <button onClick={toggle} style={{ width:'100%', display:'flex', justifyContent:'space-between', padding:'15px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
+        <span><strong style={{ fontSize:'12px', color:'#DDD', textTransform:'uppercase' }}>{title}</strong><span style={{ display:'block', fontSize:'11px', color:'#777', marginTop:'4px' }}>{description}</span></span>
+        <span style={{ fontSize:'11px', color:culoare }}>{docs.length ? `${docs.length} documente` : ''} {expanded?'▲':'▼'}</span>
+      </button>
+      {expanded && <div style={{ padding:'16px 18px', borderTop:'1px solid #222', background:'#111' }}>
+        {docs.map(doc => <div key={doc.id} style={{ display:'flex', gap:'8px', alignItems:'center', padding:'8px 10px', marginBottom:'5px', background:'#181818', borderRadius:'8px' }}>
+          <span style={{ flex:1, minWidth:0, fontSize:'12px', color:'#CCC', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</span>
+          <span style={{ fontSize:'10px', color:'#777' }}>{doc.tip_document}</span>
+          <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', color:culoare, fontWeight:700 }}>Descarcă ↓</a>
+        </div>)}
+        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px', marginTop:'12px' }}>
+          <input value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="Furnizor: Inatech Packaging, Sameday, Jumbo, OpenAI..." style={INP}/>
+          <button onClick={searchSupplier} disabled={supplier.length<2} style={{ border:'1px solid #303030', borderRadius:'8px', background:'#202020', color:'#CCC', cursor:'pointer' }}>Caută în extras</button>
+          <select value={documentType} onChange={e=>setDocumentType(e.target.value)} style={INP}><option value="factura">Factură</option><option value="chitanta">Chitanță</option></select>
+        </div>
+        {suggestions.map(s => <button key={s.id} onClick={()=>useSuggestion(s)} style={{ width:'100%', marginTop:'5px', padding:'8px 10px', textAlign:'left', background:'#181818', border:'1px solid #282828', borderRadius:'7px', color:'#AAA', cursor:'pointer' }}>
+          <strong style={{ color:'#DDD' }}>{s.data_tranzactie} · {s.suma.toFixed(2)} {s.valuta}</strong> · {s.descriere_curatata || s.descriere} {s.referinta ? `· Ref: ${s.referinta}` : ''}
+        </button>)}
+        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px', marginTop:'8px' }}>
+          <input value={descriptionValue} onChange={e=>setDescriptionValue(e.target.value)} placeholder="Descrierea plății / facturii" style={INP}/>
+          <input value={reference} onChange={e=>setReference(e.target.value)} placeholder="Referință bancară (indiciu)" style={INP}/>
+          <select value={category} onChange={e=>setCategory(e.target.value)} style={INP}><option value="altul">Altele</option><option value="utilitati">Utilități</option><option value="chirie">Chirie</option></select>
+        </div>
+        {transactionId && <p style={{ fontSize:'11px', color:'#4ADE80', marginTop:'6px' }}>Tranzacția selectată va fi asociată documentului. Descrierea și referința sunt păstrate pentru verificare.</p>}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginTop:'8px' }}>
+          <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Link PDF Oblio" style={INP}/>
+          <button onClick={importUrl} disabled={busy || !sourceUrl} style={{ padding:'8px 14px', border:'none', borderRadius:'8px', background:culoare, color:'#FFF', cursor:'pointer', opacity:busy?.6:1 }}>Importă linkul</button>
+        </div>
+        <button onClick={()=>fileRef.current?.click()} disabled={busy} style={{ marginTop:'8px', width:'100%', padding:'12px', border:`1.5px dashed rgba(${r},.4)`, borderRadius:'9px', background:'#0D0D0D', color:'#999', cursor:'pointer' }}>
+          {busy ? 'Se salvează în dosarul contabilității...' : section==='facturi-chitanta' ? 'Adaugă separat factura sau chitanța' : 'Adaugă factura restantă'}
+        </button>
+        <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{display:'none'}} onChange={e=>e.target.files&&uploadFiles(e.target.files)}/>
+        {error && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'8px' }}>{error}</p>}
+      </div>}
+    </div>
+  )
+}
+
+function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { firme:Firma[]; firmaInitiala:Firma; lunaIdInitial:string; culoare:string }) {
+  const [expanded, setExpanded] = useState(false)
+  const [firmaId, setFirmaId] = useState(firmaInitiala.id)
+  const selectedFirma = firme.find(firma => firma.id === firmaId) || firmaInitiala
+  const selectedLunaId = selectedFirma.luna_id || lunaIdInitial
+  const [number, setNumber] = useState('')
+  const [date, setDate] = useState(new Date().toLocaleDateString('ro-RO'))
+  const [beneficiary, setBeneficiary] = useState('')
+  const [amount, setAmount] = useState('')
+  const [purpose, setPurpose] = useState('')
+  const [error, setError] = useState('')
+  const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'9px 12px', color:'#BBB', outline:'none', width:'100%' }
+
+  const loadNumber = useCallback(async () => {
+    const res = await fetch(`/api/chitante/dispozitie?lunaId=${encodeURIComponent(selectedLunaId)}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) setNumber(data.nextNumber)
+  }, [selectedLunaId])
+  useEffect(() => { if (expanded) loadNumber() }, [expanded, loadNumber])
+
+  async function toggle() { if (!expanded) await loadNumber(); setExpanded(value=>!value) }
+  async function generate() {
+    setError('')
+    const res = await fetch('/api/chitante/dispozitie', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      firmaId:selectedFirma.id, lunaId:selectedLunaId, firmaNume:selectedFirma.nume, cif:selectedFirma.cif||selectedFirma.cui, nrRegCom:selectedFirma.nr_reg_com||selectedFirma.nr_registru_comertului, adresa:selectedFirma.adresa,
+      date, beneficiary, amount, purpose,
+    })})
+    if (!res.ok) { const data=await res.json().catch(()=>({})); setError(data.error||'Generarea nu a reușit'); return }
+    const assigned=res.headers.get('X-Disposition-Number')||number; const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dispozitie_plata_${assigned}.pdf`; a.click(); URL.revokeObjectURL(url); await loadNumber()
+  }
+  return <div style={{ marginTop:'10px', background:'#161616', border:'1px solid #242424', borderRadius:'14px', overflow:'hidden' }}>
+    <button onClick={toggle} style={{ width:'100%', display:'flex', justifyContent:'space-between', padding:'15px 18px', background:'transparent', border:'none', cursor:'pointer', color:'#DDD', textAlign:'left' }}><span><strong>DISPOZIȚII DE PLATĂ</strong><small style={{display:'block',color:'#777',marginTop:'4px'}}>Generator numerotat lunar, salvat automat în dosarul contabilității.</small></span><span>{expanded?'▲':'▼'}</span></button>
+    {expanded && <div style={{ padding:'16px 18px', borderTop:'1px solid #222', background:'#111' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px' }}>
+        <select value={firmaId} onChange={e=>setFirmaId(e.target.value)} style={INP}>{firme.map(f=><option key={f.id} value={f.id}>{f.nume}</option>)}</select>
+        <input readOnly value={number} placeholder="Număr automat" style={{...INP,color:culoare,fontWeight:700}}/>
+        <input value={date} onChange={e=>setDate(e.target.value)} placeholder="Data" style={INP}/>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 2fr auto', gap:'8px', marginTop:'8px' }}>
+        <input value={beneficiary} onChange={e=>setBeneficiary(e.target.value)} placeholder="Beneficiar" style={INP}/>
+        <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Suma RON" style={INP}/>
+        <input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="Scopul plății" style={INP}/>
+        <button onClick={generate} disabled={!beneficiary||!amount||!purpose} style={{border:'none',borderRadius:'8px',background:culoare,color:'#FFF',padding:'8px 14px',cursor:'pointer'}}>Generează PDF</button>
+      </div>
+      {error&&<p style={{fontSize:'11px',color:'#F87171',marginTop:'8px'}}>{error}</p>}
+    </div>}
+  </div>
 }
 
 function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:string; culoare:string }) {

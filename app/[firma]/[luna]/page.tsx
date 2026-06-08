@@ -17,7 +17,13 @@ export default async function LunaPage({ params }: { params: Promise<{firma:stri
   if (!lunaData) return <InitLuna firma={firma} luna={luna} />
   const items = await q(`checklist_items?luna_id=eq.${lunaData.id}&select=*,checklist_templates(*)`)
   const extrase = await q(`extrase?luna_id=eq.${lunaData.id}&select=*`)
+  const toateFirmele = await q('firme?select=*')
+  const toateLunile = await q(`luni_contabile?select=id,firma_id,luna`)
+  const firmeDisponibile = toateFirmele.map((f: {id:string}) => ({
+    ...f,
+    luna_id: toateLunile.find((l: {firma_id:string;luna:string}) => l.firma_id === f.id && l.luna.startsWith(luna))?.id || null,
+  })).filter((f: {luna_id:string|null}) => f.luna_id)
   const [y,m] = luna.split('-')
   const LUNI = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
-  return <ChecklistClient firma={firma} lunaId={lunaData.id} lunaStatus={lunaData.status} progresPct={lunaData.progres_pct} items={items} extrase={extrase} slug={slug} luna={luna} lunaLabel={`${LUNI[+m]} ${y}`}/>
+  return <ChecklistClient firma={firma} firmeDisponibile={firmeDisponibile} lunaId={lunaData.id} lunaStatus={lunaData.status} progresPct={lunaData.progres_pct} items={items} extrase={extrase} slug={slug} luna={luna} lunaLabel={`${LUNI[+m]} ${y}`}/>
 }

@@ -42,7 +42,8 @@ async function getNextNumber(lunaId: string) {
     .from('documente')
     .select('numar_document')
     .eq('luna_id', lunaId)
-    .eq('modul', 'dispozitie_plata')
+    .eq('modul', 'acte_contabile')
+    .like('fisier_path', '%/dispozitii-plata/%')
   if (error) throw new Error(error.message)
   const maximum = (data || []).reduce((max, document) => {
     const value = Number.parseInt(String(document.numar_document || ''), 10)
@@ -187,7 +188,7 @@ export async function POST(req: NextRequest) {
     const { error: databaseError } = await sb.from('documente').insert({
       firma_id: firmaId,
       luna_id: lunaId,
-      modul: 'dispozitie_plata',
+      modul: 'acte_contabile',
       tip_document: 'dispozitie_plata',
       furnizor: safe(body.purpose),
       numar_document: dispositionNumber,

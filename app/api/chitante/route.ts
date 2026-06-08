@@ -4,6 +4,7 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 const ALLOWED_CATEGORIES = new Set(['utilitati', 'chirie', 'altul'])
 const ALLOWED_DOCUMENT_TYPES = new Set(['factura', 'chitanta'])
+const ALLOWED_SECTIONS = new Set(['facturi-chitanta', 'facturi-restante'])
 
 function safeFilePart(value: string, fallback: string) {
   return value
@@ -16,14 +17,17 @@ function safeFilePart(value: string, fallback: string) {
 
 export async function GET(req: NextRequest) {
   const lunaId = req.nextUrl.searchParams.get('lunaId')
+  const section = req.nextUrl.searchParams.get('section') || 'facturi-chitanta'
   if (!lunaId) return NextResponse.json({ docs: [] })
+  if (!ALLOWED_SECTIONS.has(section)) return NextResponse.json({ docs: [] }, { status: 400 })
 
   const sb = getServiceSupabase()
   const { data, error } = await sb
     .from('documente')
     .select('id,fisier_nume,tip_document,furnizor,modul,created_at')
     .eq('luna_id', lunaId)
-    .like('modul', 'facturi_chitanta_%')
+    .eq('modul', 'acte_contabile')
+    .like('fisier_path', `%/${section}/%`)
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -38,15 +42,20 @@ export async function POST(req: NextRequest) {
   const category = String(fd.get('category') || '')
   const documentType = String(fd.get('documentType') || '')
   const supplier = String(fd.get('supplier') || '').trim()
+  const section = String(fd.get('section') || 'facturi-chitanta')
+  const description = String(fd.get('description') || '').trim()
+  const reference = String(fd.get('reference') || '').trim()
+  const transactionId = String(fd.get('transactionId') || '').trim()
 
-  if (!file || !firmaId || !lunaId || !ALLOWED_CATEGORIES.has(category) || !ALLOWED_DOCUMENT_TYPES.has(documentType))
+  if (!file || !firmaId || !lunaId || !ALLOWED_SECTIONS.has(section) || !ALLOWED_CATEGORIES.has(category) || !ALLOWED_DOCUMENT_TYPES.has(documentType))
     return NextResponse.json({ error: 'Date lipsă sau invalide' }, { status: 400 })
   if (!ALLOWED_TYPES.has(file.type))
     return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG și PNG' }, { status: 400 })
 
   const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
-  const fileName = `${category}_${documentType}_${safeFilePart(supplier, 'fara_furnizor')}_${Date.now()}.${extension}`
-  const path = `${firmaId}/${lunaId}/facturi-chitanta/${fileName}`
+  const details = [supplier, description, reference].filter(Boolean).join(' ')
+  const fileName = `${category}_${documentType}_${safeFilePart(details, 'fara_detalii')}_${Date.now()}.${extension}`
+  const path = `${firmaId}/${lunaId}/${section}/${fileName}`
   const sb = getServiceSupabase()
 
   const { error: storageError } = await sb.storage.from('documente').upload(path, file, {
@@ -60,9 +69,10 @@ export async function POST(req: NextRequest) {
     .insert({
       firma_id: firmaId,
       luna_id: lunaId,
-      modul: `facturi_chitanta_${category}`,
+      tranzactie_id: transactionId || null,
+      modul: 'acte_contabile',
       tip_document: documentType,
-      furnizor: supplier,
+      furnizor: [supplier, description && `Descriere: ${description}`, reference && `Referinta: ${reference}`, `Categorie: ${category}`].filter(Boolean).join(' | '),
       fisier_path: path,
       fisier_nume: fileName,
       fisier_tip: file.type,
@@ -76,5 +86,6 @@ export async function POST(req: NextRequest) {
     await sb.storage.from('documente').remove([path])
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  if (transactionId) await sb.from('tranzactii').update({ document_id: doc.id, note: null }).eq('id', transactionId)
   return NextResponse.json({ doc })
 }

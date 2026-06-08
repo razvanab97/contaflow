@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     .from('documente')
     .select('fisier_path,fisier_nume,fisier_tip,modul')
     .eq('id', id)
-    .like('modul', 'facturi_chitanta_%')
+    .eq('modul', 'acte_contabile')
     .single()
   if (error || !doc) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
 

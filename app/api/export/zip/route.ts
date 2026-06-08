@@ -18,7 +18,12 @@ export async function POST(req: NextRequest) {
   for (const doc of docs||[]) {
     const { data:b } = await sb.storage.from('documente').download(doc.fisier_path)
     if (!b) continue
-    const folder = root.folder(doc.tip_document||'Altele')!
+    const path = String(doc.fisier_path || '')
+    const folderName = path.includes('/dispozitii-plata/') ? 'Dispozitii de plata'
+      : path.includes('/facturi-chitanta/') ? 'Facturi + chitanta'
+      : path.includes('/facturi-restante/') ? 'Facturi restante'
+      : doc.tip_document || 'Altele'
+    const folder = root.folder(folderName)!
     const tx = doc.tranzactii as {data_tranzactie:string;descriere_curatata:string}|null
     const name = tx ? `${tx.data_tranzactie}_${(tx.descriere_curatata||'').slice(0,30).replace(/[^a-zA-Z0-9]/g,'_')}.${doc.fisier_nume.split('.').pop()}` : doc.fisier_nume
     folder.file(name, b)
