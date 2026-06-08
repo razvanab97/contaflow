@@ -41,7 +41,12 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const [activeTxIndex, setActiveTxIndex] = useState(0)
   const [exportingDocs, setExportingDocs] = useState(false)
   const [exportError, setExportError] = useState('')
+  const restoredActiveId = useRef<string|null>(null)
+  const restoredScrollY = useRef(0)
+  const restored = useRef(false)
+  const positionRestored = useRef(false)
   const c = firma.culoare || '#F27A1A'
+  const workspaceKey = `contaflow:extras-workspace:${lunaId}`
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -66,13 +71,28 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         return aR ? 1 : -1
       })
       setTxs(data)
+      if (restoredActiveId.current) {
+        const restoredIndex = data.findIndex((tx: Tx) => tx.id === restoredActiveId.current)
+        if (restoredIndex >= 0) setActiveTxIndex(restoredIndex)
+      }
     } catch(e) {
       setError(String(e))
     }
     setLoading(false)
   }, [lunaId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(workspaceKey) || '{}')
+      if (saved.filter) setFilter(saved.filter)
+      if (saved.flowFilter) setFlowFilter(saved.flowFilter)
+      if (saved.viewMode) setViewMode(saved.viewMode)
+      restoredActiveId.current = saved.activeTxId || null
+      restoredScrollY.current = Number(saved.scrollY) || 0
+    } catch {}
+    restored.current = true
+    load()
+  }, [load, workspaceKey])
 
   const filtered = txs.filter(t => {
     const matchesStatus =
@@ -96,6 +116,26 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   }
   const rez = counts.ok + counts.na
   const pct = txs.length > 0 ? Math.round((rez/txs.length)*100) : 0
+  const activeTx = filtered[Math.min(activeTxIndex, Math.max(filtered.length - 1, 0))]
+
+  useEffect(() => {
+    if (!restored.current || loading || positionRestored.current) return
+    const activeIndex = restoredActiveId.current ? filtered.findIndex(tx => tx.id === restoredActiveId.current) : -1
+    if (activeIndex >= 0) setActiveTxIndex(activeIndex)
+    restoredActiveId.current = null
+    requestAnimationFrame(() => window.scrollTo({ top: restoredScrollY.current }))
+    positionRestored.current = true
+  }, [filtered, loading])
+
+  useEffect(() => {
+    if (!restored.current) return
+    const save = () => localStorage.setItem(workspaceKey, JSON.stringify({
+      filter, flowFilter, viewMode, activeTxId: activeTx?.id || null, scrollY: window.scrollY
+    }))
+    save()
+    window.addEventListener('scroll', save, { passive:true })
+    return () => window.removeEventListener('scroll', save)
+  }, [activeTx?.id, filter, flowFilter, viewMode, workspaceKey])
 
   function setF(f: typeof filter) { setFilter(f); setPage(1); setActiveTxIndex(0) }
   function setFlow(f: typeof flowFilter) { setFlowFilter(f); setPage(1); setActiveTxIndex(0) }
@@ -123,13 +163,26 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     setExportingDocs(false)
   }
 
-  async function markNA(id: string) {
-    await fetch('/api/tranzactii/note', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, note:'na'}) })
-    load()
+  async function updateNote(id: string, note: string|null) {
+    const previous = txs.find(tx => tx.id === id)?.note || null
+    setTxs(current => current.map(tx => tx.id === id ? { ...tx, note } : tx))
+    try {
+      const res = await fetch('/api/tranzactii/note', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, note}) })
+      if (!res.ok) setTxs(current => current.map(tx => tx.id === id ? { ...tx, note:previous } : tx))
+    } catch {
+      setTxs(current => current.map(tx => tx.id === id ? { ...tx, note:previous } : tx))
+    }
   }
-  async function clearNA(id: string) {
-    await fetch('/api/tranzactii/note', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, note:null}) })
-    load()
+  function markNA(id: string) {
+    updateNote(id, 'na')
+    if (filter === 'lipsa') {
+      setActiveTxIndex(index => Math.min(index, Math.max(filtered.length - 2, 0)))
+    } else {
+      setActiveTxIndex(index => Math.min(index + 1, Math.max(filtered.length - 1, 0)))
+    }
+  }
+  function clearNA(id: string) {
+    updateNote(id, null)
   }
 
   const onUploadSuccess = useCallback((uploadedTxId: string) => {
@@ -439,6 +492,32 @@ interface WorkspaceViewProps {
 function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, culoare, onNA, onClearNA, onUploadSuccess }: WorkspaceViewProps) {
   const safeIndex = Math.min(activeTxIndex, Math.max(txs.length - 1, 0))
   const activeTx = txs[safeIndex]
+  const selectorRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!activeTx) return
+    selectorRef.current?.querySelector(`[data-tx-id="${activeTx.id}"]`)?.scrollIntoView({ block:'nearest', inline:'nearest' })
+  }, [activeTx])
+
+  useEffect(() => {
+    if (!activeTx) return
+    function handleKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement|null
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return
+      if (event.key === 'ArrowLeft' && safeIndex > 0) {
+        event.preventDefault()
+        setActiveTxIndex(safeIndex - 1)
+      } else if (event.key === 'ArrowRight' && safeIndex < txs.length - 1) {
+        event.preventDefault()
+        setActiveTxIndex(safeIndex + 1)
+      } else if (event.key === 'Enter' && !activeTx.document_id && activeTx.note !== 'na') {
+        event.preventDefault()
+        onNA(activeTx.id)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [activeTx, onNA, safeIndex, setActiveTxIndex, txs.length])
 
   if (!activeTx) {
     return (
@@ -450,8 +529,12 @@ function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, 
 
   return (
     <div style={{ minWidth:0, maxWidth:'100%' }}>
+      <div style={{ display:'flex', justifyContent:'flex-end', gap:'10px', marginBottom:'7px', fontSize:'10px', color:'#555' }}>
+        <span>← → navigare</span>
+        <span>Enter = Sari</span>
+      </div>
       {/* Transaction selector */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(145px, 1fr))', gap:'7px', maxHeight:'156px', overflowY:'auto', overflowX:'hidden', padding:'8px', marginBottom:'20px', background:'#111', border:'1px solid #202020', borderRadius:'12px', scrollbarWidth:'thin' }}>
+      <div ref={selectorRef} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(145px, 1fr))', gap:'7px', maxHeight:'156px', overflowY:'auto', overflowX:'hidden', padding:'8px', marginBottom:'20px', background:'#111', border:'1px solid #202020', borderRadius:'12px', scrollbarWidth:'thin' }}>
         {txs.map((tx, idx) => {
           const isCurrent = idx === activeTxIndex
           const isDone = !!tx.document_id
@@ -478,6 +561,7 @@ function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, 
           return (
             <button
               key={tx.id}
+              data-tx-id={tx.id}
               onClick={() => setActiveTxIndex(idx)}
               style={{
                 padding:'8px 10px',
