@@ -145,6 +145,7 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
           })}
         </div>
 
+        <EmagMonthlyPanel firma={firma} lunaId={lunaId} culoare={firma.culoare} />
         <DispositionPanel firme={firmeDisponibile} firmaInitiala={firma} lunaIdInitial={lunaId} culoare={firma.culoare} />
         <InvoiceDocumentsPanel title="Facturi + chitanță" description="Asociază separat factura și chitanța pentru aceeași plată cash." section="facturi-chitanta" firma={firma} lunaId={lunaId} culoare={firma.culoare} />
         <InvoiceDocumentsPanel title="Facturi restante" description="Facturi care trebuiau plătite, dar nu au fost încă achitate." section="facturi-restante" firma={firma} lunaId={lunaId} culoare={firma.culoare} />
@@ -208,6 +209,106 @@ interface CashDocument {
   tip_document:string
   furnizor:string
   modul:string
+}
+
+interface EmagDocument {
+  id:string; fisier_nume:string; category:string; effect:'cheltuiala'|'reducere'; amount:number
+  invoiceNumber:string; date:string; notes:string
+}
+
+interface EmagSummary {
+  bankReceipts:number; bankPayments:number; bankCashflow:number
+  emagExpenses:number; emagReductions:number; emagNetCost:number
+  categories:Record<string,number>
+}
+
+function money(value: number) {
+  return new Intl.NumberFormat('ro-RO', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(value || 0)
+}
+
+function EmagMonthlyPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:string; culoare:string }) {
+  const [expanded, setExpanded] = useState(false)
+  const [documents, setDocuments] = useState<EmagDocument[]>([])
+  const [summary, setSummary] = useState<EmagSummary>({ bankReceipts:0, bankPayments:0, bankCashflow:0, emagExpenses:0, emagReductions:0, emagNetCost:0, categories:{} })
+  const [url, setUrl] = useState('')
+  const [category, setCategory] = useState('automat')
+  const [effect, setEffect] = useState<'automat'|'cheltuiala'|'reducere'>('automat')
+  const [amount, setAmount] = useState('')
+  const [invoiceNumber, setInvoiceNumber] = useState('')
+  const [date, setDate] = useState('')
+  const [notes, setNotes] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [error, setError] = useState('')
+  const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'9px 12px', color:'#BBB', outline:'none', width:'100%' }
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/emag?lunaId=${encodeURIComponent(lunaId)}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) { setDocuments(data.documents || []); setSummary(data.summary || {}) }
+    else setError(data.error || 'Calculul eMAG nu a putut fi încărcat')
+  }, [lunaId])
+  async function toggle() { if (!expanded) await load(); setExpanded(value=>!value) }
+  async function addInvoice() {
+    setBusy(true); setError('')
+    const res = await fetch('/api/emag', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ url, firmaId:firma.id, lunaId, category, effect, amount, invoiceNumber, date, notes }) })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setError(data.error || 'Factura Dante nu a putut fi importată')
+    else { setUrl(''); setAmount(''); setInvoiceNumber(''); setNotes(''); await load() }
+    setBusy(false)
+  }
+  async function removeInvoice(document: EmagDocument) {
+    if (!window.confirm(`Ștergi factura eMAG „${document.fisier_nume}” din calculul lunar?`)) return
+    const res = await fetch(`/api/emag?id=${encodeURIComponent(document.id)}`, { method:'DELETE' })
+    if (res.ok) await load()
+    else setError((await res.json().catch(()=>({}))).error || 'Factura nu a putut fi ștearsă')
+  }
+  async function savePdf() {
+    setPdfBusy(true); setError('')
+    setError(await downloadGeneralPdf({ lunaId, title:'Facturi_eMAG_Dante_International', scope:{ section:'emag-calcul' } }, 'Facturi_eMAG_Dante_International.pdf'))
+    setPdfBusy(false)
+  }
+  const categoryLabels:Record<string,string> = { comision:'Comisioane', cupoane:'Cupoane', publicitate:'Publicitate', transport:'Transport', servicii:'Servicii', altele:'Altele' }
+  return <div style={{ marginTop:'10px', background:'#161616', border:`1px solid ${culoare}55`, borderRadius:'14px', overflow:'hidden' }}>
+    <button onClick={toggle} style={{ width:'100%', display:'flex', justifyContent:'space-between', padding:'15px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
+      <span><strong style={{ fontSize:'12px', color:'#DDD', textTransform:'uppercase' }}>Concluzie lunară · eMAG / Dante International</strong><span style={{ display:'block', fontSize:'11px', color:'#777', marginTop:'4px' }}>Costuri Dante din Oblio și cashflow bancar, urmărite separat pentru a evita dublarea.</span></span>
+      <span style={{ color:culoare, fontSize:'11px' }}>{documents.length ? `${documents.length} facturi · ${money(summary.emagNetCost)} RON net` : ''} {expanded?'▲':'▼'}</span>
+    </button>
+    {expanded && <div style={{ padding:'16px 18px', borderTop:'1px solid #222', background:'#111' }}>
+      <button onClick={savePdf} disabled={pdfBusy} style={{ marginBottom:'10px', fontSize:'11px', fontWeight:700, padding:'6px 10px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:culoare, cursor:'pointer' }}>{pdfBusy?'Se generează...':'Salvează facturile Dante PDF'}</button>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'8px', marginBottom:'12px' }}>
+        {[
+          ['Încasări bancare RON',summary.bankReceipts,'#4ADE80'],
+          ['Plăți bancare RON',summary.bankPayments,'#F87171'],
+          ['Cashflow bancar RON',summary.bankCashflow,summary.bankCashflow>=0?'#4ADE80':'#F87171'],
+          ['Cost net eMAG documentat',summary.emagNetCost,culoare],
+        ].map(([label,value,color])=><div key={String(label)} style={{ padding:'11px', background:'#181818', borderRadius:'9px', border:'1px solid #262626' }}>
+          <span style={{ display:'block', fontSize:'10px', color:'#777' }}>{label}</span><strong style={{ display:'block', fontSize:'15px', color:String(color), marginTop:'4px' }}>{money(Number(value))}</strong>
+        </div>)}
+      </div>
+      <p style={{ fontSize:'11px', color:'#888', marginBottom:'10px' }}>Cost eMAG: {money(summary.emagExpenses)} cheltuieli − {money(summary.emagReductions)} reduceri/storno = {money(summary.emagNetCost)} RON. Acesta este un indicator documentar, nu profitul contabil final.</p>
+      {Object.entries(summary.categories || {}).length>0 && <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'12px' }}>{Object.entries(summary.categories).map(([key,value])=><span key={key} style={{ fontSize:'10px', padding:'4px 7px', borderRadius:'6px', background:'#202020', color:'#AAA' }}>{categoryLabels[key]||key}: {money(value)} RON</span>)}</div>}
+      {documents.map(document=><div key={document.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'#181818', borderRadius:'8px' }}>
+        <span style={{ flex:1, fontSize:'11px', color:'#CCC' }}>{document.date || 'Fără dată'} · {document.invoiceNumber || document.fisier_nume} · {categoryLabels[document.category]||document.category}</span>
+        <strong style={{ fontSize:'11px', color:document.effect==='reducere'?'#4ADE80':'#F87171' }}>{document.effect==='reducere'?'-':'+'}{money(document.amount)} RON</strong>
+        <a href={`/api/chitante/document?id=${encodeURIComponent(document.id)}`} style={{ fontSize:'10px', color:culoare }}>Descarcă</a>
+        <button onClick={()=>removeInvoice(document)} style={{ fontSize:'10px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>Șterge</button>
+      </div>)}
+      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:'8px', marginTop:'12px' }}>
+        <input value={url} onChange={event=>setUrl(event.target.value)} placeholder="Link PDF Oblio pentru factura Dante International" style={INP}/>
+        <select value={category} onChange={event=>setCategory(event.target.value)} style={INP}><option value="automat">Categorie automată AI</option>{Object.entries(categoryLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select>
+        <select value={effect} onChange={event=>setEffect(event.target.value as 'automat'|'cheltuiala'|'reducere')} style={INP}><option value="automat">Efect automat AI</option><option value="cheltuiala">Cheltuială</option><option value="reducere">Reducere / storno</option></select>
+        <input type="number" min="0" step="0.01" value={amount} onChange={event=>setAmount(event.target.value)} placeholder="Total RON (opțional, extras AI)" style={INP}/>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr auto', gap:'8px', marginTop:'8px' }}>
+        <input value={invoiceNumber} onChange={event=>setInvoiceNumber(event.target.value)} placeholder="Număr factură" style={INP}/>
+        <input value={date} onChange={event=>setDate(event.target.value)} placeholder="Data facturii" style={INP}/>
+        <input value={notes} onChange={event=>setNotes(event.target.value)} placeholder="Observații: campanie, perioadă, explicații..." style={INP}/>
+        <button onClick={addInvoice} disabled={busy||!url} style={{ border:'none', borderRadius:'8px', background:culoare, color:'#FFF', padding:'8px 14px', cursor:'pointer', opacity:busy?.6:1 }}>{busy?'Se analizează...':'Importă și calculează'}</button>
+      </div>
+      {error && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'8px' }}>{error}</p>}
+    </div>}
+  </div>
 }
 
 interface TransactionSuggestion {

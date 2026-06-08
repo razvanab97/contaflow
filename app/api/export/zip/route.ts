@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     const folderName = path.includes('/dispozitii-plata/') ? 'Dispozitii de plata'
       : path.includes('/facturi-chitanta/') ? 'Facturi + chitanta'
       : path.includes('/facturi-restante/') ? 'Facturi restante'
+      : path.includes('/emag-calcul/') ? 'eMAG - Dante International'
       : doc.tip_document || 'Altele'
     const folder = root.folder(folderName)!
     const tx = doc.tranzactii as {data_tranzactie:string;descriere_curatata:string}|null
