@@ -32,7 +32,16 @@ export async function POST(req: NextRequest) {
   if (source.protocol !== 'https:' || isPrivateSource(source))
     return NextResponse.json({ error: 'Este acceptat doar un link HTTPS public către un PDF' }, { status: 400 })
 
-  const response = await fetch(source, { redirect: 'error', signal: AbortSignal.timeout(30_000) })
+  const response = await fetch(source, {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(30_000),
+    headers: {
+      'Accept': 'application/pdf,application/octet-stream;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'ro-RO,ro;q=0.9,en;q=0.8',
+      'Referer': `${source.origin}/`,
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0 Safari/537.36',
+    },
+  })
   if (!response.ok) return NextResponse.json({ error: `Platforma sursă a răspuns cu status ${response.status}` }, { status: 502 })
   const contentType = response.headers.get('content-type') || ''
   const bytes = Buffer.from(await response.arrayBuffer())
