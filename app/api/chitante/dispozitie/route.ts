@@ -40,12 +40,16 @@ async function getNextNumber(lunaId: string) {
   const sb = getServiceSupabase()
   const { data, error } = await sb
     .from('documente')
-    .select('numar_document')
+    .select('numar_document,fisier_path,created_at')
     .eq('luna_id', lunaId)
     .eq('modul', 'acte_contabile')
     .like('fisier_path', '%/dispozitii-plata/%')
+    .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
-  const maximum = (data || []).reduce((max, document) => {
+  const lastReset = [...(data || [])].reverse().find(document => String(document.fisier_path).includes('/resetari/'))
+  const relevant = lastReset ? (data || []).filter(document => document.created_at > lastReset.created_at) : (data || [])
+  const maximum = relevant.reduce((max, document) => {
+    if (String(document.fisier_path).includes('/resetari/')) return max
     const value = Number.parseInt(String(document.numar_document || ''), 10)
     return Number.isFinite(value) ? Math.max(max, value) : max
   }, 0)
@@ -155,6 +159,8 @@ export async function POST(req: NextRequest) {
     text(safe(body.identitySeries), 280, 450, 10)
     text('numarul:', 345, 450, 10, true)
     text(safe(body.identityNumber), 414, 450, 10)
+    text('Adresa beneficiarului:', 55, 438, 8, true)
+    text(safe(body.ownerAddress), 162, 438, 8)
     text('Am primit suma de:', 55, 430, 10, true)
     text(money, 201, 430, 10, true)
     text('Ron', 277, 430, 10, true)
@@ -176,8 +182,8 @@ export async function POST(req: NextRequest) {
 
     const bytes = await pdf.save()
     const fileName = `dispozitie_plata_${dispositionNumber}_${date.replace(/\./g, '-') || 'fara-data'}.pdf`
-    // A fixed path per monthly number also prevents two concurrent requests from receiving the same number.
-    const path = `${firmaId}/${lunaId}/dispozitii-plata/dispozitie_plata_${dispositionNumber}.pdf`
+    // Timestamp-ul permite reutilizarea numărului după o resetare, păstrând istoricul.
+    const path = `${firmaId}/${lunaId}/dispozitii-plata/dispozitie_plata_${dispositionNumber}_${Date.now()}.pdf`
     const sb = getServiceSupabase()
     const { error: storageError } = await sb.storage.from('documente').upload(path, Buffer.from(bytes), {
       contentType: 'application/pdf',
@@ -210,6 +216,44 @@ export async function POST(req: NextRequest) {
         'X-Disposition-Number': dispositionNumber,
       },
     })
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { firmaId, lunaId } = await req.json()
+    if (!firmaId || !lunaId)
+      return NextResponse.json({ error: 'Firma sau luna contabilă lipsește' }, { status: 400 })
+
+    const sb = getServiceSupabase()
+    const createdAt = new Date().toISOString()
+    const path = `${firmaId}/${lunaId}/dispozitii-plata/resetari/reset_${Date.now()}.json`
+    const bytes = Buffer.from(JSON.stringify({ resetAt: createdAt, nextNumber: '01' }))
+    const { error: storageError } = await sb.storage.from('documente').upload(path, bytes, {
+      contentType: 'application/json',
+      upsert: false,
+    })
+    if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
+
+    const { error } = await sb.from('documente').insert({
+      firma_id: firmaId,
+      luna_id: lunaId,
+      modul: 'acte_contabile',
+      tip_document: 'altul',
+      furnizor: 'Resetare numerotare dispoziții de plată',
+      fisier_path: path,
+      fisier_nume: 'resetare_numerotare_dispozitii.json',
+      fisier_tip: 'application/json',
+      fisier_marime: bytes.length,
+      in_zip: false,
+    })
+    if (error) {
+      await sb.storage.from('documente').remove([path])
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json({ nextNumber: '01' })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

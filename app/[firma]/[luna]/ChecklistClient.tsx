@@ -18,6 +18,19 @@ interface Firma {
 interface Item { id:string; completat:boolean; checklist_templates?:{ titlu:string; descriere?:string; modul:string; necesita_semnatura:boolean; spre_proiect:boolean; ordine:number } }
 interface Extras { id:string; valuta:string; nr_tranzactii:number; nr_documentate:number; procesat_ai:boolean }
 
+async function downloadGeneralPdf(body: Record<string, unknown>, fallbackName: string) {
+  const res = await fetch('/api/export/pdf', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+  if (!res.ok) return (await res.json().catch(() => ({}))).error || 'PDF-ul nu a putut fi generat'
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = fallbackName
+  anchor.click()
+  URL.revokeObjectURL(url)
+  return ''
+}
+
 export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaStatus, progresPct, items, extrase, slug, luna, lunaLabel }:
   { firma:Firma; firmeDisponibile:Firma[]; lunaId:string; lunaStatus:string; progresPct:number; items:Item[]; extrase:Extras[]; slug:string; luna:string; lunaLabel:string }
 ) {
@@ -28,11 +41,18 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
   const r = rgb(firma.culoare)
 
   const [exportLoading, setExportLoading] = useState(false)
+  const [globalPdfLoading, setGlobalPdfLoading] = useState(false)
+  const [exportError, setExportError] = useState('')
   async function handleExport() {
     setExportLoading(true)
     const res = await fetch('/api/export/zip', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ firmaId:firma.id, firmaNume:firma.nume, lunaId, luna }) })
     if (res.ok) { const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`${firma.nume}_${luna}.zip`; a.click(); URL.revokeObjectURL(url) }
     setExportLoading(false)
+  }
+  async function saveGlobalPdf() {
+    setGlobalPdfLoading(true); setExportError('')
+    setExportError(await downloadGeneralPdf({ lunaId, title:`${firma.nume}_${luna}_toate_documentele` }, `${firma.nume}_${luna}_toate_documentele.pdf`))
+    setGlobalPdfLoading(false)
   }
 
   const SB: React.CSSProperties = { fontSize:'13px', fontWeight:500, color:'#888', display:'flex', alignItems:'center', gap:'9px', padding:'8px 18px' }
@@ -61,7 +81,7 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
       </aside>
 
       <main style={{ flex:1, padding:'40px 44px', background:'#0F0F0F' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'22px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'20px', marginBottom:'22px' }}>
           <div>
             <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'4px' }}>
               <div style={{ width:'9px', height:'9px', borderRadius:'50%', background:firma.culoare }}/>
@@ -69,11 +89,18 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
             </div>
             <p style={{ fontSize:'13px', color:'#888', marginLeft:'19px' }}>{lunaLabel}</p>
           </div>
+          <div style={{ display:'flex', alignItems:'flex-start', gap:'10px' }}>
+            <GlobalSearch />
+            <button onClick={saveGlobalPdf} disabled={globalPdfLoading} style={{ fontSize:'12px', fontWeight:700, padding:'9px 13px', borderRadius:'8px', border:`1px solid ${firma.culoare}`, background:'transparent', color:firma.culoare, cursor:'pointer' }}>
+              {globalPdfLoading ? 'Se generează...' : 'Salvează toate PDF'}
+            </button>
           <div style={{ textAlign:'right' }}>
             <div style={{ fontSize:'30px', fontWeight:700, color:firma.culoare, letterSpacing:'-0.8px' }}>{pct}%</div>
             <div style={{ fontSize:'12px', color:'#888' }}>{done}/{total} completate</div>
           </div>
+          </div>
         </div>
+        {exportError && <p style={{ fontSize:'11px', color:'#F87171', marginBottom:'12px', textAlign:'right' }}>{exportError}</p>}
 
         <div style={{ height:'3px', background:'#1E1E1E', borderRadius:'2px', marginBottom:'28px' }}>
           <div style={{ height:'3px', borderRadius:'2px', background:firma.culoare, width:`${pct}%` }}/>
@@ -107,6 +134,7 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
                   <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                     <span style={{ fontSize:'11px', color:'#666' }}>{modDone}/{modItems.length}</span>
                     {mod==='extras' && <Link href={`/${slug}/${luna}/extras`} style={{ fontSize:'11px', fontWeight:600, color:firma.culoare }}>deschide →</Link>}
+                    <CategoryPdfButton lunaId={lunaId} module={mod} itemIds={modItems.map(item=>item.id)} title={MOD_LABELS[mod]||mod} culoare={firma.culoare} />
                   </div>
                 </div>
                 {modItems.map((item, idx) => (
@@ -132,6 +160,46 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
       </main>
     </div>
   )
+}
+
+function GlobalSearch() {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<{type:string;title:string;detail:string;href:string}[]>([])
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return }
+    const timer = window.setTimeout(async () => {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+      const data = await res.json().catch(() => ({}))
+      setResults(data.results || [])
+      setOpen(true)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [query])
+  return <div style={{ position:'relative', width:'280px' }}>
+    <input value={query} onChange={event=>setQuery(event.target.value)} onFocus={()=>setOpen(true)} placeholder="Caută sumă, nume, referință..." style={{ width:'100%', fontSize:'12px', padding:'9px 12px', borderRadius:'8px', border:'1px solid #2A2A2A', background:'#161616', color:'#DDD', outline:'none' }}/>
+    {open && query && <div style={{ position:'absolute', zIndex:20, top:'42px', right:0, width:'430px', maxHeight:'360px', overflowY:'auto', background:'#111', border:'1px solid #303030', borderRadius:'10px', boxShadow:'0 14px 40px rgba(0,0,0,.5)' }}>
+      {results.length ? results.map((result,index)=><Link key={`${result.href}-${index}`} href={result.href} style={{ display:'block', padding:'10px 12px', borderBottom:'1px solid #222' }}>
+        <span style={{ fontSize:'10px', color:'#777', textTransform:'uppercase' }}>{result.type}</span>
+        <strong style={{ display:'block', fontSize:'12px', color:'#DDD', marginTop:'2px' }}>{result.title}</strong>
+        <span style={{ display:'block', fontSize:'10px', color:'#777', marginTop:'2px' }}>{result.detail}</span>
+      </Link>) : <p style={{ padding:'14px', fontSize:'11px', color:'#777' }}>Niciun rezultat.</p>}
+      <button onClick={()=>setOpen(false)} style={{ width:'100%', padding:'8px', border:'none', background:'#181818', color:'#777', cursor:'pointer' }}>Închide</button>
+    </div>}
+  </div>
+}
+
+function CategoryPdfButton({ lunaId, module, itemIds, title, culoare }: { lunaId:string; module:string; itemIds:string[]; title:string; culoare:string }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function save() {
+    setBusy(true); setError('')
+    setError(await downloadGeneralPdf({ lunaId, title, scope:module==='extras'?{ extras:true }:{ module }, itemIds }, `${title}.pdf`))
+    setBusy(false)
+  }
+  return <span title={error || 'Salvează toate documentele categoriei într-un singur PDF'}>
+    <button onClick={save} disabled={busy} style={{ fontSize:'10px', padding:'4px 7px', borderRadius:'6px', border:`1px solid ${error?'#F87171':'#333'}`, background:'#1B1B1B', color:error?'#F87171':culoare, cursor:'pointer' }}>{busy?'...':'Salvează PDF'}</button>
+  </span>
 }
 
 interface CashDocument {
@@ -161,7 +229,9 @@ function InvoiceDocumentsPanel({ title, description, section, firma, lunaId, cul
   const [suggestions, setSuggestions] = useState<TransactionSuggestion[]>([])
   const [transactionId, setTransactionId] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
+  const [pdfBusy, setPdfBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
   const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'9px 12px', color:'#BBB', outline:'none', width:'100%' }
@@ -212,6 +282,23 @@ function InvoiceDocumentsPanel({ title, description, section, firma, lunaId, cul
     else { setSourceUrl(''); await load() }
     setBusy(false)
   }
+  async function savePdf() {
+    setPdfBusy(true); setError('')
+    setError(await downloadGeneralPdf({ lunaId, title, scope:{ section } }, `${title}.pdf`))
+    setPdfBusy(false)
+  }
+  async function deleteDocument(doc: CashDocument) {
+    if (!window.confirm(`Ștergi documentul „${doc.fisier_nume}”? Asocierea cu tranzacția va fi eliminată.`)) return
+    setDeletingId(doc.id); setError('')
+    const res = await fetch(`/api/chitante/document?id=${encodeURIComponent(doc.id)}`, { method:'DELETE' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setError(data.error || 'Documentul nu a putut fi șters')
+    else {
+      if (data.warning) setError(`Documentul a fost eliminat, dar fișierul vechi nu a putut fi curățat: ${data.warning}`)
+      await load()
+    }
+    setDeletingId('')
+  }
 
   return (
     <div style={{ marginTop:'10px', background:'#161616', border:'1px solid #242424', borderRadius:'14px', overflow:'hidden' }}>
@@ -220,10 +307,12 @@ function InvoiceDocumentsPanel({ title, description, section, firma, lunaId, cul
         <span style={{ fontSize:'11px', color:culoare }}>{docs.length ? `${docs.length} documente` : ''} {expanded?'▲':'▼'}</span>
       </button>
       {expanded && <div style={{ padding:'16px 18px', borderTop:'1px solid #222', background:'#111' }}>
+        <button onClick={savePdf} disabled={pdfBusy} style={{ marginBottom:'10px', fontSize:'11px', fontWeight:700, padding:'6px 10px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:culoare, cursor:'pointer' }}>{pdfBusy?'Se generează...':'Salvează PDF categorie'}</button>
         {docs.map(doc => <div key={doc.id} style={{ display:'flex', gap:'8px', alignItems:'center', padding:'8px 10px', marginBottom:'5px', background:'#181818', borderRadius:'8px' }}>
           <span style={{ flex:1, minWidth:0, fontSize:'12px', color:'#CCC', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</span>
           <span style={{ fontSize:'10px', color:'#777' }}>{doc.tip_document}</span>
           <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', color:culoare, fontWeight:700 }}>Descarcă ↓</a>
+          <button onClick={()=>deleteDocument(doc)} disabled={deletingId===doc.id} style={{ fontSize:'10px', fontWeight:700, color:'#F87171', background:'#241515', border:'1px solid #5B3030', borderRadius:'6px', padding:'4px 7px', cursor:'pointer' }}>{deletingId===doc.id?'Se șterge...':'Șterge'}</button>
         </div>)}
         <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px', marginTop:'12px' }}>
           <input value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="Furnizor: Inatech Packaging, Sameday, Jumbo, OpenAI..." style={INP}/>
@@ -263,6 +352,13 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   const [beneficiary, setBeneficiary] = useState('')
   const [amount, setAmount] = useState('')
   const [purpose, setPurpose] = useState('')
+  const [owner, setOwner] = useState('')
+  const [ownerAddress, setOwnerAddress] = useState('')
+  const [beneficiaryFunction, setBeneficiaryFunction] = useState('')
+  const [identitySeries, setIdentitySeries] = useState('')
+  const [identityNumber, setIdentityNumber] = useState('')
+  const [templateBusy, setTemplateBusy] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState(false)
   const [error, setError] = useState('')
   const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'9px 12px', color:'#BBB', outline:'none', width:'100%' }
 
@@ -271,14 +367,46 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
     const data = await res.json().catch(() => ({}))
     if (res.ok) setNumber(data.nextNumber)
   }, [selectedLunaId])
-  useEffect(() => { if (expanded) loadNumber() }, [expanded, loadNumber])
+  const loadTemplate = useCallback(async () => {
+    const res = await fetch(`/api/chitante/dispozitie/template?firmaId=${encodeURIComponent(selectedFirma.id)}`)
+    const data = await res.json().catch(() => ({}))
+    const template = data.template || {}
+    setOwner(template.owner || '')
+    setOwnerAddress(template.ownerAddress || '')
+    setBeneficiaryFunction(template.beneficiaryFunction || '')
+    setIdentitySeries(template.identitySeries || '')
+    setIdentityNumber(template.identityNumber || '')
+    if (template.defaultPurpose) setPurpose(template.defaultPurpose)
+  }, [selectedFirma.id])
+  useEffect(() => { if (expanded) { loadNumber(); loadTemplate() } }, [expanded, loadNumber, loadTemplate])
 
-  async function toggle() { if (!expanded) await loadNumber(); setExpanded(value=>!value) }
+  async function toggle() { if (!expanded) await Promise.all([loadNumber(), loadTemplate()]); setExpanded(value=>!value) }
+  async function saveTemplate() {
+    setTemplateBusy(true); setError('')
+    const res = await fetch('/api/chitante/dispozitie/template', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      firmaId:selectedFirma.id, lunaId:selectedLunaId, template:{ owner, ownerAddress, beneficiaryFunction, identitySeries, identityNumber, defaultPurpose:purpose },
+    })})
+    if (!res.ok) setError((await res.json().catch(()=>({}))).error || 'Șablonul nu a putut fi salvat')
+    setTemplateBusy(false)
+  }
+  async function resetNumber() {
+    if (!window.confirm('Numerotarea dispozițiilor de plată va reîncepe de la 01. Istoricul existent rămâne salvat. Continui?')) return
+    setError('')
+    const res = await fetch('/api/chitante/dispozitie', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ firmaId:selectedFirma.id, lunaId:selectedLunaId }) })
+    const data = await res.json().catch(()=>({}))
+    if (res.ok) setNumber('01')
+    else setError(data.error || 'Numerotarea nu a putut fi resetată')
+  }
+  async function savePdf() {
+    setPdfBusy(true); setError('')
+    setError(await downloadGeneralPdf({ lunaId:selectedLunaId, title:`Dispozitii_plata_${selectedFirma.nume}`, scope:{ section:'dispozitii-plata' } }, `Dispozitii_plata_${selectedFirma.nume}.pdf`))
+    setPdfBusy(false)
+  }
   async function generate() {
     setError('')
     const res = await fetch('/api/chitante/dispozitie', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
       firmaId:selectedFirma.id, lunaId:selectedLunaId, firmaNume:selectedFirma.nume, cif:selectedFirma.cif||selectedFirma.cui, nrRegCom:selectedFirma.nr_reg_com||selectedFirma.nr_registru_comertului, adresa:selectedFirma.adresa,
-      date, beneficiary, amount, purpose,
+      date, beneficiary:beneficiary || owner, function:beneficiaryFunction, amount, purpose, identitySeries, identityNumber, ownerAddress,
     })})
     if (!res.ok) { const data=await res.json().catch(()=>({})); setError(data.error||'Generarea nu a reușit'); return }
     const assigned=res.headers.get('X-Disposition-Number')||number; const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dispozitie_plata_${assigned}.pdf`; a.click(); URL.revokeObjectURL(url); await loadNumber()
@@ -286,16 +414,28 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   return <div style={{ marginTop:'10px', background:'#161616', border:'1px solid #242424', borderRadius:'14px', overflow:'hidden' }}>
     <button onClick={toggle} style={{ width:'100%', display:'flex', justifyContent:'space-between', padding:'15px 18px', background:'transparent', border:'none', cursor:'pointer', color:'#DDD', textAlign:'left' }}><span><strong>DISPOZIȚII DE PLATĂ</strong><small style={{display:'block',color:'#777',marginTop:'4px'}}>Generator numerotat lunar, salvat automat în dosarul contabilității.</small></span><span>{expanded?'▲':'▼'}</span></button>
     {expanded && <div style={{ padding:'16px 18px', borderTop:'1px solid #222', background:'#111' }}>
+      <div style={{ display:'flex', gap:'8px', marginBottom:'10px', flexWrap:'wrap' }}>
+        <button onClick={savePdf} disabled={pdfBusy} style={{fontSize:'11px',border:`1px solid ${culoare}`,borderRadius:'7px',background:'transparent',color:culoare,padding:'6px 10px',cursor:'pointer'}}>{pdfBusy?'Se generează...':'Salvează PDF dispoziții'}</button>
+        <button onClick={saveTemplate} disabled={templateBusy} style={{fontSize:'11px',border:'1px solid #333',borderRadius:'7px',background:'#202020',color:'#CCC',padding:'6px 10px',cursor:'pointer'}}>{templateBusy?'Se salvează...':'Salvează șablonul'}</button>
+        <button onClick={resetNumber} style={{fontSize:'11px',border:'1px solid #5B3030',borderRadius:'7px',background:'#241515',color:'#F87171',padding:'6px 10px',cursor:'pointer'}}>Resetează la 01</button>
+      </div>
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px' }}>
         <select value={firmaId} onChange={e=>setFirmaId(e.target.value)} style={INP}>{firme.map(f=><option key={f.id} value={f.id}>{f.nume}</option>)}</select>
         <input readOnly value={number} placeholder="Număr automat" style={{...INP,color:culoare,fontWeight:700}}/>
         <input value={date} onChange={e=>setDate(e.target.value)} placeholder="Data" style={INP}/>
       </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr 1fr 1fr 1fr', gap:'8px', marginTop:'8px' }}>
+        <input value={owner} onChange={e=>{setOwner(e.target.value);if(!beneficiary)setBeneficiary(e.target.value)}} placeholder="Proprietar / beneficiar implicit" style={INP}/>
+        <input value={ownerAddress} onChange={e=>setOwnerAddress(e.target.value)} placeholder="Adresa proprietarului / beneficiarului" style={INP}/>
+        <input value={beneficiaryFunction} onChange={e=>setBeneficiaryFunction(e.target.value)} placeholder="Calitate / funcție" style={INP}/>
+        <input value={identitySeries} onChange={e=>setIdentitySeries(e.target.value)} placeholder="Serie CI" style={INP}/>
+        <input value={identityNumber} onChange={e=>setIdentityNumber(e.target.value)} placeholder="Număr CI" style={INP}/>
+      </div>
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 2fr auto', gap:'8px', marginTop:'8px' }}>
         <input value={beneficiary} onChange={e=>setBeneficiary(e.target.value)} placeholder="Beneficiar" style={INP}/>
         <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Suma RON" style={INP}/>
         <input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="Scopul plății" style={INP}/>
-        <button onClick={generate} disabled={!beneficiary||!amount||!purpose} style={{border:'none',borderRadius:'8px',background:culoare,color:'#FFF',padding:'8px 14px',cursor:'pointer'}}>Generează PDF</button>
+        <button onClick={generate} disabled={!(beneficiary||owner)||!amount||!purpose} style={{border:'none',borderRadius:'8px',background:culoare,color:'#FFF',padding:'8px 14px',cursor:'pointer'}}>Generează PDF</button>
       </div>
       {error&&<p style={{fontSize:'11px',color:'#F87171',marginTop:'8px'}}>{error}</p>}
     </div>}
