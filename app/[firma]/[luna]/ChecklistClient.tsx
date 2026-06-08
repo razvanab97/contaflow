@@ -833,7 +833,6 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
     if (res.ok) { setSourceUrl(''); await loadDocs() }
     else {
       const data = await res.json().catch(()=>({}))
-      if (data.bookingLoginRequired && data.sourceUrl) window.open(data.sourceUrl, '_blank', 'noopener,noreferrer')
       setError(data.error || 'Importul din link nu a reușit')
     }
     setUploading(false)

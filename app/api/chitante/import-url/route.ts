@@ -18,6 +18,21 @@ function isPrivateSource(source: URL) {
   return isIP(hostname) === 6 && (hostname === '::1' || hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('fe80:'))
 }
 
+function downloadHeaders(source: URL) {
+  const headers: Record<string, string> = {
+    'Accept': 'application/pdf,application/octet-stream;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'ro-RO,ro;q=0.9,en;q=0.8',
+    'Referer': `${source.origin}/`,
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0 Safari/537.36',
+  }
+  if (source.hostname.endsWith('booking.com')) {
+    const session = source.searchParams.get('ses')
+    const cookies = [process.env.BOOKING_COOKIE || '', session ? `ses=${session}` : ''].filter(Boolean)
+    if (cookies.length) headers.Cookie = cookies.join('; ')
+  }
+  return headers
+}
+
 export async function POST(req: NextRequest) {
   const {
     url, firmaId, lunaId, section, supplier, description, reference, transactionId,
@@ -35,18 +50,13 @@ export async function POST(req: NextRequest) {
   const response = await fetch(source, {
     redirect: 'follow',
     signal: AbortSignal.timeout(30_000),
-    headers: {
-      'Accept': 'application/pdf,application/octet-stream;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'ro-RO,ro;q=0.9,en;q=0.8',
-      'Referer': `${source.origin}/`,
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0 Safari/537.36',
-    },
+    headers: downloadHeaders(source),
   })
   if (!response.ok) {
     const bookingLoginRequired = source.hostname.endsWith('booking.com') && response.status === 401
     return NextResponse.json({
       error: bookingLoginRequired
-        ? 'Linkul Booking necesită sesiunea autentificată. Deschide linkul, descarcă PDF-ul și încarcă-l în această categorie.'
+        ? 'Booking cere autentificare server. Pentru import direct setează BOOKING_COOKIE în .env.local cu cookie-ul sesiunii Booking.'
         : `Platforma sursă a răspuns cu status ${response.status}`,
       bookingLoginRequired,
       sourceUrl: bookingLoginRequired ? source.toString() : undefined,
