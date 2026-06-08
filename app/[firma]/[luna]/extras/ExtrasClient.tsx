@@ -20,6 +20,7 @@ interface Tx {
   id: string; extras_id: string; data_tranzactie: string
   descriere: string; descriere_curatata: string
   tip: 'debit'|'credit'; suma: number; valuta: string
+  referinta: string|null
   categorie: string; document_id: string|null; note: string|null
   documente: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }|null
 }
@@ -196,9 +197,12 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         ) : (
           <>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px', flexWrap:'wrap', gap:'10px' }}>
-              <h2 style={{ fontSize:'16px', fontWeight:700, color:'#FFF' }}>
-                Tranzacții <span style={{ color:'#666', fontWeight:400 }}>({filtered.length})</span>
-              </h2>
+              <div>
+                <h2 style={{ fontSize:'16px', fontWeight:700, color:'#FFF' }}>
+                  Tranzacții individuale <span style={{ color:'#666', fontWeight:400 }}>({filtered.length})</span>
+                </h2>
+                <p style={{ fontSize:'11px', color:'#666', marginTop:'3px' }}>Selectează fiecare tranzacție și asociază manual documentul justificativ.</p>
+              </div>
               <div style={{ display:'flex', gap:'16px', alignItems:'center' }}>
                 {/* View Mode Toggle */}
                 <div style={{ display:'flex', background:'#161616', border:'1px solid #242424', padding:'3px', borderRadius:'10px' }}>
@@ -293,6 +297,7 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
   const [furnizor, setFurnizor] = useState('')
   const [numDoc, setNumDoc] = useState('')
   const [drag, setDrag] = useState(false)
+  const [uploadError, setUploadError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const isNA = tx.note==='na', isDone=!!tx.document_id
@@ -301,14 +306,18 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
   const r = `${parseInt(culoare.slice(1,3),16)},${parseInt(culoare.slice(3,5),16)},${parseInt(culoare.slice(5,7),16)}`
 
   async function upload(files: FileList) {
+    if (!files.length) return
     setUploading(true)
+    setUploadError('')
     const fd = new FormData()
     fd.append('file', files[0]); fd.append('txId', tx.id)
     fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
     fd.append('tip', tip); fd.append('furnizor', furnizor); fd.append('numDoc', numDoc)
     const res = await fetch('/api/tranzactii/doc', { method:'POST', body:fd })
     setUploading(false)
-    if (res.ok) { setOpen(false); onDone() }
+    if (res.ok) { setOpen(false); onDone(); return }
+    const data = await res.json().catch(() => ({}))
+    setUploadError(data.error || 'Documentul nu a putut fi asociat')
   }
 
   const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'7px 11px', color:'#BBB', outline:'none', width:'100%' }
@@ -366,6 +375,7 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
             {uploading?<p style={{fontSize:'12px',color:'#777'}}>Se încarcă...</p>:<p style={{fontSize:'12px',fontWeight:600,color:'#888'}}>drag & drop sau click · PDF / JPG / PNG</p>}
           </div>
           <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{display:'none'}} onChange={e=>e.target.files&&upload(e.target.files)}/>
+          {uploadError && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'8px' }}>{uploadError}</p>}
         </div>
       )}
 
@@ -394,7 +404,8 @@ interface WorkspaceViewProps {
 }
 
 function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, culoare, onNA, onClearNA, onUploadSuccess }: WorkspaceViewProps) {
-  const activeTx = txs[activeTxIndex]
+  const safeIndex = Math.min(activeTxIndex, Math.max(txs.length - 1, 0))
+  const activeTx = txs[safeIndex]
 
   if (!activeTx) {
     return (
@@ -452,6 +463,8 @@ function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, 
               }}
             >
               <span>#{idx + 1}</span>
+              <span style={{ opacity:.75 }}>{new Date(tx.data_tranzactie).toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit'})}</span>
+              <span>{tx.tip==='credit'?'+':'-'}{tx.suma.toFixed(2)} {tx.valuta}</span>
               {isDone && <span style={{ fontSize:'10px' }}>✓</span>}
               {isNA && <span style={{ fontSize:'10px' }}>✕</span>}
             </button>
@@ -462,13 +475,13 @@ function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, 
       {/* Active Transaction Workspace Card */}
       <WorkspaceCard 
         tx={activeTx} 
-        index={activeTxIndex} 
+        index={safeIndex}
         total={txs.length} 
         firmaId={firmaId} 
         lunaId={lunaId} 
         culoare={culoare}
-        onPrev={activeTxIndex > 0 ? () => setActiveTxIndex(activeTxIndex - 1) : undefined}
-        onNext={activeTxIndex < txs.length - 1 ? () => setActiveTxIndex(activeTxIndex + 1) : undefined}
+        onPrev={safeIndex > 0 ? () => setActiveTxIndex(safeIndex - 1) : undefined}
+        onNext={safeIndex < txs.length - 1 ? () => setActiveTxIndex(safeIndex + 1) : undefined}
         onNA={() => onNA(activeTx.id)}
         onClearNA={() => onClearNA(activeTx.id)}
         onUploadSuccess={() => onUploadSuccess(activeTx.id)}
@@ -496,6 +509,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   const [furnizor, setFurnizor] = useState('')
   const [numDoc, setNumDoc] = useState('')
   const [drag, setDrag] = useState(false)
+  const [uploadError, setUploadError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const isNA = tx.note==='na', isDone=!!tx.document_id
@@ -509,11 +523,13 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     setNumDoc(tx.documente?.numar_document || '')
     setTip(tx.documente?.tip_document || 'factura')
     setEditDoc(false)
+    setUploadError('')
   }, [tx])
 
   async function upload(files: FileList) {
     if (!files.length) return
     setUploading(true)
+    setUploadError('')
     const fd = new FormData()
     fd.append('file', files[0]); fd.append('txId', tx.id)
     fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
@@ -522,7 +538,10 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     setUploading(false)
     if (res.ok) {
       onUploadSuccess()
+      return
     }
+    const data = await res.json().catch(() => ({}))
+    setUploadError(data.error || 'Documentul nu a putut fi asociat')
   }
 
   const INP: React.CSSProperties = { fontSize:'13px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'10px 14px', color:'#BBB', outline:'none', width:'100%' }
@@ -715,6 +734,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
               )}
             </div>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{display:'none'}} onChange={e=>e.target.files&&upload(e.target.files)}/>
+            {uploadError && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'8px' }}>{uploadError}</p>}
           </div>
         )}
       </div>
