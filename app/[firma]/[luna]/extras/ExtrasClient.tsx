@@ -197,7 +197,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
       </aside>
 
       {/* Main */}
-      <main style={{ flex:1, padding:'40px 44px', background:'#0F0F0F' }}>
+      <main style={{ flex:1, minWidth:0, padding:'40px 44px', background:'#0F0F0F', overflowX:'hidden' }}>
         <div style={{ marginBottom:'28px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' }}>
             <div style={{ width:'9px', height:'9px', borderRadius:'50%', background:c }}/>
@@ -449,9 +449,9 @@ function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, 
   }
 
   return (
-    <div>
-      {/* Horizontal Tabs Bar */}
-      <div style={{ display:'flex', gap:'8px', overflowX:'auto', paddingBottom:'14px', marginBottom:'24px', scrollbarWidth:'thin' }}>
+    <div style={{ minWidth:0, maxWidth:'100%' }}>
+      {/* Transaction selector */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(145px, 1fr))', gap:'7px', maxHeight:'156px', overflowY:'auto', overflowX:'hidden', padding:'8px', marginBottom:'20px', background:'#111', border:'1px solid #202020', borderRadius:'12px', scrollbarWidth:'thin' }}>
         {txs.map((tx, idx) => {
           const isCurrent = idx === activeTxIndex
           const isDone = !!tx.document_id
@@ -480,24 +480,25 @@ function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, 
               key={tx.id}
               onClick={() => setActiveTxIndex(idx)}
               style={{
-                padding:'8px 16px',
+                padding:'8px 10px',
                 borderRadius:'9px',
-                fontSize:'12px',
+                fontSize:'11px',
                 fontWeight:600,
                 cursor:'pointer',
                 border:`1px solid ${borderCol}`,
                 background:bgCol,
                 color:txtCol,
-                whiteSpace:'nowrap',
                 transition:'all .2s ease',
                 display:'flex',
                 alignItems:'center',
-                gap:'6px'
+                justifyContent:'space-between',
+                gap:'5px',
+                minWidth:0
               }}
             >
               <span>#{idx + 1}</span>
               <span style={{ opacity:.75 }}>{new Date(tx.data_tranzactie).toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit'})}</span>
-              <span>{tx.tip==='credit'?'+':'-'}{tx.suma.toFixed(2)} {tx.valuta}</span>
+              <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tx.tip==='credit'?'+':'-'}{tx.suma.toFixed(2)} {tx.valuta}</span>
               {isDone && <span style={{ fontSize:'10px' }}>✓</span>}
               {isNA && <span style={{ fontSize:'10px' }}>✕</span>}
             </button>
@@ -584,12 +585,12 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   }
 
   return (
-    <div style={{ background:'#141414', border:'1px solid #222', borderRadius:'16px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'32px', padding:'32px', minHeight:'420px', position:'relative', overflow:'hidden' }}>
+    <div style={{ background:'#141414', border:'1px solid #222', borderRadius:'16px', display:'flex', flexDirection:'column', padding:'28px 32px', minHeight:'420px', position:'relative', overflow:'hidden', maxWidth:'100%' }}>
       {/* Background radial highlight */}
       <div style={{ position:'absolute', width:'300px', height:'300px', background:`radial-gradient(circle, rgba(${r},0.04) 0%, rgba(0,0,0,0) 70%)`, top:'-100px', left:'-100px', pointerEvents:'none' }} />
 
       {/* Left Column: Details & Nav */}
-      <div style={{ display:'flex', flexDirection:'column', justifyContent:'space-between', zIndex:1 }}>
+      <div style={{ display:'flex', flexDirection:'column', justifyContent:'space-between', zIndex:1, minWidth:0 }}>
         <div>
           {/* Header */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px' }}>
@@ -655,8 +656,8 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
         </div>
       </div>
 
-      {/* Right Column: Upload / Success */}
-      <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', borderLeft:'1px solid #1E1E1E', paddingLeft:'32px', zIndex:1 }}>
+      {/* Bottom: Upload / Success */}
+      <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', borderTop:'1px solid #1E1E1E', paddingTop:'24px', marginTop:'26px', zIndex:1 }}>
         {isDone && !editDoc ? (
           /* Success Card */
           <div style={{ textAlign:'center', padding:'20px 0' }}>
