@@ -831,7 +831,11 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
       url:sourceUrl, firmaId, lunaId, itemId:item.id, documentType:tip, description:desc,
     }) })
     if (res.ok) { setSourceUrl(''); await loadDocs() }
-    else setError((await res.json().catch(()=>({}))).error || 'Importul din link nu a reușit')
+    else {
+      const data = await res.json().catch(()=>({}))
+      if (data.bookingLoginRequired && data.sourceUrl) window.open(data.sourceUrl, '_blank', 'noopener,noreferrer')
+      setError(data.error || 'Importul din link nu a reușit')
+    }
     setUploading(false)
   }
 

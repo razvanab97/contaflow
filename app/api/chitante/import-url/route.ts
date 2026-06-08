@@ -42,7 +42,16 @@ export async function POST(req: NextRequest) {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0 Safari/537.36',
     },
   })
-  if (!response.ok) return NextResponse.json({ error: `Platforma sursă a răspuns cu status ${response.status}` }, { status: 502 })
+  if (!response.ok) {
+    const bookingLoginRequired = source.hostname.endsWith('booking.com') && response.status === 401
+    return NextResponse.json({
+      error: bookingLoginRequired
+        ? 'Linkul Booking necesită sesiunea autentificată. Deschide linkul, descarcă PDF-ul și încarcă-l în această categorie.'
+        : `Platforma sursă a răspuns cu status ${response.status}`,
+      bookingLoginRequired,
+      sourceUrl: bookingLoginRequired ? source.toString() : undefined,
+    }, { status: bookingLoginRequired ? 401 : 502 })
+  }
   const contentType = response.headers.get('content-type') || ''
   const bytes = Buffer.from(await response.arrayBuffer())
   if (!contentType.toLowerCase().includes('pdf') && !bytes.subarray(0, 5).equals(Buffer.from('%PDF-')))
