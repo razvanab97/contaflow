@@ -462,6 +462,8 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   const selectedFirma = firme.find(firma => firma.id === firmaId) || firmaInitiala
   const selectedLunaId = selectedFirma.luna_id || lunaIdInitial
   const [number, setNumber] = useState('')
+  const [documents, setDocuments] = useState<{id:string;fisier_nume:string;numar_document:string;furnizor:string}[]>([])
+  const [deletingId, setDeletingId] = useState('')
   const [date, setDate] = useState(new Date().toLocaleDateString('ro-RO'))
   const [beneficiary, setBeneficiary] = useState('')
   const [amount, setAmount] = useState('')
@@ -479,7 +481,7 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   const loadNumber = useCallback(async () => {
     const res = await fetch(`/api/chitante/dispozitie?lunaId=${encodeURIComponent(selectedLunaId)}`)
     const data = await res.json().catch(() => ({}))
-    if (res.ok) setNumber(data.nextNumber)
+    if (res.ok) { setNumber(data.nextNumber); setDocuments(data.documents || []) }
   }, [selectedLunaId])
   const loadTemplate = useCallback(async () => {
     const res = await fetch(`/api/chitante/dispozitie/template?firmaId=${encodeURIComponent(selectedFirma.id)}`)
@@ -516,6 +518,15 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
     setError(await downloadGeneralPdf({ lunaId:selectedLunaId, title:`Dispozitii_plata_${selectedFirma.nume}`, scope:{ section:'dispozitii-plata' } }, `Dispozitii_plata_${selectedFirma.nume}.pdf`))
     setPdfBusy(false)
   }
+  async function deleteDisposition(document: {id:string;fisier_nume:string}) {
+    if (!window.confirm(`Ștergi definitiv dispoziția „${document.fisier_nume}”? Nu va mai apărea în PDF-ul general sau în ZIP.`)) return
+    setDeletingId(document.id); setError('')
+    const res = await fetch(`/api/chitante/dispozitie?id=${encodeURIComponent(document.id)}`, { method:'DELETE' })
+    const data = await res.json().catch(()=>({}))
+    if (!res.ok) setError(data.error || 'Dispoziția nu a putut fi ștearsă')
+    else { setNumber(data.nextNumber || number); setDocuments(current=>current.filter(entry=>entry.id!==document.id)) }
+    setDeletingId('')
+  }
   async function generate() {
     setError('')
     const res = await fetch('/api/chitante/dispozitie', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
@@ -533,6 +544,11 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
         <button onClick={saveTemplate} disabled={templateBusy} style={{fontSize:'11px',border:'1px solid #333',borderRadius:'7px',background:'#202020',color:'#CCC',padding:'6px 10px',cursor:'pointer'}}>{templateBusy?'Se salvează...':'Salvează șablonul'}</button>
         <button onClick={resetNumber} style={{fontSize:'11px',border:'1px solid #5B3030',borderRadius:'7px',background:'#241515',color:'#F87171',padding:'6px 10px',cursor:'pointer'}}>Resetează la 01</button>
       </div>
+      {documents.map(document=><div key={document.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'#181818', borderRadius:'8px' }}>
+        <span style={{ flex:1, fontSize:'11px', color:'#CCC' }}>DP nr. {document.numar_document} · {document.furnizor || document.fisier_nume}</span>
+        <a href={`/api/chitante/document?id=${encodeURIComponent(document.id)}`} style={{ fontSize:'10px', color:culoare }}>Descarcă</a>
+        <button onClick={()=>deleteDisposition(document)} disabled={deletingId===document.id} style={{ fontSize:'10px', color:'#F87171', background:'#241515', border:'1px solid #5B3030', borderRadius:'6px', padding:'4px 7px', cursor:'pointer' }}>{deletingId===document.id?'Se șterge...':'Șterge definitiv'}</button>
+      </div>)}
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px' }}>
         <select value={firmaId} onChange={e=>setFirmaId(e.target.value)} style={INP}>{firme.map(f=><option key={f.id} value={f.id}>{f.nume}</option>)}</select>
         <input readOnly value={number} placeholder="Număr automat" style={{...INP,color:culoare,fontWeight:700}}/>

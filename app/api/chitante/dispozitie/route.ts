@@ -60,7 +60,17 @@ export async function GET(req: NextRequest) {
   const lunaId = req.nextUrl.searchParams.get('lunaId')
   if (!lunaId) return NextResponse.json({ error: 'Luna contabilă lipsește' }, { status: 400 })
   try {
-    return NextResponse.json({ nextNumber: await getNextNumber(lunaId) })
+    const sb = getServiceSupabase()
+    const { data: documents, error } = await sb
+      .from('documente')
+      .select('id,fisier_nume,numar_document,furnizor,created_at')
+      .eq('luna_id', lunaId)
+      .eq('modul', 'acte_contabile')
+      .eq('tip_document', 'dispozitie_plata')
+      .like('fisier_path', '%/dispozitii-plata/%')
+      .order('created_at', { ascending: true })
+    if (error) throw new Error(error.message)
+    return NextResponse.json({ nextNumber: await getNextNumber(lunaId), documents: documents || [] })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
@@ -257,4 +267,27 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
+}
+
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'Dispoziția de plată lipsește' }, { status: 400 })
+
+  const sb = getServiceSupabase()
+  const { data: document, error } = await sb
+    .from('documente')
+    .select('id,luna_id,fisier_path,tip_document')
+    .eq('id', id)
+    .eq('modul', 'acte_contabile')
+    .eq('tip_document', 'dispozitie_plata')
+    .single()
+  if (error || !document || !String(document.fisier_path).includes('/dispozitii-plata/'))
+    return NextResponse.json({ error: 'Dispoziția de plată nu a fost găsită' }, { status: 404 })
+
+  const { error: storageError } = await sb.storage.from('documente').remove([document.fisier_path])
+  if (storageError) return NextResponse.json({ error: `Fișierul nu a putut fi șters: ${storageError.message}` }, { status: 500 })
+  const { error: deleteError } = await sb.from('documente').delete().eq('id', id)
+  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
+
+  return NextResponse.json({ ok: true, nextNumber: await getNextNumber(document.luna_id) })
 }
