@@ -1,10 +1,8 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 
 const MOD_LABELS: Record<string,string> = { extras:'Extras de cont', emag:'Emag facturi', trendyol:'Trendyol', booking:'Booking', airbnb:'Airbnb', '5stardesk':'5starDesk', angajati:'Documente angajați', resurse_umane:'Resurse umane', acte_contabile:'Acte contabile' }
-const UPLOAD_MODS = ['emag','trendyol','booking','airbnb','5stardesk','angajati','resurse_umane','acte_contabile']
 const TIP_OPT = ['aviz_plata','factura','borderou','raport_csv','chenzina','foaie_prezenta','stat_plata','contract','altul']
 const TIP_LBL: Record<string,string> = { aviz_plata:'Aviz plată', factura:'Factură', borderou:'Borderou', raport_csv:'Raport CSV', chenzina:'Chenzina', foaie_prezenta:'Foaie prezență', stat_plata:'Stat plată', contract:'Contract', altul:'Altul' }
 
@@ -151,7 +149,7 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
                   </div>
                 </div>
                 {modItems.map((item, idx) => (
-                  <ChecklistItemRow key={item.id} item={item} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} hasUpload={UPLOAD_MODS.includes(mod)} borderTop={idx>0} onToggle={()=>toggleChecklistItem(item)} />
+                  <ChecklistItemRow key={item.id} item={item} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} hasUpload borderTop={idx>0} onToggle={()=>toggleChecklistItem(item)} />
                 ))}
               </div>
             )
@@ -308,7 +306,7 @@ function EmagMonthlyPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:stri
         <button onClick={()=>removeInvoice(document)} style={{ fontSize:'10px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>Șterge</button>
       </div>)}
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:'8px', marginTop:'12px' }}>
-        <input value={url} onChange={event=>setUrl(event.target.value)} placeholder="Link PDF Oblio pentru factura Dante International" style={INP}/>
+        <input value={url} onChange={event=>setUrl(event.target.value)} placeholder="Link PDF Oblio sau altă platformă pentru factura Dante" style={INP}/>
         <select value={category} onChange={event=>setCategory(event.target.value)} style={INP}><option value="automat">Categorie automată AI</option>{Object.entries(categoryLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select>
         <select value={effect} onChange={event=>setEffect(event.target.value as 'automat'|'cheltuiala'|'reducere')} style={INP}><option value="automat">Efect automat AI</option><option value="cheltuiala">Cheltuială</option><option value="reducere">Reducere / storno</option></select>
         <input type="number" min="0" step="0.01" value={amount} onChange={event=>setAmount(event.target.value)} placeholder="Total RON (opțional, extras AI)" style={INP}/>
@@ -390,7 +388,7 @@ function InvoiceDocumentsPanel({ title, description, section, firma, lunaId, cul
 
   async function importUrl() {
     setBusy(true); setError('')
-    const res = await fetch('/api/chitante/import-url', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ url:sourceUrl, firmaId:firma.id, lunaId, section, supplier, description:descriptionValue, reference, transactionId }) })
+    const res = await fetch('/api/chitante/import-url', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ url:sourceUrl, firmaId:firma.id, lunaId, section, supplier, description:descriptionValue, reference, transactionId, documentType }) })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setError(data.error || 'Importul din link nu a reușit')
     else { setSourceUrl(''); await load() }
@@ -443,7 +441,7 @@ function InvoiceDocumentsPanel({ title, description, section, firma, lunaId, cul
         </div>
         {transactionId && <p style={{ fontSize:'11px', color:'#4ADE80', marginTop:'6px' }}>Tranzacția selectată va fi asociată documentului. Descrierea și referința sunt păstrate pentru verificare.</p>}
         <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginTop:'8px' }}>
-          <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Link PDF Oblio" style={INP}/>
+          <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Link PDF Oblio sau altă platformă" style={INP}/>
           <button onClick={importUrl} disabled={busy || !sourceUrl} style={{ padding:'8px 14px', border:'none', borderRadius:'8px', background:culoare, color:'#FFF', cursor:'pointer', opacity:busy?.6:1 }}>Importă linkul</button>
         </div>
         <button onClick={()=>fileRef.current?.click()} disabled={busy} style={{ marginTop:'8px', width:'100%', padding:'12px', border:`1.5px dashed rgba(${r},.4)`, borderRadius:'9px', background:'#0D0D0D', color:'#999', cursor:'pointer' }}>
@@ -797,9 +795,10 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
   const [merging, setMerging] = useState(false)
   const [tip, setTip] = useState('aviz_plata')
   const [desc, setDesc] = useState('')
+  const [sourceUrl, setSourceUrl] = useState('')
+  const [error, setError] = useState('')
   const [drag, setDrag] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const router = useRouter()
   const t = item.checklist_templates
   const r = rgb(culoare)
 
@@ -816,13 +815,24 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
   }
 
   async function upload(files: FileList) {
-    setUploading(true)
+    setUploading(true); setError('')
     for (const f of Array.from(files)) {
       const fd = new FormData()
       fd.append('file',f); fd.append('itemId',item.id); fd.append('firmaId',firmaId); fd.append('lunaId',lunaId); fd.append('tip',tip); fd.append('desc',desc)
-      await fetch('/api/checklist/upload', { method:'POST', body:fd })
+      const res = await fetch('/api/checklist/upload', { method:'POST', body:fd })
+      if (!res.ok) { setError((await res.json().catch(()=>({}))).error || 'Fișierul nu a putut fi încărcat'); break }
     }
-    await loadDocs(); setUploading(false); router.refresh()
+    await loadDocs(); setUploading(false)
+  }
+
+  async function importUrl() {
+    setUploading(true); setError('')
+    const res = await fetch('/api/chitante/import-url', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      url:sourceUrl, firmaId, lunaId, itemId:item.id, documentType:tip, description:desc,
+    }) })
+    if (res.ok) { setSourceUrl(''); await loadDocs() }
+    else setError((await res.json().catch(()=>({}))).error || 'Importul din link nu a reușit')
+    setUploading(false)
   }
 
   async function merge() {
@@ -879,6 +889,10 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
               </select>
               <input type="text" placeholder="Descriere (opțional)" value={desc} onChange={e=>setDesc(e.target.value)} style={INP}/>
             </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginBottom:'10px' }}>
+              <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Link PDF Oblio sau altă platformă" style={INP}/>
+              <button onClick={importUrl} disabled={uploading||!sourceUrl} style={{ padding:'8px 14px', border:'none', borderRadius:'8px', background:culoare, color:'#FFF', cursor:'pointer', opacity:uploading?.6:1 }}>Importă linkul</button>
+            </div>
             <div onClick={()=>fileRef.current?.click()} onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);e.dataTransfer.files.length&&upload(e.dataTransfer.files)}}
               style={{ border:`1.5px dashed ${drag?culoare:'#2A2A2A'}`, borderRadius:'10px', padding:'20px', textAlign:'center', cursor:'pointer', background:drag?`rgba(${r},.06)`:'#0D0D0D' }}>
               {uploading
@@ -887,6 +901,7 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
               }
             </div>
             <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e=>e.target.files&&upload(e.target.files)}/>
+            {error && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'8px' }}>{error}</p>}
           </div>
         </div>
       )}

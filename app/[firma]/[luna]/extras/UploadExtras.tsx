@@ -33,7 +33,7 @@ export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare,
     fd.append('lunaId', lunaId); fd.append('valuta', valuta)
     const res = await fetch('/api/extras/upload', { method: 'POST', body: fd })
     const d = await res.json()
-    if (res.ok && d.ok) { setStatus(`✓ ${d.count} tranzacții`); onDone() }
+    if (res.ok && d.ok) { setStatus(`✓ ${d.count} tranzacții · ${d.valuta || valuta}`); onDone() }
     else setErr(d.error || 'Eroare')
     setLoading(false)
   }
@@ -42,7 +42,7 @@ export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare,
     <div style={{ background: '#161616', border: `1px solid rgba(${r},.2)`, borderRadius: '14px', padding: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
         <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: extras?.nr_tranzactii ? '#4ADE80' : '#333' }} />
-        <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFF' }}>Extras {valuta}</span>
+        <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFF' }}>{valuta === 'AUTO' ? 'Citire extras cu AI' : `Extras ${valuta}`}</span>
         {extras?.nr_tranzactii ? (
           <span style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: 'rgba(74,222,128,.15)', color: '#4ADE80' }}>
             {extras.nr_tranzactii} tx ✓
@@ -51,6 +51,12 @@ export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare,
           <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#555' }}>neîncărcat</span>
         )}
       </div>
+
+      {valuta === 'AUTO' && (
+        <p style={{ margin: '0 0 14px', fontSize: '11px', lineHeight: 1.5, color: '#777' }}>
+          Încarcă extrasul PDF, iar AI identifică automat moneda și tranzacțiile.
+        </p>
+      )}
 
       {extras?.nr_tranzactii ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
@@ -71,11 +77,13 @@ export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare,
         </div>
       ) : (
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: '9px', border: 'none', background: culoare, color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-            ↑ Import CSV
-          </button>
-          <button onClick={() => pdfRef.current?.click()} style={{ padding: '9px 14px', borderRadius: '9px', border: `1px solid rgba(${r},.3)`, background: 'transparent', color: culoare, fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-            PDF + AI
+          {valuta !== 'AUTO' && (
+            <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: '9px', border: 'none', background: culoare, color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+              ↑ Import CSV
+            </button>
+          )}
+          <button onClick={() => pdfRef.current?.click()} style={{ flex: valuta === 'AUTO' ? 1 : undefined, padding: '9px 14px', borderRadius: '9px', border: `1px solid rgba(${r},.3)`, background: 'transparent', color: culoare, fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+            {valuta === 'AUTO' ? 'Alege PDF · AI detectează moneda' : 'PDF + citire AI'}
           </button>
         </div>
       )}

@@ -43,14 +43,15 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const [exportingDocs, setExportingDocs] = useState(false)
   const [exportError, setExportError] = useState('')
   const restoredActiveId = useRef<string|null>(null)
+  const pendingFocusId = useRef<string|null>(null)
   const restoredScrollY = useRef(0)
   const restored = useRef(false)
   const positionRestored = useRef(false)
   const c = firma.culoare || '#F27A1A'
   const workspaceKey = `contaflow:extras-workspace:${lunaId}`
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError('')
     try {
       // Load extrase counts
@@ -61,9 +62,9 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
       }
       // Load tranzactii via server API (avoids RLS/CORS issues)
       const res = await fetch(`/api/tranzactii/list?lunaId=${lunaId}`)
-      if (!res.ok) { setError(`Server error ${res.status}`); setLoading(false); return }
+      if (!res.ok) { setError(`Server error ${res.status}`); if (!silent) setLoading(false); return }
       const data = await res.json()
-      if (!Array.isArray(data)) { setError('Format invalid'); setLoading(false); return }
+      if (!Array.isArray(data)) { setError('Format invalid'); if (!silent) setLoading(false); return }
       // Sort unresolved first
       data.sort((a: Tx, b: Tx) => {
         const aR = !!a.document_id || a.note === 'na'
@@ -79,7 +80,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     } catch(e) {
       setError(String(e))
     }
-    setLoading(false)
+    if (!silent) setLoading(false)
   }, [lunaId])
 
   useEffect(() => {
@@ -130,6 +131,13 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     requestAnimationFrame(() => window.scrollTo({ top: restoredScrollY.current }))
     positionRestored.current = true
   }, [filtered, loading])
+
+  useEffect(() => {
+    if (!pendingFocusId.current) return
+    const nextIndex = filtered.findIndex(tx => tx.id === pendingFocusId.current)
+    if (nextIndex >= 0) setActiveTxIndex(nextIndex)
+    pendingFocusId.current = null
+  }, [filtered])
 
   useEffect(() => {
     if (extrase.length && !extrase.some(extras => extras.id === activeExtrasId)) {
@@ -213,9 +221,9 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
       }
     }
     if (nextIdx !== -1) {
-      setActiveTxIndex(nextIdx)
+      pendingFocusId.current = filtered[nextIdx].id
     }
-    load()
+    load(true)
   }, [activeTxIndex, filtered, load])
 
   const PB = (dis: boolean, act=false): React.CSSProperties => ({
@@ -270,11 +278,14 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           <p style={{ fontSize:'13px', color:'#888', marginLeft:'17px' }}>{firma.nume} · {lunaLabel}</p>
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'40px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px' }}>
           {['RON','EUR'].map(v => (
             <UploadExtras key={v} valuta={v} firmaId={firma.id} lunaId={lunaId}
               extras={extrase.find(x => x.valuta===v)||null} culoare={c} onDone={load}/>
           ))}
+        </div>
+        <div style={{ marginBottom:'40px' }}>
+          <UploadExtras valuta="AUTO" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load}/>
         </div>
 
         {extrase.length > 0 && (
@@ -299,7 +310,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         ) : error ? (
           <div style={{ padding:'24px', background:'rgba(248,113,113,.08)', border:'1px solid rgba(248,113,113,.3)', borderRadius:'12px' }}>
             <p style={{ fontSize:'13px', color:'#F87171' }}>Eroare: {error}</p>
-            <button onClick={load} style={{ marginTop:'10px', fontSize:'12px', padding:'6px 14px', borderRadius:'7px', border:'none', background:c, color:'#fff', cursor:'pointer' }}>Reîncearcă</button>
+            <button onClick={()=>load()} style={{ marginTop:'10px', fontSize:'12px', padding:'6px 14px', borderRadius:'7px', border:'none', background:c, color:'#fff', cursor:'pointer' }}>Reîncearcă</button>
           </div>
         ) : scopedTxs.length === 0 ? (
           <div style={{ padding:'40px', background:'#161616', border:'1px solid #242424', borderRadius:'12px', textAlign:'center' }}>
@@ -406,6 +417,7 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
   const [tip, setTip] = useState('factura')
   const [furnizor, setFurnizor] = useState('')
   const [numDoc, setNumDoc] = useState('')
+  const [sourceUrl, setSourceUrl] = useState('')
   const [drag, setDrag] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -428,6 +440,16 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
     if (res.ok) { setOpen(false); onDone(); return }
     const data = await res.json().catch(() => ({}))
     setUploadError(data.error || 'Documentul nu a putut fi asociat')
+  }
+
+  async function importUrl() {
+    setUploading(true); setUploadError('')
+    const res = await fetch('/api/chitante/import-url', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      url:sourceUrl, firmaId, lunaId, transactionId:tx.id, documentType:tip, supplier:furnizor, reference:numDoc,
+    }) })
+    setUploading(false)
+    if (res.ok) { setSourceUrl(''); setOpen(false); onDone(); return }
+    setUploadError((await res.json().catch(()=>({}))).error || 'Importul din link nu a reușit')
   }
 
   const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'7px 11px', color:'#BBB', outline:'none', width:'100%' }
@@ -477,6 +499,10 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
             </select>
             <input type="text" placeholder="Furnizor" value={furnizor} onChange={e=>setFurnizor(e.target.value)} style={INP}/>
             <input type="text" placeholder="Nr. document" value={numDoc} onChange={e=>setNumDoc(e.target.value)} style={INP}/>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginBottom:'10px' }}>
+            <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Link PDF Oblio sau altă platformă" style={INP}/>
+            <button onClick={importUrl} disabled={uploading||!sourceUrl} style={{ padding:'8px 14px', border:'none', borderRadius:'8px', background:culoare, color:'#FFF', cursor:'pointer', opacity:uploading?.6:1 }}>Importă linkul</button>
           </div>
           <div onClick={()=>fileRef.current?.click()}
             onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)}
@@ -651,6 +677,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   const [tip, setTip] = useState('factura')
   const [furnizor, setFurnizor] = useState('')
   const [numDoc, setNumDoc] = useState('')
+  const [sourceUrl, setSourceUrl] = useState('')
   const [drag, setDrag] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -665,6 +692,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     setFurnizor(tx.documente?.furnizor || '')
     setNumDoc(tx.documente?.numar_document || '')
     setTip(tx.documente?.tip_document || 'factura')
+    setSourceUrl('')
     setEditDoc(false)
     setUploadError('')
   }, [tx])
@@ -685,6 +713,16 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     }
     const data = await res.json().catch(() => ({}))
     setUploadError(data.error || 'Documentul nu a putut fi asociat')
+  }
+
+  async function importUrl() {
+    setUploading(true); setUploadError('')
+    const res = await fetch('/api/chitante/import-url', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      url:sourceUrl, firmaId, lunaId, transactionId:tx.id, documentType:tip, supplier:furnizor, reference:numDoc,
+    }) })
+    setUploading(false)
+    if (res.ok) { setSourceUrl(''); onUploadSuccess(); return }
+    setUploadError((await res.json().catch(()=>({}))).error || 'Importul din link nu a reușit')
   }
 
   const INP: React.CSSProperties = { fontSize:'13px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'10px 14px', color:'#BBB', outline:'none', width:'100%' }
@@ -882,6 +920,12 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                   <p style={{fontSize:'10px',color:'#555'}}>drag & drop sau click pentru navigare</p>
                 </div>
               )}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginTop:'10px' }}>
+              <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Link PDF Oblio sau altă platformă" style={INP}/>
+              <button onClick={importUrl} disabled={uploading||!sourceUrl} style={{ ...BTN, background:culoare, color:'#FFF', opacity:(uploading||!sourceUrl)?.5:1 }}>
+                Importă linkul
+              </button>
             </div>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{display:'none'}} onChange={e=>e.target.files&&upload(e.target.files)}/>
             {uploadError && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'8px' }}>{uploadError}</p>}

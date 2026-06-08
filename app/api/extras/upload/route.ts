@@ -53,22 +53,12 @@ export async function POST(req: NextRequest) {
     const file = fd.get('pdf') as File
     const firmaId = fd.get('firmaId') as string
     const lunaId = fd.get('lunaId') as string
-    const valuta = fd.get('valuta') as string
+    const selectedValuta = String(fd.get('valuta') || '').toUpperCase()
 
-    if (!file || !firmaId || !lunaId || !valuta)
+    if (!file || !firmaId || !lunaId)
       return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
 
     const buf = Buffer.from(await file.arrayBuffer())
-    const storagePath = `${firmaId}/${lunaId}/${valuta}_${Date.now()}.pdf`
-
-    // Upload PDF
-    const upRes = await fetch(`${SB}/storage/v1/object/extrase-pdf/${storagePath}`, {
-      method: 'POST',
-      headers: { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
-      body: buf
-    })
-    if (!upRes.ok) return NextResponse.json({ error: 'Storage: ' + await upRes.text() }, { status: 500 })
-
     // AI - folosim Haiku (de 10x mai ieftin decat Opus)
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -92,7 +82,7 @@ Exclude randurile: RULAJ ZI, SOLD FINAL, SOLD ANTERIOR, SOLD INITIAL.` }
 
     // Parse robust - functioneaza si daca JSON e trunchiat
     let tranzactii: any[] = []
-    let iban = '', soldFinal = null
+    let iban = '', soldFinal = null, detectedValuta = ''
 
     // Incearca parse complet
     const fullMatch = raw.match(/\{[\s\S]*\}/)
@@ -102,6 +92,7 @@ Exclude randurile: RULAJ ZI, SOLD FINAL, SOLD ANTERIOR, SOLD INITIAL.` }
         tranzactii = parsed.tranzactii || []
         iban = parsed.iban || ''
         soldFinal = parsed.sold_final || null
+        detectedValuta = String(parsed.valuta || '').toUpperCase()
       } catch {
         // JSON trunchiat - extrage obiectele complete manual
         tranzactii = extractObjects(raw)
@@ -109,11 +100,24 @@ Exclude randurile: RULAJ ZI, SOLD FINAL, SOLD ANTERIOR, SOLD INITIAL.` }
         if (ibanM) iban = ibanM[1]
         const soldM = raw.match(/"sold_final"\s*:\s*([\d.]+)/)
         if (soldM) soldFinal = parseFloat(soldM[1])
+        const valutaM = raw.match(/"valuta"\s*:\s*"([^"]+)"/)
+        if (valutaM) detectedValuta = valutaM[1].toUpperCase()
       }
     }
 
     if (tranzactii.length === 0)
       return NextResponse.json({ error: `Nicio tranzactie extrasa. Preview AI: ${raw.slice(0, 200)}` }, { status: 500 })
+
+    const valuta = selectedValuta && selectedValuta !== 'AUTO'
+      ? selectedValuta
+      : detectedValuta || String(tranzactii[0]?.valuta || 'RON').toUpperCase()
+    const storagePath = `${firmaId}/${lunaId}/${valuta}_${Date.now()}.pdf`
+    const upRes = await fetch(`${SB}/storage/v1/object/extrase-pdf/${storagePath}`, {
+      method: 'POST',
+      headers: { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
+      body: buf
+    })
+    if (!upRes.ok) return NextResponse.json({ error: 'Storage: ' + await upRes.text() }, { status: 500 })
 
     // Sterge vechi
     const old = await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${valuta}&select=id`)
@@ -150,7 +154,7 @@ Exclude randurile: RULAJ ZI, SOLD FINAL, SOLD ANTERIOR, SOLD INITIAL.` }
       if (!r.ok) return NextResponse.json({ error: `Batch ${i}: ${await r.text()}` }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true, extrasId: extras.id, count: tranzactii.length })
+    return NextResponse.json({ ok: true, extrasId: extras.id, count: tranzactii.length, valuta })
 
   } catch (e: any) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
