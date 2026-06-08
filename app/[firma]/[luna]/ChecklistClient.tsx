@@ -34,7 +34,9 @@ async function downloadGeneralPdf(body: Record<string, unknown>, fallbackName: s
 export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaStatus, progresPct, items, extrase, slug, luna, lunaLabel }:
   { firma:Firma; firmeDisponibile:Firma[]; lunaId:string; lunaStatus:string; progresPct:number; items:Item[]; extrase:Extras[]; slug:string; luna:string; lunaLabel:string }
 ) {
-  const sorted = [...items].sort((a,b)=>(a.checklist_templates?.ordine||0)-(b.checklist_templates?.ordine||0))
+  const [checklistItems, setChecklistItems] = useState(items)
+  const [checklistError, setChecklistError] = useState('')
+  const sorted = [...checklistItems].sort((a,b)=>(a.checklist_templates?.ordine||0)-(b.checklist_templates?.ordine||0))
   const byMod: Record<string,Item[]> = {}
   for (const i of sorted) { const m=i.checklist_templates?.modul||'altul'; if(!byMod[m]) byMod[m]=[]; byMod[m]!.push(i) }
   const total = sorted.length, done = sorted.filter(i=>i.completat).length, pct = total>0?Math.round((done/total)*100):0
@@ -53,6 +55,16 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
     setGlobalPdfLoading(true); setExportError('')
     setExportError(await downloadGeneralPdf({ lunaId, title:`${firma.nume}_${luna}_toate_documentele` }, `${firma.nume}_${luna}_toate_documentele.pdf`))
     setGlobalPdfLoading(false)
+  }
+  async function toggleChecklistItem(item: Item) {
+    const next = !item.completat
+    setChecklistError('')
+    setChecklistItems(current => current.map(entry => entry.id === item.id ? { ...entry, completat: next } : entry))
+    const res = await fetch('/api/checklist/toggle', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ itemId:item.id, lunaId, completat:next }) })
+    if (!res.ok) {
+      setChecklistItems(current => current.map(entry => entry.id === item.id ? { ...entry, completat:item.completat } : entry))
+      setChecklistError((await res.json().catch(() => ({}))).error || 'Progresul nu a putut fi salvat')
+    }
   }
 
   const SB: React.CSSProperties = { fontSize:'13px', fontWeight:500, color:'#888', display:'flex', alignItems:'center', gap:'9px', padding:'8px 18px' }
@@ -101,6 +113,7 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
           </div>
         </div>
         {exportError && <p style={{ fontSize:'11px', color:'#F87171', marginBottom:'12px', textAlign:'right' }}>{exportError}</p>}
+        {checklistError && <p style={{ fontSize:'11px', color:'#F87171', marginBottom:'12px' }}>{checklistError}</p>}
 
         <div style={{ height:'3px', background:'#1E1E1E', borderRadius:'2px', marginBottom:'28px' }}>
           <div style={{ height:'3px', borderRadius:'2px', background:firma.culoare, width:`${pct}%` }}/>
@@ -138,7 +151,7 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
                   </div>
                 </div>
                 {modItems.map((item, idx) => (
-                  <ChecklistItemRow key={item.id} item={item} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} hasUpload={UPLOAD_MODS.includes(mod)} borderTop={idx>0} />
+                  <ChecklistItemRow key={item.id} item={item} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} hasUpload={UPLOAD_MODS.includes(mod)} borderTop={idx>0} onToggle={()=>toggleChecklistItem(item)} />
                 ))}
               </div>
             )
@@ -758,8 +771,8 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
   )
 }
 
-function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop }:
-  { item:Item; firmaId:string; lunaId:string; culoare:string; hasUpload:boolean; borderTop:boolean }
+function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop, onToggle }:
+  { item:Item; firmaId:string; lunaId:string; culoare:string; hasUpload:boolean; borderTop:boolean; onToggle:()=>void }
 ) {
   const [expanded, setExpanded] = useState(false)
   const [docs, setDocs] = useState<{id:string;fisier_nume:string;tip_document?:string}[]>([])
@@ -808,9 +821,9 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
   return (
     <div style={{ borderTop:borderTop?'1px solid #1A1A1A':'none', background:item.completat?'rgba(74,222,128,.04)':'transparent' }}>
       <div onClick={hasUpload?toggle:undefined} style={{ display:'flex', alignItems:'flex-start', gap:'12px', padding:'13px 18px', cursor:hasUpload?'pointer':'default' }}>
-        <div style={{ width:'17px', height:'17px', borderRadius:'5px', flexShrink:0, marginTop:'1px', border:item.completat?'none':'1.5px solid #333', background:item.completat?'#4ADE80':'transparent', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <button type="button" aria-label={item.completat?'Marchează ca nefinalizat':'Marchează ca finalizat'} onClick={event=>{event.stopPropagation();onToggle()}} style={{ width:'18px', height:'18px', padding:0, borderRadius:'5px', flexShrink:0, marginTop:'1px', border:item.completat?'none':'1.5px solid #555', background:item.completat?'#4ADE80':'transparent', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
           {item.completat && <svg width="10" height="10" fill="none" stroke="#0A0A0A" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>}
-        </div>
+        </button>
         <div style={{ flex:1 }}>
           <div style={{ display:'flex', alignItems:'center', gap:'7px', flexWrap:'wrap' }}>
             <span style={{ fontSize:'14px', fontWeight:item.completat?400:500, color:item.completat?'#555':'#DDD', textDecoration:item.completat?'line-through':'none' }}>{t?.titlu}</span>
