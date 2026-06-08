@@ -209,6 +209,10 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
     const docSupplier = doc?.furnizor || supplier
     setPurpose(docCategory === 'chirie' ? `Achitare chirie${docSupplier ? ` - ${docSupplier}` : ''}` : docCategory === 'utilitati' ? `Achitare utilitati${docSupplier ? ` - ${docSupplier}` : ''}` : `Achitare ${docSupplier || 'document cash'}`)
     setShowDisposition(true)
+    fetch(`/api/chitante/dispozitie?lunaId=${encodeURIComponent(lunaId)}`)
+      .then(response => response.ok ? response.json() : null)
+      .then(data => data?.nextNumber && setDispositionNumber(data.nextNumber))
+      .catch(() => {})
   }
 
   async function generateDisposition() {
@@ -218,11 +222,12 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
       body:JSON.stringify({
+        firmaId:firma.id,
+        lunaId,
         firmaNume:firma.nume,
         cif:companyCif,
         nrRegCom:companyRegCom,
         adresa:companyAddress,
-        dispositionNumber,
         date:dispositionDate,
         beneficiary,
         function:beneficiaryFunction,
@@ -234,13 +239,15 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
       }),
     })
     if (res.ok) {
+      const assignedNumber = res.headers.get('X-Disposition-Number') || dispositionNumber
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `dispozitie_plata_${dispositionNumber || 'noua'}.pdf`
+      anchor.download = `dispozitie_plata_${assignedNumber}.pdf`
       anchor.click()
       URL.revokeObjectURL(url)
+      setDispositionNumber(String(Number.parseInt(assignedNumber, 10) + 1).padStart(2, '0'))
     } else {
       const data = await res.json().catch(() => ({}))
       setError(data.error || 'Dispoziția de plată nu a putut fi generată')
@@ -322,7 +329,7 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
                 <input value={companyAddress} onChange={event=>setCompanyAddress(event.target.value)} placeholder="Adresa firmei" style={INP} />
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr', gap:'8px', marginBottom:'8px' }}>
-                <input value={dispositionNumber} onChange={event=>setDispositionNumber(event.target.value)} placeholder="Număr dispoziție" style={INP} />
+                <input value={dispositionNumber} readOnly placeholder="Se atribuie automat" title="Numărul este atribuit automat în ordine, separat pentru fiecare lună" style={{ ...INP, color:culoare, fontWeight:700, cursor:'not-allowed' }} />
                 <input value={dispositionDate} onChange={event=>setDispositionDate(event.target.value)} placeholder="Data: 30.07.2025" style={INP} />
                 <input value={beneficiary} onChange={event=>setBeneficiary(event.target.value)} placeholder="Numele și prenumele beneficiarului" style={INP} />
               </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { getServiceSupabase } from '@/lib/supabase/server'
 
 const SMALL = ['zero','unu','doi','trei','patru','cinci','sase','sapte','opt','noua','zece','unsprezece','doisprezece','treisprezece','paisprezece','cincisprezece','saisprezece','saptesprezece','optsprezece','nouasprezece']
 const TENS = ['','','douazeci','treizeci','patruzeci','cincizeci','saizeci','saptezeci','optzeci','nouazeci']
@@ -35,12 +36,42 @@ function safe(value: unknown, fallback = '') {
   return String(value || fallback).replace(/[^\x20-\x7E]/g, '')
 }
 
+async function getNextNumber(lunaId: string) {
+  const sb = getServiceSupabase()
+  const { data, error } = await sb
+    .from('documente')
+    .select('numar_document')
+    .eq('luna_id', lunaId)
+    .eq('modul', 'dispozitie_plata')
+  if (error) throw new Error(error.message)
+  const maximum = (data || []).reduce((max, document) => {
+    const value = Number.parseInt(String(document.numar_document || ''), 10)
+    return Number.isFinite(value) ? Math.max(max, value) : max
+  }, 0)
+  return String(maximum + 1).padStart(2, '0')
+}
+
+export async function GET(req: NextRequest) {
+  const lunaId = req.nextUrl.searchParams.get('lunaId')
+  if (!lunaId) return NextResponse.json({ error: 'Luna contabilă lipsește' }, { status: 400 })
+  try {
+    return NextResponse.json({ nextNumber: await getNextNumber(lunaId) })
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    const lunaId = String(body.lunaId || '')
+    const firmaId = String(body.firmaId || '')
+    if (!lunaId || !firmaId)
+      return NextResponse.json({ error: 'Firma sau luna contabilă lipsește' }, { status: 400 })
     const amount = Number(body.amount)
     if (!Number.isFinite(amount) || amount <= 0)
       return NextResponse.json({ error: 'Suma trebuie să fie mai mare decât zero' }, { status: 400 })
+    const dispositionNumber = await getNextNumber(lunaId)
 
     const pdf = await PDFDocument.create()
     const page = pdf.addPage([595, 842])
@@ -80,7 +111,7 @@ export async function POST(req: NextRequest) {
     centered('DISPOZITIE DE PLATA CATRE CASIERIE', 733, 13, true)
     centered('Cont: 5311 - Casa in lei', 716, 10, true)
     text('Numar:', 177, 700, 10, true)
-    text(safe(body.dispositionNumber, '____'), 242, 700, 10)
+    text(dispositionNumber, 242, 700, 10)
     dotted(217, 694, 275)
     text('din', 286, 700, 10, true)
     text(date || '____.__.____', 323, 700, 10)
@@ -143,11 +174,39 @@ export async function POST(req: NextRequest) {
     line(left, 300, right, 300, 1)
 
     const bytes = await pdf.save()
-    const fileName = `dispozitie_plata_${safe(body.dispositionNumber, 'noua')}_${date.replace(/\./g, '-') || 'fara-data'}.pdf`
+    const fileName = `dispozitie_plata_${dispositionNumber}_${date.replace(/\./g, '-') || 'fara-data'}.pdf`
+    // A fixed path per monthly number also prevents two concurrent requests from receiving the same number.
+    const path = `${firmaId}/${lunaId}/dispozitii-plata/dispozitie_plata_${dispositionNumber}.pdf`
+    const sb = getServiceSupabase()
+    const { error: storageError } = await sb.storage.from('documente').upload(path, Buffer.from(bytes), {
+      contentType: 'application/pdf',
+      upsert: false,
+    })
+    if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
+
+    const { error: databaseError } = await sb.from('documente').insert({
+      firma_id: firmaId,
+      luna_id: lunaId,
+      modul: 'dispozitie_plata',
+      tip_document: 'dispozitie_plata',
+      furnizor: safe(body.purpose),
+      numar_document: dispositionNumber,
+      fisier_path: path,
+      fisier_nume: fileName,
+      fisier_tip: 'application/pdf',
+      fisier_marime: bytes.length,
+      in_zip: true,
+    })
+    if (databaseError) {
+      await sb.storage.from('documente').remove([path])
+      return NextResponse.json({ error: databaseError.message }, { status: 500 })
+    }
+
     return new NextResponse(Buffer.from(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${fileName}"`,
+        'X-Disposition-Number': dispositionNumber,
       },
     })
   } catch (error) {
