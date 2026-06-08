@@ -5,6 +5,16 @@ const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cC
 const H = { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/json' }
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
+function filenamePart(value: string, fallback = '') {
+  const normalized = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60)
+  return normalized || fallback
+}
+
 export async function POST(req: NextRequest) {
   try {
     const fd = await req.formData()
@@ -22,7 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG și PNG' }, { status: 400 })
 
     const txRes = await fetch(
-      `${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}&firma_id=eq.${encodeURIComponent(firmaId)}&select=id,extras_id,document_id`,
+      `${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}&firma_id=eq.${encodeURIComponent(firmaId)}&select=id,extras_id,document_id,data_tranzactie,descriere_curatata,descriere`,
       { headers: H }
     )
     const txs = txRes.ok ? await txRes.json() : []
@@ -31,8 +41,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tranzacția nu a fost găsită pentru firma selectată' }, { status: 404 })
 
     const buf = Buffer.from(await file.arrayBuffer())
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const path = `${firmaId}/${lunaId}/tx/${txId}_${Date.now()}_${safeName}`
+    const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
+    const details = furnizor || tx.descriere_curatata || tx.descriere || 'document'
+    const renamedFile = [
+      filenamePart(tx.data_tranzactie, 'fara_data'),
+      filenamePart(tip, 'document'),
+      numDoc ? filenamePart(numDoc) : '',
+      filenamePart(details, 'document'),
+    ].filter(Boolean).join('_') + `.${extension}`
+    const path = `${firmaId}/${lunaId}/tx/${txId}_${Date.now()}_${renamedFile}`
 
     const upRes = await fetch(`${SB}/storage/v1/object/documente/${path}`, {
       method: 'POST',
@@ -44,7 +61,7 @@ export async function POST(req: NextRequest) {
     const documentBody = {
       firma_id: firmaId, luna_id: lunaId, tranzactie_id: txId,
       modul: 'extras', tip_document: tip, furnizor, numar_document: numDoc,
-      fisier_path: path, fisier_nume: file.name, fisier_tip: file.type,
+      fisier_path: path, fisier_nume: renamedFile, fisier_tip: file.type,
       fisier_marime: file.size, in_zip: true
     }
     const docRes = await fetch(
@@ -82,7 +99,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ ok: true, docId: doc.id })
+    return NextResponse.json({ ok: true, docId: doc.id, filename: renamedFile })
   } catch (error) {
     const message = String(error)
     const status = message.includes('Content-Type') ? 400 : 500

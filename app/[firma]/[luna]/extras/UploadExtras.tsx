@@ -17,7 +17,7 @@ export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare,
   async function handleCSV(file: File) {
     setLoading(true); setErr(''); setStatus('Se procesează CSV-ul...')
     const fd = new FormData()
-    fd.append('csv', file); fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
+    fd.append('csv', file); fd.append('firmaId', firmaId); fd.append('lunaId', lunaId); fd.append('valuta', valuta)
     const res = await fetch('/api/extras/upload-csv', { method: 'POST', body: fd })
     const d = await res.json()
     if (res.ok && d.ok) { setStatus('✓ Import reușit'); onDone() }

@@ -4,11 +4,23 @@ import { PDFDocument } from 'pdf-lib'
 
 export async function POST(req: NextRequest) {
   try {
-    const { lunaId, firmaNume, luna } = await req.json()
+    const { lunaId, extrasId, firmaNume, luna, extrasLabel } = await req.json()
     if (!lunaId) return NextResponse.json({ error: 'Luna contabilă lipsește' }, { status: 400 })
 
     const sb = getServiceSupabase()
-    const { data: docs, error } = await sb
+    let transactionIds: string[] | null = null
+    if (extrasId) {
+      const { data: transactions, error: transactionError } = await sb
+        .from('tranzactii')
+        .select('id')
+        .eq('extras_id', extrasId)
+      if (transactionError) return NextResponse.json({ error: transactionError.message }, { status: 500 })
+      transactionIds = (transactions || []).map(transaction => transaction.id)
+      if (transactionIds.length === 0)
+        return NextResponse.json({ error: 'Extrasul selectat nu are tranzacții' }, { status: 400 })
+    }
+
+    let docsQuery = sb
       .from('documente')
       .select('id,fisier_path,fisier_nume,fisier_tip,created_at')
       .eq('luna_id', lunaId)
@@ -16,6 +28,8 @@ export async function POST(req: NextRequest) {
       .eq('in_zip', true)
       .not('tranzactie_id', 'is', null)
       .order('created_at', { ascending: true })
+    if (transactionIds) docsQuery = docsQuery.in('tranzactie_id', transactionIds)
+    const { data: docs, error } = await docsQuery
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!docs?.length) return NextResponse.json({ error: 'Nu există documente asociate tranzacțiilor' }, { status: 400 })
@@ -54,7 +68,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Documentele salvate nu au putut fi convertite în PDF' }, { status: 422 })
 
     const bytes = await merged.save()
-    const safeName = `${firmaNume || 'firma'}_${luna || 'luna'}_documente_tranzactii`.replace(/[^a-zA-Z0-9_-]/g, '_')
+    const safeName = `${firmaNume || 'firma'}_${luna || 'luna'}_${extrasLabel || 'documente_tranzactii'}`.replace(/[^a-zA-Z0-9_-]/g, '_')
     return new NextResponse(Buffer.from(bytes), {
       headers: {
         'Content-Type': 'application/pdf',

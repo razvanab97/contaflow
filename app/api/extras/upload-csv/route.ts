@@ -301,8 +301,9 @@ export async function POST(req: NextRequest) {
     const file = fd.get('csv') as File
     const firmaId = fd.get('firmaId') as string
     const lunaId = fd.get('lunaId') as string
+    const selectedValuta = String(fd.get('valuta') || '').toUpperCase()
 
-    if (!file || !firmaId || !lunaId)
+    if (!file || !firmaId || !lunaId || !selectedValuta)
       return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
 
     const text = await file.text()
@@ -314,10 +315,13 @@ export async function POST(req: NextRequest) {
     // Group by valuta (either from parsed metadata or default to what's in rows or 'RON')
     const byValuta: Record<string, any[]> = {}
     for (const row of parsedData.rows) {
-      const v = row.valuta || 'RON'
+      const v = String(row.valuta || 'RON').toUpperCase()
+      if (v !== selectedValuta) continue
       if (!byValuta[v]) byValuta[v] = []
       byValuta[v].push(row)
     }
+    if (!byValuta[selectedValuta]?.length)
+      return NextResponse.json({ error: `Fișierul nu conține tranzacții în ${selectedValuta}` }, { status: 400 })
 
     const results: any[] = []
 

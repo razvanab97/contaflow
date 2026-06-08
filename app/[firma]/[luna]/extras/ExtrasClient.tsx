@@ -24,7 +24,7 @@ interface Tx {
   categorie: string; document_id: string|null; note: string|null
   documente: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }|null
 }
-interface Extras { id:string; valuta:string; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
+interface Extras { id:string; valuta:string; iban?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 
 export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: initExtrase, slug }: {
@@ -36,6 +36,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<'all'|'lipsa'|'ok'|'na'>('all')
   const [flowFilter, setFlowFilter] = useState<'all'|'debit'|'credit'>('all')
+  const [activeExtrasId, setActiveExtrasId] = useState(initExtrase[0]?.id || '')
   const [page, setPage] = useState(1)
   const [viewMode, setViewMode] = useState<'list'|'workspace'>('workspace')
   const [activeTxIndex, setActiveTxIndex] = useState(0)
@@ -87,6 +88,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
       if (saved.filter) setFilter(saved.filter)
       if (saved.flowFilter) setFlowFilter(saved.flowFilter)
       if (saved.viewMode) setViewMode(saved.viewMode)
+      if (saved.activeExtrasId) setActiveExtrasId(saved.activeExtrasId)
       restoredActiveId.current = saved.activeTxId || null
       restoredScrollY.current = Number(saved.scrollY) || 0
     } catch {}
@@ -94,7 +96,9 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     load()
   }, [load, workspaceKey])
 
-  const filtered = txs.filter(t => {
+  const selectedExtras = extrase.find(extras => extras.id === activeExtrasId) || extrase[0]
+  const scopedTxs = selectedExtras ? txs.filter(tx => tx.extras_id === selectedExtras.id) : txs
+  const filtered = scopedTxs.filter(t => {
     const matchesStatus =
       filter === 'lipsa' ? (!t.document_id && t.note !== 'na') :
       filter === 'ok' ? !!t.document_id :
@@ -104,18 +108,18 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const pages = Math.ceil(filtered.length / PER)
   const pageItems = filtered.slice((page-1)*PER, page*PER)
   const counts = {
-    all: txs.length,
-    lipsa: txs.filter(t => !t.document_id && t.note !== 'na').length,
-    ok: txs.filter(t => !!t.document_id).length,
-    na: txs.filter(t => t.note === 'na').length,
+    all: scopedTxs.length,
+    lipsa: scopedTxs.filter(t => !t.document_id && t.note !== 'na').length,
+    ok: scopedTxs.filter(t => !!t.document_id).length,
+    na: scopedTxs.filter(t => t.note === 'na').length,
   }
   const flowCounts = {
-    all: txs.length,
-    debit: txs.filter(t => t.tip === 'debit').length,
-    credit: txs.filter(t => t.tip === 'credit').length,
+    all: scopedTxs.length,
+    debit: scopedTxs.filter(t => t.tip === 'debit').length,
+    credit: scopedTxs.filter(t => t.tip === 'credit').length,
   }
   const rez = counts.ok + counts.na
-  const pct = txs.length > 0 ? Math.round((rez/txs.length)*100) : 0
+  const pct = scopedTxs.length > 0 ? Math.round((rez/scopedTxs.length)*100) : 0
   const activeTx = filtered[Math.min(activeTxIndex, Math.max(filtered.length - 1, 0))]
 
   useEffect(() => {
@@ -128,17 +132,24 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   }, [filtered, loading])
 
   useEffect(() => {
+    if (extrase.length && !extrase.some(extras => extras.id === activeExtrasId)) {
+      setActiveExtrasId(extrase[0].id)
+    }
+  }, [activeExtrasId, extrase])
+
+  useEffect(() => {
     if (!restored.current) return
     const save = () => localStorage.setItem(workspaceKey, JSON.stringify({
-      filter, flowFilter, viewMode, activeTxId: activeTx?.id || null, scrollY: window.scrollY
+      filter, flowFilter, viewMode, activeExtrasId:selectedExtras?.id || null, activeTxId: activeTx?.id || null, scrollY: window.scrollY
     }))
     save()
     window.addEventListener('scroll', save, { passive:true })
     return () => window.removeEventListener('scroll', save)
-  }, [activeTx?.id, filter, flowFilter, viewMode, workspaceKey])
+  }, [activeTx?.id, filter, flowFilter, selectedExtras?.id, viewMode, workspaceKey])
 
   function setF(f: typeof filter) { setFilter(f); setPage(1); setActiveTxIndex(0) }
   function setFlow(f: typeof flowFilter) { setFlowFilter(f); setPage(1); setActiveTxIndex(0) }
+  function selectExtras(id: string) { setActiveExtrasId(id); setPage(1); setActiveTxIndex(0) }
 
   async function exportDocuments() {
     setExportingDocs(true)
@@ -146,14 +157,14 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     const res = await fetch('/api/tranzactii/documente-pdf', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ lunaId, firmaNume:firma.nume, luna })
+      body:JSON.stringify({ lunaId, extrasId:selectedExtras?.id, extrasLabel:selectedExtras ? `documente_${selectedExtras.valuta}` : undefined, firmaNume:firma.nume, luna })
     })
     if (res.ok) {
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${firma.nume}_${luna}_documente_tranzactii.pdf`
+      a.download = `${firma.nume}_${luna}_documente_${selectedExtras?.valuta || 'tranzactii'}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } else {
@@ -230,19 +241,19 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         <div style={{ height:'1px', background:'#1E1E1E', margin:'8px 14px' }}/>
         <div style={{ padding:'8px 18px 4px', fontSize:'13px', fontWeight:600, color:'#DDD' }}>Extras de cont</div>
         {extrase.map(e => (
-          <div key={e.id} style={{ padding:'3px 18px 3px 28px', display:'flex', justifyContent:'space-between' }}>
-            <span style={{ fontSize:'12px', color:'#777' }}>{e.valuta}</span>
+          <button key={e.id} onClick={()=>selectExtras(e.id)} style={{ padding:'7px 18px 7px 28px', display:'flex', justifyContent:'space-between', gap:'8px', border:'none', borderLeft:`2px solid ${selectedExtras?.id===e.id?c:'transparent'}`, background:selectedExtras?.id===e.id?'#181818':'transparent', cursor:'pointer', textAlign:'left' }}>
+            <span style={{ fontSize:'12px', color:selectedExtras?.id===e.id?'#FFF':'#777', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.valuta}{e.iban ? ` · ${e.iban.slice(-6)}` : ''}</span>
             <span style={{ fontSize:'11px', fontWeight:600, color:'#4ADE80' }}>{e.nr_tranzactii} tx</span>
-          </div>
+          </button>
         ))}
-        {txs.length > 0 && <>
+        {scopedTxs.length > 0 && <>
           <div style={{ height:'1px', background:'#1E1E1E', margin:'12px 14px' }}/>
           <div style={{ padding:'0 18px' }}>
             <div style={{ fontSize:'10px', fontWeight:700, color:'#555', marginBottom:'6px', textTransform:'uppercase', letterSpacing:'.08em' }}>Progres</div>
             <div style={{ height:'3px', background:'#1E1E1E', borderRadius:'2px', marginBottom:'6px' }}>
               <div style={{ height:'3px', background:c, borderRadius:'2px', width:`${pct}%` }}/>
             </div>
-            <div style={{ fontSize:'14px', fontWeight:700, color:'#FFF' }}>{rez}/{txs.length}</div>
+            <div style={{ fontSize:'14px', fontWeight:700, color:'#FFF' }}>{rez}/{scopedTxs.length}</div>
             <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>{pct}% rezolvate</div>
           </div>
         </>}
@@ -266,6 +277,19 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           ))}
         </div>
 
+        {extrase.length > 0 && (
+          <div style={{ marginBottom:'22px' }}>
+            <div style={{ fontSize:'10px', fontWeight:700, color:'#555', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:'8px' }}>Lucrează pe extrasul</div>
+            <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+              {extrase.map(e => (
+                <button key={e.id} onClick={()=>selectExtras(e.id)} style={{ padding:'9px 14px', borderRadius:'9px', border:`1px solid ${selectedExtras?.id===e.id?c:'#292929'}`, background:selectedExtras?.id===e.id?c:'#171717', color:selectedExtras?.id===e.id?'#FFF':'#888', cursor:'pointer', fontSize:'12px', fontWeight:700 }}>
+                  {e.valuta}{e.iban ? ` · cont ${e.iban.slice(-6)}` : ''} · {e.nr_tranzactii} tranzacții
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div style={{ textAlign:'center', padding:'60px' }}>
             <div style={{ width:'24px', height:'24px', border:`2px solid ${c}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin .8s linear infinite', margin:'0 auto 12px' }}/>
@@ -277,7 +301,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
             <p style={{ fontSize:'13px', color:'#F87171' }}>Eroare: {error}</p>
             <button onClick={load} style={{ marginTop:'10px', fontSize:'12px', padding:'6px 14px', borderRadius:'7px', border:'none', background:c, color:'#fff', cursor:'pointer' }}>Reîncearcă</button>
           </div>
-        ) : txs.length === 0 ? (
+        ) : scopedTxs.length === 0 ? (
           <div style={{ padding:'40px', background:'#161616', border:'1px solid #242424', borderRadius:'12px', textAlign:'center' }}>
             <p style={{ fontSize:'13px', color:'#888' }}>Importă CSV sau PDF mai sus.</p>
           </div>
@@ -288,7 +312,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
                 <h2 style={{ fontSize:'16px', fontWeight:700, color:'#FFF' }}>
                   Tranzacții individuale <span style={{ color:'#666', fontWeight:400 }}>({filtered.length})</span>
                 </h2>
-                <p style={{ fontSize:'11px', color:'#666', marginTop:'3px' }}>Selectează fiecare tranzacție și asociază manual documentul justificativ.</p>
+                <p style={{ fontSize:'11px', color:'#666', marginTop:'3px' }}>Extras selectat: {selectedExtras?.valuta || '—'}{selectedExtras?.iban ? ` · ${selectedExtras.iban}` : ''}. Asociază documentele pe rând.</p>
                 <button onClick={exportDocuments} disabled={exportingDocs || counts.ok===0} style={{ marginTop:'10px', fontSize:'11px', fontWeight:700, padding:'7px 12px', borderRadius:'8px', border:`1px solid ${counts.ok>0?c:'#2A2A2A'}`, background:'transparent', color:counts.ok>0?c:'#555', cursor:counts.ok>0?'pointer':'not-allowed', opacity:exportingDocs?.6:1 }}>
                   {exportingDocs ? 'Se generează PDF-ul...' : `Descarcă toate documentele (${counts.ok}) ↓`}
                 </button>
@@ -471,6 +495,7 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
           <span style={{fontSize:'12px',fontWeight:500,color:'#4ADE80'}}>{tx.documente.fisier_nume}</span>
           {tx.documente.furnizor&&<span style={{fontSize:'11px',color:'#555'}}>· {tx.documente.furnizor}</span>}
           {tx.documente.numar_document&&<span style={{fontSize:'11px',color:'#555'}}>· {tx.documente.numar_document}</span>}
+          <a href={`/api/tranzactii/document?id=${encodeURIComponent(tx.documente.id)}`} style={{ marginLeft:'auto', fontSize:'11px', fontWeight:700, color:'#4ADE80', textDecoration:'none' }}>Descarcă ↓</a>
         </div>
       )}
     </div>
@@ -772,9 +797,16 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
               )}
             </div>
 
-            <button onClick={() => setEditDoc(true)} style={{ ...BTN, background:'transparent', border:`1px solid rgba(${r},.3)`, color:culoare, margin:'0 auto' }}>
-              Schimbă Documentul
-            </button>
+            <div style={{ display:'flex', justifyContent:'center', gap:'8px', flexWrap:'wrap' }}>
+              {tx.documente && (
+                <a href={`/api/tranzactii/document?id=${encodeURIComponent(tx.documente.id)}`} style={{ ...BTN, background:culoare, color:'#fff', textDecoration:'none' }}>
+                  Descarcă Documentul ↓
+                </a>
+              )}
+              <button onClick={() => setEditDoc(true)} style={{ ...BTN, background:'transparent', border:`1px solid rgba(${r},.3)`, color:culoare }}>
+                Schimbă Documentul
+              </button>
+            </div>
           </div>
         ) : isNA ? (
           /* N/A Card */

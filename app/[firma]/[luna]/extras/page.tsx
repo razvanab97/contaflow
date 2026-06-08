@@ -21,7 +21,7 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
   const lunaData = luni.find((l: { luna: string }) => l.luna.startsWith(luna))
   if (!lunaData) notFound()
 
-  const extrase = await get(`extrase?luna_id=eq.${lunaData.id}&select=id,valuta,nr_tranzactii,nr_documentate,procesat_ai,sold_final&order=valuta`)
+  const extrase = await get(`extrase?luna_id=eq.${lunaData.id}&select=id,valuta,iban,pdf_nume,nr_tranzactii,nr_documentate,procesat_ai,sold_final&order=valuta`)
 
   const [y, m] = luna.split('-')
   const LUNI = ['','Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec']
