@@ -35,9 +35,12 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<'all'|'lipsa'|'ok'|'na'>('all')
+  const [flowFilter, setFlowFilter] = useState<'all'|'debit'|'credit'>('all')
   const [page, setPage] = useState(1)
   const [viewMode, setViewMode] = useState<'list'|'workspace'>('workspace')
   const [activeTxIndex, setActiveTxIndex] = useState(0)
+  const [exportingDocs, setExportingDocs] = useState(false)
+  const [exportError, setExportError] = useState('')
   const c = firma.culoare || '#F27A1A'
 
   const load = useCallback(async () => {
@@ -71,11 +74,13 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
 
   useEffect(() => { load() }, [load])
 
-  const filtered = txs.filter(t =>
-    filter === 'lipsa' ? (!t.document_id && t.note !== 'na') :
-    filter === 'ok' ? !!t.document_id :
-    filter === 'na' ? t.note === 'na' : true
-  )
+  const filtered = txs.filter(t => {
+    const matchesStatus =
+      filter === 'lipsa' ? (!t.document_id && t.note !== 'na') :
+      filter === 'ok' ? !!t.document_id :
+      filter === 'na' ? t.note === 'na' : true
+    return matchesStatus && (flowFilter === 'all' || t.tip === flowFilter)
+  })
   const pages = Math.ceil(filtered.length / PER)
   const pageItems = filtered.slice((page-1)*PER, page*PER)
   const counts = {
@@ -84,10 +89,39 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     ok: txs.filter(t => !!t.document_id).length,
     na: txs.filter(t => t.note === 'na').length,
   }
+  const flowCounts = {
+    all: txs.length,
+    debit: txs.filter(t => t.tip === 'debit').length,
+    credit: txs.filter(t => t.tip === 'credit').length,
+  }
   const rez = counts.ok + counts.na
   const pct = txs.length > 0 ? Math.round((rez/txs.length)*100) : 0
 
   function setF(f: typeof filter) { setFilter(f); setPage(1); setActiveTxIndex(0) }
+  function setFlow(f: typeof flowFilter) { setFlowFilter(f); setPage(1); setActiveTxIndex(0) }
+
+  async function exportDocuments() {
+    setExportingDocs(true)
+    setExportError('')
+    const res = await fetch('/api/tranzactii/documente-pdf', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ lunaId, firmaNume:firma.nume, luna })
+    })
+    if (res.ok) {
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${firma.nume}_${luna}_documente_tranzactii.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } else {
+      const data = await res.json().catch(() => ({}))
+      setExportError(data.error || 'PDF-ul nu a putut fi generat')
+    }
+    setExportingDocs(false)
+  }
 
   async function markNA(id: string) {
     await fetch('/api/tranzactii/note', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, note:'na'}) })
@@ -202,28 +236,27 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
                   Tranzacții individuale <span style={{ color:'#666', fontWeight:400 }}>({filtered.length})</span>
                 </h2>
                 <p style={{ fontSize:'11px', color:'#666', marginTop:'3px' }}>Selectează fiecare tranzacție și asociază manual documentul justificativ.</p>
+                <button onClick={exportDocuments} disabled={exportingDocs || counts.ok===0} style={{ marginTop:'10px', fontSize:'11px', fontWeight:700, padding:'7px 12px', borderRadius:'8px', border:`1px solid ${counts.ok>0?c:'#2A2A2A'}`, background:'transparent', color:counts.ok>0?c:'#555', cursor:counts.ok>0?'pointer':'not-allowed', opacity:exportingDocs?.6:1 }}>
+                  {exportingDocs ? 'Se generează PDF-ul...' : `Descarcă toate documentele (${counts.ok}) ↓`}
+                </button>
+                {exportError && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'6px' }}>{exportError}</p>}
               </div>
-              <div style={{ display:'flex', gap:'16px', alignItems:'center' }}>
+              <div style={{ display:'flex', gap:'10px', alignItems:'flex-end', flexDirection:'column' }}>
                 {/* View Mode Toggle */}
-                <div style={{ display:'flex', background:'#161616', border:'1px solid #242424', padding:'3px', borderRadius:'10px' }}>
-                  <button 
-                    onClick={()=>setViewMode('workspace')}
-                    style={{
-                      fontSize:'12px', fontWeight:600, padding:'6px 14px', borderRadius:'7px', border:'none',
-                      background:viewMode==='workspace'?c:'transparent', color:viewMode==='workspace'?'#fff':'#888', cursor:'pointer'
-                    }}
-                  >
-                    Workspace App
-                  </button>
-                  <button 
-                    onClick={()=>setViewMode('list')}
-                    style={{
-                      fontSize:'12px', fontWeight:600, padding:'6px 14px', borderRadius:'7px', border:'none',
-                      background:viewMode==='list'?c:'transparent', color:viewMode==='list'?'#fff':'#888', cursor:'pointer'
-                    }}
-                  >
-                    Listă
-                  </button>
+                <div style={{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
+                  <div style={{ display:'flex', background:'#161616', border:'1px solid #242424', padding:'3px', borderRadius:'10px' }}>
+                    <button onClick={()=>setViewMode('workspace')} style={{ fontSize:'12px', fontWeight:600, padding:'6px 14px', borderRadius:'7px', border:'none', background:viewMode==='workspace'?c:'transparent', color:viewMode==='workspace'?'#fff':'#888', cursor:'pointer' }}>
+                      Workspace App
+                    </button>
+                    <button onClick={()=>setViewMode('list')} style={{ fontSize:'12px', fontWeight:600, padding:'6px 14px', borderRadius:'7px', border:'none', background:viewMode==='list'?c:'transparent', color:viewMode==='list'?'#fff':'#888', cursor:'pointer' }}>
+                      Listă
+                    </button>
+                  </div>
+                  <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
+                    {([['all',`Toate (${flowCounts.all})`],['debit',`Doar ieșiri (${flowCounts.debit})`],['credit',`Doar încasări (${flowCounts.credit})`]] as const).map(([f,l])=>(
+                      <button key={f} onClick={()=>setFlow(f)} style={PB(false,flowFilter===f)}>{l}</button>
+                    ))}
+                  </div>
                 </div>
 
                 <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
