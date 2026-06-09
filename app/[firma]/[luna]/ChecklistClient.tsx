@@ -36,6 +36,11 @@ const DISPOSITION_COMPANY_PRESETS: Record<string,{ nrRegCom:string; cif:string; 
     tara:'RO',
   },
 }
+const DISPOSITION_PERSON_PRESETS = [
+  { label:'Grumăzescu Angela · Asociație', beneficiary:'Grumazescu Angela', function:'Proprietar', identitySeries:'MX', identityNumber:'864860', purpose:'Chitanță asociație' },
+  { label:'Bucșa Radu · Administrație apartamente', beneficiary:'Bucsa Radu', function:'Proprietar', identitySeries:'ZC', identityNumber:'553054', purpose:'Factură administrație apartament' },
+  { label:'Bordeanu Dănuț · E.ON Gaz', beneficiary:'Bordeanu Danut', function:'Proprietar', identitySeries:'MZ', identityNumber:'699302', purpose:'Factură gaz E.ON' },
+]
 
 function dispositionCompanyDetails(firma: Firma) {
   const byName = firma.nume.toLowerCase().includes('ab homes invest') ? DISPOSITION_COMPANY_PRESETS['ab-homes-invest']
@@ -499,9 +504,10 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   const companyDetails = dispositionCompanyDetails(selectedFirma)
   const selectedLunaId = selectedFirma.luna_id || lunaIdInitial
   const [number, setNumber] = useState('')
-  const [documents, setDocuments] = useState<{id:string;fisier_nume:string;numar_document:string;furnizor:string}[]>([])
+  type DispositionDocument = {id:string;fisier_nume:string;numar_document:string;furnizor:string;data?:Record<string,string|number>;attachments?:{id:string;fisier_nume:string}[]}
+  const [documents, setDocuments] = useState<DispositionDocument[]>([])
   const [deletingId, setDeletingId] = useState('')
-  const [date, setDate] = useState(new Date().toLocaleDateString('ro-RO'))
+  const [date, setDate] = useState(new Date().toISOString().slice(0,10))
   const [beneficiary, setBeneficiary] = useState('')
   const [amount, setAmount] = useState('')
   const [purpose, setPurpose] = useState('')
@@ -513,6 +519,11 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   const [templateBusy, setTemplateBusy] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
   const [error, setError] = useState('')
+  const [preset, setPreset] = useState('')
+  const [invoiceBusy, setInvoiceBusy] = useState(false)
+  const [attachedInvoices, setAttachedInvoices] = useState<{id:string;fisier_nume:string}[]>([])
+  const [editId, setEditId] = useState('')
+  const invoiceRef = useRef<HTMLInputElement>(null)
   const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'9px 12px', color:'#BBB', outline:'none', width:'100%' }
 
   const loadNumber = useCallback(async () => {
@@ -569,10 +580,44 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
     const res = await fetch('/api/chitante/dispozitie', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
       firmaId:selectedFirma.id, lunaId:selectedLunaId, firmaNume:selectedFirma.nume, cif:companyDetails.cif, nrRegCom:companyDetails.nrRegCom,
       adresa:companyDetails.adresa, judet:companyDetails.judet, tara:companyDetails.tara,
-      date, beneficiary:beneficiary || owner, function:beneficiaryFunction, amount, purpose, identitySeries, identityNumber, ownerAddress,
+      editId, date, beneficiary:beneficiary || owner, function:beneficiaryFunction, amount, purpose, identitySeries, identityNumber, ownerAddress, attachmentIds:attachedInvoices.map(invoice=>invoice.id),
     })})
     if (!res.ok) { const data=await res.json().catch(()=>({})); setError(data.error||'Generarea nu a reușit'); return }
-    const assigned=res.headers.get('X-Disposition-Number')||number; const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dispozitie_plata_${assigned}.pdf`; a.click(); URL.revokeObjectURL(url); await loadNumber()
+    const assigned=res.headers.get('X-Disposition-Number')||number; const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dispozitie_plata_${assigned}.pdf`; a.click(); URL.revokeObjectURL(url); setEditId(''); setAttachedInvoices([]); await loadNumber()
+  }
+  function applyPreset(value: string) {
+    setPreset(value)
+    const selected = DISPOSITION_PERSON_PRESETS.find(entry=>entry.label===value)
+    if (!selected) return
+    setBeneficiary(selected.beneficiary); setOwner(selected.beneficiary)
+    setBeneficiaryFunction(selected.function); setIdentitySeries(selected.identitySeries)
+    setIdentityNumber(selected.identityNumber); setPurpose(selected.purpose)
+  }
+  async function analyzeInvoices(files: FileList) {
+    setInvoiceBusy(true); setError('')
+    for (const file of Array.from(files)) {
+      const fd = new FormData()
+      fd.append('file', file); fd.append('firmaId', selectedFirma.id); fd.append('lunaId', selectedLunaId); fd.append('number', number)
+      const res = await fetch('/api/chitante/dispozitie/analyze', { method:'POST', body:fd })
+      const data = await res.json().catch(()=>({}))
+      if (!res.ok) { setError(data.error || 'Factura nu a putut fi analizată'); break }
+      setAttachedInvoices(current=>[...current, data.document])
+      if (data.purpose) setPurpose(current=>current ? `${current}; ${data.purpose}` : data.purpose)
+      if (data.amount && !amount) setAmount(String(data.amount))
+    }
+    setInvoiceBusy(false)
+  }
+  function editDisposition(document: DispositionDocument) {
+    const data = document.data || {}
+    setEditId(document.id); setNumber(document.numar_document); setDate(String(data.date || date)); setBeneficiary(String(data.beneficiary || ''))
+    setOwner(String(data.beneficiary || '')); setBeneficiaryFunction(String(data.function || ''))
+    setAmount(String(data.amount || '')); setPurpose(String(data.purpose || ''))
+    setIdentitySeries(String(data.identitySeries || '')); setIdentityNumber(String(data.identityNumber || ''))
+    setOwnerAddress(String(data.ownerAddress || '')); setAttachedInvoices(document.attachments || [])
+  }
+  async function cancelEdit() {
+    setEditId(''); setAttachedInvoices([]); setPreset('')
+    await loadNumber()
   }
   return <div style={{ marginTop:'10px', background:'#161616', border:'1px solid #242424', borderRadius:'14px', overflow:'hidden' }}>
     <button onClick={toggle} style={{ width:'100%', display:'flex', justifyContent:'space-between', padding:'15px 18px', background:'transparent', border:'none', cursor:'pointer', color:'#DDD', textAlign:'left' }}><span><strong>DISPOZIȚII DE PLATĂ</strong><small style={{display:'block',color:'#777',marginTop:'4px'}}>Generator numerotat lunar, salvat automat în dosarul contabilității.</small></span><span>{expanded?'▲':'▼'}</span></button>
@@ -583,14 +628,15 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
         <button onClick={resetNumber} style={{fontSize:'11px',border:'1px solid #5B3030',borderRadius:'7px',background:'#241515',color:'#F87171',padding:'6px 10px',cursor:'pointer'}}>Resetează la 01</button>
       </div>
       {documents.map(document=><div key={document.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'#181818', borderRadius:'8px' }}>
-        <span style={{ flex:1, fontSize:'11px', color:'#CCC' }}>DP nr. {document.numar_document} · {document.furnizor || document.fisier_nume}</span>
+        <span style={{ flex:1, fontSize:'11px', color:'#CCC' }}>DP nr. {document.numar_document} · {String(document.data?.purpose || document.furnizor || document.fisier_nume).replace(/^DP_DATA:.*/, document.fisier_nume)}{document.attachments?.length ? ` · ${document.attachments.length} anexe` : ''}</span>
         <a href={`/api/chitante/document?id=${encodeURIComponent(document.id)}`} style={{ fontSize:'10px', color:culoare }}>Descarcă</a>
+        <button onClick={()=>editDisposition(document)} style={{ fontSize:'10px', color:'#8DB8FF', background:'transparent', border:'none', cursor:'pointer' }}>Modifică</button>
         <button onClick={()=>deleteDisposition(document)} disabled={deletingId===document.id} style={{ fontSize:'10px', color:'#F87171', background:'#241515', border:'1px solid #5B3030', borderRadius:'6px', padding:'4px 7px', cursor:'pointer' }}>{deletingId===document.id?'Se șterge...':'Șterge definitiv'}</button>
       </div>)}
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px' }}>
         <select value={firmaId} onChange={e=>setFirmaId(e.target.value)} style={INP}>{firme.map(f=><option key={f.id} value={f.id}>{f.nume}</option>)}</select>
         <input readOnly value={number} placeholder="Număr automat" style={{...INP,color:culoare,fontWeight:700}}/>
-        <input value={date} onChange={e=>setDate(e.target.value)} placeholder="Data" style={INP}/>
+        <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={INP}/>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr 70px 70px', gap:'8px', marginTop:'8px' }}>
         <input readOnly value={companyDetails.nrRegCom} placeholder="Reg. com." style={{...INP,color:'#888'}}/>
@@ -606,11 +652,23 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
         <input value={identitySeries} onChange={e=>setIdentitySeries(e.target.value)} placeholder="Serie CI" style={INP}/>
         <input value={identityNumber} onChange={e=>setIdentityNumber(e.target.value)} placeholder="Număr CI" style={INP}/>
       </div>
+      <div style={{ display:'grid', gridTemplateColumns:'2fr auto', gap:'8px', marginTop:'8px' }}>
+        <select value={preset} onChange={event=>applyPreset(event.target.value)} style={INP}>
+          <option value="">Preset proprietar / beneficiar...</option>
+          {DISPOSITION_PERSON_PRESETS.map(entry=><option key={entry.label} value={entry.label}>{entry.label}</option>)}
+        </select>
+        <button onClick={()=>invoiceRef.current?.click()} disabled={invoiceBusy} style={{border:'1px solid #333',borderRadius:'8px',background:'#202020',color:'#CCC',padding:'8px 14px',cursor:'pointer'}}>{invoiceBusy?'AI analizează...':'Adaugă facturi + recunoaștere AI'}</button>
+        <input ref={invoiceRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{display:'none'}} onChange={event=>event.target.files&&analyzeInvoices(event.target.files)}/>
+      </div>
+      {attachedInvoices.length>0&&<div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'8px'}}>{attachedInvoices.map(invoice=><span key={invoice.id} style={{fontSize:'10px',padding:'4px 7px',borderRadius:'6px',background:'#202020',color:'#AAA'}}>{invoice.fisier_nume}</span>)}</div>}
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 2fr auto', gap:'8px', marginTop:'8px' }}>
         <input value={beneficiary} onChange={e=>setBeneficiary(e.target.value)} placeholder="Beneficiar" style={INP}/>
         <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Suma RON" style={INP}/>
         <input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="Scopul plății" style={INP}/>
-        <button onClick={generate} disabled={!(beneficiary||owner)||!amount||!purpose} style={{border:'none',borderRadius:'8px',background:culoare,color:'#FFF',padding:'8px 14px',cursor:'pointer'}}>Generează PDF</button>
+        <div style={{display:'flex',gap:'6px'}}>
+          {editId&&<button onClick={cancelEdit} style={{border:'1px solid #444',borderRadius:'8px',background:'transparent',color:'#AAA',padding:'8px 12px',cursor:'pointer'}}>Anulează</button>}
+          <button onClick={generate} disabled={!(beneficiary||owner)||!amount||!purpose} style={{border:'none',borderRadius:'8px',background:culoare,color:'#FFF',padding:'8px 14px',cursor:'pointer'}}>{editId?'Salvează modificările':'Generează PDF'}</button>
+        </div>
       </div>
       {error&&<p style={{fontSize:'11px',color:'#F87171',marginTop:'8px'}}>{error}</p>}
     </div>}

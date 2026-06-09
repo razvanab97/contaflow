@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG și PNG' }, { status: 400 })
 
     const txRes = await fetch(
-      `${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}&firma_id=eq.${encodeURIComponent(firmaId)}&select=id,extras_id,document_id,data_tranzactie,descriere_curatata,descriere`,
+      `${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}&firma_id=eq.${encodeURIComponent(firmaId)}&select=id,extras_id,document_id,data_tranzactie,descriere_curatata,descriere,suma`,
       { headers: H }
     )
     const txs = txRes.ok ? await txRes.json() : []
@@ -45,9 +45,9 @@ export async function POST(req: NextRequest) {
     const details = furnizor || tx.descriere_curatata || tx.descriere || 'document'
     const renamedFile = [
       filenamePart(tx.data_tranzactie, 'fara_data'),
-      filenamePart(tip, 'document'),
-      numDoc ? filenamePart(numDoc) : '',
+      filenamePart(Number(tx.suma).toFixed(2), 'fara_suma'),
       filenamePart(details, 'document'),
+      numDoc ? filenamePart(numDoc) : '',
     ].filter(Boolean).join('_') + `.${extension}`
     const path = `${firmaId}/${lunaId}/tx/${txId}_${Date.now()}_${renamedFile}`
 

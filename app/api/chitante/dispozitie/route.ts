@@ -70,7 +70,25 @@ export async function GET(req: NextRequest) {
       .like('fisier_path', '%/dispozitii-plata/%')
       .order('created_at', { ascending: true })
     if (error) throw new Error(error.message)
-    return NextResponse.json({ nextNumber: await getNextNumber(lunaId), documents: documents || [] })
+    const { data:attachmentDocuments, error:attachmentError } = documents?.length
+      ? await sb
+          .from('documente')
+          .select('id,fisier_nume,numar_document,furnizor')
+          .eq('luna_id', lunaId)
+          .eq('modul', 'acte_contabile')
+          .eq('tip_document', 'factura')
+          .like('furnizor', 'Atașament DP %')
+      : { data:[], error:null }
+    if (attachmentError) throw new Error(attachmentError.message)
+    const parsedDocuments = (documents || []).map(document => {
+      const attachments = (attachmentDocuments || []).filter(attachment =>
+        String(attachment.furnizor).startsWith(`Atașament DP ${document.id} `)
+        || (String(attachment.furnizor).startsWith('Atașament DP nr.') && attachment.numar_document === document.numar_document)
+      )
+      try { return { ...document, attachments, data:String(document.furnizor || '').startsWith('DP_DATA:') ? JSON.parse(String(document.furnizor).slice(8)) : {} } }
+      catch { return { ...document, attachments, data:{} } }
+    })
+    return NextResponse.json({ nextNumber: await getNextNumber(lunaId), documents:parsedDocuments })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
@@ -86,7 +104,12 @@ export async function POST(req: NextRequest) {
     const amount = Number(body.amount)
     if (!Number.isFinite(amount) || amount <= 0)
       return NextResponse.json({ error: 'Suma trebuie să fie mai mare decât zero' }, { status: 400 })
-    const dispositionNumber = await getNextNumber(lunaId)
+    const editId = String(body.editId || '')
+    const sb = getServiceSupabase()
+    const { data:existing } = editId
+      ? await sb.from('documente').select('id,numar_document,fisier_path').eq('id', editId).eq('firma_id', firmaId).eq('luna_id', lunaId).eq('tip_document', 'dispozitie_plata').maybeSingle()
+      : { data:null }
+    const dispositionNumber = existing?.numar_document || await getNextNumber(lunaId)
 
     const pdf = await PDFDocument.create()
     const page = pdf.addPage([595, 842])
@@ -192,32 +215,39 @@ export async function POST(req: NextRequest) {
     line(left, 300, right, 300, 1)
 
     const bytes = await pdf.save()
-    const fileName = `dispozitie_plata_${dispositionNumber}_${date.replace(/\./g, '-') || 'fara-data'}.pdf`
+    const fileName = `dispozitie_plata_${dispositionNumber}_${date.replace(/[./]/g, '-') || 'fara-data'}.pdf`
     // Timestamp-ul permite reutilizarea numărului după o resetare, păstrând istoricul.
-    const path = `${firmaId}/${lunaId}/dispozitii-plata/dispozitie_plata_${dispositionNumber}_${Date.now()}.pdf`
-    const sb = getServiceSupabase()
+    const path = existing?.fisier_path || `${firmaId}/${lunaId}/dispozitii-plata/dispozitie_plata_${dispositionNumber}_${Date.now()}.pdf`
     const { error: storageError } = await sb.storage.from('documente').upload(path, Buffer.from(bytes), {
       contentType: 'application/pdf',
-      upsert: false,
+      upsert:!!existing,
     })
     if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
 
-    const { error: databaseError } = await sb.from('documente').insert({
+    const dispositionData = JSON.stringify({ purpose:body.purpose, beneficiary:body.beneficiary, function:body.function, amount, date, identitySeries:body.identitySeries, identityNumber:body.identityNumber, ownerAddress:body.ownerAddress })
+    const values = {
       firma_id: firmaId,
       luna_id: lunaId,
       modul: 'acte_contabile',
       tip_document: 'dispozitie_plata',
-      furnizor: safe(body.purpose),
+      furnizor: `DP_DATA:${dispositionData}`,
       numar_document: dispositionNumber,
       fisier_path: path,
       fisier_nume: fileName,
       fisier_tip: 'application/pdf',
       fisier_marime: bytes.length,
       in_zip: true,
-    })
+    }
+    const { data:disposition, error: databaseError } = existing
+      ? await sb.from('documente').update(values).eq('id', existing.id).select('id').single()
+      : await sb.from('documente').insert(values).select('id').single()
     if (databaseError) {
-      await sb.storage.from('documente').remove([path])
+      if (!existing) await sb.storage.from('documente').remove([path])
       return NextResponse.json({ error: databaseError.message }, { status: 500 })
+    }
+    const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.filter(Boolean) : []
+    if (attachmentIds.length) {
+      await sb.from('documente').update({ furnizor:`Atașament DP ${disposition.id} nr. ${dispositionNumber} | ${safe(body.purpose)}`, numar_document:dispositionNumber, in_zip:true }).in('id', attachmentIds).eq('firma_id', firmaId).eq('luna_id', lunaId)
     }
 
     return new NextResponse(Buffer.from(bytes), {
@@ -225,6 +255,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${fileName}"`,
         'X-Disposition-Number': dispositionNumber,
+        'X-Disposition-Id': disposition.id,
       },
     })
   } catch (error) {
@@ -277,7 +308,7 @@ export async function DELETE(req: NextRequest) {
   const sb = getServiceSupabase()
   const { data: document, error } = await sb
     .from('documente')
-    .select('id,luna_id,fisier_path,tip_document')
+    .select('id,luna_id,fisier_path,tip_document,numar_document')
     .eq('id', id)
     .eq('modul', 'acte_contabile')
     .eq('tip_document', 'dispozitie_plata')
@@ -289,6 +320,11 @@ export async function DELETE(req: NextRequest) {
   if (storageError) return NextResponse.json({ error: `Fișierul nu a putut fi șters: ${storageError.message}` }, { status: 500 })
   const { error: deleteError } = await sb.from('documente').delete().eq('id', id)
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
+  await sb.from('documente')
+    .update({ in_zip:false })
+    .eq('luna_id', document.luna_id)
+    .eq('tip_document', 'factura')
+    .like('furnizor', `Atașament DP ${document.id} %`)
 
   return NextResponse.json({ ok: true, nextNumber: await getNextNumber(document.luna_id) })
 }

@@ -68,10 +68,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Linkul nu a returnat un fișier PDF' }, { status: 422 })
 
   const sb = getServiceSupabase()
-  let transaction: { id:string; document_id:string|null; extras_id:string; data_tranzactie:string; descriere_curatata:string|null; descriere:string|null } | null = null
+  let transaction: { id:string; document_id:string|null; extras_id:string; data_tranzactie:string; descriere_curatata:string|null; descriere:string|null; suma:number } | null = null
   if (transactionId) {
     const result = await sb.from('tranzactii')
-      .select('id,document_id,extras_id,data_tranzactie,descriere_curatata,descriere')
+      .select('id,document_id,extras_id,data_tranzactie,descriere_curatata,descriere,suma')
       .eq('id', transactionId).eq('firma_id', firmaId).maybeSingle()
     transaction = result.data
     if (!transaction) return NextResponse.json({ error: 'Tranzacția nu a fost găsită pentru firma selectată' }, { status: 404 })
@@ -79,7 +79,8 @@ export async function POST(req: NextRequest) {
 
   const sourceName = source.hostname.replace(/^www\./, '')
   const details = [supplier, description, reference, transaction?.descriere_curatata || transaction?.descriere].filter(Boolean).join(' ')
-  const fileName = `${safePart(transaction?.data_tranzactie || '', '')}${transaction?.data_tranzactie ? '_' : ''}${safePart(documentType, 'document')}_${safePart(details, sourceName)}_${Date.now()}.pdf`
+  const transactionPrefix = transaction ? `${safePart(transaction.data_tranzactie, 'fara_data')}_${safePart(Number(transaction.suma).toFixed(2), 'fara_suma')}_` : ''
+  const fileName = `${transactionPrefix}${safePart(details, sourceName)}_${safePart(documentType, 'document')}_${Date.now()}.pdf`
   const destination = itemId ? `checklist/${itemId}` : transactionId ? `tx/${transactionId}` : section
   const path = `${firmaId}/${lunaId}/${destination}/${fileName}`
   const { error: storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType:'application/pdf' })
