@@ -8,6 +8,17 @@ function safePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || fallback
 }
 
+function dispositionPurpose(extracted: { category?:string; supplier?:string; series?:string; invoiceNumber?:string; apartment?:string }) {
+  const category = String(extracted.category || '').toLowerCase()
+  const association = String(extracted.supplier || '').replace(/^asocia(?:t|ț)ia\s+/i, '').trim()
+  const prefix = category === 'gaz' ? 'Fact. gaz'
+    : category === 'curent' ? 'Fact. curent'
+    : category === 'asociatie' ? `Asociatia ${association}`.trim()
+    : 'Factura'
+  const invoice = [extracted.series ? `seria ${extracted.series}` : '', extracted.invoiceNumber ? `nr. ${extracted.invoiceNumber}` : ''].filter(Boolean).join(' ')
+  return [prefix, invoice, extracted.apartment ? `ap. ${extracted.apartment}` : ''].filter(Boolean).join(' - ')
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!req.headers.get('content-type')?.includes('multipart/form-data'))
@@ -30,13 +41,14 @@ export async function POST(req: NextRequest) {
       max_tokens:500,
       messages:[{ role:'user', content:[
         source,
-        { type:'text', text:'Extrage din document scopul pentru o dispozitie de plata. Returneaza doar JSON: {"purpose":"Factura energie electrica/gaz/administratie, furnizor, numar factura si numar apartament daca exista","amount":123.45,"supplier":"...","invoiceNumber":"..."}' },
+        { type:'text', text:'Extrage datele facturii pentru o dispozitie de plata. Returneaza doar JSON: {"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria facturii","invoiceNumber":"numarul facturii","apartment":"numarul apartamentului"}. Nu scrie descrieri lungi.' },
       ] }],
     })
     const raw = response.content.filter(block=>block.type==='text').map(block=>(block as {text:string}).text).join('')
     const match = raw.match(/\{[\s\S]*\}/)
-    let extracted:{purpose?:string;amount?:number;supplier?:string;invoiceNumber?:string} = {}
+    let extracted:{category?:string;amount?:number;supplier?:string;series?:string;invoiceNumber?:string;apartment?:string} = {}
     try { extracted = match ? JSON.parse(match[0]) : {} } catch {}
+    const purpose = dispositionPurpose(extracted)
 
     const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
     const fileName = `${safePart(extracted.supplier || 'factura', 'factura')}_${safePart(extracted.invoiceNumber || file.name, 'document')}_${Date.now()}.${extension}`
@@ -46,12 +58,12 @@ export async function POST(req: NextRequest) {
     if (storageError) return NextResponse.json({ error:storageError.message }, { status:500 })
     const { data:document, error } = await sb.from('documente').insert({
       firma_id:firmaId, luna_id:lunaId, modul:'acte_contabile', tip_document:'factura',
-      furnizor:`Atașament dispoziție ${number} | ${extracted.purpose || extracted.supplier || ''}`,
+      furnizor:`Atașament dispoziție ${number} | ${purpose}`,
       numar_document:String(extracted.invoiceNumber || ''), fisier_path:path, fisier_nume:fileName,
       fisier_tip:file.type, fisier_marime:bytes.length, in_zip:false,
     }).select('id,fisier_nume').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error:error.message }, { status:500 }) }
-    return NextResponse.json({ document, purpose:extracted.purpose || '', amount:extracted.amount || null })
+    return NextResponse.json({ document, purpose, amount:extracted.amount || null })
   } catch (error) {
     return NextResponse.json({ error:String(error) }, { status:500 })
   }

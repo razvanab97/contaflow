@@ -134,6 +134,35 @@ export async function POST(req: NextRequest) {
       const usedFont = useBold ? bold : font
       text(value, left + (width - usedFont.widthOfTextAtSize(safe(value), size)) / 2, y, size, useBold)
     }
+    const wrapped = (value: string, x: number, y: number, maxWidth: number, size = 10, useBold = false, maxLines = 2, lineHeight = 12) => {
+      const usedFont = useBold ? bold : font
+      const words = safe(value).split(/\s+/).filter(Boolean)
+      const rows: string[] = []
+      for (const word of words) {
+        const candidate = rows.length ? `${rows.at(-1)} ${word}` : word
+        if (!rows.length || usedFont.widthOfTextAtSize(candidate, size) <= maxWidth) {
+          if (rows.length) rows[rows.length - 1] = candidate
+          else rows.push(candidate)
+        } else if (rows.length < maxLines) {
+          rows.push(word)
+        } else {
+          const last = rows.length - 1
+          let truncated = `${rows[last]}...`
+          while (truncated.length > 3 && usedFont.widthOfTextAtSize(truncated, size) > maxWidth)
+            truncated = `${truncated.slice(0, -4)}...`
+          rows[last] = truncated
+          break
+        }
+      }
+      rows.forEach((row, index) => {
+        if (usedFont.widthOfTextAtSize(row, size) <= maxWidth) return
+        let truncated = `${row}...`
+        while (truncated.length > 3 && usedFont.widthOfTextAtSize(truncated, size) > maxWidth)
+          truncated = `${truncated.slice(0, -4)}...`
+        rows[index] = truncated
+      })
+      rows.forEach((row, index) => text(row, x, y - index * lineHeight, size, useBold))
+    }
 
     line(left, top, right, top, 1)
     line(left, top, left, 300, 1)
@@ -157,61 +186,59 @@ export async function POST(req: NextRequest) {
     dotted(308, 694, 395)
 
     text('Numele si prenumele:', 55, 674, 10, true)
-    text(safe(body.beneficiary), 166, 674, 11, true)
+    wrapped(safe(body.beneficiary), 166, 674, 374, 11, true)
     dotted(162, 668, 540)
     text('Functia (calitatea):', 55, 654, 10, true)
-    text(safe(body.function), 166, 654, 10)
+    wrapped(safe(body.function), 166, 654, 374, 10)
     dotted(162, 648, 540)
     text('Suma de:', 55, 634, 10, true)
     text(money, 201, 634, 10, true)
     text('Ron', 270, 634, 10, true)
     dotted(162, 628, 540)
     text('Adica:', 55, 614, 10, true)
-    text(amountInWords(amount), 162, 614, 9)
-    dotted(162, 608, 540)
-    text('Scopul platii:', 55, 594, 10, true)
-    text(safe(body.purpose), 162, 594, 10)
-    dotted(162, 588, 540)
+    wrapped(amountInWords(amount), 162, 614, 378, 9, false, 2, 11)
+    dotted(162, 597, 540)
+    text('Scopul platii:', 55, 580, 10, true)
+    wrapped(safe(body.purpose), 162, 580, 378, 10, false, 3, 12)
+    dotted(162, 550, 540)
 
-    line(left, 580, right, 580, 1)
-    line(left, 528, right, 528, 1)
-    line(left, 478, right, 478, 1)
-    line(70, 580, 70, 478, 1)
-    line(242, 580, 242, 478, 1)
-    line(414, 580, 414, 478, 1)
-    text('Semnatura', 48, 507, 8)
-    text('Conducatorul unitatii:', 112, 558, 9)
-    text('Viza de control', 292, 558, 9)
-    text('Financiar-preventiv', 279, 545, 9)
-    text('Departament', 449, 558, 9)
-    text('financiar-contabil', 437, 545, 9)
+    line(left, 542, right, 542, 1)
+    line(left, 510, right, 510, 1)
+    line(left, 470, right, 470, 1)
+    line(70, 542, 70, 470, 1)
+    line(242, 542, 242, 470, 1)
+    line(414, 542, 414, 470, 1)
+    text('Semnatura', 48, 489, 8)
+    text('Conducatorul unitatii:', 112, 526, 9)
+    text('Viza de control', 292, 526, 9)
+    text('Financiar-preventiv', 279, 513, 9)
+    text('Departament', 449, 526, 9)
+    text('financiar-contabil', 437, 513, 9)
 
-    text('Date suplimentare privind beneficiarul sumei:', 55, 466, 9)
-    text('Actul de identitate:', 55, 450, 10, true)
-    text(safe(body.identityType, 'C.I.'), 177, 450, 10)
-    text('seria:', 232, 450, 10, true)
-    text(safe(body.identitySeries), 280, 450, 10)
-    text('numarul:', 345, 450, 10, true)
-    text(safe(body.identityNumber), 414, 450, 10)
-    text('Adresa beneficiarului:', 55, 438, 8, true)
-    text(safe(body.ownerAddress), 162, 438, 8)
-    text('Am primit suma de:', 55, 430, 10, true)
-    text(money, 201, 430, 10, true)
-    text('Ron', 277, 430, 10, true)
-    text('Data:', 55, 410, 10, true)
-    text(date, 198, 410, 10)
-    text('Semnatura:', 286, 410, 10, true)
-    dotted(352, 405, 490)
+    text('Date suplimentare privind beneficiarul sumei:', 55, 458, 9)
+    text('Actul de identitate:', 55, 442, 10, true)
+    text(safe(body.identityType, 'C.I.'), 177, 442, 10)
+    text('seria:', 232, 442, 10, true)
+    text(safe(body.identitySeries), 280, 442, 10)
+    text('numarul:', 345, 442, 10, true)
+    text(safe(body.identityNumber), 414, 442, 10)
+    text('Am primit suma de:', 55, 422, 10, true)
+    text(money, 201, 422, 10, true)
+    text('Ron', 277, 422, 10, true)
+    text('Data:', 55, 402, 10, true)
+    text(date, 198, 402, 10)
+    text('Semnatura:', 286, 402, 10, true)
+    dotted(352, 397, 490)
 
-    line(left, 398, right, 398, 1)
-    text('CASIER:', 49, 382, 11)
-    text('Platit suma de:', 282, 362, 10, true)
-    text(money, 388, 362, 10, true)
-    text('Ron', 468, 362, 10)
-    text('Data de:', 282, 342, 10, true)
-    text(date, 382, 342, 10)
-    text('Semnatura:', 282, 322, 10, true)
-    dotted(352, 317, 490)
+    line(left, 390, right, 390, 1)
+    text('CASIER:', 49, 374, 11)
+    text('Platit suma de:', 282, 354, 10, true)
+    text(money, 388, 354, 10, true)
+    text('Ron', 468, 354, 10)
+    text('Data de:', 282, 334, 10, true)
+    text(date, 382, 334, 10)
+    text('Semnatura:', 282, 314, 10, true)
+    dotted(352, 309, 490)
     line(left, 300, right, 300, 1)
 
     const bytes = await pdf.save()
@@ -224,7 +251,7 @@ export async function POST(req: NextRequest) {
     })
     if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
 
-    const dispositionData = JSON.stringify({ purpose:body.purpose, beneficiary:body.beneficiary, function:body.function, amount, date, identitySeries:body.identitySeries, identityNumber:body.identityNumber, ownerAddress:body.ownerAddress })
+    const dispositionData = JSON.stringify({ purpose:body.purpose, beneficiary:body.beneficiary, function:body.function, amount, date, identitySeries:body.identitySeries, identityNumber:body.identityNumber })
     const values = {
       firma_id: firmaId,
       luna_id: lunaId,

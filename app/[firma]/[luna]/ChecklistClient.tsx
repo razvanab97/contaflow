@@ -37,9 +37,9 @@ const DISPOSITION_COMPANY_PRESETS: Record<string,{ nrRegCom:string; cif:string; 
   },
 }
 const DISPOSITION_PERSON_PRESETS = [
-  { label:'Grumăzescu Angela · Asociație', beneficiary:'Grumazescu Angela', function:'Proprietar', identitySeries:'MX', identityNumber:'864860', purpose:'Chitanță asociație' },
-  { label:'Bucșa Radu · Administrație apartamente', beneficiary:'Bucsa Radu', function:'Proprietar', identitySeries:'ZC', identityNumber:'553054', purpose:'Factură administrație apartament' },
-  { label:'Bordeanu Dănuț · E.ON Gaz', beneficiary:'Bordeanu Danut', function:'Proprietar', identitySeries:'MZ', identityNumber:'699302', purpose:'Factură gaz E.ON' },
+  { label:'Grumăzescu Angela · Asociație', beneficiary:'Grumazescu Angela', function:'Proprietar', identitySeries:'MX', identityNumber:'864860', purpose:'Asociația' },
+  { label:'Bucșa Radu · Administrație apartamente', beneficiary:'Bucsa Radu', function:'Proprietar', identitySeries:'ZC', identityNumber:'553054', purpose:'Asociația' },
+  { label:'Bordeanu Dănuț · E.ON Gaz', beneficiary:'Bordeanu Danut', function:'Proprietar', identitySeries:'MZ', identityNumber:'699302', purpose:'Fact. gaz' },
 ]
 
 function dispositionCompanyDetails(firma: Firma) {
@@ -512,7 +512,6 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   const [amount, setAmount] = useState('')
   const [purpose, setPurpose] = useState('')
   const [owner, setOwner] = useState('')
-  const [ownerAddress, setOwnerAddress] = useState('')
   const [beneficiaryFunction, setBeneficiaryFunction] = useState('')
   const [identitySeries, setIdentitySeries] = useState('')
   const [identityNumber, setIdentityNumber] = useState('')
@@ -536,7 +535,6 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
     const data = await res.json().catch(() => ({}))
     const template = data.template || {}
     setOwner(template.owner || '')
-    setOwnerAddress(template.ownerAddress || '')
     setBeneficiaryFunction(template.beneficiaryFunction || '')
     setIdentitySeries(template.identitySeries || '')
     setIdentityNumber(template.identityNumber || '')
@@ -548,7 +546,7 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   async function saveTemplate() {
     setTemplateBusy(true); setError('')
     const res = await fetch('/api/chitante/dispozitie/template', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-      firmaId:selectedFirma.id, lunaId:selectedLunaId, template:{ owner, ownerAddress, beneficiaryFunction, identitySeries, identityNumber, defaultPurpose:purpose },
+      firmaId:selectedFirma.id, lunaId:selectedLunaId, template:{ owner, beneficiaryFunction, identitySeries, identityNumber, defaultPurpose:purpose },
     })})
     if (!res.ok) setError((await res.json().catch(()=>({}))).error || 'Șablonul nu a putut fi salvat')
     setTemplateBusy(false)
@@ -580,7 +578,7 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
     const res = await fetch('/api/chitante/dispozitie', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
       firmaId:selectedFirma.id, lunaId:selectedLunaId, firmaNume:selectedFirma.nume, cif:companyDetails.cif, nrRegCom:companyDetails.nrRegCom,
       adresa:companyDetails.adresa, judet:companyDetails.judet, tara:companyDetails.tara,
-      editId, date, beneficiary:beneficiary || owner, function:beneficiaryFunction, amount, purpose, identitySeries, identityNumber, ownerAddress, attachmentIds:attachedInvoices.map(invoice=>invoice.id),
+      editId, date, beneficiary:beneficiary || owner, function:beneficiaryFunction, amount, purpose, identitySeries, identityNumber, attachmentIds:attachedInvoices.map(invoice=>invoice.id),
     })})
     if (!res.ok) { const data=await res.json().catch(()=>({})); setError(data.error||'Generarea nu a reușit'); return }
     const assigned=res.headers.get('X-Disposition-Number')||number; const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dispozitie_plata_${assigned}.pdf`; a.click(); URL.revokeObjectURL(url); setEditId(''); setAttachedInvoices([]); await loadNumber()
@@ -613,7 +611,7 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
     setOwner(String(data.beneficiary || '')); setBeneficiaryFunction(String(data.function || ''))
     setAmount(String(data.amount || '')); setPurpose(String(data.purpose || ''))
     setIdentitySeries(String(data.identitySeries || '')); setIdentityNumber(String(data.identityNumber || ''))
-    setOwnerAddress(String(data.ownerAddress || '')); setAttachedInvoices(document.attachments || [])
+    setAttachedInvoices(document.attachments || [])
   }
   async function cancelEdit() {
     setEditId(''); setAttachedInvoices([]); setPreset('')
@@ -645,9 +643,8 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
         <input readOnly value={companyDetails.judet} placeholder="Județ" style={{...INP,color:'#888'}}/>
         <input readOnly value={companyDetails.tara} placeholder="Țară" style={{...INP,color:'#888'}}/>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr 1fr 1fr 1fr', gap:'8px', marginTop:'8px' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:'8px', marginTop:'8px' }}>
         <input value={owner} onChange={e=>{setOwner(e.target.value);if(!beneficiary)setBeneficiary(e.target.value)}} placeholder="Proprietar / beneficiar implicit" style={INP}/>
-        <input value={ownerAddress} onChange={e=>setOwnerAddress(e.target.value)} placeholder="Adresa proprietarului / beneficiarului" style={INP}/>
         <input value={beneficiaryFunction} onChange={e=>setBeneficiaryFunction(e.target.value)} placeholder="Calitate / funcție" style={INP}/>
         <input value={identitySeries} onChange={e=>setIdentitySeries(e.target.value)} placeholder="Serie CI" style={INP}/>
         <input value={identityNumber} onChange={e=>setIdentityNumber(e.target.value)} placeholder="Număr CI" style={INP}/>

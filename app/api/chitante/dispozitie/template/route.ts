@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
-const FIELDS = ['owner', 'ownerAddress', 'beneficiaryFunction', 'identitySeries', 'identityNumber', 'defaultPurpose']
+const FIELDS = ['owner', 'beneficiaryFunction', 'identitySeries', 'identityNumber', 'defaultPurpose']
 
 function cleanTemplate(value: unknown) {
   const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
