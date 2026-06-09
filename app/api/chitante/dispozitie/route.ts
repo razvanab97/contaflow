@@ -122,6 +122,7 @@ export async function POST(req: NextRequest) {
     text('Nr. la Reg Com', 190, 774, 10, true)
     text(safe(body.nrRegCom, '________________'), 274, 774, 10)
     text(safe(body.adresa, 'Adresa: ________________________________________________'), 49, 758, 9)
+    text(`Judet: ${safe(body.judet, '__')}    Tara: ${safe(body.tara, '__')}`, 49, 746, 8)
 
     centered('DISPOZITIE DE PLATA CATRE CASIERIE', 733, 13, true)
     centered('Cont: 5311 - Casa in lei', 716, 10, true)

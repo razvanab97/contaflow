@@ -500,9 +500,12 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
             <input type="text" placeholder="Furnizor" value={furnizor} onChange={e=>setFurnizor(e.target.value)} style={INP}/>
             <input type="text" placeholder="Nr. document" value={numDoc} onChange={e=>setNumDoc(e.target.value)} style={INP}/>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginBottom:'10px' }}>
-            <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Link PDF Oblio sau altă platformă" style={INP}/>
-            <button onClick={importUrl} disabled={uploading||!sourceUrl} style={{ padding:'8px 14px', border:'none', borderRadius:'8px', background:culoare, color:'#FFF', cursor:'pointer', opacity:uploading?.6:1 }}>Importă linkul</button>
+          <div style={{ padding:'10px', marginBottom:'10px', background:'#171717', border:'1px solid #282828', borderRadius:'9px' }}>
+            <p style={{ fontSize:'11px', fontWeight:700, color:'#AAA', marginBottom:'7px' }}>Adaugă factura prin link</p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px' }}>
+              <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Link PDF Oblio, Booking, Airbnb sau altă platformă" style={INP}/>
+              <button onClick={importUrl} disabled={uploading||!sourceUrl} style={{ padding:'8px 14px', border:'none', borderRadius:'8px', background:culoare, color:'#FFF', cursor:'pointer', opacity:uploading?.6:1 }}>Adaugă din link</button>
+            </div>
           </div>
           <div onClick={()=>fileRef.current?.click()}
             onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)}
@@ -896,6 +899,17 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
               </div>
             </div>
 
+            <div style={{ padding:'12px', marginBottom:'12px', background:'#171717', border:'1px solid #282828', borderRadius:'10px' }}>
+              <div style={{ fontSize:'12px', fontWeight:700, color:'#DDD', marginBottom:'4px' }}>Adaugă factura prin link</div>
+              <div style={{ fontSize:'10px', color:'#666', marginBottom:'9px' }}>Oblio, Booking, Airbnb sau orice link HTTPS care returnează un PDF.</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px' }}>
+                <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Lipește linkul facturii PDF" style={INP}/>
+                <button onClick={importUrl} disabled={uploading||!sourceUrl} style={{ ...BTN, background:culoare, color:'#FFF', opacity:(uploading||!sourceUrl)?.5:1 }}>
+                  Adaugă din link
+                </button>
+              </div>
+            </div>
+
             <div 
               onClick={()=>fileRef.current?.click()}
               onDragOver={e=>{e.preventDefault();setDrag(true)}} 
@@ -920,12 +934,6 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                   <p style={{fontSize:'10px',color:'#555'}}>drag & drop sau click pentru navigare</p>
                 </div>
               )}
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginTop:'10px' }}>
-              <input value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="Link PDF Oblio sau altă platformă" style={INP}/>
-              <button onClick={importUrl} disabled={uploading||!sourceUrl} style={{ ...BTN, background:culoare, color:'#FFF', opacity:(uploading||!sourceUrl)?.5:1 }}>
-                Importă linkul
-              </button>
             </div>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{display:'none'}} onChange={e=>e.target.files&&upload(e.target.files)}/>
             {uploadError && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'8px' }}>{uploadError}</p>}

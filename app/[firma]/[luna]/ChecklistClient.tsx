@@ -13,6 +13,44 @@ interface Firma {
   cif?:string; cui?:string; nr_reg_com?:string; nr_registru_comertului?:string; adresa?:string
   luna_id?:string
 }
+const DISPOSITION_COMPANY_PRESETS: Record<string,{ nrRegCom:string; cif:string; adresa:string; judet:string; tara:string }> = {
+  abxhomes: {
+    nrRegCom:'J2025022705009',
+    cif:'51540013',
+    adresa:'Soseaua Nicolina, nr 164U, etaj 5, ap 65, Iasi',
+    judet:'IS',
+    tara:'RO',
+  },
+  'ab-homes-invest': {
+    nrRegCom:'J22/3035/2023',
+    cif:'RO48872594',
+    adresa:'Sat Erbiceni Com. Erbiceni, Vol. 7, Poz. 051, Erbiceni',
+    judet:'IS',
+    tara:'RO',
+  },
+  'ab-textile': {
+    nrRegCom:'J2025073349009',
+    cif:'52575850',
+    adresa:'Sat Erbiceni Com. Erbiceni, Vol. 7, Poz. 051',
+    judet:'IS',
+    tara:'RO',
+  },
+}
+
+function dispositionCompanyDetails(firma: Firma) {
+  const byName = firma.nume.toLowerCase().includes('ab homes invest') ? DISPOSITION_COMPANY_PRESETS['ab-homes-invest']
+    : firma.nume.toLowerCase().includes('ab textile') ? DISPOSITION_COMPANY_PRESETS['ab-textile']
+    : firma.nume.toLowerCase().includes('abxhomes') ? DISPOSITION_COMPANY_PRESETS.abxhomes
+    : undefined
+  const preset = DISPOSITION_COMPANY_PRESETS[firma.slug] || byName
+  return {
+    nrRegCom:preset?.nrRegCom || firma.nr_reg_com || firma.nr_registru_comertului || '',
+    cif:preset?.cif || firma.cif || firma.cui || '',
+    adresa:preset?.adresa || firma.adresa || '',
+    judet:preset?.judet || '',
+    tara:preset?.tara || '',
+  }
+}
 interface Item { id:string; completat:boolean; checklist_templates?:{ titlu:string; descriere?:string; modul:string; necesita_semnatura:boolean; spre_proiect:boolean; ordine:number } }
 interface Extras { id:string; valuta:string; nr_tranzactii:number; nr_documentate:number; procesat_ai:boolean }
 
@@ -149,7 +187,7 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
                   </div>
                 </div>
                 {modItems.map((item, idx) => (
-                  <ChecklistItemRow key={item.id} item={item} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} hasUpload borderTop={idx>0} onToggle={()=>toggleChecklistItem(item)} />
+                  <ChecklistItemRow key={item.id} item={item} destinations={sorted.filter(entry=>entry.id!==item.id)} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} hasUpload borderTop={idx>0} onToggle={()=>toggleChecklistItem(item)} />
                 ))}
               </div>
             )
@@ -458,6 +496,7 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   const [expanded, setExpanded] = useState(false)
   const [firmaId, setFirmaId] = useState(firmaInitiala.id)
   const selectedFirma = firme.find(firma => firma.id === firmaId) || firmaInitiala
+  const companyDetails = dispositionCompanyDetails(selectedFirma)
   const selectedLunaId = selectedFirma.luna_id || lunaIdInitial
   const [number, setNumber] = useState('')
   const [documents, setDocuments] = useState<{id:string;fisier_nume:string;numar_document:string;furnizor:string}[]>([])
@@ -528,7 +567,8 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
   async function generate() {
     setError('')
     const res = await fetch('/api/chitante/dispozitie', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-      firmaId:selectedFirma.id, lunaId:selectedLunaId, firmaNume:selectedFirma.nume, cif:selectedFirma.cif||selectedFirma.cui, nrRegCom:selectedFirma.nr_reg_com||selectedFirma.nr_registru_comertului, adresa:selectedFirma.adresa,
+      firmaId:selectedFirma.id, lunaId:selectedLunaId, firmaNume:selectedFirma.nume, cif:companyDetails.cif, nrRegCom:companyDetails.nrRegCom,
+      adresa:companyDetails.adresa, judet:companyDetails.judet, tara:companyDetails.tara,
       date, beneficiary:beneficiary || owner, function:beneficiaryFunction, amount, purpose, identitySeries, identityNumber, ownerAddress,
     })})
     if (!res.ok) { const data=await res.json().catch(()=>({})); setError(data.error||'Generarea nu a reușit'); return }
@@ -551,6 +591,13 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
         <select value={firmaId} onChange={e=>setFirmaId(e.target.value)} style={INP}>{firme.map(f=><option key={f.id} value={f.id}>{f.nume}</option>)}</select>
         <input readOnly value={number} placeholder="Număr automat" style={{...INP,color:culoare,fontWeight:700}}/>
         <input value={date} onChange={e=>setDate(e.target.value)} placeholder="Data" style={INP}/>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr 70px 70px', gap:'8px', marginTop:'8px' }}>
+        <input readOnly value={companyDetails.nrRegCom} placeholder="Reg. com." style={{...INP,color:'#888'}}/>
+        <input readOnly value={companyDetails.cif} placeholder="CIF" style={{...INP,color:'#888'}}/>
+        <input readOnly value={companyDetails.adresa} placeholder="Adresa firmei" style={{...INP,color:'#888'}}/>
+        <input readOnly value={companyDetails.judet} placeholder="Județ" style={{...INP,color:'#888'}}/>
+        <input readOnly value={companyDetails.tara} placeholder="Țară" style={{...INP,color:'#888'}}/>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr 1fr 1fr 1fr', gap:'8px', marginTop:'8px' }}>
         <input value={owner} onChange={e=>{setOwner(e.target.value);if(!beneficiary)setBeneficiary(e.target.value)}} placeholder="Proprietar / beneficiar implicit" style={INP}/>
@@ -785,8 +832,8 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
   )
 }
 
-function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop, onToggle }:
-  { item:Item; firmaId:string; lunaId:string; culoare:string; hasUpload:boolean; borderTop:boolean; onToggle:()=>void }
+function ChecklistItemRow({ item, destinations, firmaId, lunaId, culoare, hasUpload, borderTop, onToggle }:
+  { item:Item; destinations:Item[]; firmaId:string; lunaId:string; culoare:string; hasUpload:boolean; borderTop:boolean; onToggle:()=>void }
 ) {
   const [expanded, setExpanded] = useState(false)
   const [docs, setDocs] = useState<{id:string;fisier_nume:string;tip_document?:string}[]>([])
@@ -797,6 +844,11 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
   const [desc, setDesc] = useState('')
   const [sourceUrl, setSourceUrl] = useState('')
   const [error, setError] = useState('')
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([])
+  const [deletingDocs, setDeletingDocs] = useState(false)
+  const [movingDocs, setMovingDocs] = useState(false)
+  const [bulkMoveTarget, setBulkMoveTarget] = useState('')
+  const [moveTargets, setMoveTargets] = useState<Record<string,string>>({})
   const [drag, setDrag] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const t = item.checklist_templates
@@ -805,7 +857,11 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
   const loadDocs = useCallback(async () => {
     setLoadingDocs(true)
     const res = await fetch(`/api/checklist/docs?itemId=${item.id}`)
-    if (res.ok) { const d = await res.json(); setDocs(d.docs||[]) }
+    if (res.ok) {
+      const d = await res.json()
+      setDocs(d.docs||[])
+      setSelectedDocIds(current => current.filter(id => (d.docs||[]).some((doc:{id:string}) => doc.id===id)))
+    }
     setLoadingDocs(false)
   }, [item.id])
 
@@ -845,6 +901,41 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
     setMerging(false)
   }
 
+  function toggleDocument(id: string) {
+    setSelectedDocIds(current => current.includes(id) ? current.filter(value=>value!==id) : [...current, id])
+  }
+
+  async function deleteDocuments(ids: string[]) {
+    if (!ids.length || !window.confirm(`Ștergi definitiv ${ids.length === 1 ? 'documentul selectat' : `${ids.length} documente selectate`}?`)) return
+    setDeletingDocs(true); setError('')
+    const res = await fetch('/api/checklist/docs', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ itemId:item.id, ids }) })
+    const data = await res.json().catch(()=>({}))
+    if (!res.ok) setError(data.error || 'Documentele nu au putut fi șterse')
+    else {
+      const deletedIds:string[] = data.deletedIds || ids
+      setDocs(current=>current.filter(doc=>!deletedIds.includes(doc.id)))
+      setSelectedDocIds(current=>current.filter(id=>!deletedIds.includes(id)))
+      if (data.warning) setError(`Documentele au fost eliminate, dar unele fișiere nu au putut fi curățate: ${data.warning}`)
+    }
+    setDeletingDocs(false)
+  }
+
+  async function moveDocuments(ids: string[], targetItemId: string) {
+    if (!ids.length || !targetItemId) return
+    setMovingDocs(true); setError('')
+    const res = await fetch('/api/checklist/docs', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ itemId:item.id, targetItemId, ids }) })
+    const data = await res.json().catch(()=>({}))
+    if (!res.ok) setError(data.error || 'Documentele nu au putut fi mutate')
+    else {
+      const movedIds:string[] = data.movedIds || ids
+      setDocs(current=>current.filter(doc=>!movedIds.includes(doc.id)))
+      setSelectedDocIds(current=>current.filter(id=>!movedIds.includes(id)))
+      setMoveTargets(current=>Object.fromEntries(Object.entries(current).filter(([id])=>!movedIds.includes(id))))
+      setBulkMoveTarget('')
+    }
+    setMovingDocs(false)
+  }
+
   const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'8px 12px', color:'#BBB', outline:'none', width:'100%' }
 
   return (
@@ -871,12 +962,34 @@ function ChecklistItemRow({ item, firmaId, lunaId, culoare, hasUpload, borderTop
 
           {docs.length>0 && (
             <div style={{ marginTop:'14px', marginBottom:'14px' }}>
-              <div style={{ fontSize:'11px', fontWeight:700, color:'#666', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:'8px' }}>Fișiere ({docs.length})</div>
+              <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', flexWrap:'wrap' }}>
+                <div style={{ flex:1, fontSize:'11px', fontWeight:700, color:'#666', textTransform:'uppercase', letterSpacing:'.08em' }}>Fișiere ({docs.length})</div>
+                <button onClick={()=>setSelectedDocIds(selectedDocIds.length===docs.length?[]:docs.map(doc=>doc.id))} style={{ fontSize:'10px', border:'1px solid #333', borderRadius:'6px', padding:'4px 7px', background:'#1B1B1B', color:'#AAA', cursor:'pointer' }}>
+                  {selectedDocIds.length===docs.length?'Deselectează toate':'Selectează toate'}
+                </button>
+                <select value={bulkMoveTarget} onChange={event=>setBulkMoveTarget(event.target.value)} style={{ fontSize:'10px', border:'1px solid #333', borderRadius:'6px', padding:'4px 7px', background:'#1B1B1B', color:'#AAA' }}>
+                  <option value="">Mută selectate în...</option>
+                  {destinations.map(destination=><option key={destination.id} value={destination.id}>{MOD_LABELS[destination.checklist_templates?.modul || ''] || destination.checklist_templates?.modul || 'Altele'} · {destination.checklist_templates?.titlu || 'Altă secțiune'}</option>)}
+                </select>
+                <button onClick={()=>moveDocuments(selectedDocIds, bulkMoveTarget)} disabled={!selectedDocIds.length||!bulkMoveTarget||movingDocs} style={{ fontSize:'10px', border:'1px solid #3A4C68', borderRadius:'6px', padding:'4px 7px', background:'#172033', color:'#8DB8FF', cursor:'pointer', opacity:(!selectedDocIds.length||!bulkMoveTarget||movingDocs)?.5:1 }}>
+                  {movingDocs?'Se mută...':`Mută (${selectedDocIds.length})`}
+                </button>
+                <button onClick={()=>deleteDocuments(selectedDocIds)} disabled={!selectedDocIds.length||deletingDocs} style={{ fontSize:'10px', border:'1px solid #5B3030', borderRadius:'6px', padding:'4px 7px', background:'#241515', color:'#F87171', cursor:'pointer', opacity:(!selectedDocIds.length||deletingDocs)?.5:1 }}>
+                  {deletingDocs?'Se șterg...':`Șterge selectate (${selectedDocIds.length})`}
+                </button>
+              </div>
               {docs.map(d => (
-                <div key={d.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'#161616', borderRadius:'8px', border:'1px solid #222', marginBottom:'5px' }}>
+                <div key={d.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:selectedDocIds.includes(d.id)?'rgba(74,222,128,.05)':'#161616', borderRadius:'8px', border:`1px solid ${selectedDocIds.includes(d.id)?'#365B45':'#222'}`, marginBottom:'5px' }}>
+                  <input type="checkbox" aria-label={`Selectează ${d.fisier_nume}`} checked={selectedDocIds.includes(d.id)} onChange={()=>toggleDocument(d.id)} style={{ accentColor:culoare, cursor:'pointer' }}/>
                   <svg width="14" height="14" fill="none" stroke={culoare} strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
                   <span style={{ fontSize:'13px', fontWeight:500, color:'#CCC', flex:1 }}>{d.fisier_nume}</span>
                   {d.tip_document && <span style={{ fontSize:'10px', color:'#666', background:'#1E1E1E', padding:'2px 7px', borderRadius:'5px' }}>{TIP_LBL[d.tip_document]||d.tip_document}</span>}
+                  <select value={moveTargets[d.id] || ''} onChange={event=>setMoveTargets(current=>({...current,[d.id]:event.target.value}))} style={{ maxWidth:'180px', fontSize:'10px', border:'1px solid #333', borderRadius:'6px', padding:'4px 6px', background:'#1B1B1B', color:'#AAA' }}>
+                    <option value="">Mută în...</option>
+                    {destinations.map(destination=><option key={destination.id} value={destination.id}>{MOD_LABELS[destination.checklist_templates?.modul || ''] || destination.checklist_templates?.modul || 'Altele'} · {destination.checklist_templates?.titlu || 'Altă secțiune'}</option>)}
+                  </select>
+                  <button onClick={()=>moveDocuments([d.id], moveTargets[d.id])} disabled={!moveTargets[d.id]||movingDocs} style={{ fontSize:'10px', color:'#8DB8FF', background:'transparent', border:'none', cursor:'pointer' }}>Mută</button>
+                  <button onClick={()=>deleteDocuments([d.id])} disabled={deletingDocs} style={{ fontSize:'10px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>Șterge</button>
                 </div>
               ))}
               <button onClick={merge} disabled={merging} style={{ marginTop:'10px', fontSize:'12px', fontWeight:700, padding:'8px 16px', borderRadius:'8px', border:'none', background:culoare, color:'#fff', cursor:'pointer', opacity:merging?.6:1 }}>
