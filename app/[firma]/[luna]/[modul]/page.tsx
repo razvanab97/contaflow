@@ -43,8 +43,8 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
     dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
     modulSlug === 'extras' ? dbSelect('extrase', { eq: { luna_id: lunaData.id } }) : Promise.resolve([]),
     dbSelect('task_stari', { select: 'luna_id,completat' }),
-    // Recuperează checklist_items din sistemul vechi (pentru documente eMAG/Trendyol deja încărcate)
-    ['emag', 'trendyol'].includes(modulSlug)
+    // Recuperează checklist_items din sistemul vechi pentru documente deja încărcate
+    ['emag', 'trendyol', 'booking-facturi', 'booking-borderou', 'airbnb-facturi', 'airbnb-borderou', '5stardesk'].includes(modulSlug)
       ? dbSelect('checklist_items', { eq: { luna_id: lunaData.id }, select: 'id,completat,checklist_templates(titlu,descriere,modul,ordine)' })
       : Promise.resolve([]),
   ])
@@ -92,15 +92,15 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'trendyol':
         return <TrendyolModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} checklistItems={checklistItemsRaw.filter((i: any) => i.checklist_templates?.modul === 'trendyol')}/>
       case 'booking-facturi':
-        return <BookingModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="booking-facturi"/>
+        return <BookingModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="booking-facturi" checklistItems={checklistItemsRaw.filter((i: any) => i.checklist_templates?.modul === 'booking-facturi')}/>
       case 'booking-borderou':
-        return <BookingModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="booking-borderou"/>
+        return <BookingModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="booking-borderou" checklistItems={checklistItemsRaw.filter((i: any) => i.checklist_templates?.modul === 'booking-borderou')}/>
       case 'airbnb-facturi':
-        return <AirbnbModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="airbnb-facturi"/>
+        return <AirbnbModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="airbnb-facturi" checklistItems={checklistItemsRaw.filter((i: any) => i.checklist_templates?.modul === 'airbnb-facturi')}/>
       case 'airbnb-borderou':
-        return <AirbnbModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="airbnb-borderou"/>
+        return <AirbnbModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="airbnb-borderou" checklistItems={checklistItemsRaw.filter((i: any) => i.checklist_templates?.modul === 'airbnb-borderou')}/>
       case '5stardesk':
-        return <StarsdeskModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks}/>
+        return <StarsdeskModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} checklistItems={checklistItemsRaw.filter((i: any) => i.checklist_templates?.modul === '5stardesk')}/>
       case 'angajati':
         return <AngajatiModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks}/>
       case 'acte-contabile':
