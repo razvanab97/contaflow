@@ -1,72 +1,129 @@
 import Link from 'next/link'
-
-const URL = 'https://aqlmuoaaipbanjdptleg.supabase.co/rest/v1'
-const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxbG11b2FhaXBiYW5qZHB0bGVnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDY2NzE2OCwiZXhwIjoyMDk2MjQzMTY4fQ.VCnFDYSfxcbS9Hb9g12di7npy5plSvHpMrb6E2FEdfU'
-const H = { 'apikey': KEY, 'Authorization': `Bearer ${KEY}` }
-async function q(path: string) { const r = await fetch(`${URL}/${path}`, { headers: H, cache: 'no-store' }); return r.ok ? r.json() : [] }
+import Sidebar from '@/components/Sidebar'
+import { dbSelect } from '@/lib/db'
+import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 
 const LUNA = new Date().toISOString().slice(0, 7)
-function ll(s: string) { const [y,m]=s.split('-'); return `${['','Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec'][+m]} ${y}` }
-function llFull(s: string) { const [y,m]=s.split('-'); return `${['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'][+m]} ${y}` }
-function ini(n: string) { return n.split(' ').slice(0,2).map((w:string)=>w[0]).join('') }
+const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
+function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
+function ini(n: string) { return n.split(' ').filter((w:string) => /^[A-ZĂÎȘȚ]/.test(w)).slice(0,2).map((w:string)=>w[0]).join('') }
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 
 export default async function Dashboard() {
-  const firme = await q('firme?select=*&activa=eq.true&order=created_at')
-  const luni = await q('luni_contabile?select=*')
-  const luniMap: Record<string,any> = {}
-  for (const l of luni) luniMap[`${l.firma_id}_${l.luna.slice(0,7)}`] = l
-  const lunaLabel = llFull(LUNA)
+  const [firme, luni, taskStariRaw] = await Promise.all([
+    dbSelect('firme', { eq: { activa: true }, order: 'created_at' }),
+    dbSelect('luni_contabile', { select: '*' }),
+    dbSelect('task_stari', { select: 'luna_id,completat' }),
+  ])
+
+  const luniMap: Record<string, any> = {}
+  for (const l of luni) luniMap[`${l.firma_id}_${l.luna?.slice(0,7)}`] = l
+
+  const taskCount: Record<string, { done: number }> = {}
+  for (const ts of taskStariRaw) {
+    if (!taskCount[ts.luna_id]) taskCount[ts.luna_id] = { done: 0 }
+    if (ts.completat) taskCount[ts.luna_id].done++
+  }
+
+  const firmeNav = firme.map((f: any) => {
+    const lunaData = luniMap[`${f.id}_${LUNA}`]
+    const total = getFirmaTotalTasks(f.slug)
+    const done = lunaData ? (taskCount[lunaData.id]?.done || 0) : 0
+    return { id: f.id, slug: f.slug, nume: f.nume, culoare: f.culoare, pct: total > 0 ? Math.round((done / total) * 100) : 0 }
+  })
+
+  const ll = lunaLabel(LUNA)
 
   return (
-    <div style={{ display:'flex', minHeight:'100vh', background:'#0A0A0A' }}>
-      <aside style={{ width:'220px', flexShrink:0, background:'#0D0D0D', borderRight:'1px solid #1E1E1E', display:'flex', flexDirection:'column', padding:'20px 0', position:'sticky', top:0, height:'100vh' }}>
-        <div style={{ padding:'4px 18px 24px', display:'flex', alignItems:'center', gap:'10px' }}>
-          <div style={{ width:'28px', height:'28px', background:'#FFF', borderRadius:'7px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <svg width="14" height="14" fill="none" stroke="#111" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#0A0A0A' }}>
+      <Sidebar firme={firmeNav} lunaCurenta={LUNA} lunaLabel={ll} />
+
+      <main style={{ flex: 1, padding: '48px 52px', maxWidth: '860px' }}>
+        <div style={{ marginBottom: '40px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: '#333', letterSpacing: '.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
+            Contaflow · Dashboard
           </div>
-          <span style={{ fontSize:'15px', fontWeight:700, color:'#FFF' }}>ContaFlow</span>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#FFF', letterSpacing: '-0.6px', lineHeight: 1.2 }}>
+            Bună, Razvan
+          </h1>
+          <p style={{ fontSize: '13px', color: '#555', marginTop: '6px' }}>
+            {ll} · {firme.length} firme active
+          </p>
         </div>
-        <div style={{ padding:'0 18px 8px', fontSize:'10px', fontWeight:700, color:'#444', letterSpacing:'.12em', textTransform:'uppercase' }}>Firme</div>
-        {firme.map((f:any) => (
-          <Link key={f.id} href={`/${f.slug}/${LUNA}`} style={{ display:'flex', alignItems:'center', gap:'9px', padding:'8px 18px', color:'#999', fontSize:'13px', fontWeight:500 }}>
-            <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:f.culoare, flexShrink:0 }}/>
-            <span style={{ flex:1 }}>{f.nume.replace(' SRL','')}</span>
-            <span style={{ fontSize:'10px', color:'#444' }}>{luniMap[`${f.id}_${LUNA}`] ? ll(LUNA) : '—'}</span>
-          </Link>
-        ))}
-        <div style={{ marginTop:'auto', padding:'12px 18px', fontSize:'11px', color:'#555' }}>{lunaLabel}</div>
-      </aside>
-      <main style={{ flex:1, padding:'40px 44px', background:'#0F0F0F' }}>
-        <div style={{ marginBottom:'32px' }}>
-          <h1 style={{ fontSize:'24px', fontWeight:700, color:'#FFF', letterSpacing:'-0.5px' }}>Bună, Razvan</h1>
-          <p style={{ fontSize:'13px', color:'#777', marginTop:'4px' }}>{lunaLabel} · {firme.length} firme active</p>
-        </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-          {firme.map((f:any) => {
-            const luna = luniMap[`${f.id}_${LUNA}`]
-            const pct = luna?.progres_pct||0
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {firme.map((f: any) => {
+            const lunaData = luniMap[`${f.id}_${LUNA}`]
+            const total = getFirmaTotalTasks(f.slug)
+            const done = lunaData ? (taskCount[lunaData.id]?.done || 0) : 0
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0
             const r = rgb(f.culoare)
-            const statusLabel = luna ? (luna.status==='finalizata'?'finalizată':luna.status==='trimisa_contabil'?'trimisă':'în lucru') : 'neîncepută'
-            const statusColor = luna ? (luna.status==='finalizata'?{bg:'rgba(74,222,128,.15)',c:'#4ADE80'}:{bg:'rgba(251,146,60,.15)',c:'#FB923C'}) : {bg:'#1A1A1A',c:'#555'}
+            const isFinalizata = pct === 100 && lunaData
+            const isStarted = done > 0
+            const statusLabel = !lunaData ? 'Neîncepută' : isFinalizata ? 'Finalizată' : isStarted ? 'În lucru' : 'Neîncepută'
+            const statusStyle = isFinalizata
+              ? { bg: 'rgba(74,222,128,.1)', c: '#4ADE80' }
+              : isStarted ? { bg: 'rgba(252,211,77,.08)', c: '#FCD34D' }
+              : { bg: '#161616', c: '#3A3A3A' }
+            const modules = getFirmaModules(f.slug)
+
             return (
-              <div key={f.id} style={{ background:'#161616', border:'1px solid #242424', borderRadius:'14px', padding:'18px 22px' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'14px' }}>
-                  <div style={{ width:'36px', height:'36px', borderRadius:'9px', background:`rgba(${r},.18)`, color:f.culoare, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:700, flexShrink:0 }}>
+              <div key={f.id} style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '16px', padding: '24px 28px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '18px' }}>
+                  <div style={{
+                    width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0,
+                    background: `rgba(${r},.12)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '13px', fontWeight: 700, color: f.culoare,
+                  }}>
                     {ini(f.nume)}
                   </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:'15px', fontWeight:600, color:'#FFF' }}>{f.nume}</div>
-                    <div style={{ fontSize:'11px', color:'#666', marginTop:'2px' }}>{f.cui?`CUI ${f.cui}`:''}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '15px', fontWeight: 600, color: '#EFEFEF', letterSpacing: '-0.2px' }}>
+                        {f.nume}
+                      </span>
+                      <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 9px', borderRadius: '20px', background: statusStyle.bg, color: statusStyle.c }}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#3A3A3A' }}>
+                      {modules.length} module · {total} task-uri lunare
+                    </div>
                   </div>
-                  <span style={{ fontSize:'11px', fontWeight:600, padding:'3px 10px', borderRadius:'20px', background:statusColor.bg, color:statusColor.c }}>{statusLabel}</span>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: '28px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1, color: pct === 100 ? '#4ADE80' : f.culoare }}>
+                      {pct}%
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#3A3A3A', marginTop: '3px' }}>
+                      {done}/{total} task-uri
+                    </div>
+                  </div>
                 </div>
-                <div style={{ height:'2px', background:'#1E1E1E', borderRadius:'1px', marginBottom:'12px' }}>
-                  <div style={{ height:'2px', borderRadius:'1px', background:f.culoare, width:`${pct}%` }}/>
+
+                <div style={{ height: '2px', background: '#1A1A1A', borderRadius: '2px', marginBottom: '18px' }}>
+                  <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? '#4ADE80' : f.culoare, width: `${pct}%` }}/>
                 </div>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                  <span style={{ fontSize:'12px', color:'#666' }}>{luna ? `${pct}% completat` : `${lunaLabel} · neîncepută`}</span>
-                  <Link href={`/${f.slug}/${LUNA}`} style={{ fontSize:'12px', fontWeight:600, color:f.culoare, padding:'5px 14px', borderRadius:'7px', border:`1px solid rgba(${r},.3)` }}>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '18px' }}>
+                  {modules.map(m => (
+                    <span key={m.slug} style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '5px', background: '#161616', border: '1px solid #222', color: '#444' }}>
+                      {m.label}
+                    </span>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '12px', color: '#3A3A3A' }}>
+                    {lunaData ? ll : `${ll} · lună neîncepută`}
+                  </span>
+                  <Link href={`/${f.slug}/${LUNA}`} style={{
+                    fontSize: '12px', fontWeight: 600, color: f.culoare,
+                    padding: '7px 16px', borderRadius: '8px',
+                    border: `1px solid rgba(${r},.25)`,
+                    background: `rgba(${r},.06)`,
+                    letterSpacing: '-0.1px',
+                  }}>
                     Deschide →
                   </Link>
                 </div>

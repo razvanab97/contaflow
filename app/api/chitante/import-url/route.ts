@@ -2,7 +2,12 @@ import { isIP } from 'node:net'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
-const ACCOUNTING_SECTIONS = new Set(['facturi-chitanta', 'facturi-restante'])
+const ACCOUNTING_SECTIONS = new Set([
+  'facturi-chitanta', 'facturi-restante',
+  'booking-facturi', 'booking-borderou',
+  'airbnb-facturi', 'airbnb-borderou',
+  '5stardesk', 'trendyol', 'acte-contabile', 'angajati',
+])
 
 function safePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || fallback

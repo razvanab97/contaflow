@@ -3,8 +3,13 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 const ALLOWED_CATEGORIES = new Set(['utilitati', 'chirie', 'altul'])
-const ALLOWED_DOCUMENT_TYPES = new Set(['factura', 'chitanta'])
-const ALLOWED_SECTIONS = new Set(['facturi-chitanta', 'facturi-restante'])
+const ALLOWED_DOCUMENT_TYPES = new Set(['factura', 'chitanta', 'borderou', 'raport_csv', 'contract', 'altul'])
+const ALLOWED_SECTIONS = new Set([
+  'facturi-chitanta', 'facturi-restante',
+  'booking-facturi', 'booking-borderou',
+  'airbnb-facturi', 'airbnb-borderou',
+  '5stardesk', 'trendyol', 'acte-contabile', 'angajati',
+])
 
 function safeFilePart(value: string, fallback: string) {
   return value
@@ -47,14 +52,19 @@ export async function POST(req: NextRequest) {
   const reference = String(fd.get('reference') || '').trim()
   const transactionId = String(fd.get('transactionId') || '').trim()
 
-  if (!file || !firmaId || !lunaId || !ALLOWED_SECTIONS.has(section) || !ALLOWED_CATEGORIES.has(category) || !ALLOWED_DOCUMENT_TYPES.has(documentType))
+  const simpleSection = !['facturi-chitanta', 'facturi-restante'].includes(section)
+  const effectiveCategory = category || 'altul'
+  const effectiveType = documentType || 'altul'
+  if (!file || !firmaId || !lunaId || !ALLOWED_SECTIONS.has(section))
+    return NextResponse.json({ error: 'Date lipsă sau invalide' }, { status: 400 })
+  if (!simpleSection && (!ALLOWED_CATEGORIES.has(effectiveCategory) || !ALLOWED_DOCUMENT_TYPES.has(effectiveType)))
     return NextResponse.json({ error: 'Date lipsă sau invalide' }, { status: 400 })
   if (!ALLOWED_TYPES.has(file.type))
     return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG și PNG' }, { status: 400 })
 
   const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
   const details = [supplier, description, reference].filter(Boolean).join(' ')
-  const fileName = `${category}_${documentType}_${safeFilePart(details, 'fara_detalii')}_${Date.now()}.${extension}`
+  const fileName = `${effectiveCategory}_${effectiveType}_${safeFilePart(details, 'fara_detalii')}_${Date.now()}.${extension}`
   const path = `${firmaId}/${lunaId}/${section}/${fileName}`
   const sb = getServiceSupabase()
 
