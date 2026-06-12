@@ -76,21 +76,21 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
               </h1>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '20px' }}>
-              <Link href={`/${slug}/${prevLuna(luna)}`} style={{ fontSize: '12px', color: '#444', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Link href={`/${slug}/${prevLuna(luna)}`} style={{ fontSize: '12px', color: '#888', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
               </Link>
               <span style={{ fontSize: '14px', fontWeight: 500, color: '#AAA' }}>{ll}</span>
-              <Link href={`/${slug}/${nextLuna(luna)}`} style={{ fontSize: '12px', color: '#444', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Link href={`/${slug}/${nextLuna(luna)}`} style={{ fontSize: '12px', color: '#888', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
               </Link>
             </div>
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '32px', fontWeight: 700, letterSpacing: '-1px', color: pct === 100 ? '#4ADE80' : firma.culoare, lineHeight: 1 }}>
+            <div style={{ fontSize: '32px', fontWeight: 700, letterSpacing: '-1px', color: pct === 100 ? '#6EE7B0' : firma.culoare, lineHeight: 1 }}>
               {pct}%
             </div>
-            <div style={{ fontSize: '12px', color: '#444', marginTop: '4px' }}>
+            <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
               {done}/{total} task-uri
             </div>
           </div>
@@ -98,7 +98,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
 
         {/* Total progress bar */}
         <div style={{ height: '2px', background: '#1A1A1A', borderRadius: '2px', marginBottom: '36px' }}>
-          <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? '#4ADE80' : firma.culoare, width: `${pct}%` }}/>
+          <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? '#6EE7B0' : firma.culoare, width: `${pct}%` }}/>
         </div>
 
         {/* Module cards grid */}
@@ -113,9 +113,9 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
 
             const statusLabel = isComplete ? 'Gata' : isStarted ? 'În lucru' : 'Neînceput'
             const statusStyle = isComplete
-              ? { bg: 'rgba(74,222,128,.1)', c: '#4ADE80', border: 'rgba(74,222,128,.2)' }
+              ? { bg: 'rgba(110,231,176,.08)', c: '#6EE7B0', border: 'rgba(110,231,176,.18)' }
               : isStarted
-              ? { bg: 'rgba(252,211,77,.08)', c: '#FCD34D', border: 'rgba(252,211,77,.2)' }
+              ? { bg: 'rgba(245,201,106,.07)', c: '#F5C96A', border: 'rgba(245,201,106,.18)' }
               : { bg: '#161616', c: '#3A3A3A', border: '#222' }
 
             const href = mod.linkDirect
@@ -137,7 +137,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
                       <div style={{ fontSize: '14px', fontWeight: 600, color: '#E8E8E8', letterSpacing: '-0.2px', marginBottom: '3px' }}>
                         {mod.label}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#3A3A3A', lineHeight: 1.4 }}>
+                      <div style={{ fontSize: '12px', color: '#888', lineHeight: 1.4 }}>
                         {mod.description}
                       </div>
                     </div>
@@ -154,17 +154,17 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
                   {/* Progress */}
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '7px' }}>
-                      <span style={{ fontSize: '11px', color: '#3A3A3A' }}>
+                      <span style={{ fontSize: '12px', color: '#888' }}>
                         {modDone}/{modTotal} task-uri
                       </span>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: isComplete ? '#4ADE80' : firma.culoare }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: isComplete ? '#6EE7B0' : firma.culoare }}>
                         {modPct}%
                       </span>
                     </div>
                     <div style={{ height: '2px', background: '#1A1A1A', borderRadius: '2px' }}>
                       <div style={{
                         height: '2px', borderRadius: '2px',
-                        background: isComplete ? '#4ADE80' : firma.culoare,
+                        background: isComplete ? '#6EE7B0' : firma.culoare,
                         width: `${modPct}%`,
                       }}/>
                     </div>
@@ -186,7 +186,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
                             </svg>
                           )}
                         </div>
-                        <span style={{ fontSize: '11px', color: taskMap[t.key] ? '#666' : '#4A4A4A', textDecoration: taskMap[t.key] ? 'line-through' : 'none' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 500, color: taskMap[t.key] ? '#777' : '#AAA', textDecoration: taskMap[t.key] ? 'line-through' : 'none' }}>
                           {t.label}
                         </span>
                       </div>

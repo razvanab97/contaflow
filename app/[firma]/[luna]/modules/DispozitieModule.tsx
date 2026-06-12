@@ -138,7 +138,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
         <div style={{ padding:'18px 22px', borderBottom:'1px solid #1A1A1A', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'10px' }}>
           <div>
             <div style={{ fontSize:'13px', fontWeight:600, color:'#E0E0E0' }}>Dispoziții de plată</div>
-            <div style={{ fontSize:'11px', color:'#444', marginTop:'2px' }}>Generator numerotat lunar, salvat automat în dosarul contabilității.</div>
+            <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>Generator numerotat lunar, salvat automat în dosarul contabilității.</div>
           </div>
           <div style={{ display:'flex', gap:'8px' }}>
             <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'11px', border:`1px solid ${firma.culoare}`, borderRadius:'7px', background:'transparent', color:firma.culoare, padding:'6px 10px', cursor:'pointer' }}>{pdfBusy?'...':'Salvează PDF'}</button>
@@ -163,11 +163,11 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
             <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={INP}/>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr 70px 70px', gap:'8px', marginTop:'8px' }}>
-            <input readOnly value={legal?.nrRegCom||''} placeholder="Reg. com." style={{ ...INP, color:'#555' }}/>
-            <input readOnly value={legal?.cif||''} placeholder="CIF" style={{ ...INP, color:'#555' }}/>
-            <input readOnly value={legal?.adresa||''} placeholder="Adresa" style={{ ...INP, color:'#555' }}/>
-            <input readOnly value={legal?.judet||''} style={{ ...INP, color:'#555' }}/>
-            <input readOnly value={legal?.tara||''} style={{ ...INP, color:'#555' }}/>
+            <input readOnly value={legal?.nrRegCom||''} placeholder="Reg. com." style={{ ...INP, color:'#888' }}/>
+            <input readOnly value={legal?.cif||''} placeholder="CIF" style={{ ...INP, color:'#888' }}/>
+            <input readOnly value={legal?.adresa||''} placeholder="Adresa" style={{ ...INP, color:'#888' }}/>
+            <input readOnly value={legal?.judet||''} style={{ ...INP, color:'#888' }}/>
+            <input readOnly value={legal?.tara||''} style={{ ...INP, color:'#888' }}/>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:'8px', marginTop:'8px' }}>
             <input value={owner} onChange={e=>setOwner(e.target.value)} placeholder="Proprietar / beneficiar implicit" style={INP}/>

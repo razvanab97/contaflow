@@ -58,13 +58,13 @@ export default function EmagModule({ firma, lunaId, tasks }: Props) {
       {/* Summary cards */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'8px' }}>
         {([
-          ['Încasări RON', summary.bankReceipts, '#4ADE80'],
+          ['Încasări RON', summary.bankReceipts, '#6EE7B0'],
           ['Plăți RON', summary.bankPayments, '#F87171'],
-          ['Cashflow RON', summary.bankCashflow, summary.bankCashflow>=0?'#4ADE80':'#F87171'],
+          ['Cashflow RON', summary.bankCashflow, summary.bankCashflow>=0?'#6EE7B0':'#F87171'],
           ['Cost net eMAG', summary.emagNetCost, firma.culoare],
         ] as [string,number,string][]).map(([label,value,color]) => (
           <div key={label} style={{ padding:'14px', background:'#111', border:'1px solid #1E1E1E', borderRadius:'10px' }}>
-            <div style={{ fontSize:'10px', color:'#444', marginBottom:'6px' }}>{label}</div>
+            <div style={{ fontSize:'11px', fontWeight:500, color:'#777', marginBottom:'6px' }}>{label}</div>
             <div style={{ fontSize:'16px', fontWeight:700, color, letterSpacing:'-0.4px' }}>{money(value)}</div>
           </div>
         ))}
@@ -74,7 +74,7 @@ export default function EmagModule({ firma, lunaId, tasks }: Props) {
       <div style={{ background:'#111', border:'1px solid #1E1E1E', borderRadius:'12px', overflow:'hidden' }}>
         <div style={{ padding:'16px 20px', borderBottom:'1px solid #1A1A1A' }}>
           <div style={{ fontSize:'13px', fontWeight:600, color:'#E0E0E0' }}>Facturi Dante International</div>
-          <div style={{ fontSize:'11px', color:'#444', marginTop:'2px' }}>Cost eMAG: {money(summary.emagExpenses)} − {money(summary.emagReductions)} reduceri = {money(summary.emagNetCost)} RON net</div>
+          <div style={{ fontSize:'12px', color:'#888', marginTop:'2px' }}>Cost eMAG: {money(summary.emagExpenses)} − {money(summary.emagReductions)} reduceri = {money(summary.emagNetCost)} RON net</div>
         </div>
         <div style={{ padding:'16px 20px' }}>
           {docs.map(doc => (

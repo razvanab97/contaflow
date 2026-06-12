@@ -55,7 +55,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
         <Link href={`/${firmaAtiva}/${lunaCurenta}`} style={{
           display: 'flex', alignItems: 'center', gap: '8px',
           padding: '8px 20px', marginBottom: '4px',
-          fontSize: '12px', fontWeight: 500, color: '#666',
+          fontSize: '12px', fontWeight: 500, color: '#999',
           transition: 'color .15s',
         }}>
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -68,7 +68,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
       <div style={{ height: '1px', background: '#1A1A1A', margin: '0 16px 14px' }}/>
 
       {/* Firme */}
-      <div style={{ padding: '0 20px 8px', fontSize: '10px', fontWeight: 700, color: '#3A3A3A', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+      <div style={{ padding: '0 20px 8px', fontSize: '11px', fontWeight: 700, color: '#777', letterSpacing: '.1em', textTransform: 'uppercase' }}>
         Firme
       </div>
       {firme.map(f => {
@@ -91,7 +91,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
             </span>
             <span style={{
               fontSize: '11px', fontWeight: 600,
-              color: f.pct === 100 ? '#4ADE80' : f.pct > 0 ? f.culoare : '#3A3A3A',
+              color: f.pct === 100 ? '#6EE7B0' : f.pct > 0 ? f.culoare : '#666',
             }}>
               {f.pct}%
             </span>
@@ -103,7 +103,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
       {firmaAtiva && moduleFirma && moduleFirma.length > 0 && (
         <>
           <div style={{ height: '1px', background: '#1A1A1A', margin: '14px 16px 12px' }}/>
-          <div style={{ padding: '0 20px 8px', fontSize: '10px', fontWeight: 700, color: '#3A3A3A', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+          <div style={{ padding: '0 20px 8px', fontSize: '11px', fontWeight: 700, color: '#777', letterSpacing: '.1em', textTransform: 'uppercase' }}>
             Module
           </div>
           {moduleFirma.map(m => {
@@ -126,7 +126,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
                 }}/>
                 <span style={{
                   fontSize: '12px', fontWeight: isCurrentMod ? 600 : 400,
-                  color: isCurrentMod ? '#DDD' : '#666',
+                  color: isCurrentMod ? '#DDD' : '#999',
                 }}>
                   {m.label}
                 </span>
@@ -140,7 +140,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
       <div style={{ marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid #1A1A1A' }}>
         <Link href="/dashboard" style={{
           display: 'flex', alignItems: 'center', gap: '7px',
-          fontSize: '11px', color: isDashboard ? '#888' : '#555',
+          fontSize: '12px', color: isDashboard ? '#999' : '#888',
           marginBottom: '8px',
         }}>
           <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -149,7 +149,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
           </svg>
           Dashboard
         </Link>
-        <div style={{ fontSize: '11px', color: '#333' }}>{lunaLabel}</div>
+        <div style={{ fontSize: '12px', color: '#777' }}>{lunaLabel}</div>
       </div>
     </aside>
   )

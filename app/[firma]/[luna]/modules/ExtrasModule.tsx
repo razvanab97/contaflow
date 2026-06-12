@@ -26,7 +26,7 @@ export default function ExtrasModule({ firma, lunaId, tasks, extrase, slug, luna
             ['Documentate', `${docTx}/${totalTx}`, docTx===totalTx?'#4ADE80':firma.culoare],
           ] as [string,string,string][]).map(([label,value,color]) => (
             <div key={label} style={{ padding:'14px', background:'#111', border:'1px solid #1E1E1E', borderRadius:'10px' }}>
-              <div style={{ fontSize:'10px', color:'#444', marginBottom:'6px' }}>{label}</div>
+              <div style={{ fontSize:'11px', fontWeight:500, color:'#777', marginBottom:'6px' }}>{label}</div>
               <div style={{ fontSize:'18px', fontWeight:700, color, letterSpacing:'-0.4px' }}>{value}</div>
             </div>
           ))}
@@ -67,7 +67,7 @@ export default function ExtrasModule({ firma, lunaId, tasks, extrase, slug, luna
       </Link>
 
       {extrase.length === 0 && (
-        <div style={{ padding:'32px', textAlign:'center', color:'#444', fontSize:'13px' }}>
+        <div style={{ padding:'32px', textAlign:'center', color:'#888', fontSize:'13px' }}>
           Niciun extras încărcat pentru luna aceasta.
         </div>
       )}

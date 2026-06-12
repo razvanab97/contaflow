@@ -90,7 +90,7 @@ export default function UploadPanel({
     <div style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '12px', overflow: 'hidden' }}>
       <div style={{ padding: '18px 22px', borderBottom: '1px solid #1A1A1A' }}>
         <div style={{ fontSize: '13px', fontWeight: 600, color: '#E0E0E0', marginBottom: '2px' }}>{title}</div>
-        {description && <div style={{ fontSize: '11px', color: '#444' }}>{description}</div>}
+        {description && <div style={{ fontSize: '11px', color: '#888' }}>{description}</div>}
       </div>
 
       <div style={{ padding: '18px 22px' }}>
@@ -101,14 +101,14 @@ export default function UploadPanel({
               <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: '#161616', border: '1px solid #222', borderRadius: '8px' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: culoare, flexShrink: 0 }}/>
                 <span style={{ flex: 1, fontSize: '12px', color: '#CCC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
-                {doc.tip_document && <span style={{ fontSize: '10px', color: '#444' }}>{doc.tip_document}</span>}
+                {doc.tip_document && <span style={{ fontSize: '10px', color: '#888' }}>{doc.tip_document}</span>}
                 <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: culoare }}>↓</a>
                 <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: '#F87171', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
               </div>
             ))}
           </div>
         )}
-        {!loaded && <div style={{ fontSize: '12px', color: '#444', marginBottom: '12px' }}>Se încarcă...</div>}
+        {!loaded && <div style={{ fontSize: '12px', color: '#999', marginBottom: '12px' }}>Se încarcă...</div>}
 
         {/* Options row */}
         <div style={{ display: 'grid', gridTemplateColumns: supplier !== undefined ? '1fr' + (documentTypeOptions ? ' 1fr' : '') : '1fr', gap: '8px', marginBottom: '10px' }}>
@@ -147,7 +147,7 @@ export default function UploadPanel({
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#666', marginBottom: '3px' }}>
             {busy ? 'Se încarcă...' : 'Adaugă fișiere'}
           </div>
-          <div style={{ fontSize: '11px', color: '#333' }}>PDF, JPG, PNG · drag & drop sau click</div>
+          <div style={{ fontSize: '12px', color: '#888' }}>PDF, JPG, PNG · drag & drop sau click</div>
         </div>
         <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} onChange={e => e.target.files && upload(e.target.files)}/>
 

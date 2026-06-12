@@ -40,13 +40,13 @@ export default async function Dashboard() {
 
       <main style={{ flex: 1, padding: '48px 52px', maxWidth: '860px' }}>
         <div style={{ marginBottom: '40px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: '#333', letterSpacing: '.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', letterSpacing: '.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
             Contaflow · Dashboard
           </div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#FFF', letterSpacing: '-0.6px', lineHeight: 1.2 }}>
             Bună, Razvan
           </h1>
-          <p style={{ fontSize: '13px', color: '#555', marginTop: '6px' }}>
+          <p style={{ fontSize: '13px', color: '#999', marginTop: '6px' }}>
             {ll} · {firme.length} firme active
           </p>
         </div>
@@ -62,8 +62,8 @@ export default async function Dashboard() {
             const isStarted = done > 0
             const statusLabel = !lunaData ? 'Neîncepută' : isFinalizata ? 'Finalizată' : isStarted ? 'În lucru' : 'Neîncepută'
             const statusStyle = isFinalizata
-              ? { bg: 'rgba(74,222,128,.1)', c: '#4ADE80' }
-              : isStarted ? { bg: 'rgba(252,211,77,.08)', c: '#FCD34D' }
+              ? { bg: 'rgba(110,231,176,.09)', c: '#6EE7B0' }
+              : isStarted ? { bg: 'rgba(245,201,106,.08)', c: '#F5C96A' }
               : { bg: '#161616', c: '#3A3A3A' }
             const modules = getFirmaModules(f.slug)
 
@@ -87,34 +87,34 @@ export default async function Dashboard() {
                         {statusLabel}
                       </span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#3A3A3A' }}>
+                    <div style={{ fontSize: '12px', color: '#888' }}>
                       {modules.length} module · {total} task-uri lunare
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: '28px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1, color: pct === 100 ? '#4ADE80' : f.culoare }}>
+                    <div style={{ fontSize: '28px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1, color: pct === 100 ? '#6EE7B0' : f.culoare }}>
                       {pct}%
                     </div>
-                    <div style={{ fontSize: '11px', color: '#3A3A3A', marginTop: '3px' }}>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '3px' }}>
                       {done}/{total} task-uri
                     </div>
                   </div>
                 </div>
 
                 <div style={{ height: '2px', background: '#1A1A1A', borderRadius: '2px', marginBottom: '18px' }}>
-                  <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? '#4ADE80' : f.culoare, width: `${pct}%` }}/>
+                  <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? '#6EE7B0' : f.culoare, width: `${pct}%` }}/>
                 </div>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '18px' }}>
                   {modules.map(m => (
-                    <span key={m.slug} style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '5px', background: '#161616', border: '1px solid #222', color: '#444' }}>
+                    <span key={m.slug} style={{ fontSize: '11px', fontWeight: 500, padding: '3px 8px', borderRadius: '5px', background: '#161616', border: '1px solid #222', color: '#777' }}>
                       {m.label}
                     </span>
                   ))}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', color: '#3A3A3A' }}>
+                  <span style={{ fontSize: '12px', color: '#999' }}>
                     {lunaData ? ll : `${ll} · lună neîncepută`}
                   </span>
                   <Link href={`/${f.slug}/${LUNA}`} style={{

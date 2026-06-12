@@ -125,7 +125,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       <main style={{ flex:1, padding:'44px 52px', maxWidth:'900px' }}>
         {/* Header */}
         <div style={{ marginBottom:'32px' }}>
-          <Link href={`/${slug}/${luna}`} style={{ display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'#444', marginBottom:'16px' }}>
+          <Link href={`/${slug}/${luna}`} style={{ display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'#888', marginBottom:'16px' }}>
             <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
             {firma.nume.replace(' SRL','')} · {ll}
           </Link>
@@ -135,7 +135,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
               {modulDef.label}
             </h1>
           </div>
-          <p style={{ fontSize:'13px', color:'#555', marginTop:'6px', marginLeft:'22px' }}>
+          <p style={{ fontSize:'14px', fontWeight:500, color:'#888', marginTop:'6px', marginLeft:'22px' }}>
             {modulDef.description}
           </p>
         </div>
