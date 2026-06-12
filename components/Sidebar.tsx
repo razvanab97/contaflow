@@ -99,6 +99,25 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
         )
       })}
 
+      {/* Furnizori link (when in a firm context) */}
+      {firmaAtiva && (
+        <>
+          <div style={{ height: '1px', background: '#1A1A1A', margin: '14px 16px 4px' }}/>
+          <Link href={`/${firmaAtiva}/furnizori`} style={{
+            display: 'flex', alignItems: 'center', gap: '9px',
+            padding: '7px 20px',
+            background: pathname.endsWith('/furnizori') ? 'rgba(255,255,255,.04)' : 'transparent',
+            borderLeft: pathname.endsWith('/furnizori') ? '2px solid #555' : '2px solid transparent',
+          }}>
+            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/furnizori') ? '#CCC' : '#555'} strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+            <span style={{ fontSize: '12px', fontWeight: 400, color: pathname.endsWith('/furnizori') ? '#DDD' : '#777' }}>Furnizori</span>
+          </Link>
+        </>
+      )}
+
       {/* Module sub-nav (when in a firm's hub or module) */}
       {firmaAtiva && moduleFirma && moduleFirma.length > 0 && (
         <>

@@ -465,10 +465,14 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
         </div>
         <span style={{ fontSize:'11px', fontWeight:600, color:'#666', flexShrink:0, width:'52px' }}>{data}</span>
         <div style={{ flex:1, minWidth:0 }}>
-          <p style={{ fontSize:'13px', fontWeight:500, color:isNA?'#555':'#DDD', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration:isNA?'line-through':'none' }}>
-            {tx.descriere_curatata||tx.descriere}
-          </p>
-          <span style={{ fontSize:'10px', fontWeight:600, padding:'1px 7px', borderRadius:'20px', background:cat.bg, color:cat.c }}>{tx.categorie||'altele'}</span>
+          {tx.documente?.furnizor
+            ? <p style={{ fontSize:'13px', fontWeight:700, color:isNA?'#555':'#EEE', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration:isNA?'line-through':'none' }}>{tx.documente.furnizor}</p>
+            : <p style={{ fontSize:'13px', fontWeight:600, color:isNA?'#555':'#DDD', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration:isNA?'line-through':'none' }}>{tx.descriere_curatata||tx.descriere}</p>
+          }
+          <div style={{ display:'flex', alignItems:'center', gap:'6px', marginTop:'2px' }}>
+            <span style={{ fontSize:'10px', fontWeight:600, padding:'1px 7px', borderRadius:'20px', background:cat.bg, color:cat.c }}>{tx.categorie||'altele'}</span>
+            {tx.documente?.furnizor && <span style={{ fontSize:'10px', color:'#555', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tx.descriere_curatata||tx.descriere}</span>}
+          </div>
         </div>
         <span style={{ fontSize:'14px', fontWeight:700, flexShrink:0, color:tx.tip==='credit'?'#4ADE80':'#F87171' }}>
           {tx.tip==='credit'?'+':'-'}{tx.suma?.toFixed(2)} {tx.valuta}
@@ -644,7 +648,7 @@ function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, 
                   {isDone && <span style={{ fontSize:'10px', flexShrink:0 }}>✓</span>}
                   {isNA && <span style={{ fontSize:'10px', flexShrink:0 }}>✕</span>}
                 </div>
-                <span style={{ fontSize:'10px', fontWeight:400, opacity:.7, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', width:'100%', textAlign:'left' }}>
+                <span style={{ fontSize:'11px', fontWeight: tx.documente?.furnizor ? 600 : 400, color: isCurrent ? 'rgba(255,255,255,.85)' : tx.documente?.furnizor ? '#AAAAAA' : '#666', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', width:'100%', textAlign:'left' }}>
                   {tx.documente?.furnizor || tx.descriere_curatata || tx.descriere}
                 </span>
               </div>
@@ -764,24 +768,26 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
 
           {/* Info Rows */}
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-            {/* Furnizor — prioritate maximă dacă există din document atașat */}
-            {tx.documente?.furnizor && (
-              <div style={{ padding:'10px 14px', background:`rgba(${r},.06)`, border:`1px solid rgba(${r},.2)`, borderRadius:'10px' }}>
-                <div style={{ fontSize:'10px', fontWeight:700, color:culoare, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:'3px' }}>Furnizor</div>
-                <div style={{ fontSize:'15px', fontWeight:600, color:'#EEE' }}>{tx.documente.furnizor}</div>
+            {/* Entitate / Furnizor — mereu vizibil, prioritate maximă */}
+            <div style={{ padding:'12px 16px', background: tx.documente?.furnizor ? `rgba(${r},.06)` : '#111', border:`1px solid ${tx.documente?.furnizor ? `rgba(${r},.25)` : '#222'}`, borderRadius:'10px' }}>
+              <div style={{ fontSize:'10px', fontWeight:700, color: tx.documente?.furnizor ? culoare : '#555', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:'4px' }}>
+                {tx.documente?.furnizor ? 'Furnizor' : 'Entitate (extras bancă)'}
               </div>
-            )}
-
-            <div>
-              <div style={{ fontSize:'10px', fontWeight:600, color:'#777', textTransform:'uppercase', marginBottom:'3px' }}>Descriere bancă</div>
-              <div style={{ fontSize:'14px', color:'#CCC', lineHeight:'1.5', wordBreak:'break-word' }}>
-                {tx.descriere_curatata || tx.descriere}
+              <div style={{ fontSize:'16px', fontWeight:700, color:'#EEE', lineHeight:'1.3', wordBreak:'break-word' }}>
+                {tx.documente?.furnizor || tx.descriere_curatata || tx.descriere}
               </div>
-              {/* Dacă descrierea curatată diferă de cea originală, arată și originalul */}
-              {tx.descriere_curatata && tx.descriere_curatata !== tx.descriere && (
-                <div style={{ fontSize:'11px', color:'#555', marginTop:'4px', lineHeight:'1.4', wordBreak:'break-word' }}>{tx.descriere}</div>
+              {tx.documente?.furnizor && (
+                <div style={{ fontSize:'11px', color:'#666', marginTop:'5px', wordBreak:'break-word' }}>{tx.descriere_curatata || tx.descriere}</div>
               )}
             </div>
+
+            {/* Descriere originală din bancă (dacă diferă de curatată și nu e deja afișată sus) */}
+            {!tx.documente?.furnizor && tx.descriere_curatata && tx.descriere_curatata !== tx.descriere && (
+              <div>
+                <div style={{ fontSize:'10px', fontWeight:600, color:'#555', textTransform:'uppercase', marginBottom:'2px' }}>Descriere originală</div>
+                <div style={{ fontSize:'11px', color:'#555', lineHeight:'1.4', wordBreak:'break-word' }}>{tx.descriere}</div>
+              </div>
+            )}
 
             <div>
               <div style={{ fontSize:'10px', fontWeight:600, color:'#777', textTransform:'uppercase', marginBottom:'3px' }}>Data tranzacție</div>
@@ -791,7 +797,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
             {tx.referinta && (
               <div>
                 <div style={{ fontSize:'10px', fontWeight:600, color:'#555', textTransform:'uppercase', marginBottom:'2px' }}>Referință internă</div>
-                <div style={{ fontSize:'12px', color:'#555', fontFamily:'monospace', wordBreak:'break-all' }}>{tx.referinta}</div>
+                <div style={{ fontSize:'11px', color:'#555', fontFamily:'monospace', wordBreak:'break-all' }}>{tx.referinta}</div>
               </div>
             )}
           </div>
