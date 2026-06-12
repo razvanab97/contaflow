@@ -13,6 +13,7 @@ import ActeModule from '../modules/ActeModule'
 import DispozitieModule from '../modules/DispozitieModule'
 import FacturiModule from '../modules/FacturiModule'
 import ExtrasModule from '../modules/ExtrasModule'
+import RaportLunarModule from '../modules/RaportLunarModule'
 
 const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
 function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
@@ -110,6 +111,8 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
         return <FacturiModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="facturi-chitanta"/>
       case 'facturi-restante':
         return <FacturiModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="facturi-restante"/>
+      case 'raport-lunar':
+        return <RaportLunarModule firma={firmaForModule} lunaId={lunaData.id}/>
       default:
         notFound()
     }
