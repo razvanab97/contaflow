@@ -38,10 +38,14 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   const lunaData = luni.find((l: any) => l.firma_id === firma.id && l.luna?.startsWith(luna))
   if (!lunaData) notFound()
 
-  const [taskStariRaw, extrase, allTaskStari] = await Promise.all([
+  const [taskStariRaw, extrase, allTaskStari, checklistItemsRaw] = await Promise.all([
     dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
     modulSlug === 'extras' ? dbSelect('extrase', { eq: { luna_id: lunaData.id } }) : Promise.resolve([]),
     dbSelect('task_stari', { select: 'luna_id,completat' }),
+    // Recuperează checklist_items din sistemul vechi (pentru documente eMAG/Trendyol deja încărcate)
+    ['emag', 'trendyol'].includes(modulSlug)
+      ? dbSelect('checklist_items', { eq: { luna_id: lunaData.id }, select: 'id,completat,checklist_templates(titlu,descriere,modul,ordine)' })
+      : Promise.resolve([]),
   ])
 
   const taskMap: Record<string, boolean> = {}
@@ -83,9 +87,9 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'extras':
         return <ExtrasModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} extrase={extrase} slug={slug} luna={luna}/>
       case 'emag':
-        return <EmagModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks}/>
+        return <EmagModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} checklistItems={checklistItemsRaw.filter((i: any) => i.checklist_templates?.modul === 'emag')}/>
       case 'trendyol':
-        return <TrendyolModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks}/>
+        return <TrendyolModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} checklistItems={checklistItemsRaw.filter((i: any) => i.checklist_templates?.modul === 'trendyol')}/>
       case 'booking-facturi':
         return <BookingModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="booking-facturi"/>
       case 'booking-borderou':

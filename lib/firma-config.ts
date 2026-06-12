@@ -93,11 +93,14 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
   },
   emag: {
     slug: 'emag',
-    label: 'eMAG / Dante',
-    description: 'Facturi Dante International și calculul lunar eMAG',
+    label: 'eMAG Facturi',
+    description: 'Avize de plată și facturi Dante International',
     tasks: [
-      { key: 'emag.facturi_incarcate', label: 'Facturi Dante încărcate' },
-      { key: 'emag.calculator_verificat', label: 'Calculator eMAG verificat' },
+      { key: 'emag.aviz_ro_inceput', label: 'Aviz plată Emag RO — început lună' },
+      { key: 'emag.aviz_ro_jumatate', label: 'Aviz plată Emag RO — jumătate lună' },
+      { key: 'emag.aviz_bg_inceput', label: 'Aviz plată Emag BG — început lună' },
+      { key: 'emag.aviz_bg_jumatate', label: 'Aviz plată Emag BG — jumătate lună' },
+      { key: 'emag.aviz_hu_sold', label: 'Aviz plată Emag HU — verificare Soldul meu' },
     ],
   },
   trendyol: {
@@ -106,6 +109,7 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     description: 'Documente și facturi Trendyol',
     tasks: [
       { key: 'trendyol.factura_incarcata', label: 'Factură Trendyol încărcată' },
+      { key: 'trendyol.borderou_incarcat', label: 'Borderou Trendyol încărcat' },
     ],
   },
   'booking-facturi': {
