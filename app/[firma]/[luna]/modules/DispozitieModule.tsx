@@ -89,7 +89,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
       editId, date, beneficiary:beneficiary||owner, function:beneficiaryFunction, amount, purpose, identitySeries, identityNumber, attachmentIds:attachedInvoices.map(i=>i.id),
     }) })
     if (!res.ok) { setError((await res.json().catch(()=>({}))).error||'Generarea nu a reușit'); return }
-    const assigned=res.headers.get('X-Disposition-Number')||number; const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dispozitie_plata_${assigned}.pdf`; a.click(); URL.revokeObjectURL(url)
+    const assigned=res.headers.get('X-Disposition-Number')||number; const isZip=(res.headers.get('Content-Type')||'').includes('zip'); const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dispozitie_plata_${assigned}.${isZip?'zip':'pdf'}`; a.click(); URL.revokeObjectURL(url)
     setEditId(''); setAttachedInvoices([]); await loadNumber()
   }
 
@@ -111,7 +111,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
       if (!res.ok) { setError(data.error||'Analiza nu a reușit'); break }
       setAttachedInvoices(prev=>[...prev, data.document])
       if (data.purpose) setPurpose(prev=>prev ? `${prev}; ${data.purpose}` : data.purpose)
-      if (data.amount && !amount) setAmount(String(data.amount))
+      if (data.amount) setAmount(prev => String(Math.round(((Number(prev) || 0) + data.amount) * 100) / 100))
     }
     setInvoiceBusy(false)
   }

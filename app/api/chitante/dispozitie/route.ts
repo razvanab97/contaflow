@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import JSZip from 'jszip'
 
 const SMALL = ['zero','unu','doi','trei','patru','cinci','sase','sapte','opt','noua','zece','unsprezece','doisprezece','treisprezece','paisprezece','cincisprezece','saisprezece','saptesprezece','optsprezece','nouasprezece']
 const TENS = ['','','douazeci','treizeci','patruzeci','cincizeci','saizeci','saptezeci','optzeci','nouazeci']
@@ -308,6 +309,23 @@ export async function POST(req: NextRequest) {
     const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.filter(Boolean) : []
     if (attachmentIds.length) {
       await sb.from('documente').update({ furnizor:`Atașament DP ${disposition.id} nr. ${dispositionNumber} | ${safe(body.purpose)}`, numar_document:dispositionNumber, in_zip:true }).in('id', attachmentIds).eq('firma_id', firmaId).eq('luna_id', lunaId)
+      const { data: attDocs } = await sb.from('documente').select('fisier_path,fisier_nume').in('id', attachmentIds).eq('firma_id', firmaId)
+      const zip = new JSZip()
+      zip.file(fileName, bytes)
+      for (const att of attDocs || []) {
+        const { data: attFile } = await sb.storage.from('documente').download(att.fisier_path)
+        if (attFile) zip.file(att.fisier_nume, Buffer.from(await attFile.arrayBuffer()))
+      }
+      const zipBuffer = await zip.generateAsync({ type: 'arraybuffer' })
+      const zipName = `dispozitie_plata_${dispositionNumber}_${dateStr.replace(/[./]/g, '-') || 'fara-data'}.zip`
+      return new NextResponse(zipBuffer, {
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="${zipName}"`,
+          'X-Disposition-Number': dispositionNumber,
+          'X-Disposition-Id': disposition.id,
+        },
+      })
     }
 
     return new NextResponse(Buffer.from(bytes), {
