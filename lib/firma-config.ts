@@ -27,10 +27,17 @@ export interface FirmaLegal {
   tara: string
 }
 
+export interface Proprietar {
+  nume: string
+  serieCi: string
+  numarCi: string
+}
+
 export interface FirmaConfigDef {
   slug: string
   module: ModuleSlug[]
   legal: FirmaLegal
+  proprietari?: Proprietar[]
 }
 
 const COMUNE: ModuleSlug[] = [
@@ -182,6 +189,11 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
       judet: 'IS',
       tara: 'RO',
     },
+    proprietari: [
+      { nume: 'Grumăzescu Angela', serieCi: 'MX', numarCi: '864860' },
+      { nume: 'Bucșa Radu', serieCi: 'ZC', numarCi: '553054' },
+      { nume: 'Bordeanu Dănuț', serieCi: 'MZ', numarCi: '699302' },
+    ],
   },
   'ab-textile': {
     slug: 'ab-textile',
@@ -212,4 +224,8 @@ export function getFirmaTotalTasks(slug: string): number {
 
 export function getLegal(slug: string): FirmaLegal | undefined {
   return FIRMA_CONFIGS[slug]?.legal
+}
+
+export function getProprietari(slug: string): Proprietar[] {
+  return FIRMA_CONFIGS[slug]?.proprietari || []
 }

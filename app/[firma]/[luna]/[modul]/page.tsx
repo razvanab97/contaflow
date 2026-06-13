@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import { dbSelect } from '@/lib/db'
-import { getFirmaConfig, getFirmaModules, getFirmaTotalTasks, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
+import { getFirmaConfig, getFirmaModules, getFirmaTotalTasks, getProprietari, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
 import EmagModule from '../modules/EmagModule'
 import TrendyolModule from '../modules/TrendyolModule'
 import BookingModule from '../modules/BookingModule'
@@ -121,7 +121,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'acte-contabile':
         return <ActeModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks}/>
       case 'dispozitie-plata':
-        return <DispozitieModule firma={firmaForModule} firmeDisponibile={firmeDisponibile} lunaId={lunaData.id} tasks={tasks}/>
+        return <DispozitieModule firma={firmaForModule} firmeDisponibile={firmeDisponibile} lunaId={lunaData.id} tasks={tasks} proprietari={getProprietari(firma.slug)}/>
       case 'facturi-chitanta':
         return <FacturiModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="facturi-chitanta"/>
       case 'facturi-restante':

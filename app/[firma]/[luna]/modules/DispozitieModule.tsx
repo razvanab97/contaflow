@@ -1,20 +1,14 @@
 'use client'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
-import { getLegal } from '@/lib/firma-config'
+import { getLegal, Proprietar } from '@/lib/firma-config'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:string }
-interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[] }
+interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[]; proprietari?: Proprietar[] }
 
 type DispDoc = { id:string; fisier_nume:string; numar_document:string; furnizor:string; data?:Record<string,string|number>; attachments?:{id:string;fisier_nume:string}[] }
 
-const PRESETS = [
-  { label:'Grumăzescu Angela · Asociație', beneficiary:'Grumazescu Angela', function:'Proprietar', identitySeries:'MX', identityNumber:'864860', purpose:'Asociația' },
-  { label:'Bucșa Radu · Administrație apartamente', beneficiary:'Bucsa Radu', function:'Proprietar', identitySeries:'ZC', identityNumber:'553054', purpose:'Asociația' },
-  { label:'Bordeanu Dănuț · E.ON Gaz', beneficiary:'Bordeanu Danut', function:'Proprietar', identitySeries:'MZ', identityNumber:'699302', purpose:'Fact. gaz' },
-]
-
-export default function DispozitieModule({ firma, firmeDisponibile, lunaId, tasks }: Props) {
+export default function DispozitieModule({ firma, firmeDisponibile, lunaId, tasks, proprietari = [] }: Props) {
   const [firmaId, setFirmaId] = useState(firma.id)
   const selectedFirma = firmeDisponibile.find(f => f.id === firmaId) || firma
   const legal = getLegal(selectedFirma.slug)
@@ -101,9 +95,10 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
 
   function applyPreset(val: string) {
     setPreset(val)
-    const p = PRESETS.find(e=>e.label===val)
+    const p = proprietari.find(e => e.nume === val)
     if (!p) return
-    setBeneficiary(p.beneficiary); setOwner(p.beneficiary); setBeneficiaryFunction(p.function); setIdentitySeries(p.identitySeries); setIdentityNumber(p.identityNumber); setPurpose(p.purpose)
+    setBeneficiary(p.nume); setOwner(p.nume); setBeneficiaryFunction('Proprietar')
+    setIdentitySeries(p.serieCi); setIdentityNumber(p.numarCi)
   }
 
   async function analyzeInvoices(files: FileList) {
@@ -177,8 +172,8 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'2fr auto', gap:'8px', marginTop:'8px' }}>
             <select value={preset} onChange={e=>applyPreset(e.target.value)} style={INP}>
-              <option value="">Preset persoană...</option>
-              {PRESETS.map(p=><option key={p.label} value={p.label}>{p.label}</option>)}
+              <option value="">{proprietari.length ? 'Selectează proprietar...' : 'Niciun proprietar configurat'}</option>
+              {proprietari.map(p=><option key={p.nume} value={p.nume}>{p.nume}</option>)}
             </select>
             <button onClick={()=>invoiceRef.current?.click()} disabled={invoiceBusy} style={{ border:'1px solid #333', borderRadius:'8px', background:'#1A1A1A', color:'#CCC', padding:'9px 14px', cursor:'pointer', fontSize:'12px' }}>{invoiceBusy?'AI analizează...':'+ Facturi AI'}</button>
             <input ref={invoiceRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e=>e.target.files&&analyzeInvoices(e.target.files)}/>
