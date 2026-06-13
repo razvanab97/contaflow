@@ -43,6 +43,7 @@ async function getNextNumber(lunaId: string) {
     .select('numar_document,fisier_path,created_at')
     .eq('luna_id', lunaId)
     .eq('modul', 'acte_contabile')
+    .neq('tip_document', 'factura')
     .like('fisier_path', '%/dispozitii-plata/%')
     .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
