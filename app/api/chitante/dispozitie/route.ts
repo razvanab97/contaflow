@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
 const SMALL = ['zero','unu','doi','trei','patru','cinci','sase','sapte','opt','noua','zece','unsprezece','doisprezece','treisprezece','paisprezece','cincisprezece','saisprezece','saptesprezece','optsprezece','nouasprezece']
@@ -111,138 +111,163 @@ export async function POST(req: NextRequest) {
       : { data:null }
     const dispositionNumber = existing?.numar_document || await getNextNumber(lunaId)
 
+    function fmtDate(s: string) {
+      const p = String(s || '').split('-')
+      return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : (safe(s) || '__.__.____')
+    }
+
     const pdf = await PDFDocument.create()
     const page = pdf.addPage([595, 842])
     const font = await pdf.embedFont(StandardFonts.Helvetica)
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold)
     const black = rgb(0, 0, 0)
-    const left = 36
-    const right = 559
-    const top = 810
-    const width = right - left
-    const money = amount.toFixed(2).replace('.', ',')
-    const date = safe(body.date)
 
-    const text = (value: string, x: number, y: number, size = 10, useBold = false) =>
-      page.drawText(safe(value), { x, y, size, font: useBold ? bold : font, color: black })
-    const line = (x1: number, y1: number, x2: number, y2: number, thickness = 1) =>
-      page.drawLine({ start:{ x:x1, y:y1 }, end:{ x:x2, y:y2 }, thickness, color:black })
-    const dotted = (x1: number, y: number, x2: number) => {
-      for (let x = x1; x < x2; x += 4) line(x, y, Math.min(x + 1.5, x2), y, .5)
-    }
-    const centered = (value: string, y: number, size = 10, useBold = false) => {
-      const usedFont = useBold ? bold : font
-      text(value, left + (width - usedFont.widthOfTextAtSize(safe(value), size)) / 2, y, size, useBold)
-    }
-    const wrapped = (value: string, x: number, y: number, maxWidth: number, size = 10, useBold = false, maxLines = 2, lineHeight = 12) => {
-      const usedFont = useBold ? bold : font
-      const words = safe(value).split(/\s+/).filter(Boolean)
+    const L = 50, R = 545, W = R - L
+    const money = amount.toFixed(2).replace('.', ',')
+    const dateStr = fmtDate(body.date)
+
+    const t = (val: string, x: number, y: number, sz = 10, b = false) =>
+      page.drawText(safe(val), { x, y, size: sz, font: b ? bold : font, color: black })
+    const tw = (val: string, sz = 10, b = false) =>
+      (b ? bold : font).widthOfTextAtSize(safe(val), sz)
+    const hl = (y: number, x1 = L, x2 = R, lw = 0.5) =>
+      page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, thickness: lw, color: black })
+    const vl = (x: number, y1: number, y2: number, lw = 0.5) =>
+      page.drawLine({ start: { x, y: y1 }, end: { x, y: y2 }, thickness: lw, color: black })
+
+    function wrapLines(val: string, maxW: number, sz = 9, b = false): string[] {
+      const f = b ? bold : font
+      const words = safe(val).split(/\s+/).filter(Boolean)
       const rows: string[] = []
       for (const word of words) {
-        const candidate = rows.length ? `${rows.at(-1)} ${word}` : word
-        if (!rows.length || usedFont.widthOfTextAtSize(candidate, size) <= maxWidth) {
-          if (rows.length) rows[rows.length - 1] = candidate
-          else rows.push(candidate)
-        } else if (rows.length < maxLines) {
-          rows.push(word)
-        } else {
-          const last = rows.length - 1
-          let truncated = `${rows[last]}...`
-          while (truncated.length > 3 && usedFont.widthOfTextAtSize(truncated, size) > maxWidth)
-            truncated = `${truncated.slice(0, -4)}...`
-          rows[last] = truncated
-          break
-        }
+        const last = rows.at(-1)
+        const candidate = last ? `${last} ${word}` : word
+        if (!last || f.widthOfTextAtSize(candidate, sz) > maxW) rows.push(word)
+        else rows[rows.length - 1] = candidate
       }
-      rows.forEach((row, index) => {
-        if (usedFont.widthOfTextAtSize(row, size) <= maxWidth) return
-        let truncated = `${row}...`
-        while (truncated.length > 3 && usedFont.widthOfTextAtSize(truncated, size) > maxWidth)
-          truncated = `${truncated.slice(0, -4)}...`
-        rows[index] = truncated
-      })
-      rows.forEach((row, index) => text(row, x, y - index * lineHeight, size, useBold))
+      return rows
     }
 
-    line(left, top, right, top, 1)
-    line(left, top, left, 300, 1)
-    line(right, top, right, 300, 1)
+    // ─── TITLU ───────────────────────────────────────────────────────────
+    const TITLE = 'Dispozitie de plata'
+    const TSZ = 16
+    const TW = bold.widthOfTextAtSize(TITLE, TSZ)
+    t(TITLE, L + (W - TW) / 2, 796, TSZ, true)
+    t(dispositionNumber, R - tw(dispositionNumber, TSZ, true) - 2, 796, TSZ, true)
+    hl(782, L, R, 1)
 
-    text(safe(body.firmaNume, 'S.C. FIRMA S.R.L.'), 49, 792, 12, true)
-    text('CIF:', 49, 774, 10, true)
-    text(safe(body.cif, '________________'), 75, 774, 10)
-    text('Nr. la Reg Com', 190, 774, 10, true)
-    text(safe(body.nrRegCom, '________________'), 274, 774, 10)
-    text(safe(body.adresa, 'Adresa: ________________________________________________'), 49, 758, 9)
-    text(`Judet: ${safe(body.judet, '__')}    Tara: ${safe(body.tara, '__')}`, 49, 746, 8)
+    // ─── DATE FIRMĂ ──────────────────────────────────────────────────────
+    t('Unitatea', L, 766, 10, true)
+    t(safe(body.firmaNume), L + 90, 766, 10)
+    t('Punct Lucru', L, 751, 10, true)
+    t('Sediu', L + 90, 751, 10)
+    t('Data emiterii', L, 736, 10, true)
+    t(dateStr, L + 90, 736, 10)
 
-    centered('DISPOZITIE DE PLATA CATRE CASIERIE', 733, 13, true)
-    centered('Cont: 5311 - Casa in lei', 716, 10, true)
-    text('Numar:', 177, 700, 10, true)
-    text(dispositionNumber, 242, 700, 10)
-    dotted(217, 694, 275)
-    text('din', 286, 700, 10, true)
-    text(date || '____.__.____', 323, 700, 10)
-    dotted(308, 694, 395)
+    // ─── TABEL PRINCIPAL ─────────────────────────────────────────────────
+    // Coloane: Nume(L..C2) | Functia(C2..C3) | Suma(C3..C4) | Explicatie(C4..R)
+    const C2 = 220, C3 = 318, C4 = 415
+    const TBL_TOP = 718
 
-    text('Numele si prenumele:', 55, 674, 10, true)
-    wrapped(safe(body.beneficiary), 166, 674, 374, 11, true)
-    dotted(162, 668, 540)
-    text('Functia (calitatea):', 55, 654, 10, true)
-    wrapped(safe(body.function), 166, 654, 374, 10)
-    dotted(162, 648, 540)
-    text('Suma de:', 55, 634, 10, true)
-    text(money, 201, 634, 10, true)
-    text('Ron', 270, 634, 10, true)
-    dotted(162, 628, 540)
-    text('Adica:', 55, 614, 10, true)
-    wrapped(amountInWords(amount), 162, 614, 378, 9, false, 2, 11)
-    dotted(162, 597, 540)
-    text('Scopul platii:', 55, 580, 10, true)
-    wrapped(safe(body.purpose), 162, 580, 378, 10, false, 3, 12)
-    dotted(162, 550, 540)
+    hl(TBL_TOP, L, R, 1)
 
-    line(left, 542, right, 542, 1)
-    line(left, 510, right, 510, 1)
-    line(left, 470, right, 470, 1)
-    line(70, 542, 70, 470, 1)
-    line(242, 542, 242, 470, 1)
-    line(414, 542, 414, 470, 1)
-    text('Semnatura', 48, 489, 8)
-    text('Conducatorul unitatii:', 112, 526, 9)
-    text('Viza de control', 292, 526, 9)
-    text('Financiar-preventiv', 279, 513, 9)
-    text('Departament', 449, 526, 9)
-    text('financiar-contabil', 437, 513, 9)
+    const HDR_Y = TBL_TOP - 14
+    t('Nume si prenume', L + 4, HDR_Y, 9, true)
+    t('Functia', C2 + 4, HDR_Y, 9, true)
+    t('Suma', C3 + 4, HDR_Y, 9, true)
+    t('Explicatie', C4 + 4, HDR_Y, 9, true)
 
-    text('Date suplimentare privind beneficiarul sumei:', 55, 458, 9)
-    text('Actul de identitate:', 55, 442, 10, true)
-    text(safe(body.identityType, 'C.I.'), 177, 442, 10)
-    text('seria:', 232, 442, 10, true)
-    text(safe(body.identitySeries), 280, 442, 10)
-    text('numarul:', 345, 442, 10, true)
-    text(safe(body.identityNumber), 414, 442, 10)
-    text('Am primit suma de:', 55, 422, 10, true)
-    text(money, 201, 422, 10, true)
-    text('Ron', 277, 422, 10, true)
-    text('Data:', 55, 402, 10, true)
-    text(date, 198, 402, 10)
-    text('Semnatura:', 286, 402, 10, true)
-    dotted(352, 397, 490)
+    const HDR_BOT = TBL_TOP - 27
+    hl(HDR_BOT, L, R, 1)
 
-    line(left, 390, right, 390, 1)
-    text('CASIER:', 49, 374, 11)
-    text('Platit suma de:', 282, 354, 10, true)
-    text(money, 388, 354, 10, true)
-    text('Ron', 468, 354, 10)
-    text('Data de:', 282, 334, 10, true)
-    text(date, 382, 334, 10)
-    text('Semnatura:', 282, 314, 10, true)
-    dotted(352, 309, 490)
-    line(left, 300, right, 300, 1)
+    const DATA_Y = HDR_BOT - 14
+    const EXP_W = R - C4 - 8
+    const expLines = wrapLines(safe(body.purpose), EXP_W)
+    const rowH = Math.max(22, expLines.length * 12 + 10)
+
+    t(safe(body.beneficiary), L + 4, DATA_Y, 9)
+    t(safe(body.function), C2 + 4, DATA_Y, 9)
+    t(`${money} RON`, C3 + 4, DATA_Y, 9)
+    expLines.forEach((l, i) => t(l, C4 + 4, DATA_Y - i * 12, 9))
+
+    const DATA_BOT = HDR_BOT - rowH
+    hl(DATA_BOT, L, R, 1)
+
+    const TOT_Y = DATA_BOT - 14
+    t('Total plata', C3 + 4, TOT_Y, 10, true)
+    t(`${money} RON`, C4 + 4, TOT_Y, 10, true)
+
+    const TBL_BOT = DATA_BOT - 26
+    hl(TBL_BOT, L, R, 1)
+
+    vl(C2, TBL_TOP, TBL_BOT, 1)
+    vl(C3, TBL_TOP, TBL_BOT, 1)
+    vl(C4, TBL_TOP, TBL_BOT, 1)
+    vl(L, TBL_TOP, TBL_BOT, 1)
+    vl(R, TBL_TOP, TBL_BOT, 1)
+
+    // ─── CASETA SEMNĂTURI ────────────────────────────────────────────────
+    const SIG_TOP = TBL_BOT - 14
+    const SIG_H = 100
+    const SIG_BOT = SIG_TOP - SIG_H
+
+    hl(SIG_TOP, L, R, 1); hl(SIG_BOT, L, R, 1)
+    vl(L, SIG_TOP, SIG_BOT, 1); vl(R, SIG_TOP, SIG_BOT, 1)
+
+    const SEM_X = L + 28
+    vl(SEM_X, SIG_TOP, SIG_BOT, 1)
+    page.drawText('Semnatura', {
+      x: L + 21, y: SIG_BOT + (SIG_H - tw('Semnatura', 8)) / 2,
+      size: 8, font, color: black, rotate: degrees(90),
+    })
+
+    const COL_W = (R - SEM_X) / 4
+    const SC1 = SEM_X, SC2 = SEM_X + COL_W, SC3 = SEM_X + COL_W * 2, SC4 = SEM_X + COL_W * 3
+    vl(SC2, SIG_TOP, SIG_BOT, 1)
+    vl(SC3, SIG_TOP, SIG_BOT, 1)
+    vl(SC4, SIG_TOP, SIG_BOT, 1)
+
+    const SIG_DIV = SIG_TOP - 46
+    hl(SIG_DIV, SEM_X, R, 1)
+
+    t('Conducatorul Unitatii', SC1 + 4, SIG_TOP - 14, 8)
+    t('Viza de control financiar', SC2 + 4, SIG_TOP - 12, 8)
+    t('- preventiv', SC2 + 4, SIG_TOP - 22, 8)
+    t('Compartimentul financiar', SC3 + 4, SIG_TOP - 12, 8)
+    t('- contabil', SC3 + 4, SIG_TOP - 22, 8)
+    t('Casier,', SC4 + 4, SIG_TOP - 12, 8)
+    t('Platit suma de ', SC4 + 4, SIG_TOP - 23, 8)
+    t(`${money} RON`, SC4 + 4 + tw('Platit suma de ', 8), SIG_TOP - 23, 8, true)
+    t('Data: ', SC4 + 4, SIG_TOP - 34, 8)
+    t(dateStr, SC4 + 4 + tw('Data: ', 8), SIG_TOP - 34, 8, true)
+
+    // ─── DATE SUPLIMENTARE ───────────────────────────────────────────────
+    const DS_Y = SIG_BOT - 20
+    t('Date suplimentare privind beneficiarul sumei', L, DS_Y, 10, true)
+    hl(DS_Y - 13, L, R, 0.5)
+
+    const AI_Y = DS_Y - 27
+    let ax = L
+    const ai1 = 'Act de identitate: Seria '
+    t(ai1, ax, AI_Y, 10); ax += tw(ai1, 10)
+    t(safe(body.identitySeries), ax, AI_Y, 10, true); ax += tw(safe(body.identitySeries), 10, true)
+    const ai2 = ', Numar '
+    t(ai2, ax, AI_Y, 10); ax += tw(ai2, 10)
+    t(safe(body.identityNumber), ax, AI_Y, 10, true)
+
+    const AP_Y = AI_Y - 17
+    let bx = L
+    const ap1 = 'Am primit suma de '
+    t(ap1, bx, AP_Y, 10); bx += tw(ap1, 10)
+    t(`${money} RON`, bx, AP_Y, 10, true)
+
+    const DP_Y = AP_Y - 17
+    t('Data: ', L, DP_Y, 10)
+    t(dateStr, L + tw('Data: ', 10), DP_Y, 10, true)
+    t('Semnatura:', 300, DP_Y, 10, true)
 
     const bytes = await pdf.save()
-    const fileName = `dispozitie_plata_${dispositionNumber}_${date.replace(/[./]/g, '-') || 'fara-data'}.pdf`
+    const fileName = `dispozitie_plata_${dispositionNumber}_${dateStr.replace(/[./]/g, '-') || 'fara-data'}.pdf`
     // Timestamp-ul permite reutilizarea numărului după o resetare, păstrând istoricul.
     const path = existing?.fisier_path || `${firmaId}/${lunaId}/dispozitii-plata/dispozitie_plata_${dispositionNumber}_${Date.now()}.pdf`
     const { error: storageError } = await sb.storage.from('documente').upload(path, Buffer.from(bytes), {
@@ -251,7 +276,7 @@ export async function POST(req: NextRequest) {
     })
     if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
 
-    const dispositionData = JSON.stringify({ purpose:body.purpose, beneficiary:body.beneficiary, function:body.function, amount, date, identitySeries:body.identitySeries, identityNumber:body.identityNumber })
+    const dispositionData = JSON.stringify({ purpose:body.purpose, beneficiary:body.beneficiary, function:body.function, amount, date:body.date, identitySeries:body.identitySeries, identityNumber:body.identityNumber })
     const values = {
       firma_id: firmaId,
       luna_id: lunaId,
