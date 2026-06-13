@@ -157,17 +157,24 @@ export async function POST(req: NextRequest) {
     hl(782, L, R, 1)
 
     // ─── DATE FIRMĂ ──────────────────────────────────────────────────────
+    const LBL = 95
     t('Unitatea', L, 766, 10, true)
-    t(safe(body.firmaNume), L + 90, 766, 10)
-    t('Punct Lucru', L, 751, 10, true)
-    t('Sediu', L + 90, 751, 10)
-    t('Data emiterii', L, 736, 10, true)
-    t(dateStr, L + 90, 736, 10)
+    t(safe(body.firmaNume), L + LBL, 766, 10)
+    t('CUI', L, 752, 10, true)
+    t(safe(body.cif), L + LBL, 752, 10)
+    t('Nr. Reg. Com.', L, 738, 10, true)
+    t(safe(body.nrRegCom), L + LBL, 738, 10)
+    t('Adresa', L, 724, 10, true)
+    t(safe(body.adresa), L + LBL, 724, 9)
+    t('Punct Lucru', L, 710, 10, true)
+    t('Sediu', L + LBL, 710, 10)
+    t('Data emiterii', L, 696, 10, true)
+    t(dateStr, L + LBL, 696, 10)
 
     // ─── TABEL PRINCIPAL ─────────────────────────────────────────────────
     // Coloane: Nume(L..C2) | Functia(C2..C3) | Suma(C3..C4) | Explicatie(C4..R)
     const C2 = 220, C3 = 318, C4 = 415
-    const TBL_TOP = 718
+    const TBL_TOP = 678
 
     hl(TBL_TOP, L, R, 1)
 
