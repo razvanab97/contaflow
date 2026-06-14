@@ -175,33 +175,6 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'20px' }}>
 
-      {/* Concluzia lunară — la top, în afara cardurilor */}
-      {summary && (
-        <div style={{ textAlign:'center', padding:'24px 0 4px' }}>
-          <div style={{ fontSize:'11px', fontWeight:700, color:'#666', textTransform:'uppercase', letterSpacing:'.12em', marginBottom:'12px' }}>
-            Concluzia lunară
-          </div>
-          <div style={{ display:'flex', justifyContent:'center', gap:'32px', flexWrap:'wrap' }}>
-            {([
-              ['Încasări', summary.bankReceipts, '#6EE7B0'],
-              ['Plăți', summary.bankPayments, '#F87171'],
-              ['Cashflow', summary.bankCashflow, summary.bankCashflow >= 0 ? '#6EE7B0' : '#F87171'],
-              ['Cost net eMAG', summary.emagNetCost, firma.culoare],
-            ] as [string, number, string][]).map(([label, value, color]) => (
-              <div key={label} style={{ textAlign:'center' }}>
-                <div style={{ fontSize:'22px', fontWeight:800, color, letterSpacing:'-0.5px', lineHeight:1 }}>
-                  {money(value)}
-                </div>
-                <div style={{ fontSize:'10px', fontWeight:600, color:'#555', marginTop:'4px', textTransform:'uppercase', letterSpacing:'.08em' }}>
-                  {label}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={{ height:'1px', background:'#1A1A1A', margin:'20px 0 0' }}/>
-        </div>
-      )}
-
       {/* Task-uri bifabile */}
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
 

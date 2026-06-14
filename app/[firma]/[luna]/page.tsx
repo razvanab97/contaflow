@@ -5,6 +5,7 @@ import InitLuna from './InitLuna'
 import ModuleGrid from './ModuleGrid'
 import { dbSelect } from '@/lib/db'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
+import LunaSummary from './LunaSummary'
 
 const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
 function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
@@ -84,6 +85,8 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
               </Link>
             </div>
           </div>
+
+          <LunaSummary lunaId={lunaData.id} culoare={firma.culoare} />
 
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '32px', fontWeight: 700, letterSpacing: '-1px', color: pct === 100 ? '#6EE7B0' : firma.culoare, lineHeight: 1 }}>
