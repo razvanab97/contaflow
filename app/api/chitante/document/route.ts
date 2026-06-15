@@ -10,7 +10,6 @@ export async function GET(req: NextRequest) {
     .from('documente')
     .select('fisier_path,fisier_nume,fisier_tip,modul')
     .eq('id', id)
-    .eq('modul', 'acte_contabile')
     .single()
   if (error || !doc) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
 
@@ -35,7 +34,6 @@ export async function DELETE(req: NextRequest) {
     .from('documente')
     .select('id,fisier_path,tranzactie_id,modul')
     .eq('id', id)
-    .eq('modul', 'acte_contabile')
     .single()
   if (error || !doc) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
 

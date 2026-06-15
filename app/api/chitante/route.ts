@@ -24,14 +24,14 @@ export async function GET(req: NextRequest) {
   const lunaId = req.nextUrl.searchParams.get('lunaId')
   const section = req.nextUrl.searchParams.get('section') || 'facturi-chitanta'
   if (!lunaId) return NextResponse.json({ docs: [] })
-  if (!ALLOWED_SECTIONS.has(section)) return NextResponse.json({ docs: [] }, { status: 400 })
 
   const sb = getServiceSupabase()
   const { data, error } = await sb
     .from('documente')
     .select('id,fisier_nume,tip_document,furnizor,modul,created_at')
     .eq('luna_id', lunaId)
-    .eq('modul', 'acte_contabile')
+    .not('fisier_path', 'like', '%/tx/%')
+    .not('fisier_path', 'like', '%/checklist/%')
     .like('fisier_path', `%/${section}/%`)
     .order('created_at', { ascending: true })
 
