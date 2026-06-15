@@ -51,8 +51,21 @@ amount este totalul final al documentului in RON, pozitiv.` },
 
 export async function GET(req: NextRequest) {
   const lunaId = req.nextUrl.searchParams.get('lunaId')
-  if (!lunaId) return NextResponse.json({ documents: [], summary: {} })
+  const docId = req.nextUrl.searchParams.get('docId')
   const sb = getServiceSupabase()
+
+  if (docId) {
+    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip').eq('id', docId).like('fisier_path', '%/emag-calcul/%').single()
+    if (!doc?.fisier_path) return NextResponse.json({ error: 'Factura nu a fost găsită' }, { status: 404 })
+    const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
+    if (!file) return NextResponse.json({ error: 'Eroare descărcare' }, { status: 500 })
+    const fileName = String(doc.fisier_nume || 'factura.pdf').replace(/["\r\n]/g, '_')
+    return new NextResponse(Buffer.from(await file.arrayBuffer()), {
+      headers: { 'Content-Type': doc.fisier_tip || 'application/pdf', 'Content-Disposition': `attachment; filename="${fileName}"` },
+    })
+  }
+
+  if (!lunaId) return NextResponse.json({ documents: [], summary: {} })
   const [{ data: documents, error }, { data: statements }] = await Promise.all([
     sb.from('documente')
       .select('id,fisier_nume,fisier_path,furnizor,numar_document,created_at')

@@ -3,9 +3,22 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
   const itemId = req.nextUrl.searchParams.get('itemId')
+  const docId = req.nextUrl.searchParams.get('docId')
+  const sb = getServiceSupabase()
+
+  if (docId) {
+    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip').eq('id', docId).single()
+    if (!doc?.fisier_path) return NextResponse.json({ error: 'Document negăsit' }, { status: 404 })
+    const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
+    if (!file) return NextResponse.json({ error: 'Eroare descărcare' }, { status: 500 })
+    const fileName = String(doc.fisier_nume || 'document').replace(/["\r\n]/g, '_')
+    return new NextResponse(Buffer.from(await file.arrayBuffer()), {
+      headers: { 'Content-Type': doc.fisier_tip || 'application/octet-stream', 'Content-Disposition': `attachment; filename="${fileName}"` },
+    })
+  }
+
   if (!itemId) return NextResponse.json({ docs: [] })
 
-  const sb = getServiceSupabase()
   const { data:docs, error } = await sb.from('documente')
     .select('id,fisier_nume,tip_document')
     .eq('checklist_item_id', itemId)
