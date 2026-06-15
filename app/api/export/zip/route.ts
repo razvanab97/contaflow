@@ -3,6 +3,8 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS, MODULE_DEFS } from '@/lib/firma-config'
 import JSZip from 'jszip'
 
+export const maxDuration = 120
+
 function pathToSection(path: string): string {
   const p = String(path)
   if (p.includes('/dispozitii-plata/')) return 'dispozitie-plata'

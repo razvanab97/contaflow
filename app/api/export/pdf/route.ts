@@ -3,6 +3,8 @@ import { PDFDocument } from 'pdf-lib'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS } from '@/lib/firma-config'
 
+export const maxDuration = 120
+
 function safeName(value: string) {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'documente'
 }
@@ -36,7 +38,14 @@ function matchesSection(filePath: string, section: string): boolean {
 async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: string) {
   try {
     if (type === 'application/pdf' || name?.toLowerCase().endsWith('.pdf')) {
-      const source = await PDFDocument.load(bytes)
+      let source: PDFDocument
+      try {
+        source = await PDFDocument.load(bytes)
+      } catch {
+        // fallback pentru PDF-uri cu owner-protection
+        source = await PDFDocument.load(bytes, { ignoreEncryption: true })
+      }
+      if (source.getPageCount() === 0) return
       const pages = await merged.copyPages(source, source.getPageIndices())
       pages.forEach(page => merged.addPage(page))
     } else if (type?.startsWith('image/')) {
