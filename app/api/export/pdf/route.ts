@@ -21,7 +21,6 @@ function pathToSection(path: string): string {
   if (p.includes('/emag-calcul/')) return 'emag'
   if (p.includes('/acte-contabile/')) return 'acte-contabile'
   if (p.includes('/angajati/')) return 'angajati'
-  if (p.includes('/extras/')) return 'extras'
   return 'altele'
 }
 
@@ -50,32 +49,34 @@ export async function POST(req: NextRequest) {
   if (!lunaId) return NextResponse.json({ error: 'Luna contabilă lipsește' }, { status: 400 })
   const sb = getServiceSupabase()
 
-  // Query toate documentele pentru luna (excluzând tranzacții și checklist)
-  // Filtrarea pe secțiune se face în cod (mai robustă față de SQL LIKE)
-  const baseQuery = sb.from('documente')
-    .select('fisier_path,fisier_nume,fisier_tip,created_at')
-    .eq('luna_id', lunaId)
-    .not('fisier_path', 'like', '%/tx/%')
-    .not('fisier_path', 'like', '%/checklist/%')
-    .order('created_at', { ascending: true })
+  // Categoria extras e stocată în tabelul extrase, nu în documente
+  const isExtras = scope?.extras || scope?.section === 'extras'
 
-  const { data: allDocs, error } = scope?.extras
+  // Documente din categorii (fără filtru in_zip — include doc-uri istorice + noi)
+  const { data: allDocs, error } = isExtras
     ? { data: [], error: null }
-    : await (scope?.section ? baseQuery.eq('in_zip', true) : baseQuery)
+    : await sb.from('documente')
+        .select('fisier_path,fisier_nume,fisier_tip,created_at')
+        .eq('luna_id', lunaId)
+        .not('fisier_path', 'like', '%/tx/%')
+        .not('fisier_path', 'like', '%/checklist/%')
+        .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Filtrare pe secțiune în cod (suportă și 'dispozitie-plata' → '/dispozitii-plata/')
-  const docs = scope?.section
+  // Filtrare pe secțiune în cod (suportă 'dispozitie-plata' → '/dispozitii-plata/')
+  const docs = (scope?.section && !isExtras)
     ? (allDocs || []).filter(d => pathToSection(String(d.fisier_path)) === scope.section)
     : allDocs
 
-  const { data: statements } = (!scope || scope.extras)
+  // Extras bancare: la export complet, la scope.extras, sau când secțiunea e 'extras'
+  const includeExtras = !scope || scope.extras || scope?.section === 'extras'
+  const { data: statements } = includeExtras
     ? await sb.from('extrase').select('pdf_path,pdf_nume').eq('luna_id', lunaId)
     : { data: [] }
 
   if (!docs?.length && !statements?.length)
-    return NextResponse.json({ error: 'Nu există documente PDF sau imagini în această categorie' }, { status: 404 })
+    return NextResponse.json({ error: 'Nu există documente în această categorie' }, { status: 404 })
 
   const merged = await PDFDocument.create()
 
@@ -86,14 +87,15 @@ export async function POST(req: NextRequest) {
     type Entry = { path: string; name: string; type: string; bucket: 'documente' | 'extrase-pdf' }
     const sectionMap = new Map<string, Entry[]>()
 
+    // Extras bancare
     for (const s of statements || []) {
       if (!s.pdf_path) continue
       if (!sectionMap.has('extras')) sectionMap.set('extras', [])
       sectionMap.get('extras')!.push({ path: s.pdf_path, name: s.pdf_nume || 'extras.pdf', type: 'application/pdf', bucket: 'extrase-pdf' })
     }
+    // Documente din categorii
     for (const doc of docs || []) {
       const section = pathToSection(doc.fisier_path)
-      if (section === 'altele') continue // exclude documente nerecunoscute
       if (!sectionMap.has(section)) sectionMap.set(section, [])
       sectionMap.get(section)!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente' })
     }
@@ -117,7 +119,7 @@ export async function POST(req: NextRequest) {
       }
     }
   } else {
-    // PDF per-secțiune sau fără firmaSlug
+    // PDF per-secțiune (sau fără firmaSlug): extras + documente secțiunii
     for (const s of statements || []) {
       if (!s.pdf_path) continue
       const { data } = await sb.storage.from('extrase-pdf').download(s.pdf_path)
@@ -132,7 +134,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!merged.getPageCount())
-    return NextResponse.json({ error: 'Documentele categoriei nu au putut fi convertite în PDF' }, { status: 422 })
+    return NextResponse.json({ error: 'Documentele nu au putut fi convertite în PDF (format nesuportat)' }, { status: 422 })
   const bytes = await merged.save()
   const fileName = `${safeName(title || 'documente_generale')}.pdf`
   return new NextResponse(Buffer.from(bytes), {

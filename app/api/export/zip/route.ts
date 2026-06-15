@@ -45,11 +45,10 @@ export async function POST(req: NextRequest) {
       if (b) extraseFiles.push({ name: e.pdf_nume || `extras_${e.valuta}.pdf`, data: b })
     }
 
-    // Documente din categorii (excl. documente de tranzacții și checklist)
+    // Documente din categorii — fără filtru in_zip (include doc-uri istorice + noi)
     const { data: docs } = await sb.from('documente')
       .select('fisier_path,fisier_nume,fisier_tip,created_at')
       .eq('luna_id', lunaId)
-      .eq('in_zip', true)
       .not('fisier_path', 'like', '%/tx/%')
       .not('fisier_path', 'like', '%/checklist/%')
       .order('created_at', { ascending: true })

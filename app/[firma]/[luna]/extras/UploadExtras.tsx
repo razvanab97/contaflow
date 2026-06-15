@@ -111,13 +111,24 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
             </button>
           </div>
           {extrasId && (
-            <button
-              onClick={() => savePdfRef.current?.click()}
-              disabled={savingPdf}
-              style={{ padding: '7px', borderRadius: '9px', border: `1px solid ${hasPdf ? 'rgba(74,222,128,.3)' : '#2A2A2A'}`, background: hasPdf ? 'rgba(74,222,128,.06)' : '#111', color: hasPdf ? '#4ADE80' : '#666', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              {savingPdf ? 'Se salvează...' : hasPdf ? `📄 PDF extras salvat · ${extras?.pdf_nume || ''}` : '📎 Atașează PDF extras bancar'}
-            </button>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+              <button
+                onClick={() => savePdfRef.current?.click()}
+                disabled={savingPdf}
+                style={{ flex: 1, padding: '7px', borderRadius: '9px', border: `1px solid ${hasPdf ? 'rgba(74,222,128,.3)' : '#2A2A2A'}`, background: hasPdf ? 'rgba(74,222,128,.06)' : '#111', color: hasPdf ? '#4ADE80' : '#666', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              >
+                {savingPdf ? 'Se salvează...' : hasPdf ? `📄 ${extras?.pdf_nume || 'PDF salvat'}` : '📎 Atașează PDF extras bancar'}
+              </button>
+              {hasPdf && extrasId && (
+                <a
+                  href={`/api/extras/pdf-download?extrasId=${extrasId}`}
+                  download={extras?.pdf_nume || 'extras.pdf'}
+                  style={{ padding: '7px 12px', borderRadius: '9px', border: '1px solid rgba(74,222,128,.3)', background: 'rgba(74,222,128,.06)', color: '#4ADE80', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', textDecoration: 'none' }}
+                >
+                  ↓
+                </a>
+              )}
+            </div>
           )}
         </div>
       )}

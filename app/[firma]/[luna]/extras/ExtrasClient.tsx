@@ -24,7 +24,7 @@ interface Tx {
   categorie: string; document_id: string|null; note: string|null
   documente: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }|null
 }
-interface Extras { id:string; valuta:string; iban?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
+interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 
 export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: initExtrase, slug }: {
