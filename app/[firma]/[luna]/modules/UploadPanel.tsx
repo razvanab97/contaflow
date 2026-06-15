@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 interface Doc {
   id: string
@@ -46,7 +46,7 @@ export default function UploadPanel({
     setLoaded(true)
   }, [lunaId, section])
 
-  useState(() => { load() })
+  useEffect(() => { load() }, [load])
 
   async function upload(files: FileList) {
     setBusy(true); setError('')

@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export interface TaskItem {
@@ -18,6 +18,8 @@ export default function TaskSection({ tasks, lunaId, culoare }: Props) {
   const router = useRouter()
   const [items, setItems] = useState(tasks)
   const [loading, setLoading] = useState<string | null>(null)
+
+  useEffect(() => { setItems(tasks) }, [tasks])
 
   async function toggle(key: string) {
     const current = items.find(t => t.key === key)
