@@ -21,6 +21,7 @@ function pathToSection(path: string): string {
   if (p.includes('/emag-calcul/')) return 'emag'
   if (p.includes('/acte-contabile/')) return 'acte-contabile'
   if (p.includes('/angajati/')) return 'angajati'
+  if (p.includes('/extras/')) return 'extras'
   return 'altele'
 }
 
@@ -91,13 +92,10 @@ export async function POST(req: NextRequest) {
       if (!ordered.includes(sec)) ordered.push(sec)
     }
 
-    let first = true
-    for (const section of ordered) {
-      const entries = sectionMap.get(section) || []
-      if (!entries.length) continue
-      if (!first) merged.addPage([595, 842]) // pagină albă separator
-      first = false
-      for (const entry of entries) {
+    const nonEmpty = ordered.filter(s => (sectionMap.get(s) || []).length > 0)
+    for (let i = 0; i < nonEmpty.length; i++) {
+      if (i > 0) merged.addPage([595, 842]) // pagină albă separator
+      for (const entry of sectionMap.get(nonEmpty[i]) || []) {
         const { data } = await sb.storage.from(entry.bucket).download(entry.path)
         if (!data) continue
         await embedDoc(merged, Buffer.from(await data.arrayBuffer()), entry.type, entry.name)

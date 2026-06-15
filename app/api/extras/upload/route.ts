@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     const firmaId = fd.get('firmaId') as string
     const lunaId = fd.get('lunaId') as string
     const selectedValuta = String(fd.get('valuta') || '').toUpperCase()
+    const replaceExtrasId = fd.get('extrasId') as string | null
 
     if (!file || !firmaId || !lunaId)
       return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
@@ -119,10 +120,11 @@ Exclude randurile: RULAJ ZI, SOLD FINAL, SOLD ANTERIOR, SOLD INITIAL.` }
     })
     if (!upRes.ok) return NextResponse.json({ error: 'Storage: ' + await upRes.text() }, { status: 500 })
 
-    // Sterge vechi
-    const old = await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${valuta}&select=id`)
-    for (const e of old) await sbDelete(`tranzactii?extras_id=eq.${e.id}`)
-    if (old.length > 0) await sbDelete(`extrase?id=in.(${old.map((e: any) => e.id).join(',')})`)
+    // Sterge specific (daca extrasId e furnizat) sau omite stergerea (cont nou)
+    if (replaceExtrasId) {
+      await sbDelete(`tranzactii?extras_id=eq.${replaceExtrasId}`)
+      await sbDelete(`extrase?id=eq.${replaceExtrasId}`)
+    }
 
     // Insereaza extras
     const { ok: eOk, data: extras } = await sbPost('extrase', {

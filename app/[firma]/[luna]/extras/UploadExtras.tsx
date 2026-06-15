@@ -1,23 +1,26 @@
 'use client'
 import { useState, useRef } from 'react'
 
-interface Extras { id: string; nr_tranzactii: number; nr_documentate: number; procesat_ai?: boolean; sold_final?: number; valuta?: string }
+interface Extras { id: string; nr_tranzactii: number; nr_documentate: number; procesat_ai?: boolean; sold_final?: number; valuta?: string; pdf_path?: string | null; pdf_nume?: string | null }
 
-export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare, onDone }: {
-  valuta: string; firmaId: string; lunaId: string
+export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras, culoare, onDone }: {
+  valuta: string; extrasId?: string; firmaId: string; lunaId: string
   extras: Extras | null; culoare: string; onDone: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [status, setStatus] = useState('')
+  const [savingPdf, setSavingPdf] = useState(false)
   const csvRef = useRef<HTMLInputElement>(null)
   const pdfRef = useRef<HTMLInputElement>(null)
+  const savePdfRef = useRef<HTMLInputElement>(null)
   const r = `${parseInt(culoare.slice(1,3),16)},${parseInt(culoare.slice(3,5),16)},${parseInt(culoare.slice(5,7),16)}`
 
   async function handleCSV(file: File) {
     setLoading(true); setErr(''); setStatus('Se procesează CSV-ul...')
     const fd = new FormData()
     fd.append('csv', file); fd.append('firmaId', firmaId); fd.append('lunaId', lunaId); fd.append('valuta', valuta)
+    if (extrasId) fd.append('extrasId', extrasId)
     const res = await fetch('/api/extras/upload-csv', { method: 'POST', body: fd })
     const d = await res.json()
     if (res.ok && d.ok) { setStatus('✓ Import reușit'); onDone() }
@@ -31,6 +34,7 @@ export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare,
     const fd = new FormData()
     fd.append('pdf', file); fd.append('firmaId', firmaId)
     fd.append('lunaId', lunaId); fd.append('valuta', valuta)
+    if (extrasId) fd.append('extrasId', extrasId)
     const res = await fetch('/api/extras/upload', { method: 'POST', body: fd })
     const d = await res.json()
     if (res.ok && d.ok) { setStatus(`✓ ${d.count} tranzacții · ${d.valuta || valuta}`); onDone() }
@@ -38,11 +42,30 @@ export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare,
     setLoading(false)
   }
 
+  async function handleSavePdf(file: File) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) { setErr('Selectează PDF'); return }
+    if (!extrasId) return
+    setSavingPdf(true); setErr('')
+    const fd = new FormData()
+    fd.append('pdf', file); fd.append('extrasId', extrasId)
+    fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
+    const res = await fetch('/api/extras/save-pdf', { method: 'POST', body: fd })
+    const d = await res.json()
+    if (res.ok && d.ok) onDone()
+    else setErr(d.error || 'Eroare salvare PDF')
+    setSavingPdf(false)
+  }
+
+  const hasPdf = !!extras?.pdf_path
+
   return (
     <div style={{ background: '#161616', border: `1px solid rgba(${r},.2)`, borderRadius: '14px', padding: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
         <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: extras?.nr_tranzactii ? '#4ADE80' : '#333' }} />
-        <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFF' }}>{valuta === 'AUTO' ? 'Citire extras cu AI' : `Extras ${valuta}`}</span>
+        <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFF' }}>
+          {valuta === 'AUTO' ? 'Citire extras cu AI' : `Extras ${valuta}`}
+          {extras?.id && extras.valuta && extras.valuta !== valuta ? ` (${extras.valuta})` : ''}
+        </span>
         {extras?.nr_tranzactii ? (
           <span style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: 'rgba(74,222,128,.15)', color: '#4ADE80' }}>
             {extras.nr_tranzactii} tx ✓
@@ -76,15 +99,26 @@ export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare,
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {valuta !== 'AUTO' && (
-            <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: '9px', border: 'none', background: culoare, color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-              ↑ Import CSV
+        <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {valuta !== 'AUTO' && (
+              <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: '9px', border: 'none', background: culoare, color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                ↑ Import CSV
+              </button>
+            )}
+            <button onClick={() => pdfRef.current?.click()} style={{ flex: valuta === 'AUTO' ? 1 : undefined, padding: '9px 14px', borderRadius: '9px', border: `1px solid rgba(${r},.3)`, background: 'transparent', color: culoare, fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+              {valuta === 'AUTO' ? 'Alege PDF · AI detectează moneda' : 'PDF + citire AI'}
+            </button>
+          </div>
+          {extrasId && (
+            <button
+              onClick={() => savePdfRef.current?.click()}
+              disabled={savingPdf}
+              style={{ padding: '7px', borderRadius: '9px', border: `1px solid ${hasPdf ? 'rgba(74,222,128,.3)' : '#2A2A2A'}`, background: hasPdf ? 'rgba(74,222,128,.06)' : '#111', color: hasPdf ? '#4ADE80' : '#666', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              {savingPdf ? 'Se salvează...' : hasPdf ? `📄 PDF extras salvat · ${extras?.pdf_nume || ''}` : '📎 Atașează PDF extras bancar'}
             </button>
           )}
-          <button onClick={() => pdfRef.current?.click()} style={{ flex: valuta === 'AUTO' ? 1 : undefined, padding: '9px 14px', borderRadius: '9px', border: `1px solid rgba(${r},.3)`, background: 'transparent', color: culoare, fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-            {valuta === 'AUTO' ? 'Alege PDF · AI detectează moneda' : 'PDF + citire AI'}
-          </button>
         </div>
       )}
 
@@ -96,6 +130,7 @@ export default function UploadExtras({ valuta, firmaId, lunaId, extras, culoare,
 
       <input ref={csvRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) handleCSV(e.target.files[0]); e.target.value = '' }} />
       <input ref={pdfRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) handlePDF(e.target.files[0]); e.target.value = '' }} />
+      <input ref={savePdfRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) handleSavePdf(e.target.files[0]); e.target.value = '' }} />
     </div>
   )
 }

@@ -32,6 +32,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
 }) {
   const [txs, setTxs] = useState<Tx[]>([])
   const [extrase, setExtrase] = useState<Extras[]>(initExtrase)
+  const [newSlots, setNewSlots] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<'all'|'lipsa'|'ok'|'na'>('all')
@@ -279,13 +280,33 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px' }}>
-          {['RON','EUR'].map(v => (
-            <UploadExtras key={v} valuta={v} firmaId={firma.id} lunaId={lunaId}
-              extras={extrase.find(x => x.valuta===v)||null} culoare={c} onDone={load}/>
+          {/* Conturi existente din BD */}
+          {extrase.map(e => (
+            <UploadExtras key={e.id} extrasId={e.id} valuta={e.valuta||'RON'} firmaId={firma.id} lunaId={lunaId}
+              extras={e} culoare={c} onDone={load}/>
+          ))}
+          {/* Slot gol RON dacă nu există */}
+          {!extrase.some(e => e.valuta==='RON') && (
+            <UploadExtras key="ron-empty" valuta="RON" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load}/>
+          )}
+          {/* Slot gol EUR dacă nu există */}
+          {!extrase.some(e => e.valuta==='EUR') && (
+            <UploadExtras key="eur-empty" valuta="EUR" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load}/>
+          )}
+          {/* Sloturi noi pentru conturi adiționale */}
+          {Array.from({length:newSlots}).map((_,i) => (
+            <UploadExtras key={`new-${i}`} valuta="AUTO" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c}
+              onDone={()=>{setNewSlots(s=>Math.max(0,s-1));load()}}/>
           ))}
         </div>
-        <div style={{ marginBottom:'40px' }}>
-          <UploadExtras valuta="AUTO" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load}/>
+        <div style={{ display:'flex', gap:'12px', marginBottom:'40px', alignItems:'stretch' }}>
+          <div style={{ flex:1 }}>
+            <UploadExtras valuta="AUTO" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load}/>
+          </div>
+          <button
+            onClick={()=>setNewSlots(s=>s+1)}
+            style={{ padding:'0 18px', border:'1px solid #2A2A2A', borderRadius:'14px', background:'#111', color:'#888', fontSize:'12px', fontWeight:600, cursor:'pointer', flexShrink:0 }}
+          >+ Adaugă cont</button>
         </div>
 
         {extrase.length > 0 && (

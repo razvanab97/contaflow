@@ -16,8 +16,11 @@ export default function ExportButtons({ firmaId, firmaNume, firmaSlug, lunaId, l
 
   async function downloadZip() {
     setZipBusy(true)
-    const res = await fetch('/api/export/zip', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ firmaId, firmaNume, firmaSlug, lunaId, luna:lunaLabel }) })
-    if (res.ok) { const b=await res.blob(); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`${firmaNume.replace(/[^a-zA-Z0-9]+/g,'_')}_${lunaLabel.replace(/\s+/g,'_')}.zip`; a.click(); URL.revokeObjectURL(u) }
+    try {
+      const res = await fetch('/api/export/zip', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ firmaId, firmaNume, firmaSlug, lunaId, luna:lunaLabel }) })
+      if (res.ok) { const b=await res.blob(); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`${firmaNume.replace(/[^a-zA-Z0-9]+/g,'_')}_${lunaLabel.replace(/\s+/g,'_')}.zip`; a.click(); URL.revokeObjectURL(u) }
+      else { const e=await res.json().catch(()=>({error:'Eroare server'})); alert(e.error||'Eroare la generare ZIP') }
+    } catch(e) { alert('Eroare conexiune: '+String(e)) }
     setZipBusy(false)
   }
 

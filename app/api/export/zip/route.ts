@@ -17,6 +17,7 @@ function pathToSection(path: string): string {
   if (p.includes('/emag-calcul/')) return 'emag'
   if (p.includes('/acte-contabile/')) return 'acte-contabile'
   if (p.includes('/angajati/')) return 'angajati'
+  if (p.includes('/extras/')) return 'extras'
   return 'altele'
 }
 
@@ -47,6 +48,9 @@ export async function POST(req: NextRequest) {
     .eq('luna_id', lunaId)
     .eq('in_zip', true)
     .order('created_at', { ascending: true })
+
+  if (!extraseFiles.length && !docs?.length)
+    return NextResponse.json({ error: 'Nu există documente pentru descărcare' }, { status: 404 })
 
   type Entry = { name: string; data: Blob }
   const sectionMap = new Map<string, Entry[]>()
@@ -83,22 +87,24 @@ export async function POST(req: NextRequest) {
   }
 
   // CSV tranzacții (util pentru reconciliere)
-  const ids = (extrase || []).map(e => e.id)
-  if (ids.length) {
-    const { data: txs } = await sb.from('tranzactii')
-      .select('*, documente(tip_document,furnizor,numar_document)')
-      .in('extras_id', ids)
-      .order('data_tranzactie')
-    if (txs?.length) {
-      const csv = ['Data,Descriere,Tip,Suma,Valuta,Categorie,Document',
-        ...txs.map(t => {
-          const d = Array.isArray(t.documente) ? t.documente[0] : t.documente
-          return [t.data_tranzactie, `"${t.descriere_curatata || t.descriere}"`, t.tip, t.suma, t.valuta, t.categorie || '', d?.tip_document || 'LIPSA'].join(',')
-        })
-      ].join('\n')
-      root.file('tranzactii.csv', csv)
+  try {
+    const ids = (extrase || []).map((e: any) => e.id).filter(Boolean)
+    if (ids.length) {
+      const { data: txs } = await sb.from('tranzactii')
+        .select('data_tranzactie,descriere,descriere_curatata,tip,suma,valuta,categorie,documente(tip_document,furnizor,numar_document)')
+        .in('extras_id', ids)
+        .order('data_tranzactie')
+      if (txs?.length) {
+        const csv = ['Data,Descriere,Tip,Suma,Valuta,Categorie,Document',
+          ...txs.map((t: any) => {
+            const d = Array.isArray(t.documente) ? t.documente[0] : t.documente
+            return [t.data_tranzactie, `"${t.descriere_curatata || t.descriere}"`, t.tip, t.suma, t.valuta, t.categorie || '', d?.tip_document || 'LIPSA'].join(',')
+          })
+        ].join('\n')
+        root.file('tranzactii.csv', csv)
+      }
     }
-  }
+  } catch {}
 
   const buf = await zip.generateAsync({ type: 'arraybuffer' })
   return new NextResponse(buf, {
