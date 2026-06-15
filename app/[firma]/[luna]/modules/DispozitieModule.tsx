@@ -90,7 +90,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
     }) })
     if (!res.ok) { setError((await res.json().catch(()=>({}))).error||'Generarea nu a reușit'); return }
     const assigned=res.headers.get('X-Disposition-Number')||number; const isZip=(res.headers.get('Content-Type')||'').includes('zip'); const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dispozitie_plata_${assigned}.${isZip?'zip':'pdf'}`; a.click(); URL.revokeObjectURL(url)
-    setEditId(''); setAttachedInvoices([]); await loadNumber()
+    setEditId(''); setAttachedInvoices([]); setPreset(''); setBeneficiary(''); setAmount(''); setPurpose(''); await loadNumber()
   }
 
   function applyPreset(val: string) {
