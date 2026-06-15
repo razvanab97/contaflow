@@ -26,12 +26,17 @@ function pathToSection(path: string): string {
 }
 
 async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: string) {
-  try {
-    if (type === 'application/pdf' || name?.toLowerCase().endsWith('.pdf')) {
-      const source = await PDFDocument.load(bytes)
+  if (type === 'application/pdf' || name?.toLowerCase().endsWith('.pdf')) {
+    try {
+      const source = await PDFDocument.load(bytes, { ignoreEncryption: true })
       const pages = await merged.copyPages(source, source.getPageIndices())
       pages.forEach(page => merged.addPage(page))
-    } else if (type?.startsWith('image/')) {
+    } catch {
+      // PDF incompatibil (criptat, comprimat nesuportat) — adaugă pagină albă de rezervă
+      merged.addPage([595, 842])
+    }
+  } else if (type?.startsWith('image/')) {
+    try {
       const image = type === 'image/png' ? await merged.embedPng(bytes) : await merged.embedJpg(bytes)
       const page = merged.addPage()
       const scale = Math.min(page.getWidth() / image.width, page.getHeight() / image.height, 1)
@@ -41,8 +46,8 @@ async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: 
         width: image.width * scale,
         height: image.height * scale,
       })
-    }
-  } catch {}
+    } catch {}
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -50,12 +55,25 @@ export async function POST(req: NextRequest) {
   if (!lunaId) return NextResponse.json({ error: 'Luna contabilă lipsește' }, { status: 400 })
   const sb = getServiceSupabase()
 
-  let query = sb.from('documente').select('fisier_path,fisier_nume,fisier_tip,created_at').eq('luna_id', lunaId).eq('in_zip', true)
-    .not('fisier_path', 'like', '%/tx/%').not('fisier_path', 'like', '%/checklist/%')
-  if (scope?.section) query = query.like('fisier_path', `%/${scope.section}/%`)
-  if (scope?.module && itemIds.length) query = query.in('checklist_item_id', itemIds)
-  const { data: docs, error } = scope?.extras ? { data: [], error: null } : await query.order('created_at', { ascending: true })
+  // Query toate documentele pentru luna (excluzând tranzacții și checklist)
+  // Filtrarea pe secțiune se face în cod (mai robustă față de SQL LIKE)
+  const baseQuery = sb.from('documente')
+    .select('fisier_path,fisier_nume,fisier_tip,created_at')
+    .eq('luna_id', lunaId)
+    .not('fisier_path', 'like', '%/tx/%')
+    .not('fisier_path', 'like', '%/checklist/%')
+    .order('created_at', { ascending: true })
+
+  const { data: allDocs, error } = scope?.extras
+    ? { data: [], error: null }
+    : await (scope?.section ? baseQuery.eq('in_zip', true) : baseQuery)
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Filtrare pe secțiune în cod (suportă și 'dispozitie-plata' → '/dispozitii-plata/')
+  const docs = scope?.section
+    ? (allDocs || []).filter(d => pathToSection(String(d.fisier_path)) === scope.section)
+    : allDocs
 
   const { data: statements } = (!scope || scope.extras)
     ? await sb.from('extrase').select('pdf_path,pdf_nume').eq('luna_id', lunaId)
@@ -80,11 +98,12 @@ export async function POST(req: NextRequest) {
     }
     for (const doc of docs || []) {
       const section = pathToSection(doc.fisier_path)
+      if (section === 'altele') continue // exclude documente nerecunoscute
       if (!sectionMap.has(section)) sectionMap.set(section, [])
       sectionMap.get(section)!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente' })
     }
 
-    // Ordinea secțiunilor după modulele firmei, necunoscutele la final
+    // Ordinea secțiunilor după modulele firmei
     const ordered: string[] = []
     for (const mod of moduleOrder) {
       if (sectionMap.has(mod)) ordered.push(mod)
@@ -103,7 +122,7 @@ export async function POST(req: NextRequest) {
       }
     }
   } else {
-    // PDF per-secțiune sau fără firmaSlug — comportament existent, fără separator
+    // PDF per-secțiune sau fără firmaSlug
     for (const s of statements || []) {
       if (!s.pdf_path) continue
       const { data } = await sb.storage.from('extrase-pdf').download(s.pdf_path)

@@ -115,6 +115,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
           firma={{ id: firma.id, slug: firma.slug, nume: firma.nume, culoare: firma.culoare }}
           luna={luna}
           slug={slug}
+          lunaId={lunaData.id}
           taskMap={taskMap}
         />
       </main>

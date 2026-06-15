@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
 
 interface FirmaInfo { id: string; slug: string; nume: string; culoare: string }
@@ -9,6 +9,7 @@ interface Props {
   firma: FirmaInfo
   luna: string
   slug: string
+  lunaId: string
   taskMap: Record<string, boolean>
 }
 
@@ -27,12 +28,14 @@ function loadOrder(slug: string, modules: ModuleDef[]): string[] {
   return modules.map(m => m.slug)
 }
 
-export default function ModuleGrid({ modules, firma, luna, slug, taskMap }: Props) {
+export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap }: Props) {
   const [reordering, setReordering] = useState(false)
   const [order, setOrder] = useState<string[]>(modules.map(m => m.slug))
   const [dragOver, setDragOver] = useState<number | null>(null)
+  const [busyPdf, setBusyPdf] = useState<string | null>(null)
   const dragIdx = useRef<number | null>(null)
   const r = rgb(firma.culoare)
+  const router = useRouter()
 
   useEffect(() => { setOrder(loadOrder(slug, modules)) }, [slug, modules])
 
@@ -73,6 +76,33 @@ export default function ModuleGrid({ modules, firma, luna, slug, taskMap }: Prop
   }
 
   function resetOrder() { localStorage.removeItem(storageKey(slug)); setOrder(modules.map(m => m.slug)) }
+
+  async function downloadSectionPdf(e: React.MouseEvent, modSlug: string, modLabel: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (busyPdf) return
+    setBusyPdf(modSlug)
+    try {
+      const res = await fetch('/api/export/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lunaId, title: modLabel, scope: { section: modSlug } }),
+      })
+      if (res.ok) {
+        const b = await res.blob()
+        const u = URL.createObjectURL(b)
+        const a = document.createElement('a')
+        a.href = u
+        a.download = `${modLabel.replace(/[^a-zA-Z0-9]+/g, '_')}.pdf`
+        a.click()
+        URL.revokeObjectURL(u)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || 'Nu există documente în această categorie')
+      }
+    } catch {}
+    setBusyPdf(null)
+  }
 
   return (
     <div>
@@ -123,24 +153,15 @@ export default function ModuleGrid({ modules, firma, luna, slug, taskMap }: Prop
                   userSelect:'none',
                 }}
               >
-                {/* Drag handle */}
                 <div style={{ color:'#444', fontSize:'16px', lineHeight:1, flexShrink:0, cursor:'grab' }}>⠿</div>
-
-                {/* Index */}
                 <div style={{ width:'20px', fontSize:'11px', fontWeight:700, color:'#555', flexShrink:0, textAlign:'center' }}>
                   {idx + 1}
                 </div>
-
-                {/* Label */}
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:'13px', fontWeight:600, color:'#E0E0E0' }}>{mod.label}</div>
                   <div style={{ fontSize:'11px', color:'#777', marginTop:'1px' }}>{mod.description}</div>
                 </div>
-
-                {/* Status dot */}
                 <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: isComplete ? '#6EE7B0' : modDone > 0 ? firma.culoare : '#2A2A2A' }}/>
-
-                {/* Arrow buttons */}
                 <div style={{ display:'flex', flexDirection:'column', gap:'2px', flexShrink:0 }}>
                   <button onClick={() => moveUp(idx)} disabled={idx === 0} style={{ width:'22px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center', background:'transparent', border:'1px solid #2A2A2A', borderRadius:'4px', cursor: idx===0?'not-allowed':'pointer', color: idx===0?'#2A2A2A':'#888', fontSize:'10px' }}>▲</button>
                   <button onClick={() => moveDown(idx)} disabled={idx === sorted.length-1} style={{ width:'22px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center', background:'transparent', border:'1px solid #2A2A2A', borderRadius:'4px', cursor: idx===sorted.length-1?'not-allowed':'pointer', color: idx===sorted.length-1?'#2A2A2A':'#888', fontSize:'10px' }}>▼</button>
@@ -173,49 +194,65 @@ export default function ModuleGrid({ modules, firma, luna, slug, taskMap }: Prop
               ? `/${slug}/${luna}/${mod.linkDirect}`
               : `/${slug}/${luna}/${mod.slug}`
 
+            const isBusy = busyPdf === mod.slug
+
             return (
-              <Link key={mod.slug} href={href} style={{ textDecoration:'none' }}>
-                <div style={{
+              <div
+                key={mod.slug}
+                onClick={() => router.push(href)}
+                style={{
                   background:'#111', border:'1px solid #1E1E1E', borderRadius:'14px',
                   padding:'20px 22px', cursor:'pointer', height:'100%',
                   display:'flex', flexDirection:'column', gap:'14px',
-                }}>
-                  <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
-                    <div>
-                      <div style={{ fontSize:'14px', fontWeight:600, color:'#E8E8E8', letterSpacing:'-0.2px', marginBottom:'3px' }}>{mod.label}</div>
-                      <div style={{ fontSize:'12px', color:'#888', lineHeight:1.4 }}>{mod.description}</div>
-                    </div>
-                    <span style={{ fontSize:'10px', fontWeight:600, padding:'3px 9px', borderRadius:'20px', flexShrink:0, background:statusStyle.bg, color:statusStyle.c, border:`1px solid ${statusStyle.border}` }}>
-                      {statusLabel}
-                    </span>
-                  </div>
-
+                }}
+              >
+                <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
                   <div>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'7px' }}>
-                      <span style={{ fontSize:'12px', color:'#888' }}>{modDone}/{modTotal} task-uri</span>
-                      <span style={{ fontSize:'12px', fontWeight:600, color: isComplete ? '#6EE7B0' : firma.culoare }}>{modPct}%</span>
-                    </div>
-                    <div style={{ height:'2px', background:'#1A1A1A', borderRadius:'2px' }}>
-                      <div style={{ height:'2px', borderRadius:'2px', background: isComplete ? '#6EE7B0' : firma.culoare, width:`${modPct}%` }}/>
-                    </div>
+                    <div style={{ fontSize:'14px', fontWeight:600, color:'#E8E8E8', letterSpacing:'-0.2px', marginBottom:'3px' }}>{mod.label}</div>
+                    <div style={{ fontSize:'12px', color:'#888', lineHeight:1.4 }}>{mod.description}</div>
                   </div>
+                  <span style={{ fontSize:'10px', fontWeight:600, padding:'3px 9px', borderRadius:'20px', flexShrink:0, background:statusStyle.bg, color:statusStyle.c, border:`1px solid ${statusStyle.border}` }}>
+                    {statusLabel}
+                  </span>
+                </div>
 
-                  <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
-                    {modTasks.map(t => (
-                      <div key={t.key} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                        <div style={{ width:'14px', height:'14px', borderRadius:'4px', flexShrink:0, background: taskMap[t.key] ? `rgba(${r},.15)` : '#1A1A1A', border: taskMap[t.key] ? `1px solid rgba(${r},.4)` : '1px solid #252525', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                          {taskMap[t.key] && <svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke={firma.culoare} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                        </div>
-                        <span style={{ fontSize:'12px', fontWeight:500, color: taskMap[t.key] ? '#777' : '#AAA', textDecoration: taskMap[t.key] ? 'line-through' : 'none' }}>{t.label}</span>
-                      </div>
-                    ))}
+                <div>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'7px' }}>
+                    <span style={{ fontSize:'12px', color:'#888' }}>{modDone}/{modTotal} task-uri</span>
+                    <span style={{ fontSize:'12px', fontWeight:600, color: isComplete ? '#6EE7B0' : firma.culoare }}>{modPct}%</span>
                   </div>
-
-                  <div style={{ marginTop:'auto', display:'flex', justifyContent:'flex-end' }}>
-                    <span style={{ fontSize:'12px', fontWeight:600, color:firma.culoare }}>Deschide →</span>
+                  <div style={{ height:'2px', background:'#1A1A1A', borderRadius:'2px' }}>
+                    <div style={{ height:'2px', borderRadius:'2px', background: isComplete ? '#6EE7B0' : firma.culoare, width:`${modPct}%` }}/>
                   </div>
                 </div>
-              </Link>
+
+                <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
+                  {modTasks.map(t => (
+                    <div key={t.key} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                      <div style={{ width:'14px', height:'14px', borderRadius:'4px', flexShrink:0, background: taskMap[t.key] ? `rgba(${r},.15)` : '#1A1A1A', border: taskMap[t.key] ? `1px solid rgba(${r},.4)` : '1px solid #252525', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        {taskMap[t.key] && <svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke={firma.culoare} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      </div>
+                      <span style={{ fontSize:'12px', fontWeight:500, color: taskMap[t.key] ? '#777' : '#AAA', textDecoration: taskMap[t.key] ? 'line-through' : 'none' }}>{t.label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop:'auto', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <button
+                    onClick={e => downloadSectionPdf(e, mod.slug, mod.label)}
+                    disabled={isBusy}
+                    style={{
+                      fontSize:'11px', fontWeight:600, padding:'5px 11px', borderRadius:'7px',
+                      border:`1px solid rgba(${r},.35)`, background:`rgba(${r},.06)`,
+                      color: firma.culoare, cursor: isBusy ? 'wait' : 'pointer',
+                      opacity: isBusy ? .6 : 1, transition:'opacity .15s',
+                    }}
+                  >
+                    {isBusy ? '...' : '↓ PDF'}
+                  </button>
+                  <span style={{ fontSize:'12px', fontWeight:600, color:firma.culoare }}>Deschide →</span>
+                </div>
+              </div>
             )
           })}
         </div>
