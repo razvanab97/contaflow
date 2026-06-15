@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       max_tokens:500,
       messages:[{ role:'user', content:[
         source,
-        { type:'text', text:'Extrage datele facturii sau chitantei pentru o dispozitie de plata. Returneaza doar JSON: {"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria documentului","invoiceNumber":"numarul documentului","apartment":"numarul apartamentului","invoiceDate":"ZZ.LL.AAAA","representingPeriod":"luna si anul reprezentat ex: Iulie 2026 — completeaza doar daca exista camp reprezentand/pentru luna"}. Nu scrie descrieri lungi.' },
+        { type:'text', text:'Extrage datele facturii sau chitantei pentru o dispozitie de plata. Citeste cu atentie textul scris de mana. Returneaza doar JSON: {"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria documentului","invoiceNumber":"numarul documentului","apartment":"numarul apartamentului","invoiceDate":"ZZ.LL.AAAA","representingPeriod":"copiaza exact textul din campul reprezentand/pentru luna — poate fi o luna (ex: Mai 2026) sau doua luni (ex: Mai si Iunie 2026) — lasa null daca nu exista acest camp"}. Nu scrie descrieri lungi, nu inventa date.' },
       ] }],
     })
     const raw = response.content.filter(block=>block.type==='text').map(block=>(block as {text:string}).text).join('')
