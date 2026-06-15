@@ -7,6 +7,7 @@ interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:
 interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[]; proprietari?: Proprietar[] }
 
 type DispDoc = { id:string; fisier_nume:string; numar_document:string; furnizor:string; data?:Record<string,string|number>; attachments?:{id:string;fisier_nume:string}[] }
+type BuletinResult = { prenume:string; nume:string; serieCi:string; numarCi:string }
 
 export default function DispozitieModule({ firma, firmeDisponibile, lunaId, tasks, proprietari = [] }: Props) {
   const [firmaId, setFirmaId] = useState(firma.id)
@@ -33,6 +34,19 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
   const [pdfBusy, setPdfBusy] = useState(false)
   const [error, setError] = useState('')
   const invoiceRef = useRef<HTMLInputElement>(null)
+  const buletinRef = useRef<HTMLInputElement>(null)
+
+  // Proprietari salvați local (adăugați din buletin)
+  const lsKey = `contaflow:proprietari:${firma.id}`
+  const [localProprietari, setLocalProprietari] = useState<Proprietar[]>([])
+  const [buletinBusy, setBuletinBusy] = useState(false)
+  const [buletinResult, setBuletinResult] = useState<BuletinResult|null>(null)
+  const [bPrenume, setBPrenume] = useState(''); const [bNume, setBNume] = useState('')
+  const [bSerie, setBSerie] = useState(''); const [bNumar, setBNumar] = useState('')
+
+  useEffect(() => {
+    try { setLocalProprietari(JSON.parse(localStorage.getItem(lsKey) || '[]')) } catch {}
+  }, [lsKey])
   const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'9px 12px', color:'#BBB', outline:'none', width:'100%' }
 
   const loadNumber = useCallback(async () => {
@@ -93,12 +107,46 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
     setEditId(''); setAttachedInvoices([]); setPreset(''); setBeneficiary(''); setAmount(''); setPurpose(''); await loadNumber()
   }
 
+  const allProprietari = [...proprietari, ...localProprietari.filter(l => !proprietari.some(s => s.nume === l.nume))]
+
   function applyPreset(val: string) {
     setPreset(val)
-    const p = proprietari.find(e => e.nume === val)
+    const p = allProprietari.find(e => e.nume === val)
     if (!p) return
     setBeneficiary(p.nume); setOwner(p.nume); setBeneficiaryFunction('Proprietar')
     setIdentitySeries(p.serieCi); setIdentityNumber(p.numarCi)
+  }
+
+  async function analyzeBuletin(file: File) {
+    setBuletinBusy(true); setError(''); setBuletinResult(null)
+    const fd = new FormData(); fd.append('file', file)
+    const res = await fetch('/api/proprietar/analyze', { method:'POST', body:fd })
+    const data = await res.json().catch(()=>({}))
+    if (!res.ok) { setError(data.error||'AI nu a putut citi buletinul'); setBuletinBusy(false); return }
+    setBuletinResult(data)
+    setBPrenume(data.prenume||''); setBNume(data.nume||'')
+    setBSerie(data.serieCi||''); setBNumar(data.numarCi||'')
+    setBuletinBusy(false)
+  }
+
+  function saveProprietar() {
+    const numeComplet = `${bPrenume} ${bNume}`.trim()
+    if (!numeComplet) return
+    const p: Proprietar = { nume: numeComplet, serieCi: bSerie, numarCi: bNumar }
+    const updated = [...localProprietari.filter(x => x.nume !== numeComplet), p]
+    setLocalProprietari(updated)
+    try { localStorage.setItem(lsKey, JSON.stringify(updated)) } catch {}
+    setBuletinResult(null)
+    // auto-select
+    setPreset(numeComplet); setBeneficiary(numeComplet); setOwner(numeComplet)
+    setBeneficiaryFunction('Proprietar'); setIdentitySeries(bSerie); setIdentityNumber(bNumar)
+  }
+
+  function deleteLocalProprietar(nume: string) {
+    const updated = localProprietari.filter(p => p.nume !== nume)
+    setLocalProprietari(updated)
+    try { localStorage.setItem(lsKey, JSON.stringify(updated)) } catch {}
+    if (preset === nume) setPreset('')
   }
 
   async function analyzeInvoices(files: FileList) {
@@ -170,15 +218,48 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
             <input value={identitySeries} onChange={e=>setIdentitySeries(e.target.value)} placeholder="Serie CI" style={INP}/>
             <input value={identityNumber} onChange={e=>setIdentityNumber(e.target.value)} placeholder="Număr CI" style={INP}/>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'2fr auto', gap:'8px', marginTop:'8px' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'2fr auto auto', gap:'8px', marginTop:'8px' }}>
             <select value={preset} onChange={e=>applyPreset(e.target.value)} style={INP}>
-              <option value="">{proprietari.length ? 'Selectează proprietar...' : 'Niciun proprietar configurat'}</option>
-              {proprietari.map(p=><option key={p.nume} value={p.nume}>{p.nume}</option>)}
+              <option value="">{allProprietari.length ? 'Selectează proprietar...' : 'Niciun proprietar configurat'}</option>
+              {allProprietari.map(p=>(
+                <option key={p.nume} value={p.nume}>{p.nume}{localProprietari.some(l=>l.nume===p.nume) ? ' ✓' : ''}</option>
+              ))}
             </select>
-            <button onClick={()=>invoiceRef.current?.click()} disabled={invoiceBusy} style={{ border:'1px solid #333', borderRadius:'8px', background:'#1A1A1A', color:'#CCC', padding:'9px 14px', cursor:'pointer', fontSize:'12px' }}>{invoiceBusy?'AI analizează...':'+ Facturi AI'}</button>
+            <button onClick={()=>buletinRef.current?.click()} disabled={buletinBusy} style={{ border:`1px solid ${firma.culoare}`, borderRadius:'8px', background:'transparent', color:firma.culoare, padding:'9px 14px', cursor:'pointer', fontSize:'12px', fontWeight:600, whiteSpace:'nowrap' }}>{buletinBusy?'AI citește...':'+ Buletin'}</button>
+            <button onClick={()=>invoiceRef.current?.click()} disabled={invoiceBusy} style={{ border:'1px solid #333', borderRadius:'8px', background:'#1A1A1A', color:'#CCC', padding:'9px 14px', cursor:'pointer', fontSize:'12px', whiteSpace:'nowrap' }}>{invoiceBusy?'AI analizează...':'+ Facturi AI'}</button>
+            <input ref={buletinRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style={{ display:'none' }} onChange={e=>e.target.files?.[0]&&analyzeBuletin(e.target.files[0])}/>
             <input ref={invoiceRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e=>e.target.files&&analyzeInvoices(e.target.files)}/>
           </div>
           {attachedInvoices.length>0 && <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>{attachedInvoices.map(i=><span key={i.id} style={{ fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:'#1A1A1A', color:'#888' }}>{i.fisier_nume}</span>)}</div>}
+
+          {/* Proprietari locali salvați */}
+          {localProprietari.length>0 && (
+            <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>
+              {localProprietari.map(p=>(
+                <span key={p.nume} style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:`rgba(${parseInt(firma.culoare.slice(1,3),16)},${parseInt(firma.culoare.slice(3,5),16)},${parseInt(firma.culoare.slice(5,7),16)},.12)`, color:firma.culoare }}>
+                  {p.nume} · {p.serieCi} {p.numarCi}
+                  <button onClick={()=>deleteLocalProprietar(p.nume)} style={{ background:'none', border:'none', color:firma.culoare, cursor:'pointer', padding:'0 2px', fontSize:'10px', lineHeight:1 }}>✕</button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Panou confirmare buletin */}
+          {buletinResult && (
+            <div style={{ marginTop:'10px', padding:'14px 16px', background:'#111', border:`1px solid ${firma.culoare}44`, borderRadius:'10px' }}>
+              <div style={{ fontSize:'11px', fontWeight:700, color:firma.culoare, marginBottom:'10px' }}>Proprietar extras din buletin — confirmă și salvează</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 80px 80px', gap:'8px', marginBottom:'10px' }}>
+                <input value={bPrenume} onChange={e=>setBPrenume(e.target.value)} placeholder="Prenume" style={INP}/>
+                <input value={bNume} onChange={e=>setBNume(e.target.value)} placeholder="Nume familie" style={INP}/>
+                <input value={bSerie} onChange={e=>setBSerie(e.target.value.toUpperCase())} placeholder="Serie CI" style={INP}/>
+                <input value={bNumar} onChange={e=>setBNumar(e.target.value)} placeholder="Nr. CI" style={INP}/>
+              </div>
+              <div style={{ display:'flex', gap:'8px' }}>
+                <button onClick={saveProprietar} disabled={!bPrenume&&!bNume} style={{ border:'none', borderRadius:'8px', background:firma.culoare, color:'#FFF', padding:'8px 16px', cursor:'pointer', fontSize:'12px', fontWeight:700 }}>Salvează preset</button>
+                <button onClick={()=>setBuletinResult(null)} style={{ border:'1px solid #333', borderRadius:'8px', background:'transparent', color:'#888', padding:'8px 12px', cursor:'pointer', fontSize:'12px' }}>Anulează</button>
+              </div>
+            </div>
+          )}
           <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 2fr auto', gap:'8px', marginTop:'8px' }}>
             <input value={beneficiary} onChange={e=>setBeneficiary(e.target.value)} placeholder="Beneficiar" style={INP}/>
             <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Suma RON" style={INP}/>
