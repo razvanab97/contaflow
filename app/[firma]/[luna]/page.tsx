@@ -106,7 +106,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
 
         {/* Export buttons */}
         <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'24px', marginTop:'-12px' }}>
-          <ExportButtons firmaId={firma.id} firmaNume={firma.nume} lunaId={lunaData.id} lunaLabel={ll} culoare={firma.culoare}/>
+          <ExportButtons firmaId={firma.id} firmaNume={firma.nume} firmaSlug={firma.slug} lunaId={lunaData.id} lunaLabel={ll} culoare={firma.culoare}/>
         </div>
 
         {/* Module cards grid — cu reordonare */}

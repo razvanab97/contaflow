@@ -4,12 +4,13 @@ import { useState } from 'react'
 interface Props {
   firmaId: string
   firmaNume: string
+  firmaSlug: string
   lunaId: string
   lunaLabel: string
   culoare: string
 }
 
-export default function ExportButtons({ firmaId, firmaNume, lunaId, lunaLabel, culoare }: Props) {
+export default function ExportButtons({ firmaId, firmaNume, firmaSlug, lunaId, lunaLabel, culoare }: Props) {
   const [zipBusy, setZipBusy] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
 
@@ -22,7 +23,7 @@ export default function ExportButtons({ firmaId, firmaNume, lunaId, lunaLabel, c
 
   async function downloadPdf() {
     setPdfBusy(true)
-    const res = await fetch('/api/export/pdf', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId, title:`${firmaNume}_${lunaLabel}_toate` }) })
+    const res = await fetch('/api/export/pdf', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId, firmaSlug, title:`${firmaNume}_${lunaLabel}_toate` }) })
     if (res.ok) { const b=await res.blob(); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`${firmaNume.replace(/[^a-zA-Z0-9]+/g,'_')}_${lunaLabel.replace(/\s+/g,'_')}_toate.pdf`; a.click(); URL.revokeObjectURL(u) }
     setPdfBusy(false)
   }
