@@ -6,6 +6,7 @@ import ModuleGrid from './ModuleGrid'
 import { dbSelect } from '@/lib/db'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 import LunaSummary from './LunaSummary'
+import ExportButtons from './ExportButtons'
 
 const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
 function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
@@ -101,6 +102,11 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
         {/* Total progress bar */}
         <div style={{ height: '2px', background: '#1A1A1A', borderRadius: '2px', marginBottom: '36px' }}>
           <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? '#6EE7B0' : firma.culoare, width: `${pct}%` }}/>
+        </div>
+
+        {/* Export buttons */}
+        <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'24px', marginTop:'-12px' }}>
+          <ExportButtons firmaId={firma.id} firmaNume={firma.nume} lunaId={lunaData.id} lunaLabel={ll} culoare={firma.culoare}/>
         </div>
 
         {/* Module cards grid — cu reordonare */}

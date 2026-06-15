@@ -29,6 +29,7 @@ export default function UploadPanel({
   const [docs, setDocs] = useState<Doc[]>([])
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState(false)
   const [link, setLink] = useState('')
   const [supplier, setSupplier] = useState('')
   const [documentType, setDocumentType] = useState(documentTypeOptions?.[0]?.value || 'altul')
@@ -79,6 +80,13 @@ export default function UploadPanel({
     setBusy(false)
   }
 
+  async function savePdf() {
+    setPdfBusy(true)
+    const res = await fetch('/api/export/pdf', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId, title, scope:{ section } }) })
+    if (res.ok) { const b=await res.blob(); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`${title.replace(/[^a-zA-Z0-9]+/g,'_')}.pdf`; a.click(); URL.revokeObjectURL(u) }
+    setPdfBusy(false)
+  }
+
   async function deleteDoc(doc: Doc) {
     if (!confirm(`Ștergi „${doc.fisier_nume}"?`)) return
     const res = await fetch(`/api/chitante/document?id=${encodeURIComponent(doc.id)}`, { method: 'DELETE' })
@@ -88,9 +96,16 @@ export default function UploadPanel({
 
   return (
     <div style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '12px', overflow: 'hidden' }}>
-      <div style={{ padding: '18px 22px', borderBottom: '1px solid #1A1A1A' }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: '#E0E0E0', marginBottom: '2px' }}>{title}</div>
-        {description && <div style={{ fontSize: '11px', color: '#888' }}>{description}</div>}
+      <div style={{ padding: '18px 22px', borderBottom: '1px solid #1A1A1A', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
+        <div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: '#E0E0E0', marginBottom: '2px' }}>{title}</div>
+          {description && <div style={{ fontSize: '11px', color: '#888' }}>{description}</div>}
+        </div>
+        {loaded && docs.length > 0 && (
+          <button onClick={savePdf} disabled={pdfBusy} style={{ flexShrink:0, fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:culoare, cursor:'pointer', opacity:pdfBusy?.6:1 }}>
+            {pdfBusy ? '...' : '↓ PDF'}
+          </button>
+        )}
       </div>
 
       <div style={{ padding: '18px 22px' }}>
