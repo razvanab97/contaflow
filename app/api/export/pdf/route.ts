@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
   const sb = getServiceSupabase()
 
   let query = sb.from('documente').select('fisier_path,fisier_nume,fisier_tip,created_at').eq('luna_id', lunaId).eq('in_zip', true)
+    .not('fisier_path', 'like', '%/tx/%').not('fisier_path', 'like', '%/checklist/%')
   if (scope?.section) query = query.like('fisier_path', `%/${scope.section}/%`)
   if (scope?.module && itemIds.length) query = query.in('checklist_item_id', itemIds)
   const { data: docs, error } = scope?.extras ? { data: [], error: null } : await query.order('created_at', { ascending: true })

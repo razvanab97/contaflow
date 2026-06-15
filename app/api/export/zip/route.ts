@@ -26,91 +26,77 @@ function sectionLabel(section: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { firmaId, firmaNume, firmaSlug, lunaId, luna } = await req.json()
-  const sb = getServiceSupabase()
-  const zip = new JSZip()
-  const root = zip.folder(`${firmaNume} - ${luna}`)!
-
-  const moduleOrder = firmaSlug ? (FIRMA_CONFIGS[firmaSlug]?.module || []) : []
-
-  // Extrase bancare
-  const { data: extrase } = await sb.from('extrase').select('*').eq('luna_id', lunaId)
-  const extraseFiles: { name: string; data: Blob }[] = []
-  for (const e of extrase || []) {
-    if (!e.pdf_path) continue
-    const { data: b } = await sb.storage.from('extrase-pdf').download(e.pdf_path)
-    if (b) extraseFiles.push({ name: e.pdf_nume || `extras_${e.valuta}.pdf`, data: b })
-  }
-
-  // Documente
-  const { data: docs } = await sb.from('documente')
-    .select('fisier_path,fisier_nume,fisier_tip,created_at')
-    .eq('luna_id', lunaId)
-    .eq('in_zip', true)
-    .order('created_at', { ascending: true })
-
-  if (!extraseFiles.length && !docs?.length)
-    return NextResponse.json({ error: 'Nu există documente pentru descărcare' }, { status: 404 })
-
-  type Entry = { name: string; data: Blob }
-  const sectionMap = new Map<string, Entry[]>()
-
-  // Extras de cont
-  if (extraseFiles.length) sectionMap.set('extras', extraseFiles)
-
-  // Celelalte documente
-  for (const doc of docs || []) {
-    const section = pathToSection(doc.fisier_path)
-    const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
-    if (!b) continue
-    if (!sectionMap.has(section)) sectionMap.set(section, [])
-    sectionMap.get(section)!.push({ name: doc.fisier_nume, data: b })
-  }
-
-  // Ordinea secțiunilor după modulele firmei
-  const ordered: string[] = []
-  for (const mod of moduleOrder) {
-    if (sectionMap.has(mod)) ordered.push(mod)
-  }
-  for (const sec of sectionMap.keys()) {
-    if (!ordered.includes(sec)) ordered.push(sec)
-  }
-
-  // Creează dosarele și adaugă fișierele
-  for (const section of ordered) {
-    const entries = sectionMap.get(section) || []
-    if (!entries.length) continue
-    const folder = root.folder(sectionLabel(section))!
-    for (const entry of entries) {
-      folder.file(entry.name, entry.data)
-    }
-  }
-
-  // CSV tranzacții (util pentru reconciliere)
   try {
-    const ids = (extrase || []).map((e: any) => e.id).filter(Boolean)
-    if (ids.length) {
-      const { data: txs } = await sb.from('tranzactii')
-        .select('data_tranzactie,descriere,descriere_curatata,tip,suma,valuta,categorie,documente(tip_document,furnizor,numar_document)')
-        .in('extras_id', ids)
-        .order('data_tranzactie')
-      if (txs?.length) {
-        const csv = ['Data,Descriere,Tip,Suma,Valuta,Categorie,Document',
-          ...txs.map((t: any) => {
-            const d = Array.isArray(t.documente) ? t.documente[0] : t.documente
-            return [t.data_tranzactie, `"${t.descriere_curatata || t.descriere}"`, t.tip, t.suma, t.valuta, t.categorie || '', d?.tip_document || 'LIPSA'].join(',')
-          })
-        ].join('\n')
-        root.file('tranzactii.csv', csv)
+    const { firmaId, firmaNume, firmaSlug, lunaId, luna } = await req.json()
+    if (!lunaId) return NextResponse.json({ error: 'Luna contabilă lipsește' }, { status: 400 })
+
+    const sb = getServiceSupabase()
+    const zip = new JSZip()
+    const root = zip.folder(`${firmaNume} - ${luna}`)!
+
+    const moduleOrder = firmaSlug ? (FIRMA_CONFIGS[firmaSlug]?.module || []) : []
+
+    // Extrase bancare — PDF-uri din bucket extrase-pdf
+    const { data: extrase } = await sb.from('extrase').select('id,valuta,pdf_path,pdf_nume').eq('luna_id', lunaId)
+    const extraseFiles: { name: string; data: Blob }[] = []
+    for (const e of extrase || []) {
+      if (!e.pdf_path) continue
+      const { data: b } = await sb.storage.from('extrase-pdf').download(e.pdf_path)
+      if (b) extraseFiles.push({ name: e.pdf_nume || `extras_${e.valuta}.pdf`, data: b })
+    }
+
+    // Documente din categorii (excl. documente de tranzacții și checklist)
+    const { data: docs } = await sb.from('documente')
+      .select('fisier_path,fisier_nume,fisier_tip,created_at')
+      .eq('luna_id', lunaId)
+      .eq('in_zip', true)
+      .not('fisier_path', 'like', '%/tx/%')
+      .not('fisier_path', 'like', '%/checklist/%')
+      .order('created_at', { ascending: true })
+
+    if (!extraseFiles.length && !docs?.length)
+      return NextResponse.json({ error: 'Nu există documente de descărcat pentru această lună' }, { status: 404 })
+
+    type Entry = { name: string; data: Blob }
+    const sectionMap = new Map<string, Entry[]>()
+
+    if (extraseFiles.length) sectionMap.set('extras', extraseFiles)
+
+    for (const doc of docs || []) {
+      const section = pathToSection(doc.fisier_path)
+      const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
+      if (!b) continue
+      if (!sectionMap.has(section)) sectionMap.set(section, [])
+      sectionMap.get(section)!.push({ name: doc.fisier_nume, data: b })
+    }
+
+    // Ordinea secțiunilor după modulele firmei, necunoscutele la final
+    const ordered: string[] = []
+    for (const mod of moduleOrder) {
+      if (sectionMap.has(mod)) ordered.push(mod)
+    }
+    for (const sec of sectionMap.keys()) {
+      if (!ordered.includes(sec)) ordered.push(sec)
+    }
+
+    // Creează dosarele și adaugă fișierele
+    for (const section of ordered) {
+      const entries = sectionMap.get(section) || []
+      if (!entries.length) continue
+      const folder = root.folder(sectionLabel(section))!
+      for (const entry of entries) {
+        folder.file(entry.name, entry.data)
       }
     }
-  } catch {}
 
-  const buf = await zip.generateAsync({ type: 'arraybuffer' })
-  return new NextResponse(buf, {
-    headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${firmaNume}_${luna}.zip"`,
-    },
-  })
+    const buf = await zip.generateAsync({ type: 'arraybuffer' })
+    return new NextResponse(buf, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${firmaNume}_${luna}.zip"`,
+      },
+    })
+  } catch (e: any) {
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 })
+  }
 }
