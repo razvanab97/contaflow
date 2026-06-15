@@ -8,7 +8,7 @@ function safePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || fallback
 }
 
-function dispositionPurpose(extracted: { category?:string; supplier?:string; series?:string; invoiceNumber?:string; apartment?:string; invoiceDate?:string }) {
+function dispositionPurpose(extracted: { category?:string; supplier?:string; series?:string; invoiceNumber?:string; apartment?:string; invoiceDate?:string; representingPeriod?:string }) {
   const category = String(extracted.category || '').toLowerCase()
   const association = String(extracted.supplier || '').replace(/^asocia(?:t|ț)ia\s+/i, '').trim()
   const prefix = category === 'gaz' ? 'Fact. gaz'
@@ -16,8 +16,10 @@ function dispositionPurpose(extracted: { category?:string; supplier?:string; ser
     : category === 'asociatie' ? `Asociatia ${association}`.trim()
     : 'Factura'
   const invoice = [extracted.series ? `seria ${extracted.series}` : '', extracted.invoiceNumber ? `nr. ${extracted.invoiceNumber}` : ''].filter(Boolean).join(' ')
-  const date = extracted.invoiceDate ? `din ${extracted.invoiceDate}` : ''
-  return [prefix, invoice, extracted.apartment ? `ap. ${extracted.apartment}` : '', date].filter(Boolean).join(' - ')
+  const period = extracted.representingPeriod
+    ? `luna ${extracted.representingPeriod}`
+    : extracted.invoiceDate ? `din ${extracted.invoiceDate}` : ''
+  return [prefix, invoice, extracted.apartment ? `ap. ${extracted.apartment}` : '', period].filter(Boolean).join(' - ')
 }
 
 export async function POST(req: NextRequest) {
@@ -42,12 +44,12 @@ export async function POST(req: NextRequest) {
       max_tokens:500,
       messages:[{ role:'user', content:[
         source,
-        { type:'text', text:'Extrage datele facturii pentru o dispozitie de plata. Returneaza doar JSON: {"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria facturii","invoiceNumber":"numarul facturii","apartment":"numarul apartamentului","invoiceDate":"ZZ.LL.AAAA"}. Nu scrie descrieri lungi.' },
+        { type:'text', text:'Extrage datele facturii sau chitantei pentru o dispozitie de plata. Returneaza doar JSON: {"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria documentului","invoiceNumber":"numarul documentului","apartment":"numarul apartamentului","invoiceDate":"ZZ.LL.AAAA","representingPeriod":"luna si anul reprezentat ex: Iulie 2026 — completeaza doar daca exista camp reprezentand/pentru luna"}. Nu scrie descrieri lungi.' },
       ] }],
     })
     const raw = response.content.filter(block=>block.type==='text').map(block=>(block as {text:string}).text).join('')
     const match = raw.match(/\{[\s\S]*\}/)
-    let extracted:{category?:string;amount?:number;supplier?:string;series?:string;invoiceNumber?:string;apartment?:string;invoiceDate?:string} = {}
+    let extracted:{category?:string;amount?:number;supplier?:string;series?:string;invoiceNumber?:string;apartment?:string;invoiceDate?:string;representingPeriod?:string} = {}
     try { extracted = match ? JSON.parse(match[0]) : {} } catch {}
     const purpose = dispositionPurpose(extracted)
 
