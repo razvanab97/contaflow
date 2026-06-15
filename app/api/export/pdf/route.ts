@@ -26,17 +26,12 @@ function pathToSection(path: string): string {
 }
 
 async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: string) {
-  if (type === 'application/pdf' || name?.toLowerCase().endsWith('.pdf')) {
-    try {
-      const source = await PDFDocument.load(bytes, { ignoreEncryption: true })
+  try {
+    if (type === 'application/pdf' || name?.toLowerCase().endsWith('.pdf')) {
+      const source = await PDFDocument.load(bytes)
       const pages = await merged.copyPages(source, source.getPageIndices())
       pages.forEach(page => merged.addPage(page))
-    } catch {
-      // PDF incompatibil (criptat, comprimat nesuportat) — adaugă pagină albă de rezervă
-      merged.addPage([595, 842])
-    }
-  } else if (type?.startsWith('image/')) {
-    try {
+    } else if (type?.startsWith('image/')) {
       const image = type === 'image/png' ? await merged.embedPng(bytes) : await merged.embedJpg(bytes)
       const page = merged.addPage()
       const scale = Math.min(page.getWidth() / image.width, page.getHeight() / image.height, 1)
@@ -46,8 +41,8 @@ async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: 
         width: image.width * scale,
         height: image.height * scale,
       })
-    } catch {}
-  }
+    }
+  } catch {}
 }
 
 export async function POST(req: NextRequest) {
