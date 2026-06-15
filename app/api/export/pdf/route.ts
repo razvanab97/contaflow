@@ -21,7 +21,16 @@ function pathToSection(path: string): string {
   if (p.includes('/emag-calcul/')) return 'emag'
   if (p.includes('/acte-contabile/')) return 'acte-contabile'
   if (p.includes('/angajati/')) return 'angajati'
+  if (p.includes('/extras/')) return 'extras'
   return 'altele'
+}
+
+// Verificare directă path → secțiune (gestionează slug-uri diferite față de path, ex. 'emag' vs 'emag-calcul')
+function matchesSection(filePath: string, section: string): boolean {
+  const p = String(filePath)
+  if (section === 'dispozitie-plata') return p.includes('/dispozitii-plata/')
+  if (section === 'emag' || section === 'emag-calcul') return p.includes('/emag-calcul/')
+  return p.includes(`/${section}/`)
 }
 
 async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: string) {
@@ -64,9 +73,9 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Filtrare pe secțiune în cod (suportă 'dispozitie-plata' → '/dispozitii-plata/')
+  // Filtrare pe secțiune în cod — matchesSection gestionează toate alias-urile de slug
   const docs = (scope?.section && !isExtras)
-    ? (allDocs || []).filter(d => pathToSection(String(d.fisier_path)) === scope.section)
+    ? (allDocs || []).filter(d => matchesSection(String(d.fisier_path), scope.section))
     : allDocs
 
   // Extras bancare: la export complet, la scope.extras, sau când secțiunea e 'extras'
