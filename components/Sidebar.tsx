@@ -115,6 +115,17 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
             </svg>
             <span style={{ fontSize: '12px', fontWeight: 400, color: pathname.endsWith('/furnizori') ? '#DDD' : '#777' }}>Furnizori</span>
           </Link>
+          <Link href={`/${firmaAtiva}/date-personale`} style={{
+            display: 'flex', alignItems: 'center', gap: '9px',
+            padding: '7px 20px',
+            background: pathname.endsWith('/date-personale') ? 'rgba(255,255,255,.04)' : 'transparent',
+            borderLeft: pathname.endsWith('/date-personale') ? '2px solid #555' : '2px solid transparent',
+          }}>
+            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/date-personale') ? '#CCC' : '#555'} strokeWidth="2" viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 14h8M8 17h5"/>
+            </svg>
+            <span style={{ fontSize: '12px', fontWeight: 400, color: pathname.endsWith('/date-personale') ? '#DDD' : '#777' }}>Date personale</span>
+          </Link>
         </>
       )}
 

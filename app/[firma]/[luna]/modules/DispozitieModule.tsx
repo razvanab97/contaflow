@@ -1,9 +1,9 @@
 'use client'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
-import { getLegal, Proprietar } from '@/lib/firma-config'
+import { Proprietar } from '@/lib/firma-config'
 
-interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:string }
+interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:string; cui?:string|null; nrRegCom?:string|null; adresa?:string|null; judet?:string|null; tara?:string|null }
 interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[]; proprietari?: Proprietar[] }
 
 type DispDoc = { id:string; fisier_nume:string; numar_document:string; furnizor:string; data?:Record<string,string|number>; attachments?:{id:string;fisier_nume:string}[] }
@@ -12,7 +12,7 @@ type BuletinResult = { prenume:string; nume:string; serieCi:string; numarCi:stri
 export default function DispozitieModule({ firma, firmeDisponibile, lunaId, tasks, proprietari = [] }: Props) {
   const [firmaId, setFirmaId] = useState(firma.id)
   const selectedFirma = firmeDisponibile.find(f => f.id === firmaId) || firma
-  const legal = getLegal(selectedFirma.slug)
+  const legal = { cif: selectedFirma.cui || '', nrRegCom: selectedFirma.nrRegCom || '', adresa: selectedFirma.adresa || '', judet: selectedFirma.judet || '', tara: selectedFirma.tara || '' }
   const selectedLunaId = selectedFirma.luna_id || lunaId
 
   const [number, setNumber] = useState('')

@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import { dbSelect } from '@/lib/db'
-import { getFirmaConfig, getFirmaModules, getFirmaTotalTasks, getProprietari, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
+import { getFirmaConfig, getFirmaModules, getFirmaTotalTasks, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
 import EmagModule from '../modules/EmagModule'
 import TrendyolModule from '../modules/TrendyolModule'
 import BookingModule from '../modules/BookingModule'
@@ -14,6 +14,7 @@ import DispozitieModule from '../modules/DispozitieModule'
 import FacturiModule from '../modules/FacturiModule'
 import ExtrasModule from '../modules/ExtrasModule'
 import RaportLunarModule from '../modules/RaportLunarModule'
+import ImpoziteModule from '../modules/ImpoziteModule'
 
 const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
 function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
@@ -39,7 +40,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   const lunaData = luni.find((l: any) => l.firma_id === firma.id && l.luna?.startsWith(luna))
   if (!lunaData) notFound()
 
-  const [taskStariRaw, extrase, allTaskStari, checklistItemsRaw] = await Promise.all([
+  const [taskStariRaw, extrase, allTaskStari, checklistItemsRaw, impoziteStari, proprietariRaw] = await Promise.all([
     dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
     modulSlug === 'extras' ? dbSelect('extrase', { eq: { luna_id: lunaData.id } }) : Promise.resolve([]),
     dbSelect('task_stari', { select: 'luna_id,completat' }),
@@ -47,6 +48,8 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
     ['emag', 'trendyol', 'booking-facturi', 'booking-borderou', 'airbnb-facturi', 'airbnb-borderou', '5stardesk'].includes(modulSlug)
       ? dbSelect('checklist_items', { eq: { luna_id: lunaData.id }, select: 'id,completat,checklist_templates(titlu,descriere,modul,ordine)' })
       : Promise.resolve([]),
+    modulSlug === 'impozite' ? dbSelect('impozite_stari', { eq: { luna_id: lunaData.id }, select: 'tip_key,suma,scadenta,platit' }) : Promise.resolve([]),
+    modulSlug === 'dispozitie-plata' ? dbSelect('proprietari', { eq: { firma_id: firma.id }, order: 'ordine' }) : Promise.resolve([]),
   ])
 
   const taskMap: Record<string, boolean> = {}
@@ -80,8 +83,11 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
 
   const firmeDisponibile = toateFirmele.map((f: any) => ({
     id: f.id, slug: f.slug, nume: f.nume, culoare: f.culoare,
+    cui: f.cui, nrRegCom: f.nr_reg_com, adresa: f.adresa, judet: f.judet, tara: f.tara,
     luna_id: luni.find((l: any) => l.firma_id === f.id && l.luna?.startsWith(luna))?.id || null,
   })).filter((f: any) => f.luna_id)
+
+  const proprietari = proprietariRaw.map((p: any) => ({ nume: p.nume, serieCi: p.serie_ci || '', numarCi: p.numar_ci || '' }))
 
   // Alias-uri pentru modul-urile vechi din checklist_templates (pot diferi de slug-urile noi)
   const MODUL_ALIASES: Record<string, string[]> = {
@@ -121,13 +127,15 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'acte-contabile':
         return <ActeModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks}/>
       case 'dispozitie-plata':
-        return <DispozitieModule firma={firmaForModule} firmeDisponibile={firmeDisponibile} lunaId={lunaData.id} tasks={tasks} proprietari={getProprietari(firma.slug)}/>
+        return <DispozitieModule firma={firmaForModule} firmeDisponibile={firmeDisponibile} lunaId={lunaData.id} tasks={tasks} proprietari={proprietari}/>
       case 'facturi-chitanta':
         return <FacturiModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="facturi-chitanta"/>
       case 'facturi-restante':
         return <FacturiModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="facturi-restante"/>
       case 'raport-lunar':
         return <RaportLunarModule firma={firmaForModule} lunaId={lunaData.id}/>
+      case 'impozite':
+        return <ImpoziteModule firma={firmaForModule} lunaId={lunaData.id} tasks={modulDef.tasks} stari={impoziteStari}/>
       default:
         notFound()
     }

@@ -64,6 +64,12 @@ Repo-ul public `razvanab97/contaflow` are cheia `SUPABASE_SERVICE_ROLE_KEY` (acc
 - **Rationale / constraints:** Mai rapid; `.env.local` e fișier local, nu se commite — riscul e doar tranzitarea cheii prin transcriptul conversației.
 - **Knock-on effects:** După ce userul rotește cheia și o trimite în chat, Claude scrie direct în `.env.local`, repornește `npm run dev` și reia verificarea funcțională completă (chitanțe, extras, tranzacții, furnizori, emag, checklist, export PDF/ZIP, raport lunar, proprietar/analyze) de unde s-a oprit.
 
+### Amendament Q7: cheia de la lib/supabase/server.ts:9 nu e anon, e service_role mislabeled
+- **Descoperire în timpul implementării:** JWT-ul hardcodat ca fallback pentru `NEXT_PUBLIC_SUPABASE_ANON_KEY` are payload `{"role":"service_role",...}` — e identic cu cheia de admin, doar etichetat greșit. Premisa deciziei Q7 ("risc redus, e anon key") era greșită.
+- **User's answer / preference (confirmată după corecție):** Nu, las-o așa cum e — păstrează decizia originală chiar și după corecție.
+- **Rationale / constraints:** Nespecificat de user.
+- **Knock-on effects:** Rămâne un risc rezidual cunoscut și acceptat explicit: cheia service_role e încă vizibilă în sursă (linia 9), inertă doar cât timp `NEXT_PUBLIC_SUPABASE_ANON_KEY` e setată în mediu.
+
 ## Resolved Plan
 
 1. **Cod (acum, înainte de rotirea cheii):** Claude elimină valoarea JWT hardcodată din toate cele 12 fișiere care conțin fallback-ul `SUPABASE_SERVICE_ROLE_KEY`, înlocuind cu `process.env.SUPABASE_SERVICE_ROLE_KEY || ''` (păstrând pattern-ul de fallback gol, nu throw). Cheia anon hardcodată din `lib/supabase/server.ts` rămâne neschimbată (risc acceptat, scop limitat).

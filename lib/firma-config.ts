@@ -5,6 +5,7 @@ export type ModuleSlug =
   | 'booking-facturi' | 'booking-borderou'
   | 'airbnb-facturi' | 'airbnb-borderou'
   | '5stardesk'
+  | 'impozite'
 
 export interface TaskDef {
   key: string
@@ -42,7 +43,7 @@ export interface FirmaConfigDef {
 
 const COMUNE: ModuleSlug[] = [
   'extras', 'angajati', 'acte-contabile', 'dispozitie-plata',
-  'facturi-chitanta', 'facturi-restante', 'raport-lunar',
+  'facturi-chitanta', 'facturi-restante', 'raport-lunar', 'impozite',
 ]
 
 export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
@@ -103,6 +104,17 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     label: 'Raport Lunar',
     description: 'Analiză automată încasări, cheltuieli și sold net',
     tasks: [],
+  },
+  impozite: {
+    slug: 'impozite',
+    label: 'Plată impozite',
+    description: 'Sume datorate și status plată pentru impozitele lunare',
+    tasks: [
+      { key: 'impozite.impozit_venit', label: 'Impozit pe veniturile microîntreprinderii' },
+      { key: 'impozite.tva', label: 'TVA' },
+      { key: 'impozite.cas_cass', label: 'CAS + CASS angajați' },
+      { key: 'impozite.cladiri_terenuri', label: 'Impozit clădiri/terenuri' },
+    ],
   },
   emag: {
     slug: 'emag',
@@ -222,10 +234,5 @@ export function getFirmaTotalTasks(slug: string): number {
   return getFirmaModules(slug).reduce((sum, mod) => sum + mod.tasks.length, 0)
 }
 
-export function getLegal(slug: string): FirmaLegal | undefined {
-  return FIRMA_CONFIGS[slug]?.legal
-}
-
-export function getProprietari(slug: string): Proprietar[] {
-  return FIRMA_CONFIGS[slug]?.proprietari || []
-}
+// getLegal/getProprietari au fost migrate în DB (tabelele firme + proprietari) —
+// FIRMA_CONFIGS.legal/.proprietari de mai sus rămân doar ca valori inițiale de seed.
