@@ -38,7 +38,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
       overflowY: 'auto',
     }}>
       {/* Logo */}
-      <div style={{ padding: '22px 20px 18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <Link href="/dashboard" style={{ padding: '22px 20px 18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
         <div style={{
           width: '30px', height: '30px', background: '#FFF',
           borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -48,7 +48,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
           </svg>
         </div>
         <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFF', letterSpacing: '-0.3px' }}>ContaFlow</span>
-      </div>
+      </Link>
 
       {/* Back to hub (when in module page) */}
       {firmaAtiva && modulActiv && (
