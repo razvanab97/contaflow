@@ -10,6 +10,11 @@ const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','I
 function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
 function ini(n: string) { return n.split(' ').filter((w:string) => /^[A-ZĂÎȘȚ]/.test(w)).slice(0,2).map((w:string)=>w[0]).join('') }
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
+// Varianta pastelata a culorii de brand — pastreaza nuanta dar e mult mai lizibila ca text pe fundal intunecat
+function legibil(hex: string, mix = 0.55) {
+  const c = [hex.slice(1,3), hex.slice(3,5), hex.slice(5,7)].map(h => parseInt(h, 16))
+  return `#${c.map(v => Math.round(v + (255 - v) * mix).toString(16).padStart(2, '0')).join('')}`
+}
 
 export default async function Dashboard() {
   const [firme, luni, taskStariRaw] = await Promise.all([
@@ -40,7 +45,7 @@ export default async function Dashboard() {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0A0A0A' }}>
       <Sidebar firme={firmeNav} lunaCurenta={LUNA} lunaLabel={ll} />
 
-      <main style={{ flex: 1, padding: '48px 52px', maxWidth: '860px' }}>
+      <main style={{ flex: 1, padding: '48px 52px', width: '100%' }}>
         <div style={{ marginBottom: '40px' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', letterSpacing: '.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
             Contaflow · Dashboard
@@ -53,7 +58,7 @@ export default async function Dashboard() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '12px' }}>
           {firme.map((f: any) => {
             const lunaData = luniMap[`${f.id}_${LUNA}`]
             const total = getFirmaTotalTasks(f.slug)
@@ -76,7 +81,7 @@ export default async function Dashboard() {
                     width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0,
                     background: `rgba(${r},.12)`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '13px', fontWeight: 700, color: f.culoare,
+                    fontSize: '13px', fontWeight: 700, color: legibil(f.culoare),
                   }}>
                     {ini(f.nume)}
                   </div>
@@ -94,7 +99,7 @@ export default async function Dashboard() {
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: '28px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1, color: pct === 100 ? '#6EE7B0' : f.culoare }}>
+                    <div style={{ fontSize: '28px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1, color: pct === 100 ? '#6EE7B0' : legibil(f.culoare) }}>
                       {pct}%
                     </div>
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '3px' }}>
@@ -120,7 +125,7 @@ export default async function Dashboard() {
                     {lunaData ? ll : `${ll} · lună neîncepută`}
                   </span>
                   <Link href={`/${f.slug}/${LUNA}`} style={{
-                    fontSize: '12px', fontWeight: 600, color: f.culoare,
+                    fontSize: '12px', fontWeight: 600, color: legibil(f.culoare),
                     padding: '7px 16px', borderRadius: '8px',
                     border: `1px solid rgba(${r},.25)`,
                     background: `rgba(${r},.06)`,
