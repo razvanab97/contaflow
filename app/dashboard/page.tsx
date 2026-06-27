@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
+import DocumenteGenerale from '@/components/DocumenteGenerale'
 import { dbSelect } from '@/lib/db'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 
@@ -137,6 +138,10 @@ export default async function Dashboard() {
               </div>
             )
           })}
+        </div>
+
+        <div style={{ marginTop: '28px' }}>
+          <DocumenteGenerale />
         </div>
       </main>
     </div>
