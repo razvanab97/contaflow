@@ -5,6 +5,8 @@ import { dbSelect } from '@/lib/db'
 import { getFirmaConfig, getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 import FurnizoriClient from './FurnizoriClient'
 
+export const dynamic = 'force-dynamic'
+
 const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
 function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
 

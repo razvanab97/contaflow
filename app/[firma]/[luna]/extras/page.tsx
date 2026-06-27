@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import ExtrasClient from './ExtrasClient'
 
+export const dynamic = 'force-dynamic'
+
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const SB = 'https://aqlmuoaaipbanjdptleg.supabase.co/rest/v1'
 const H = { 'apikey': KEY, 'Authorization': `Bearer ${KEY}` }

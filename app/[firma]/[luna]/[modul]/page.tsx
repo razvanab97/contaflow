@@ -16,6 +16,8 @@ import ExtrasModule from '../modules/ExtrasModule'
 import RaportLunarModule from '../modules/RaportLunarModule'
 import ImpoziteModule from '../modules/ImpoziteModule'
 
+export const dynamic = 'force-dynamic'
+
 const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
 function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
 
