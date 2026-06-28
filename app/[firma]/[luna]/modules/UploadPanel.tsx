@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { legibil } from '@/lib/colors'
 
 interface Doc {
   id: string
@@ -102,7 +103,7 @@ export default function UploadPanel({
           {description && <div style={{ fontSize: '11px', color: '#888' }}>{description}</div>}
         </div>
         {loaded && docs.length > 0 && (
-          <button onClick={savePdf} disabled={pdfBusy} style={{ flexShrink:0, fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:culoare, cursor:'pointer', opacity:pdfBusy?.6:1 }}>
+          <button onClick={savePdf} disabled={pdfBusy} style={{ flexShrink:0, fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:legibil(culoare), cursor:'pointer', opacity:pdfBusy?.6:1 }}>
             {pdfBusy ? '...' : '↓ PDF'}
           </button>
         )}
@@ -117,7 +118,7 @@ export default function UploadPanel({
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: culoare, flexShrink: 0 }}/>
                 <span style={{ flex: 1, fontSize: '12px', color: '#CCC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
                 {doc.tip_document && <span style={{ fontSize: '10px', color: '#888' }}>{doc.tip_document}</span>}
-                <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: culoare }}>↓</a>
+                <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
                 <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: '#F87171', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
               </div>
             ))}

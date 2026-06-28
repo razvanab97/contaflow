@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import UploadExtras from './UploadExtras'
+import { legibil } from '@/lib/colors'
 
 const CAT: Record<string, { bg: string; c: string }> = {
   client:   { bg: 'rgba(74,222,128,.15)',  c: '#4ADE80' },
@@ -894,7 +895,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                   Descarcă Documentul ↓
                 </a>
               )}
-              <button onClick={() => setEditDoc(true)} style={{ ...BTN, background:'transparent', border:`1px solid rgba(${r},.3)`, color:culoare }}>
+              <button onClick={() => setEditDoc(true)} style={{ ...BTN, background:'transparent', border:`1px solid rgba(${r},.3)`, color:legibil(culoare) }}>
                 Schimbă Documentul
               </button>
             </div>

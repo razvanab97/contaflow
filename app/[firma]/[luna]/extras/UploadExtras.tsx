@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
+import { legibil } from '@/lib/colors'
 
 interface Extras { id: string; nr_tranzactii: number; nr_documentate: number; procesat_ai?: boolean; sold_final?: number; valuta?: string; pdf_path?: string | null; pdf_nume?: string | null }
 
@@ -106,7 +107,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
                 ↑ Import CSV
               </button>
             )}
-            <button onClick={() => pdfRef.current?.click()} style={{ flex: valuta === 'AUTO' ? 1 : undefined, padding: '9px 14px', borderRadius: '9px', border: `1px solid rgba(${r},.3)`, background: 'transparent', color: culoare, fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => pdfRef.current?.click()} style={{ flex: valuta === 'AUTO' ? 1 : undefined, padding: '9px 14px', borderRadius: '9px', border: `1px solid rgba(${r},.3)`, background: 'transparent', color: legibil(culoare), fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
               {valuta === 'AUTO' ? 'Alege PDF · AI detectează moneda' : 'PDF + citire AI'}
             </button>
           </div>

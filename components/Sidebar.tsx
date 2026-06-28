@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
+import { rgb, legibil } from '@/lib/colors'
 
 export interface FirmaNav {
   id: string
@@ -18,15 +19,6 @@ interface Props {
   firmaAtiva?: string
   modulActiv?: string
   moduleFirma?: ModuleDef[]
-}
-
-function rgb(h: string) {
-  return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}`
-}
-// Varianta pastelata a culorii de brand — pastreaza nuanta dar e mult mai lizibila ca text pe fundal intunecat
-function legibil(hex: string, mix = 0.55) {
-  const c = [hex.slice(1,3), hex.slice(3,5), hex.slice(5,7)].map(h => parseInt(h, 16))
-  return `#${c.map(v => Math.round(v + (255 - v) * mix).toString(16).padStart(2, '0')).join('')}`
 }
 
 export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, modulActiv, moduleFirma }: Props) {

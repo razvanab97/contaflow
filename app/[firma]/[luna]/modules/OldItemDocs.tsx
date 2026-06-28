@@ -1,5 +1,6 @@
 'use client'
 import { useState, useCallback, useRef } from 'react'
+import { legibil } from '@/lib/colors'
 
 export interface ChecklistItem {
   id: string
@@ -78,7 +79,7 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
                 <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: '#161616', borderRadius: '7px' }}>
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: culoare, flexShrink: 0 }}/>
                   <span style={{ flex: 1, fontSize: '12px', color: '#CCC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
-                  <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: culoare }}>↓</a>
+                  <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
                   <button onClick={() => deleteDoc(doc.id)} style={{ fontSize: '11px', color: '#F87171', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
                 </div>
               ))}

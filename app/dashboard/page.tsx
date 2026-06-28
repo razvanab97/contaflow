@@ -3,6 +3,7 @@ import Sidebar from '@/components/Sidebar'
 import DocumenteGenerale from '@/components/DocumenteGenerale'
 import { dbSelect } from '@/lib/db'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
+import { rgb, legibil } from '@/lib/colors'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,12 +11,6 @@ const LUNA = new Date().toISOString().slice(0, 7)
 const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
 function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
 function ini(n: string) { return n.split(' ').filter((w:string) => /^[A-ZĂÎȘȚ]/.test(w)).slice(0,2).map((w:string)=>w[0]).join('') }
-function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
-// Varianta pastelata a culorii de brand — pastreaza nuanta dar e mult mai lizibila ca text pe fundal intunecat
-function legibil(hex: string, mix = 0.55) {
-  const c = [hex.slice(1,3), hex.slice(3,5), hex.slice(5,7)].map(h => parseInt(h, 16))
-  return `#${c.map(v => Math.round(v + (255 - v) * mix).toString(16).padStart(2, '0')).join('')}`
-}
 
 export default async function Dashboard() {
   const [firme, luni, taskStariRaw] = await Promise.all([

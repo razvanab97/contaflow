@@ -1,12 +1,11 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
+import { rgb, legibil } from '@/lib/colors'
 
 const MOD_LABELS: Record<string,string> = { extras:'Extras de cont', emag:'Emag facturi', trendyol:'Trendyol', booking:'Booking', airbnb:'Airbnb', '5stardesk':'5starDesk', angajati:'Documente angajați', resurse_umane:'Resurse umane', acte_contabile:'Acte contabile' }
 const TIP_OPT = ['aviz_plata','factura','borderou','raport_csv','chenzina','foaie_prezenta','stat_plata','contract','altul']
 const TIP_LBL: Record<string,string> = { aviz_plata:'Aviz plată', factura:'Factură', borderou:'Borderou', raport_csv:'Raport CSV', chenzina:'Chenzina', foaie_prezenta:'Foaie prezență', stat_plata:'Stat plată', contract:'Contract', altul:'Altul' }
-
-function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 
 interface Firma {
   id:string; slug:string; nume:string; culoare:string
@@ -144,11 +143,11 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
           </div>
           <div style={{ display:'flex', alignItems:'flex-start', gap:'10px' }}>
             <GlobalSearch />
-            <button onClick={saveGlobalPdf} disabled={globalPdfLoading} style={{ fontSize:'12px', fontWeight:700, padding:'9px 13px', borderRadius:'8px', border:`1px solid ${firma.culoare}`, background:'transparent', color:firma.culoare, cursor:'pointer' }}>
+            <button onClick={saveGlobalPdf} disabled={globalPdfLoading} style={{ fontSize:'12px', fontWeight:700, padding:'9px 13px', borderRadius:'8px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer' }}>
               {globalPdfLoading ? 'Se generează...' : 'Salvează toate PDF'}
             </button>
           <div style={{ textAlign:'right' }}>
-            <div style={{ fontSize:'30px', fontWeight:700, color:firma.culoare, letterSpacing:'-0.8px' }}>{pct}%</div>
+            <div style={{ fontSize:'30px', fontWeight:700, color:legibil(firma.culoare), letterSpacing:'-0.8px' }}>{pct}%</div>
             <div style={{ fontSize:'12px', color:'#888' }}>{done}/{total} completate</div>
           </div>
           </div>
@@ -166,13 +165,13 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
               <div style={{ fontSize:'13px', fontWeight:600, color:'#FFF', marginBottom:'4px' }}>Extrase procesate AI</div>
               <div style={{ display:'flex', gap:'16px' }}>
                 {extrase.map(e=>(
-                  <span key={e.id} style={{ fontSize:'12px', fontWeight:500, color:firma.culoare }}>
+                  <span key={e.id} style={{ fontSize:'12px', fontWeight:500, color:legibil(firma.culoare) }}>
                     {e.valuta}: {e.nr_tranzactii} tranzacții · {e.nr_documentate} documentate
                   </span>
                 ))}
               </div>
             </div>
-            <Link href={`/${slug}/${luna}/extras`} style={{ fontSize:'12px', fontWeight:600, color:firma.culoare, padding:'6px 14px', borderRadius:'8px', border:`1px solid rgba(${r},.3)` }}>
+            <Link href={`/${slug}/${luna}/extras`} style={{ fontSize:'12px', fontWeight:600, color:legibil(firma.culoare), padding:'6px 14px', borderRadius:'8px', border:`1px solid rgba(${r},.3)` }}>
               Gestionează →
             </Link>
           </div>
@@ -187,7 +186,7 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
                   <span style={{ fontSize:'12px', fontWeight:700, color:'#CCC', textTransform:'uppercase', letterSpacing:'.06em' }}>{MOD_LABELS[mod]||mod}</span>
                   <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                     <span style={{ fontSize:'11px', color:'#666' }}>{modDone}/{modItems.length}</span>
-                    {mod==='extras' && <Link href={`/${slug}/${luna}/extras`} style={{ fontSize:'11px', fontWeight:600, color:firma.culoare }}>deschide →</Link>}
+                    {mod==='extras' && <Link href={`/${slug}/${luna}/extras`} style={{ fontSize:'11px', fontWeight:600, color:legibil(firma.culoare) }}>deschide →</Link>}
                     <CategoryPdfButton lunaId={lunaId} module={mod} itemIds={modItems.map(item=>item.id)} title={MOD_LABELS[mod]||mod} culoare={firma.culoare} />
                   </div>
                 </div>
@@ -326,10 +325,10 @@ function EmagMonthlyPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:stri
   return <div style={{ marginTop:'10px', background:'#161616', border:`1px solid ${culoare}55`, borderRadius:'14px', overflow:'hidden' }}>
     <button onClick={toggle} style={{ width:'100%', display:'flex', justifyContent:'space-between', padding:'15px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
       <span><strong style={{ fontSize:'12px', color:'#DDD', textTransform:'uppercase' }}>Concluzie lunară · eMAG / Dante International</strong><span style={{ display:'block', fontSize:'11px', color:'#777', marginTop:'4px' }}>Costuri Dante din Oblio și cashflow bancar, urmărite separat pentru a evita dublarea.</span></span>
-      <span style={{ color:culoare, fontSize:'11px' }}>{documents.length ? `${documents.length} facturi · ${money(summary.emagNetCost)} RON net` : ''} {expanded?'▲':'▼'}</span>
+      <span style={{ color:legibil(culoare), fontSize:'11px' }}>{documents.length ? `${documents.length} facturi · ${money(summary.emagNetCost)} RON net` : ''} {expanded?'▲':'▼'}</span>
     </button>
     {expanded && <div style={{ padding:'16px 18px', borderTop:'1px solid #222', background:'#111' }}>
-      <button onClick={savePdf} disabled={pdfBusy} style={{ marginBottom:'10px', fontSize:'11px', fontWeight:700, padding:'6px 10px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:culoare, cursor:'pointer' }}>{pdfBusy?'Se generează...':'Salvează facturile Dante PDF'}</button>
+      <button onClick={savePdf} disabled={pdfBusy} style={{ marginBottom:'10px', fontSize:'11px', fontWeight:700, padding:'6px 10px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:legibil(culoare), cursor:'pointer' }}>{pdfBusy?'Se generează...':'Salvează facturile Dante PDF'}</button>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'8px', marginBottom:'12px' }}>
         {[
           ['Încasări bancare RON',summary.bankReceipts,'#4ADE80'],
@@ -345,7 +344,7 @@ function EmagMonthlyPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:stri
       {documents.map(document=><div key={document.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'#181818', borderRadius:'8px' }}>
         <span style={{ flex:1, fontSize:'11px', color:'#CCC' }}>{document.date || 'Fără dată'} · {document.invoiceNumber || document.fisier_nume} · {categoryLabels[document.category]||document.category}</span>
         <strong style={{ fontSize:'11px', color:document.effect==='reducere'?'#4ADE80':'#F87171' }}>{document.effect==='reducere'?'-':'+'}{money(document.amount)} RON</strong>
-        <a href={`/api/chitante/document?id=${encodeURIComponent(document.id)}`} style={{ fontSize:'10px', color:culoare }}>Descarcă</a>
+        <a href={`/api/chitante/document?id=${encodeURIComponent(document.id)}`} style={{ fontSize:'10px', color:legibil(culoare) }}>Descarcă</a>
         <button onClick={()=>removeInvoice(document)} style={{ fontSize:'10px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>Șterge</button>
       </div>)}
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:'8px', marginTop:'12px' }}>
@@ -459,14 +458,14 @@ function InvoiceDocumentsPanel({ title, description, section, firma, lunaId, cul
     <div style={{ marginTop:'10px', background:'#161616', border:'1px solid #242424', borderRadius:'14px', overflow:'hidden' }}>
       <button onClick={toggle} style={{ width:'100%', display:'flex', justifyContent:'space-between', padding:'15px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
         <span><strong style={{ fontSize:'12px', color:'#DDD', textTransform:'uppercase' }}>{title}</strong><span style={{ display:'block', fontSize:'11px', color:'#777', marginTop:'4px' }}>{description}</span></span>
-        <span style={{ fontSize:'11px', color:culoare }}>{docs.length ? `${docs.length} documente` : ''} {expanded?'▲':'▼'}</span>
+        <span style={{ fontSize:'11px', color:legibil(culoare) }}>{docs.length ? `${docs.length} documente` : ''} {expanded?'▲':'▼'}</span>
       </button>
       {expanded && <div style={{ padding:'16px 18px', borderTop:'1px solid #222', background:'#111' }}>
-        <button onClick={savePdf} disabled={pdfBusy} style={{ marginBottom:'10px', fontSize:'11px', fontWeight:700, padding:'6px 10px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:culoare, cursor:'pointer' }}>{pdfBusy?'Se generează...':'Salvează PDF categorie'}</button>
+        <button onClick={savePdf} disabled={pdfBusy} style={{ marginBottom:'10px', fontSize:'11px', fontWeight:700, padding:'6px 10px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:legibil(culoare), cursor:'pointer' }}>{pdfBusy?'Se generează...':'Salvează PDF categorie'}</button>
         {docs.map(doc => <div key={doc.id} style={{ display:'flex', gap:'8px', alignItems:'center', padding:'8px 10px', marginBottom:'5px', background:'#181818', borderRadius:'8px' }}>
           <span style={{ flex:1, minWidth:0, fontSize:'12px', color:'#CCC', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</span>
           <span style={{ fontSize:'10px', color:'#777' }}>{doc.tip_document}</span>
-          <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', color:culoare, fontWeight:700 }}>Descarcă ↓</a>
+          <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', color:legibil(culoare), fontWeight:700 }}>Descarcă ↓</a>
           <button onClick={()=>deleteDocument(doc)} disabled={deletingId===doc.id} style={{ fontSize:'10px', fontWeight:700, color:'#F87171', background:'#241515', border:'1px solid #5B3030', borderRadius:'6px', padding:'4px 7px', cursor:'pointer' }}>{deletingId===doc.id?'Se șterge...':'Șterge'}</button>
         </div>)}
         <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px', marginTop:'12px' }}>
@@ -621,19 +620,19 @@ function DispositionPanel({ firme, firmaInitiala, lunaIdInitial, culoare }: { fi
     <button onClick={toggle} style={{ width:'100%', display:'flex', justifyContent:'space-between', padding:'15px 18px', background:'transparent', border:'none', cursor:'pointer', color:'#DDD', textAlign:'left' }}><span><strong>DISPOZIȚII DE PLATĂ</strong><small style={{display:'block',color:'#777',marginTop:'4px'}}>Generator numerotat lunar, salvat automat în dosarul contabilității.</small></span><span>{expanded?'▲':'▼'}</span></button>
     {expanded && <div style={{ padding:'16px 18px', borderTop:'1px solid #222', background:'#111' }}>
       <div style={{ display:'flex', gap:'8px', marginBottom:'10px', flexWrap:'wrap' }}>
-        <button onClick={savePdf} disabled={pdfBusy} style={{fontSize:'11px',border:`1px solid ${culoare}`,borderRadius:'7px',background:'transparent',color:culoare,padding:'6px 10px',cursor:'pointer'}}>{pdfBusy?'Se generează...':'Salvează PDF dispoziții'}</button>
+        <button onClick={savePdf} disabled={pdfBusy} style={{fontSize:'11px',border:`1px solid ${culoare}`,borderRadius:'7px',background:'transparent',color:legibil(culoare),padding:'6px 10px',cursor:'pointer'}}>{pdfBusy?'Se generează...':'Salvează PDF dispoziții'}</button>
         <button onClick={saveTemplate} disabled={templateBusy} style={{fontSize:'11px',border:'1px solid #333',borderRadius:'7px',background:'#202020',color:'#CCC',padding:'6px 10px',cursor:'pointer'}}>{templateBusy?'Se salvează...':'Salvează șablonul'}</button>
         <button onClick={resetNumber} style={{fontSize:'11px',border:'1px solid #5B3030',borderRadius:'7px',background:'#241515',color:'#F87171',padding:'6px 10px',cursor:'pointer'}}>Resetează la 01</button>
       </div>
       {documents.map(document=><div key={document.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'#181818', borderRadius:'8px' }}>
         <span style={{ flex:1, fontSize:'11px', color:'#CCC' }}>DP nr. {document.numar_document} · {String(document.data?.purpose || document.furnizor || document.fisier_nume).replace(/^DP_DATA:.*/, document.fisier_nume)}{document.attachments?.length ? ` · ${document.attachments.length} anexe` : ''}</span>
-        <a href={`/api/chitante/document?id=${encodeURIComponent(document.id)}`} style={{ fontSize:'10px', color:culoare }}>Descarcă</a>
+        <a href={`/api/chitante/document?id=${encodeURIComponent(document.id)}`} style={{ fontSize:'10px', color:legibil(culoare) }}>Descarcă</a>
         <button onClick={()=>editDisposition(document)} style={{ fontSize:'10px', color:'#8DB8FF', background:'transparent', border:'none', cursor:'pointer' }}>Modifică</button>
         <button onClick={()=>deleteDisposition(document)} disabled={deletingId===document.id} style={{ fontSize:'10px', color:'#F87171', background:'#241515', border:'1px solid #5B3030', borderRadius:'6px', padding:'4px 7px', cursor:'pointer' }}>{deletingId===document.id?'Se șterge...':'Șterge definitiv'}</button>
       </div>)}
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px' }}>
         <select value={firmaId} onChange={e=>setFirmaId(e.target.value)} style={INP}>{firme.map(f=><option key={f.id} value={f.id}>{f.nume}</option>)}</select>
-        <input readOnly value={number} placeholder="Număr automat" style={{...INP,color:culoare,fontWeight:700}}/>
+        <input readOnly value={number} placeholder="Număr automat" style={{...INP,color:legibil(culoare),fontWeight:700}}/>
         <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={INP}/>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr 70px 70px', gap:'8px', marginTop:'8px' }}>
@@ -800,7 +799,7 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
           <div style={{ fontSize:'11px', color:'#777', marginTop:'4px' }}>Documente plătite cash. Utilitățile și chiria vor putea genera dispoziție de plată.</div>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-          {loaded && <span style={{ fontSize:'11px', fontWeight:700, color:culoare }}>{docs.length} documente</span>}
+          {loaded && <span style={{ fontSize:'11px', fontWeight:700, color:legibil(culoare) }}>{docs.length} documente</span>}
           <span style={{ fontSize:'11px', color:'#666' }}>{expanded ? '▲' : '▼'}</span>
         </div>
       </button>
@@ -818,7 +817,7 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
                   {(doc.modul.endsWith('_utilitati') || doc.modul.endsWith('_chirie')) && (
                     <button onClick={()=>prepareDisposition(doc)} style={{ fontSize:'10px', fontWeight:700, color:'#DDD', background:'#242424', border:'1px solid #303030', borderRadius:'6px', padding:'4px 7px', cursor:'pointer' }}>Generează DP</button>
                   )}
-                  <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:700, color:culoare, textDecoration:'none' }}>Descarcă ↓</a>
+                  <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:700, color:legibil(culoare), textDecoration:'none' }}>Descarcă ↓</a>
                 </div>
               ))}
             </div>
@@ -843,7 +842,7 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
             <p style={{ fontSize:'11px', color:'#666', marginTop:'3px' }}>PDF, JPG, PNG · poți selecta mai multe fișiere simultan</p>
           </div>
           <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={event=>event.target.files&&upload(event.target.files)} />
-          <button onClick={()=>prepareDisposition()} style={{ marginTop:'10px', fontSize:'12px', fontWeight:700, padding:'8px 14px', borderRadius:'8px', border:`1px solid rgba(${r},.35)`, background:'transparent', color:culoare, cursor:'pointer' }}>
+          <button onClick={()=>prepareDisposition()} style={{ marginTop:'10px', fontSize:'12px', fontWeight:700, padding:'8px 14px', borderRadius:'8px', border:`1px solid rgba(${r},.35)`, background:'transparent', color:legibil(culoare), cursor:'pointer' }}>
             Generează dispoziție de plată
           </button>
 
@@ -862,7 +861,7 @@ function CashReceiptsPanel({ firma, lunaId, culoare }: { firma:Firma; lunaId:str
                 <input value={companyAddress} onChange={event=>setCompanyAddress(event.target.value)} placeholder="Adresa firmei" style={INP} />
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr', gap:'8px', marginBottom:'8px' }}>
-                <input value={dispositionNumber} readOnly placeholder="Se atribuie automat" title="Numărul este atribuit automat în ordine, separat pentru fiecare lună" style={{ ...INP, color:culoare, fontWeight:700, cursor:'not-allowed' }} />
+                <input value={dispositionNumber} readOnly placeholder="Se atribuie automat" title="Numărul este atribuit automat în ordine, separat pentru fiecare lună" style={{ ...INP, color:legibil(culoare), fontWeight:700, cursor:'not-allowed' }} />
                 <input value={dispositionDate} onChange={event=>setDispositionDate(event.target.value)} placeholder="Data: 30.07.2025" style={INP} />
                 <input value={beneficiary} onChange={event=>setBeneficiary(event.target.value)} placeholder="Numele și prenumele beneficiarului" style={INP} />
               </div>
@@ -1004,7 +1003,7 @@ function ChecklistItemRow({ item, destinations, firmaId, lunaId, culoare, hasUpl
             <span style={{ fontSize:'14px', fontWeight:item.completat?400:500, color:item.completat?'#555':'#DDD', textDecoration:item.completat?'line-through':'none' }}>{t?.titlu}</span>
             {t?.necesita_semnatura && <span style={{ fontSize:'10px', fontWeight:600, padding:'2px 7px', borderRadius:'20px', background:'rgba(251,146,60,.15)', color:'#FB923C' }}>semnat</span>}
             {t?.spre_proiect && <span style={{ fontSize:'10px', fontWeight:600, padding:'2px 7px', borderRadius:'20px', background:'rgba(167,139,250,.15)', color:'#A78BFA' }}>→ proiect</span>}
-            {hasUpload && docs.length>0 && <span style={{ fontSize:'10px', fontWeight:600, padding:'2px 7px', borderRadius:'20px', background:`rgba(${r},.15)`, color:culoare }}>{docs.length} fișiere</span>}
+            {hasUpload && docs.length>0 && <span style={{ fontSize:'10px', fontWeight:600, padding:'2px 7px', borderRadius:'20px', background:`rgba(${r},.15)`, color:legibil(culoare) }}>{docs.length} fișiere</span>}
           </div>
           {t?.descriere && <p style={{ fontSize:'11px', color:'#777', marginTop:'3px' }}>{t.descriere}</p>}
         </div>

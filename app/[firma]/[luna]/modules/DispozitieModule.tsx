@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import { Proprietar } from '@/lib/firma-config'
+import { legibil } from '@/lib/colors'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:string; cui?:string|null; nrRegCom?:string|null; adresa?:string|null; judet?:string|null; tara?:string|null }
 interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[]; proprietari?: Proprietar[] }
@@ -184,7 +185,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
             <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>Generator numerotat lunar, salvat automat în dosarul contabilității.</div>
           </div>
           <div style={{ display:'flex', gap:'8px' }}>
-            <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'11px', border:`1px solid ${firma.culoare}`, borderRadius:'7px', background:'transparent', color:firma.culoare, padding:'6px 10px', cursor:'pointer' }}>{pdfBusy?'...':'Salvează PDF'}</button>
+            <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'11px', border:`1px solid ${firma.culoare}`, borderRadius:'7px', background:'transparent', color:legibil(firma.culoare), padding:'6px 10px', cursor:'pointer' }}>{pdfBusy?'...':'Salvează PDF'}</button>
             <button onClick={saveTemplate} disabled={templateBusy} style={{ fontSize:'11px', border:'1px solid #333', borderRadius:'7px', background:'#1A1A1A', color:'#CCC', padding:'6px 10px', cursor:'pointer' }}>{templateBusy?'...':'Salvează șablon'}</button>
             <button onClick={resetNumber} style={{ fontSize:'11px', border:'1px solid #5B3030', borderRadius:'7px', background:'#1A1010', color:'#F87171', padding:'6px 10px', cursor:'pointer' }}>Reset 01</button>
           </div>
@@ -194,7 +195,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
           {documents.map(doc => (
             <div key={doc.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'#161616', borderRadius:'8px' }}>
               <span style={{ flex:1, fontSize:'11px', color:'#CCC' }}>DP nr. {doc.numar_document} · {String(doc.data?.purpose||doc.furnizor||doc.fisier_nume)}{doc.attachments?.length?` · ${doc.attachments.length} anexe`:''}</span>
-              <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:firma.culoare }}>↓</a>
+              <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare) }}>↓</a>
               <button onClick={()=>editDisposition(doc)} style={{ fontSize:'10px', color:'#8DB8FF', background:'transparent', border:'none', cursor:'pointer' }}>Modifică</button>
               <button onClick={()=>deleteDisposition(doc)} disabled={deletingId===doc.id} style={{ fontSize:'10px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>{deletingId===doc.id?'...':'✕'}</button>
             </div>
@@ -202,7 +203,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
 
           <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px', marginTop:'12px' }}>
             <select value={firmaId} onChange={e=>setFirmaId(e.target.value)} style={INP}>{firmeDisponibile.map(f=><option key={f.id} value={f.id}>{f.nume}</option>)}</select>
-            <input readOnly value={number} placeholder="Număr automat" style={{ ...INP, color:firma.culoare, fontWeight:700 }}/>
+            <input readOnly value={number} placeholder="Număr automat" style={{ ...INP, color:legibil(firma.culoare), fontWeight:700 }}/>
             <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={INP}/>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr 70px 70px', gap:'8px', marginTop:'8px' }}>
@@ -225,7 +226,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
                 <option key={p.nume} value={p.nume}>{p.nume}{localProprietari.some(l=>l.nume===p.nume) ? ' ✓' : ''}</option>
               ))}
             </select>
-            <button onClick={()=>buletinRef.current?.click()} disabled={buletinBusy} style={{ border:`1px solid ${firma.culoare}`, borderRadius:'8px', background:'transparent', color:firma.culoare, padding:'9px 14px', cursor:'pointer', fontSize:'12px', fontWeight:600, whiteSpace:'nowrap' }}>{buletinBusy?'AI citește...':'+ Buletin'}</button>
+            <button onClick={()=>buletinRef.current?.click()} disabled={buletinBusy} style={{ border:`1px solid ${firma.culoare}`, borderRadius:'8px', background:'transparent', color:legibil(firma.culoare), padding:'9px 14px', cursor:'pointer', fontSize:'12px', fontWeight:600, whiteSpace:'nowrap' }}>{buletinBusy?'AI citește...':'+ Buletin'}</button>
             <button onClick={()=>invoiceRef.current?.click()} disabled={invoiceBusy} style={{ border:'1px solid #333', borderRadius:'8px', background:'#1A1A1A', color:'#CCC', padding:'9px 14px', cursor:'pointer', fontSize:'12px', whiteSpace:'nowrap' }}>{invoiceBusy?'AI analizează...':'+ Facturi AI'}</button>
             <input ref={buletinRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style={{ display:'none' }} onChange={e=>e.target.files?.[0]&&analyzeBuletin(e.target.files[0])}/>
             <input ref={invoiceRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e=>e.target.files&&analyzeInvoices(e.target.files)}/>
@@ -236,9 +237,9 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
           {localProprietari.length>0 && (
             <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>
               {localProprietari.map(p=>(
-                <span key={p.nume} style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:`rgba(${parseInt(firma.culoare.slice(1,3),16)},${parseInt(firma.culoare.slice(3,5),16)},${parseInt(firma.culoare.slice(5,7),16)},.12)`, color:firma.culoare }}>
+                <span key={p.nume} style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:`rgba(${parseInt(firma.culoare.slice(1,3),16)},${parseInt(firma.culoare.slice(3,5),16)},${parseInt(firma.culoare.slice(5,7),16)},.12)`, color:legibil(firma.culoare) }}>
                   {p.nume} · {p.serieCi} {p.numarCi}
-                  <button onClick={()=>deleteLocalProprietar(p.nume)} style={{ background:'none', border:'none', color:firma.culoare, cursor:'pointer', padding:'0 2px', fontSize:'10px', lineHeight:1 }}>✕</button>
+                  <button onClick={()=>deleteLocalProprietar(p.nume)} style={{ background:'none', border:'none', color:legibil(firma.culoare), cursor:'pointer', padding:'0 2px', fontSize:'10px', lineHeight:1 }}>✕</button>
                 </span>
               ))}
             </div>
@@ -247,7 +248,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
           {/* Panou confirmare buletin */}
           {buletinResult && (
             <div style={{ marginTop:'10px', padding:'14px 16px', background:'#111', border:`1px solid ${firma.culoare}44`, borderRadius:'10px' }}>
-              <div style={{ fontSize:'11px', fontWeight:700, color:firma.culoare, marginBottom:'10px' }}>Proprietar extras din buletin — confirmă și salvează</div>
+              <div style={{ fontSize:'11px', fontWeight:700, color:legibil(firma.culoare), marginBottom:'10px' }}>Proprietar extras din buletin — confirmă și salvează</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 80px 80px', gap:'8px', marginBottom:'10px' }}>
                 <input value={bPrenume} onChange={e=>setBPrenume(e.target.value)} placeholder="Prenume" style={INP}/>
                 <input value={bNume} onChange={e=>setBNume(e.target.value)} placeholder="Nume familie" style={INP}/>

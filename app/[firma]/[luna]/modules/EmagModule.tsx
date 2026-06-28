@@ -1,6 +1,7 @@
 'use client'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
+import { legibil } from '@/lib/colors'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 interface ChecklistItem { id:string; completat:boolean; checklist_templates?:{ titlu:string; descriere?:string; modul:string; ordine:number } }
@@ -98,7 +99,7 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
                   <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:culoare, flexShrink:0 }}/>
                   <span style={{ flex:1, fontSize:'12px', color:'#CCC', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</span>
                   {doc.tip_document && <span style={{ fontSize:'10px', color:'#666' }}>{doc.tip_document}</span>}
-                  <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:600, color:culoare }}>↓</a>
+                  <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓</a>
                   <button onClick={() => deleteDoc(doc.id)} style={{ fontSize:'11px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
                 </div>
               ))}
@@ -185,7 +186,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
             <span style={{ fontSize:'11px', fontWeight:700, color:'#666', textTransform:'uppercase', letterSpacing:'.1em' }}>
               Avize de plată
             </span>
-            <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'11px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border:`1px solid ${firma.culoare}`, background:'transparent', color:firma.culoare, cursor:'pointer', opacity:pdfBusy?.6:1 }}>
+            <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'11px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer', opacity:pdfBusy?.6:1 }}>
               {pdfBusy ? 'Se generează...' : 'Salvează PDF'}
             </button>
           </div>
@@ -215,7 +216,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
                 </strong>
                 {' · '}{doc.fisier_nume}
               </span>
-              <a href={`/api/emag?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:firma.culoare }}>↓</a>
+              <a href={`/api/emag?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare) }}>↓</a>
               <button onClick={() => removeDoc(doc.id)} style={{ fontSize:'10px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
             </div>
           ))}

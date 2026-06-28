@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
+import { legibil } from '@/lib/colors'
 
 interface FirmaInfo { id: string; slug: string; nume: string; culoare: string }
 interface Props {
@@ -244,13 +245,13 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                     style={{
                       fontSize:'11px', fontWeight:600, padding:'5px 11px', borderRadius:'7px',
                       border:`1px solid rgba(${r},.35)`, background:`rgba(${r},.06)`,
-                      color: firma.culoare, cursor: isBusy ? 'wait' : 'pointer',
+                      color: legibil(firma.culoare), cursor: isBusy ? 'wait' : 'pointer',
                       opacity: isBusy ? .6 : 1, transition:'opacity .15s',
                     }}
                   >
                     {isBusy ? '...' : '↓ PDF'}
                   </button>
-                  <span style={{ fontSize:'12px', fontWeight:600, color:firma.culoare }}>Deschide →</span>
+                  <span style={{ fontSize:'12px', fontWeight:600, color:legibil(firma.culoare) }}>Deschide →</span>
                 </div>
               </div>
             )
