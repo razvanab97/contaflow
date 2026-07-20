@@ -11,6 +11,7 @@ export async function dbSelect(
   if (opts?.eq) for (const [col, val] of Object.entries(opts.eq)) q = q.eq(col, val)
   if (opts?.like) for (const [col, pat] of Object.entries(opts.like)) q = q.like(col, pat)
   if (opts?.order) q = q.order(opts.order, { ascending: opts.orderAsc ?? true })
-  const { data } = await q
+  const { data, error } = await q
+  if (error) console.error(`dbSelect(${table}):`, error.message)
   return (data as any[]) || []
 }

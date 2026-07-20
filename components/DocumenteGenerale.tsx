@@ -17,10 +17,16 @@ export default function DocumenteGenerale() {
 
   const load = async () => {
     setLoading(true)
-    const res = await fetch('/api/documente-generale')
-    const data = await res.json()
-    setDocs(data.docs || [])
-    setLoading(false)
+    try {
+      const res = await fetch('/api/documente-generale')
+      const data = await res.json()
+      setDocs(data.docs || [])
+    } catch (e) {
+      console.error('Eroare la încărcarea documentelor generale:', e)
+      setDocs([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
