@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import DocumenteGenerale from '@/components/DocumenteGenerale'
+import FirmaQuickInfo from '@/components/FirmaQuickInfo'
 import { dbSelect } from '@/lib/db'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 import { rgb, legibil } from '@/lib/colors'
@@ -13,10 +14,11 @@ function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m
 function ini(n: string) { return n.split(' ').filter((w:string) => /^[A-ZĂÎȘȚ]/.test(w)).slice(0,2).map((w:string)=>w[0]).join('') }
 
 export default async function Dashboard() {
-  const [firme, luni, taskStariRaw] = await Promise.all([
+  const [firme, luni, taskStariRaw, proprietariRaw] = await Promise.all([
     dbSelect('firme', { eq: { activa: true }, order: 'created_at' }),
     dbSelect('luni_contabile', { select: '*' }),
     dbSelect('task_stari', { select: 'luna_id,completat' }),
+    dbSelect('proprietari', { select: 'id,firma_id,nume,serie_ci,numar_ci', order: 'ordine' }),
   ])
 
   const luniMap: Record<string, any> = {}
@@ -26,6 +28,12 @@ export default async function Dashboard() {
   for (const ts of taskStariRaw) {
     if (!taskCount[ts.luna_id]) taskCount[ts.luna_id] = { done: 0 }
     if (ts.completat) taskCount[ts.luna_id].done++
+  }
+
+  const proprietariMap: Record<string, any[]> = {}
+  for (const p of proprietariRaw) {
+    if (!proprietariMap[p.firma_id]) proprietariMap[p.firma_id] = []
+    proprietariMap[p.firma_id].push(p)
   }
 
   const firmeNav = firme.map((f: any) => {
@@ -116,7 +124,16 @@ export default async function Dashboard() {
                   ))}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <FirmaQuickInfo
+                  cui={f.cui}
+                  nrRegCom={f.nr_reg_com}
+                  adresa={f.adresa}
+                  judet={f.judet}
+                  tara={f.tara}
+                  proprietari={proprietariMap[f.id] || []}
+                />
+
+                <div style={{ marginTop: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '12px', color: '#999' }}>
                     {lunaData ? ll : `${ll} · lună neîncepută`}
                   </span>
