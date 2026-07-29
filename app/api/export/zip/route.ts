@@ -40,11 +40,11 @@ export async function POST(req: NextRequest) {
 
     // Extrase bancare — PDF-uri din bucket extrase-pdf
     const { data: extrase } = await sb.from('extrase').select('id,valuta,pdf_path,pdf_nume').eq('luna_id', lunaId)
-    const extraseFiles: { name: string; data: Blob }[] = []
+    const extraseFiles: { name: string; data: ArrayBuffer }[] = []
     for (const e of extrase || []) {
       if (!e.pdf_path) continue
       const { data: b } = await sb.storage.from('extrase-pdf').download(e.pdf_path)
-      if (b) extraseFiles.push({ name: e.pdf_nume || `extras_${e.valuta}.pdf`, data: b })
+      if (b) extraseFiles.push({ name: e.pdf_nume || `extras_${e.valuta}.pdf`, data: await b.arrayBuffer() })
     }
 
     // Documente din categorii — fără filtru in_zip (include doc-uri istorice + noi)
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     if (!extraseFiles.length && !docs?.length)
       return NextResponse.json({ error: 'Nu există documente de descărcat pentru această lună' }, { status: 404 })
 
-    type Entry = { name: string; data: Blob }
+    type Entry = { name: string; data: ArrayBuffer }
     const sectionMap = new Map<string, Entry[]>()
 
     if (extraseFiles.length) sectionMap.set('extras', extraseFiles)
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!b) continue
       if (!sectionMap.has(section)) sectionMap.set(section, [])
-      sectionMap.get(section)!.push({ name: doc.fisier_nume, data: b })
+      sectionMap.get(section)!.push({ name: doc.fisier_nume, data: await b.arrayBuffer() })
     }
 
     // Ordinea secțiunilor după modulele firmei, necunoscutele la final
