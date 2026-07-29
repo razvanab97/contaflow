@@ -41,7 +41,7 @@ export default async function Dashboard() {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0A0A0A' }}>
       <Sidebar firme={firmeNav} lunaCurenta={LUNA} lunaLabel={ll} />
 
-      <main style={{ flex: 1, padding: '48px 52px', width: '100%' }}>
+      <main className="pt-20 px-4 pb-10 md:pt-12 md:px-[52px] md:pb-12" style={{ flex: 1, width: '100%' }}>
         <div style={{ marginBottom: '40px' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', letterSpacing: '.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
             Contaflow · Dashboard
@@ -54,7 +54,7 @@ export default async function Dashboard() {
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(440px, 100%), 1fr))', gap: '12px' }}>
           {firme.map((f: any) => {
             const lunaData = luniMap[`${f.id}_${LUNA}`]
             const total = getFirmaTotalTasks(f.slug)

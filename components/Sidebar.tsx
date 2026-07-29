@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
@@ -24,26 +25,68 @@ interface Props {
 export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, modulActiv, moduleFirma }: Props) {
   const pathname = usePathname()
   const isDashboard = pathname === '/dashboard'
+  const [open, setOpen] = useState(false)
 
   return (
-    <aside style={{
-      width: '240px', flexShrink: 0,
-      background: '#0D0D0D',
-      borderRight: '1px solid #1A1A1A',
-      display: 'flex', flexDirection: 'column',
-      position: 'sticky', top: 0, height: '100vh',
-      overflowY: 'auto',
-    }}>
-      {/* Logo */}
-      <Link href="/dashboard" style={{ padding: '22px 20px 18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{
-          width: '30px', height: '30px', background: '#FFF',
-          borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-        }}>
-          <img src="/logo-icon.png" alt="ContaFlow" width={20} height={20} />
+    <>
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3" style={{ height: '56px', padding: '0 16px', background: '#0D0D0D', borderBottom: '1px solid #1A1A1A' }}>
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="Deschide meniul"
+          style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: '#FFF', flexShrink: 0 }}
+        >
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M3 12h18M3 6h18M3 18h18"/>
+          </svg>
+        </button>
+        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img src="/logo-icon.png" alt="ContaFlow" width={18} height={18} />
+          <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFF', letterSpacing: '-0.3px' }}>ContaFlow</span>
+        </Link>
+      </div>
+
+      {/* Mobile backdrop */}
+      {open && (
+        <div
+          className="md:hidden fixed inset-0 z-40"
+          style={{ background: 'rgba(0,0,0,.5)' }}
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed md:sticky top-0 left-0 h-screen z-50 transition-transform duration-200 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{
+          width: '240px', flexShrink: 0,
+          background: '#0D0D0D',
+          borderRight: '1px solid #1A1A1A',
+          display: 'flex', flexDirection: 'column',
+          overflowY: 'auto',
+        }}
+      >
+        {/* Logo */}
+        <div style={{ padding: '22px 20px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '30px', height: '30px', background: '#FFF',
+              borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <img src="/logo-icon.png" alt="ContaFlow" width={20} height={20} />
+            </div>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFF', letterSpacing: '-0.3px' }}>ContaFlow</span>
+          </Link>
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Închide meniul"
+            className="md:hidden flex items-center justify-center"
+            style={{ width: '28px', height: '28px', background: 'transparent', border: 'none', color: '#999', flexShrink: 0 }}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
         </div>
-        <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFF', letterSpacing: '-0.3px' }}>ContaFlow</span>
-      </Link>
 
       {/* Back to hub (when in module page) */}
       {firmaAtiva && modulActiv && (
@@ -177,5 +220,6 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
         <div style={{ fontSize: '12px', color: '#777' }}>{lunaLabel}</div>
       </div>
     </aside>
+    </>
   )
 }
