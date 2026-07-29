@@ -17,9 +17,9 @@ export default function AngajatiModule({ firma, lunaId, tasks }: Props) {
         title="Documente angajați"
         description="Pontaj lunar semnat, stat de plată, documente HR"
         documentTypeOptions={[
-          { value:'altul', label:'Pontaj' },
-          { value:'contract', label:'Stat de plată' },
-          { value:'borderou', label:'Chenzina' },
+          { value:'foaie_prezenta', label:'Pontaj' },
+          { value:'stat_plata', label:'Stat de plată' },
+          { value:'chenzina', label:'Chenzina' },
           { value:'altul', label:'Alt document' },
         ]}
       />
