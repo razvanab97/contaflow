@@ -112,12 +112,12 @@ export default function ChecklistClient({ firma, firmeDisponibile, lunaId, lunaS
   return (
     <div style={{ display:'flex', minHeight:'100vh', background:'#0A0A0A' }}>
       <aside style={{ width:'220px', flexShrink:0, background:'#0D0D0D', borderRight:'1px solid #1E1E1E', display:'flex', flexDirection:'column', padding:'20px 0', position:'sticky', top:0, height:'100vh' }}>
-        <div style={{ padding:'4px 18px 24px', display:'flex', alignItems:'center', gap:'10px' }}>
+        <Link href="/dashboard" style={{ padding:'4px 18px 24px', display:'flex', alignItems:'center', gap:'10px' }}>
           <div style={{ width:'28px', height:'28px', background:'#FFF', borderRadius:'7px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <svg width="14" height="14" fill="none" stroke="#111" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            <img src="/logo-icon.png" alt="ContaFlow" width={19} height={19} />
           </div>
           <span style={{ fontSize:'15px', fontWeight:700, color:'#FFF' }}>ContaFlow</span>
-        </div>
+        </Link>
         <Link href="/dashboard" style={SB}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>Dashboard</Link>
         <div style={{ height:'1px', background:'#1E1E1E', margin:'8px 14px' }}/>
         <div style={{ padding:'0 18px 8px', fontSize:'10px', fontWeight:700, color:'#444', letterSpacing:'.12em', textTransform:'uppercase' }}>{firma.nume.replace(' SRL','')}</div>

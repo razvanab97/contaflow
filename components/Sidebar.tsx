@@ -40,9 +40,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
           width: '30px', height: '30px', background: '#FFF',
           borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
-          <svg width="14" height="14" fill="none" stroke="#0A0A0A" strokeWidth="2.5" viewBox="0 0 24 24">
-            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-          </svg>
+          <img src="/logo-icon.png" alt="ContaFlow" width={20} height={20} />
         </div>
         <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFF', letterSpacing: '-0.3px' }}>ContaFlow</span>
       </Link>
