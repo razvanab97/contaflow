@@ -143,7 +143,7 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
           ) : (
             <span style={{ flex: 1, fontSize: '13px', color: '#555' }}>Niciun fișier încărcat</span>
           )}
-          <input ref={certInputRef} type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+          <input ref={certInputRef} type="file" accept="application/pdf,image/*" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }}
             onChange={e => e.target.files?.[0] && uploadCertificat(e.target.files[0])} />
           <button onClick={() => certInputRef.current?.click()} disabled={savingCert} style={{
             fontSize: '12px', fontWeight: 600, color: '#888', background: '#161616', border: '1px solid #262626',
@@ -207,7 +207,7 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                 )}
                 <input
                   ref={el => { buletinInputRefs.current[p.id] = el }}
-                  type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                  type="file" accept="application/pdf,image/*" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }}
                   onChange={e => e.target.files?.[0] && uploadBuletin(p.id, e.target.files[0])}
                 />
                 <button onClick={() => buletinInputRefs.current[p.id]?.click()} style={{

@@ -186,7 +186,7 @@ export default function UploadPanel({
           </div>
           <div style={{ fontSize: '12px', color: '#888' }}>PDF, JPG, PNG · drag & drop sau click</div>
         </div>
-        <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} onChange={e => e.target.files && upload(e.target.files)}/>
+        <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>
 
         {error && <p style={{ fontSize: '11px', color: '#F87171', marginTop: '8px' }}>{error}</p>}
       </div>

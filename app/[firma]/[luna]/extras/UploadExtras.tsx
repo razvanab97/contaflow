@@ -140,9 +140,9 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
         </div>
       )}
 
-      <input ref={csvRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) handleCSV(e.target.files[0]); e.target.value = '' }} />
-      <input ref={pdfRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) handlePDF(e.target.files[0]); e.target.value = '' }} />
-      <input ref={savePdfRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) handleSavePdf(e.target.files[0]); e.target.value = '' }} />
+      <input ref={csvRef} type="file" accept=".csv" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { if (e.target.files?.[0]) handleCSV(e.target.files[0]); e.target.value = '' }} />
+      <input ref={pdfRef} type="file" accept=".pdf" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { if (e.target.files?.[0]) handlePDF(e.target.files[0]); e.target.value = '' }} />
+      <input ref={savePdfRef} type="file" accept=".pdf" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { if (e.target.files?.[0]) handleSavePdf(e.target.files[0]); e.target.value = '' }} />
     </div>
   )
 }

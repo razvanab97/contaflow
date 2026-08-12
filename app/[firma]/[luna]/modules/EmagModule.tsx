@@ -111,7 +111,7 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
               {uploading ? 'Se încarcă...' : '+ Adaugă aviz PDF / JPG'}
             </p>
           </div>
-          <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e => e.target.files && upload(e.target.files)}/>
+          <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>
           {error && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'6px' }}>{error}</p>}
         </div>
       )}
@@ -180,7 +180,7 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
           >
             {uploading ? '...' : '+ Factură'}
           </button>
-          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e => e.target.files?.[0] && uploadFactura(e.target.files[0])}/>
+          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files?.[0] && uploadFactura(e.target.files[0])}/>
         </>
       )}
     </div>
@@ -223,7 +223,7 @@ function BulkUploadZone({ documentId, firmaId, lunaId, culoare, onChange }: {
           {uploading ? 'Se asociază facturile...' : '+ Adaugă toate facturile deodată (se asociază automat)'}
         </p>
       </div>
-      <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e => e.target.files?.length && uploadBulk(e.target.files)}/>
+      <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files?.length && uploadBulk(e.target.files)}/>
       {result && (
         <div style={{ marginTop:'8px', display:'flex', flexDirection:'column', gap:'3px' }}>
           {result.matched.length > 0 && (
@@ -327,7 +327,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
               </p>
             </div>
           )}
-          <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ display:'none' }} onChange={e => e.target.files?.[0] && upload(e.target.files[0])}/>
+          <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files?.[0] && upload(e.target.files[0])}/>
           {error && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'6px' }}>{error}</p>}
         </div>
       )}
@@ -475,7 +475,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
               {file ? file.name : '+ Adaugă PDF factură Dante'}
             </p>
           </div>
-          <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ display:'none' }} onChange={e => e.target.files?.[0] && setFile(e.target.files[0])}/>
+          <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files?.[0] && setFile(e.target.files[0])}/>
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginTop:'8px' }}>
             <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Suma RON (opțional, se detectează automat)" style={INP}/>

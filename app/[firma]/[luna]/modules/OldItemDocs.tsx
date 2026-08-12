@@ -89,7 +89,7 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
             style={{ border: `1.5px dashed ${drag ? culoare : '#252525'}`, borderRadius: '8px', padding: '14px', textAlign: 'center', cursor: 'pointer', background: drag ? `rgba(${r},.04)` : '#0D0D0D', marginTop: docs.length > 0 ? '4px' : '12px' }}>
             <p style={{ fontSize: '12px', color: uploading ? '#777' : '#888', fontWeight: 600 }}>{uploading ? 'Se încarcă...' : '+ Adaugă document'}</p>
           </div>
-          <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} onChange={e => e.target.files && upload(e.target.files)}/>
+          <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>
           {error && <p style={{ fontSize: '11px', color: '#F87171', marginTop: '6px' }}>{error}</p>}
         </div>
       )}

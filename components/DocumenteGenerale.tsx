@@ -55,7 +55,7 @@ export default function DocumenteGenerale() {
           <div style={{ fontSize: '15px', fontWeight: 600, color: '#EFEFEF', letterSpacing: '-0.2px' }}>Documente generale</div>
           <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>Fișiere care nu țin de o firmă anume</div>
         </div>
-        <input ref={inputRef} type="file" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
+        <input ref={inputRef} type="file" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
         <button onClick={() => inputRef.current?.click()} disabled={uploading} style={{
           fontSize: '12px', fontWeight: 600, color: '#DDD', padding: '7px 16px', borderRadius: '8px',
           border: '1px solid #2A2A2A', background: '#1A1A1A', cursor: uploading ? 'not-allowed' : 'pointer',
