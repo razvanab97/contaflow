@@ -111,11 +111,11 @@ async function computeVerification(sb: ReturnType<typeof getServiceSupabase>, lu
   const stardeskFacturi = allFact || []
   const comisionFacturi = allComision || []
 
-  const faraFacturaClient = rezervari.filter(rez => !stardeskFacturi.some(f => isStardeskMatch(rez, f)))
+  const faraFacturaClient = rezervari.filter(rez => !rez.rezolvat_client && !stardeskFacturi.some(f => isStardeskMatch(rez, f)))
 
   const rezervariAirbnb = rezervari.filter(r => r.platforma === 'airbnb')
   const comisionAirbnb = comisionFacturi.filter(f => f.platforma === 'airbnb')
-  const faraComisionAirbnb = rezervariAirbnb.filter(rez => !comisionAirbnb.some(f => codesMatch(rez.cod_rezervare, f.cod_rezervare || '')))
+  const faraComisionAirbnb = rezervariAirbnb.filter(rez => !rez.rezolvat_comision && !comisionAirbnb.some(f => codesMatch(rez.cod_rezervare, f.cod_rezervare || '')))
 
   const rezervariBooking = rezervari.filter(r => r.platforma === 'booking')
   const comisionBookingExista = comisionFacturi.some(f => f.platforma === 'booking')
