@@ -22,17 +22,27 @@ export async function POST(req: NextRequest) {
 
     let docsQuery = sb
       .from('documente')
-      .select('id,fisier_path,fisier_nume,fisier_tip,created_at')
+      .select('id,fisier_path,fisier_nume,fisier_tip,created_at,tranzactie_id')
       .eq('luna_id', lunaId)
       .eq('modul', 'extras')
       .eq('in_zip', true)
       .not('tranzactie_id', 'is', null)
-      .order('created_at', { ascending: true })
     if (transactionIds) docsQuery = docsQuery.in('tranzactie_id', transactionIds)
     const { data: docs, error } = await docsQuery
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!docs?.length) return NextResponse.json({ error: 'Nu există documente asociate tranzacțiilor' }, { status: 400 })
+
+    // Ordonează documentele după data tranzacției (cronologic), nu după momentul upload-ului
+    const docTxIds = [...new Set(docs.map(doc => doc.tranzactie_id).filter(Boolean))]
+    const { data: docTxs } = await sb.from('tranzactii').select('id,data_tranzactie').in('id', docTxIds)
+    const txDateById = new Map((docTxs || []).map(tx => [tx.id, tx.data_tranzactie]))
+    docs.sort((a, b) => {
+      const da = txDateById.get(a.tranzactie_id) || ''
+      const db = txDateById.get(b.tranzactie_id) || ''
+      if (da !== db) return da < db ? -1 : 1
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
 
     const merged = await PDFDocument.create()
     let addedPages = 0
