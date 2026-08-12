@@ -4,6 +4,7 @@ import Link from 'next/link'
 import UploadExtras from './UploadExtras'
 import CopyButton from '@/components/CopyButton'
 import FacturiModule from '../modules/FacturiModule'
+import NoteTranzactii from './NoteTranzactii'
 import type { TaskItem } from '../modules/TaskSection'
 import { legibil } from '@/lib/colors'
 import { APP_UPDATE } from '@/lib/version'
@@ -35,7 +36,7 @@ interface Firma { id:string; slug:string; nume:string; culoare:string }
 export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: initExtrase, slug, facturiTasks }: {
   firma: Firma; lunaId: string; luna: string; lunaLabel: string; extrase: Extras[]; slug: string; facturiTasks: TaskItem[]
 }) {
-  const [pageTab, setPageTab] = useState<'extras'|'facturi'>('extras')
+  const [pageTab, setPageTab] = useState<'extras'|'facturi'|'note'>('extras')
   const [txs, setTxs] = useState<Tx[]>([])
   const [extrase, setExtrase] = useState<Extras[]>(initExtrase)
   const [newSlots, setNewSlots] = useState(0)
@@ -276,10 +277,13 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         <div style={{ display:'flex', background:'#161616', border:'1px solid #242424', padding:'3px', borderRadius:'10px', gap:'3px', marginBottom:'24px', width:'fit-content' }}>
           <button onClick={()=>setPageTab('extras')} style={{ padding:'7px 16px', borderRadius:'7px', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, background:pageTab==='extras'?c:'transparent', color:pageTab==='extras'?'#FFF':'#888' }}>Extras de cont</button>
           <button onClick={()=>setPageTab('facturi')} style={{ padding:'7px 16px', borderRadius:'7px', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, background:pageTab==='facturi'?c:'transparent', color:pageTab==='facturi'?'#FFF':'#888' }}>Facturi + chitanță</button>
+          <button onClick={()=>setPageTab('note')} style={{ padding:'7px 16px', borderRadius:'7px', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, background:pageTab==='note'?c:'transparent', color:pageTab==='note'?'#FFF':'#888' }}>Note</button>
         </div>
 
         {pageTab === 'facturi' ? (
           <FacturiModule firma={firma} lunaId={lunaId} tasks={facturiTasks} section="facturi-chitanta"/>
+        ) : pageTab === 'note' ? (
+          <NoteTranzactii txs={txs} firmaNume={firma.nume} lunaId={lunaId} lunaLabel={lunaLabel} culoare={c} onUpdateNote={updateNote}/>
         ) : (
         <>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px' }}>

@@ -4,8 +4,11 @@ const URL = 'https://aqlmuoaaipbanjdptleg.supabase.co/rest/v1'
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 export async function POST(req: NextRequest) {
-  const { id, note } = await req.json()
-  if (!id || (note !== null && note !== 'na'))
+  const body = await req.json()
+  const id = body.id
+  let note = body.note
+  if (typeof note === 'string') note = note.trim().slice(0, 300) || null
+  if (!id || (note !== null && note !== 'na' && typeof note !== 'string'))
     return NextResponse.json({ error: 'Date invalide' }, { status: 400 })
   const res = await fetch(`${URL}/tranzactii?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
