@@ -42,7 +42,11 @@ function extractObjects(text: string): any[] {
         if (obj.data_tranzactie && obj.suma !== undefined && obj.tip) results.push(obj)
       } catch {}
       i = j + 1
-    } else break
+    } else {
+      // Obiectul deschis la i nu se inchide (text trunchiat) - il sarim si continuam
+      // cautarea de la pozitia urmatoare, ca sa gasim obiectele complete de dupa el.
+      i++
+    }
   }
   return results
 }
