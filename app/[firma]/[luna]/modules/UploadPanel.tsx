@@ -7,6 +7,8 @@ interface Doc {
   fisier_nume: string
   tip_document?: string
   furnizor?: string
+  platit?: boolean
+  data_platii?: string|null
 }
 
 interface Props {
@@ -19,13 +21,14 @@ interface Props {
   showLinkImport?: boolean
   linkPlaceholder?: string
   documentTypeOptions?: { value: string; label: string }[]
+  showPaidToggle?: boolean
 }
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 
 export default function UploadPanel({
   firmaId, lunaId, section, culoare, title, description,
-  showLinkImport = false, linkPlaceholder, documentTypeOptions,
+  showLinkImport = false, linkPlaceholder, documentTypeOptions, showPaidToggle = false,
 }: Props) {
   const [docs, setDocs] = useState<Doc[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -41,11 +44,11 @@ export default function UploadPanel({
   const INP: React.CSSProperties = { fontSize: '12px', background: '#0F0F0F', border: '1px solid #2A2A2A', borderRadius: '8px', padding: '9px 12px', color: '#BBB', outline: 'none', width: '100%' }
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/chitante?lunaId=${encodeURIComponent(lunaId)}&section=${section}`)
+    const res = await fetch(`/api/chitante?lunaId=${encodeURIComponent(lunaId)}&firmaId=${encodeURIComponent(firmaId)}&section=${section}`)
     const data = await res.json().catch(() => ({}))
     if (res.ok) setDocs(data.docs || [])
     setLoaded(true)
-  }, [lunaId, section])
+  }, [lunaId, firmaId, section])
 
   useEffect(() => { load() }, [load])
 
@@ -98,6 +101,13 @@ export default function UploadPanel({
     else setError('Documentul nu a putut fi șters')
   }
 
+  async function togglePaid(doc: Doc) {
+    const next = !doc.platit
+    setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, platit: next } : d))
+    const res = await fetch('/api/chitante/plata', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: doc.id, platit: next }) })
+    if (!res.ok) setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, platit: doc.platit } : d))
+  }
+
   return (
     <div style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '12px', overflow: 'hidden' }}>
       <div style={{ padding: '18px 22px', borderBottom: '1px solid #1A1A1A', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
@@ -116,15 +126,23 @@ export default function UploadPanel({
         {/* Document list */}
         {loaded && docs.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
-            {docs.map(doc => (
-              <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: '#161616', border: '1px solid #222', borderRadius: '8px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: culoare, flexShrink: 0 }}/>
-                <span style={{ flex: 1, fontSize: '12px', color: '#CCC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
-                {doc.tip_document && <span style={{ fontSize: '10px', color: '#888' }}>{doc.tip_document}</span>}
-                <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
-                <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: '#F87171', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
-              </div>
-            ))}
+            {(showPaidToggle ? [...docs].sort((a, b) => Number(!!a.platit) - Number(!!b.platit)) : docs).map(doc => {
+              const isPaid = showPaidToggle && !!doc.platit
+              return (
+                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: isPaid ? '#141414' : '#161616', border: `1px solid ${isPaid ? '#1E1E1E' : '#222'}`, borderRadius: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? '#333' : culoare, flexShrink: 0 }}/>
+                  <span style={{ flex: 1, fontSize: '12px', color: isPaid ? '#666' : '#CCC', textDecoration: isPaid ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
+                  {doc.tip_document && <span style={{ fontSize: '10px', color: '#888' }}>{doc.tip_document}</span>}
+                  {showPaidToggle && (
+                    <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? '#2A2A2A' : 'rgba(110,231,176,.35)'}`, background: isPaid ? '#1A1A1A' : 'rgba(110,231,176,.08)', color: isPaid ? '#888' : '#6EE7B0', cursor: 'pointer', flexShrink: 0 }}>
+                      {isPaid ? 'Anulează' : 'Marchează achitat'}
+                    </button>
+                  )}
+                  <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
+                  <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: '#F87171', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+                </div>
+              )
+            })}
           </div>
         )}
         {!loaded && <div style={{ fontSize: '12px', color: '#999', marginBottom: '12px' }}>Se încarcă...</div>}

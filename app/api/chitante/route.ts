@@ -22,18 +22,27 @@ function safeFilePart(value: string, fallback: string) {
 
 export async function GET(req: NextRequest) {
   const lunaId = req.nextUrl.searchParams.get('lunaId')
+  const firmaId = req.nextUrl.searchParams.get('firmaId')
   const section = req.nextUrl.searchParams.get('section') || 'facturi-chitanta'
   if (!lunaId) return NextResponse.json({ docs: [] })
 
   const sb = getServiceSupabase()
-  const { data, error } = await sb
+  let query = sb
     .from('documente')
-    .select('id,fisier_nume,tip_document,furnizor,modul,created_at')
-    .eq('luna_id', lunaId)
+    .select('id,fisier_nume,tip_document,furnizor,modul,created_at,platit,data_platii')
     .not('fisier_path', 'like', '%/tx/%')
     .not('fisier_path', 'like', '%/checklist/%')
     .like('fisier_path', `%/${section}/%`)
     .order('created_at', { ascending: true })
+
+  // Facturi restante raman vizibile pe toata firma pana sunt achitate, nu doar in luna in care au fost adaugate
+  if (section === 'facturi-restante' && firmaId) {
+    query = query.eq('firma_id', firmaId).or(`luna_id.eq.${lunaId},platit.eq.false`)
+  } else {
+    query = query.eq('luna_id', lunaId)
+  }
+
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ docs: data || [] })

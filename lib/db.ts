@@ -15,3 +15,13 @@ export async function dbSelect(
   if (error) console.error(`dbSelect(${table}):`, error.message)
   return (data as any[]) || []
 }
+
+export async function getRestanteCount(firmaId: string): Promise<number> {
+  const sb = getServiceSupabase()
+  const { count } = await sb.from('documente')
+    .select('id', { count: 'exact', head: true })
+    .eq('firma_id', firmaId)
+    .eq('platit', false)
+    .like('fisier_path', '%/facturi-restante/%')
+  return count || 0
+}

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
-import { dbSelect } from '@/lib/db'
+import { dbSelect, getRestanteCount } from '@/lib/db'
 import { getFirmaConfig, getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 import DatePersonaleClient from './DatePersonaleClient'
 
@@ -50,6 +50,7 @@ export default async function DatePersonalePage({ params }: { params: Promise<{f
   })
 
   const modules = getFirmaModules(slug)
+  const restanteCount = await getRestanteCount(firma.id)
 
   return (
     <div style={{ display:'flex', minHeight:'100vh', background:'#0A0A0A' }}>
@@ -60,6 +61,7 @@ export default async function DatePersonalePage({ params }: { params: Promise<{f
         firmaAtiva={slug}
         modulActiv={undefined}
         moduleFirma={modules}
+        restanteCount={restanteCount}
       />
 
       <main style={{ flex:1, padding:'44px 52px', maxWidth:'820px' }}>

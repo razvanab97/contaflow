@@ -3,7 +3,7 @@ import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import InitLuna from './InitLuna'
 import ModuleGrid from './ModuleGrid'
-import { dbSelect } from '@/lib/db'
+import { dbSelect, getRestanteCount } from '@/lib/db'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 import LunaSummary from './LunaSummary'
 import ExportButtons from './ExportButtons'
@@ -53,6 +53,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
   })
 
   const modules = getFirmaModules(slug)
+  const restanteCount = await getRestanteCount(firma.id)
   const total = getFirmaTotalTasks(slug)
   const done = taskStariRaw.filter((ts: any) => ts.completat).length
   const pct = total > 0 ? Math.round((done/total)*100) : 0
@@ -66,6 +67,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
         lunaLabel={ll}
         firmaAtiva={slug}
         moduleFirma={modules}
+        restanteCount={restanteCount}
       />
 
       <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1000px' }}>
@@ -119,6 +121,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
           slug={slug}
           lunaId={lunaData.id}
           taskMap={taskMap}
+          restanteCount={restanteCount}
         />
       </main>
     </div>

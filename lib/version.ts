@@ -1,2 +1,2 @@
 // Crescut manual la fiecare modificare livrata, ca reper vizual ca update-ul a ajuns live.
-export const APP_UPDATE = 12
+export const APP_UPDATE = 13

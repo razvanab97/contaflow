@@ -21,9 +21,10 @@ interface Props {
   firmaAtiva?: string
   modulActiv?: string
   moduleFirma?: ModuleDef[]
+  restanteCount?: number
 }
 
-export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, modulActiv, moduleFirma }: Props) {
+export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, modulActiv, moduleFirma, restanteCount }: Props) {
   const pathname = usePathname()
   const isDashboard = pathname === '/dashboard'
   const [open, setOpen] = useState(false)
@@ -194,11 +195,21 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
                   background: isCurrentMod ? firmaColor : '#333',
                 }}/>
                 <span style={{
+                  flex: 1, minWidth: 0,
                   fontSize: '12px', fontWeight: isCurrentMod ? 600 : 400,
                   color: isCurrentMod ? '#DDD' : '#999',
                 }}>
                   {m.label}
                 </span>
+                {m.slug === 'facturi-restante' && !!restanteCount && (
+                  <span style={{
+                    fontSize: '10px', fontWeight: 700, color: '#F87171',
+                    background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.3)',
+                    borderRadius: '20px', padding: '1px 7px', flexShrink: 0,
+                  }}>
+                    {restanteCount}
+                  </span>
+                )}
               </Link>
             )
           })}

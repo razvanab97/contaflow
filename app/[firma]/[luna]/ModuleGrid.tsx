@@ -12,6 +12,7 @@ interface Props {
   slug: string
   lunaId: string
   taskMap: Record<string, boolean>
+  restanteCount?: number
 }
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
@@ -29,7 +30,7 @@ function loadOrder(slug: string, modules: ModuleDef[]): string[] {
   return modules.map(m => m.slug)
 }
 
-export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap }: Props) {
+export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap, restanteCount }: Props) {
   const [reordering, setReordering] = useState(false)
   const [order, setOrder] = useState<string[]>(modules.map(m => m.slug))
   const [dragOver, setDragOver] = useState<number | null>(null)
@@ -212,9 +213,16 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                     <div style={{ fontSize:'14px', fontWeight:600, color:'#E8E8E8', letterSpacing:'-0.2px', marginBottom:'3px' }}>{mod.label}</div>
                     <div style={{ fontSize:'12px', color:'#888', lineHeight:1.4 }}>{mod.description}</div>
                   </div>
-                  <span style={{ fontSize:'10px', fontWeight:600, padding:'3px 9px', borderRadius:'20px', flexShrink:0, background:statusStyle.bg, color:statusStyle.c, border:`1px solid ${statusStyle.border}` }}>
-                    {statusLabel}
-                  </span>
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'5px', flexShrink:0 }}>
+                    <span style={{ fontSize:'10px', fontWeight:600, padding:'3px 9px', borderRadius:'20px', background:statusStyle.bg, color:statusStyle.c, border:`1px solid ${statusStyle.border}` }}>
+                      {statusLabel}
+                    </span>
+                    {mod.slug === 'facturi-restante' && !!restanteCount && (
+                      <span style={{ fontSize:'10px', fontWeight:700, padding:'3px 9px', borderRadius:'20px', background:'rgba(248,113,113,.1)', color:'#F87171', border:'1px solid rgba(248,113,113,.3)' }}>
+                        {restanteCount} neachitate
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div>

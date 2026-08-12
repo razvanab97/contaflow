@@ -17,7 +17,7 @@ const CONFIG = {
   },
   'facturi-restante': {
     title: 'Facturi restante',
-    description: 'Facturi neachitate — de urmărit pentru luna aceasta.',
+    description: 'Facturi neachitate — rămân vizibile până le marchezi achitate.',
   },
 }
 
@@ -39,6 +39,7 @@ export default function FacturiModule({ firma, lunaId, tasks, section }: Props) 
         ]}
         showLinkImport
         linkPlaceholder="Link PDF Oblio sau altă platformă"
+        showPaidToggle={section === 'facturi-restante'}
       />
     </div>
   )

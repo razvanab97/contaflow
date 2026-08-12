@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
-import { dbSelect } from '@/lib/db'
+import { dbSelect, getRestanteCount } from '@/lib/db'
 import { getFirmaConfig, getFirmaModules, getFirmaTotalTasks, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
 import EmagModule from '../modules/EmagModule'
 import TrendyolModule from '../modules/TrendyolModule'
@@ -42,7 +42,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   const lunaData = luni.find((l: any) => l.firma_id === firma.id && l.luna?.startsWith(luna))
   if (!lunaData) notFound()
 
-  const [taskStariRaw, extrase, allTaskStari, checklistItemsRaw, impoziteStari, proprietariRaw] = await Promise.all([
+  const [taskStariRaw, extrase, allTaskStari, checklistItemsRaw, impoziteStari, proprietariRaw, restanteCount] = await Promise.all([
     dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
     modulSlug === 'extras' ? dbSelect('extrase', { eq: { luna_id: lunaData.id } }) : Promise.resolve([]),
     dbSelect('task_stari', { select: 'luna_id,completat' }),
@@ -52,6 +52,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       : Promise.resolve([]),
     modulSlug === 'impozite' ? dbSelect('impozite_stari', { eq: { luna_id: lunaData.id }, select: 'tip_key,suma,scadenta,platit' }) : Promise.resolve([]),
     modulSlug === 'dispozitie-plata' ? dbSelect('proprietari', { eq: { firma_id: firma.id }, order: 'ordine' }) : Promise.resolve([]),
+    getRestanteCount(firma.id),
   ])
 
   const taskMap: Record<string, boolean> = {}
@@ -152,6 +153,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
         firmaAtiva={slug}
         modulActiv={modulSlug}
         moduleFirma={modules}
+        restanteCount={restanteCount}
       />
 
       <main style={{ flex:1, padding:'44px 52px', maxWidth:'900px' }}>
