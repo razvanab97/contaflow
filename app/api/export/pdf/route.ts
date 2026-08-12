@@ -60,6 +60,35 @@ function matchesSection(filePath: string, section: string): boolean {
   return p.includes(`/${section}/`)
 }
 
+// Grupeaza avizele eMAG cu facturile lor proprii (dupa furnizor = task_key), in ordinea din MODULE_DEFS;
+// avizul apare inaintea facturilor sale; facturile Dante (emag-calcul) raman la final, cronologic
+function sortEmagDocs<T extends { fisier_path:string; furnizor?:string|null; created_at?:string }>(items: T[]): T[] {
+  const avizOrder = (MODULE_DEFS.emag?.tasks || []).filter(t => t.key.startsWith('emag.aviz_')).map(t => t.key)
+  const avizeAndFacturi = items.filter(d => d.fisier_path.includes('/emag-avize/') || d.fisier_path.includes('/emag-facturi/'))
+  const dante = items.filter(d => d.fisier_path.includes('/emag-calcul/'))
+
+  const byTask = new Map<string, T[]>()
+  for (const d of avizeAndFacturi) {
+    const key = d.furnizor || ''
+    if (!byTask.has(key)) byTask.set(key, [])
+    byTask.get(key)!.push(d)
+  }
+  const orderedKeys = [...avizOrder, ...[...byTask.keys()].filter(k => !avizOrder.includes(k))]
+  const ordered: T[] = []
+  for (const key of orderedKeys) {
+    const group = byTask.get(key) || []
+    group.sort((a, b) => {
+      const aAviz = a.fisier_path.includes('/emag-avize/')
+      const bAviz = b.fisier_path.includes('/emag-avize/')
+      if (aAviz === bAviz) return (a.created_at || '') < (b.created_at || '') ? -1 : 1
+      return aAviz ? -1 : 1
+    })
+    ordered.push(...group)
+  }
+  dante.sort((a, b) => (a.created_at || '') < (b.created_at || '') ? -1 : 1)
+  return [...ordered, ...dante]
+}
+
 // Documentele atașate individual pe tranzacții (facturi/chitanțe din extras), ordonate după data tranzacției
 async function getExtrasTxDocs(sb: ReturnType<typeof getServiceSupabase>, lunaId: string) {
   const { data: txDocs } = await sb.from('documente')
@@ -117,7 +146,7 @@ export async function POST(req: NextRequest) {
   const { data: allDocs, error } = isExtras
     ? { data: [], error: null }
     : await sb.from('documente')
-        .select('fisier_path,fisier_nume,fisier_tip,created_at')
+        .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor')
         .eq('luna_id', lunaId)
         .not('fisier_path', 'like', '%/tx/%')
         .not('fisier_path', 'like', '%/checklist/%')
@@ -147,7 +176,7 @@ export async function POST(req: NextRequest) {
   if (!scope && firmaSlug) {
     const moduleOrder = FIRMA_CONFIGS[firmaSlug]?.module || []
 
-    type Entry = { path: string; name: string; type: string; bucket: 'documente' | 'extrase-pdf' }
+    type Entry = { path: string; name: string; type: string; bucket: 'documente' | 'extrase-pdf'; furnizor?: string|null; created_at?: string }
     const sectionMap = new Map<string, Entry[]>()
 
     // Extras bancare
@@ -166,7 +195,11 @@ export async function POST(req: NextRequest) {
     for (const doc of docs || []) {
       const section = pathToSection(doc.fisier_path)
       if (!sectionMap.has(section)) sectionMap.set(section, [])
-      sectionMap.get(section)!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente' })
+      sectionMap.get(section)!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente', furnizor: doc.furnizor, created_at: doc.created_at })
+    }
+    // Emag: avizele impreuna cu facturile lor proprii, in ordinea din task-uri
+    if (sectionMap.has('emag')) {
+      sectionMap.set('emag', sortEmagDocs(sectionMap.get('emag')!.map(e => ({ ...e, fisier_path: e.path }))))
     }
 
     // Ordinea secțiunilor după modulele firmei
@@ -202,7 +235,8 @@ export async function POST(req: NextRequest) {
       if (!data) continue
       await embedDoc(merged, Buffer.from(await data.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)
     }
-    for (const doc of docs || []) {
+    const orderedDocs = (scope?.section === 'emag' || scope?.section === 'emag-calcul') ? sortEmagDocs(docs || []) : (docs || [])
+    for (const doc of orderedDocs) {
       const { data } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!data) continue
       await embedDoc(merged, Buffer.from(await data.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)

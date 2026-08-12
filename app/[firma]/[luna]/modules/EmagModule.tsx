@@ -187,6 +187,64 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
   )
 }
 
+function BulkUploadZone({ documentId, firmaId, lunaId, culoare, onChange }: {
+  documentId:string; firmaId:string; lunaId:string; culoare:string; onChange:()=>void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [drag, setDrag] = useState(false)
+  const [result, setResult] = useState<{ matched:{fileName:string;numarCautare:string}[]; unmatched:{fileName:string;reason:string}[] } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const r = rgb(culoare)
+
+  async function uploadBulk(files: FileList) {
+    setUploading(true); setResult(null)
+    const fd = new FormData()
+    for (const f of Array.from(files)) fd.append('files', f)
+    fd.append('documentId', documentId)
+    fd.append('firmaId', firmaId)
+    fd.append('lunaId', lunaId)
+    const res = await fetch('/api/emag/aviz/factura/bulk', { method:'POST', body:fd })
+    const d = await res.json().catch(() => ({ matched:[], unmatched:[] }))
+    setResult(d)
+    onChange()
+    setUploading(false)
+  }
+
+  return (
+    <div style={{ marginTop:'10px' }}>
+      <div
+        onClick={() => fileRef.current?.click()}
+        onDragOver={e => { e.preventDefault(); setDrag(true) }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files.length && uploadBulk(e.dataTransfer.files) }}
+        style={{ border:`1.5px dashed ${drag ? culoare : '#252525'}`, borderRadius:'8px', padding:'12px', textAlign:'center', cursor:'pointer', background: drag ? `rgba(${r},.04)` : '#0D0D0D' }}
+      >
+        <p style={{ fontSize:'11px', color: uploading ? '#777' : '#888', fontWeight:600 }}>
+          {uploading ? 'Se asociază facturile...' : '+ Adaugă toate facturile deodată (se asociază automat)'}
+        </p>
+      </div>
+      <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e => e.target.files?.length && uploadBulk(e.target.files)}/>
+      {result && (
+        <div style={{ marginTop:'8px', display:'flex', flexDirection:'column', gap:'3px' }}>
+          {result.matched.length > 0 && (
+            <span style={{ fontSize:'11px', color:'#6EE7B0' }}>✓ {result.matched.length} factur{result.matched.length===1?'ă asociată':'i asociate'} automat</span>
+          )}
+          {result.unmatched.length > 0 && (
+            <div>
+              <span style={{ fontSize:'11px', color:'#F87171', fontWeight:600 }}>
+                {result.unmatched.length} nu s-a{result.unmatched.length===1?'':'u'}u putut asocia — încarcă-le manual pe rândul potrivit:
+              </span>
+              {result.unmatched.map(u => (
+                <div key={u.fileName} style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>· {u.fileName}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoare, onChange }: {
   taskKey:string; label:string; descriere?:string; data?:AvizData; firmaId:string; lunaId:string; culoare:string
   onChange:()=>void
@@ -239,7 +297,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
                 <span style={{ fontSize:'11px', color:'#888' }}>Aviz {data.avizNumber || data.fisierNume}</span>
                 <div style={{ display:'flex', gap:'12px', alignItems:'center' }}>
-                  <a href={`/api/emag?docId=${encodeURIComponent(data.documentId)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓ PDF</a>
+                  <a href={`/api/emag/aviz/pdf?documentId=${encodeURIComponent(data.documentId)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓ PDF (aviz + facturi)</a>
                   <button onClick={removeAviz} style={{ fontSize:'11px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
                 </div>
               </div>
@@ -251,6 +309,9 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                     <FacturaRow key={inv.id} inv={inv} firmaId={firmaId} lunaId={lunaId} culoare={culoare} onChange={onChange}/>
                   ))}
                 </div>
+              )}
+              {data.invoices.some(inv => !inv.factura_document_id) && (
+                <BulkUploadZone documentId={data.documentId} firmaId={firmaId} lunaId={lunaId} culoare={culoare} onChange={onChange}/>
               )}
             </div>
           ) : (
