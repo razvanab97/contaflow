@@ -33,9 +33,19 @@ function ListaLipsa({ items }: { items: Nefacturata[] }) {
   )
 }
 
+type Categorie = 'client' | 'comision-airbnb' | 'comision-booking'
+
+function VerificaButon({ firma, checking, onClick }: { firma:Firma; checking:boolean; onClick:()=>void }) {
+  return (
+    <button onClick={onClick} disabled={checking} style={{ flexShrink:0, fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer', opacity:checking?.6:1 }}>
+      {checking ? 'Se verifică...' : 'Verifică'}
+    </button>
+  )
+}
+
 function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }) {
   const [result, setResult] = useState<VerificareResult|null>(null)
-  const [checking, setChecking] = useState(false)
+  const [checking, setChecking] = useState<Categorie|null>(null)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
@@ -46,66 +56,70 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
 
   useEffect(() => { load() }, [load])
 
-  async function verifica() {
-    setChecking(true); setError('')
+  async function verifica(categorie: Categorie) {
+    setChecking(categorie); setError('')
     const res = await fetch('/api/5stardesk/verifica', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lunaId, firmaId: firma.id }),
+      body: JSON.stringify({ lunaId, firmaId: firma.id, categorie }),
     })
     const d = await res.json().catch(() => ({}))
     if (!res.ok) setError(d.error || 'Verificarea a eșuat')
     else setResult(d)
-    setChecking(false)
+    setChecking(null)
   }
 
   return (
     <div style={{ background:'#111', border:'1px solid #1E1E1E', borderRadius:'12px', overflow:'hidden' }}>
-      <div style={{ padding:'16px 20px', borderBottom:'1px solid #1A1A1A', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
-        <div>
-          <div style={{ fontSize:'13px', fontWeight:600, color:'#E0E0E0' }}>Rezervări nefacturate</div>
-          <div style={{ fontSize:'12px', color:'#888', marginTop:'2px' }}>
-            Verifică borderourile Airbnb + Booking, după cod rezervare și sumă, împotriva facturilor de client (5StarDesk) și de comision (Airbnb/Booking) deja încărcate.
-          </div>
+      <div style={{ padding:'16px 20px', borderBottom:'1px solid #1A1A1A' }}>
+        <div style={{ fontSize:'13px', fontWeight:600, color:'#E0E0E0' }}>Rezervări nefacturate</div>
+        <div style={{ fontSize:'12px', color:'#888', marginTop:'2px' }}>
+          Verifică borderourile Airbnb + Booking, după cod rezervare și sumă, împotriva facturilor deja încărcate — pe fiecare categorie separat.
         </div>
-        <button onClick={verifica} disabled={checking} style={{ flexShrink:0, fontSize:'11px', fontWeight:600, padding:'7px 14px', borderRadius:'8px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer', opacity:checking?.6:1 }}>
-          {checking ? 'Se verifică...' : 'Verifică'}
-        </button>
       </div>
 
       <div style={{ padding:'16px 20px', display:'flex', flexDirection:'column', gap:'20px' }}>
         {error && <p style={{ fontSize:'11px', color:'#F87171' }}>{error}</p>}
         {result && (
-          <>
-            <p style={{ fontSize:'11px', color:'#666' }}>
-              {result.totalRezervari} rezervări în borderouri · {result.totalFacturiClient} facturi client (5StarDesk) · {result.totalFacturiComision} facturi comision
-            </p>
-
-            <div>
-              <div style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'8px' }}>Fără factură client (5StarDesk)</div>
-              {result.faraFacturaClient.length === 0
-                ? <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Toate rezervările au factură client asociată.</p>
-                : <ListaLipsa items={result.faraFacturaClient}/>}
-            </div>
-
-            <div>
-              <div style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'8px' }}>Fără factură de comision Airbnb</div>
-              {result.faraComisionAirbnb.length === 0
-                ? <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Toate rezervările Airbnb au factură de comision asociată.</p>
-                : <ListaLipsa items={result.faraComisionAirbnb}/>}
-            </div>
-
-            <div>
-              <div style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'8px' }}>Factură de comision Booking</div>
-              {result.totalRezervariBooking === 0 ? (
-                <p style={{ fontSize:'12px', color:'#666' }}>Nicio rezervare Booking în borderoul acestei luni.</p>
-              ) : result.comisionBookingLipsa ? (
-                <p style={{ fontSize:'12px', color:'#F87171' }}>⚠ Nu a fost găsită nicio factură de comision Booking pentru această lună — verifică secțiunea Booking · Facturi.</p>
-              ) : (
-                <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Factură de comision Booking găsită pentru această lună. (Booking facturează agregat, nu per rezervare — nu se poate verifica fiecare rezervare individual.)</p>
-              )}
-            </div>
-          </>
+          <p style={{ fontSize:'11px', color:'#666' }}>
+            {result.totalRezervari} rezervări în borderouri · {result.totalFacturiClient} facturi client (5StarDesk) · {result.totalFacturiComision} facturi comision
+          </p>
         )}
+
+        <div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
+            <span style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em' }}>Fără factură client (5StarDesk)</span>
+            <VerificaButon firma={firma} checking={checking==='client'} onClick={()=>verifica('client')}/>
+          </div>
+          {result && (result.faraFacturaClient.length === 0
+            ? <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Toate rezervările au factură client asociată.</p>
+            : <ListaLipsa items={result.faraFacturaClient}/>)}
+        </div>
+
+        <div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
+            <span style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em' }}>Fără factură de comision Airbnb</span>
+            <VerificaButon firma={firma} checking={checking==='comision-airbnb'} onClick={()=>verifica('comision-airbnb')}/>
+          </div>
+          {result && (result.faraComisionAirbnb.length === 0
+            ? <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Toate rezervările Airbnb au factură de comision asociată.</p>
+            : <ListaLipsa items={result.faraComisionAirbnb}/>)}
+        </div>
+
+        <div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
+            <span style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em' }}>Factură de comision Booking</span>
+            <VerificaButon firma={firma} checking={checking==='comision-booking'} onClick={()=>verifica('comision-booking')}/>
+          </div>
+          {result && (
+            result.totalRezervariBooking === 0 ? (
+              <p style={{ fontSize:'12px', color:'#666' }}>Nicio rezervare Booking în borderoul acestei luni.</p>
+            ) : result.comisionBookingLipsa ? (
+              <p style={{ fontSize:'12px', color:'#F87171' }}>⚠ Nu a fost găsită nicio factură de comision Booking pentru această lună — verifică secțiunea Booking · Facturi.</p>
+            ) : (
+              <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Factură de comision Booking găsită pentru această lună. (Booking facturează agregat, nu per rezervare — nu se poate verifica fiecare rezervare individual.)</p>
+            )
+          )}
+        </div>
       </div>
     </div>
   )

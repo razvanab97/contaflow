@@ -131,78 +131,89 @@ async function computeVerification(sb: ReturnType<typeof getServiceSupabase>, lu
   }
 }
 
+type Categorie = 'client' | 'comision-airbnb' | 'comision-booking'
+
+async function extrageBorderouriLipsa(sb: ReturnType<typeof getServiceSupabase>, lunaId: string, firmaId: string) {
+  const { data: borderouDocs } = await sb.from('documente')
+    .select('id,fisier_path,fisier_nume')
+    .eq('luna_id', lunaId)
+    .or('fisier_path.like.%/airbnb-borderou/%,fisier_path.like.%/booking-borderou/%')
+  const { data: existingRez } = await sb.from('borderou_rezervari').select('document_id').eq('luna_id', lunaId)
+  const extractedRezDocIds = new Set((existingRez || []).map(r => r.document_id))
+
+  for (const doc of borderouDocs || []) {
+    if (extractedRezDocIds.has(doc.id)) continue
+    const platforma: 'airbnb' | 'booking' = doc.fisier_path.includes('/airbnb-borderou/') ? 'airbnb' : 'booking'
+    const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
+    if (!file) continue
+    const bytes = Buffer.from(await file.arrayBuffer())
+    let rezervari: RezervareRow[] = []
+    try { rezervari = await extractBorderou(bytes, platforma) } catch {}
+    if (rezervari.length) {
+      await sb.from('borderou_rezervari').insert(rezervari.map(r => ({
+        luna_id: lunaId, firma_id: firmaId, document_id: doc.id, platforma,
+        cod_rezervare: r.codRezervare || '', nume_oaspete: r.numeOaspete || '', suma: Number(r.suma) || null,
+      })))
+    }
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { lunaId, firmaId } = await req.json()
-    if (!lunaId || !firmaId) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
+    const { lunaId, firmaId, categorie } = await req.json() as { lunaId?:string; firmaId?:string; categorie?:Categorie }
+    if (!lunaId || !firmaId || !categorie) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
     const sb = getServiceSupabase()
 
-    const { data: borderouDocs } = await sb.from('documente')
-      .select('id,fisier_path,fisier_nume')
-      .eq('luna_id', lunaId)
-      .or('fisier_path.like.%/airbnb-borderou/%,fisier_path.like.%/booking-borderou/%')
-    const { data: stardeskDocs } = await sb.from('documente')
-      .select('id,fisier_path,fisier_nume')
-      .eq('luna_id', lunaId)
-      .like('fisier_path', '%/5stardesk/%')
-    const { data: comisionDocs } = await sb.from('documente')
-      .select('id,fisier_path,fisier_nume')
-      .eq('luna_id', lunaId)
-      .or('fisier_path.like.%/airbnb-facturi/%,fisier_path.like.%/booking-facturi/%')
+    // Borderourile sunt referinta pentru toate cele 3 verificari, se extrag mereu (cache pe document_id deja extras)
+    await extrageBorderouriLipsa(sb, lunaId, firmaId)
 
-    const [existingRez, existingFact, existingComision] = await Promise.all([
-      sb.from('borderou_rezervari').select('document_id').eq('luna_id', lunaId),
-      sb.from('stardesk_facturi').select('document_id').eq('luna_id', lunaId),
-      sb.from('comision_facturi').select('document_id').eq('luna_id', lunaId),
-    ])
-    const extractedRezDocIds = new Set((existingRez.data || []).map(r => r.document_id))
-    const extractedFactDocIds = new Set((existingFact.data || []).map(r => r.document_id))
-    const extractedComisionDocIds = new Set((existingComision.data || []).map(r => r.document_id))
+    if (categorie === 'client') {
+      const { data: stardeskDocs } = await sb.from('documente')
+        .select('id,fisier_path,fisier_nume')
+        .eq('luna_id', lunaId)
+        .like('fisier_path', '%/5stardesk/%')
+      const { data: existingFact } = await sb.from('stardesk_facturi').select('document_id').eq('luna_id', lunaId)
+      const extractedFactDocIds = new Set((existingFact || []).map(r => r.document_id))
 
-    for (const doc of borderouDocs || []) {
-      if (extractedRezDocIds.has(doc.id)) continue
-      const platforma: 'airbnb' | 'booking' = doc.fisier_path.includes('/airbnb-borderou/') ? 'airbnb' : 'booking'
-      const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
-      if (!file) continue
-      const bytes = Buffer.from(await file.arrayBuffer())
-      let rezervari: RezervareRow[] = []
-      try { rezervari = await extractBorderou(bytes, platforma) } catch {}
-      if (rezervari.length) {
-        await sb.from('borderou_rezervari').insert(rezervari.map(r => ({
-          luna_id: lunaId, firma_id: firmaId, document_id: doc.id, platforma,
-          cod_rezervare: r.codRezervare || '', nume_oaspete: r.numeOaspete || '', suma: Number(r.suma) || null,
-        })))
+      for (const doc of stardeskDocs || []) {
+        if (extractedFactDocIds.has(doc.id)) continue
+        const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
+        if (!file) continue
+        const bytes = Buffer.from(await file.arrayBuffer())
+        let facturi: StardeskFacturaRow[] = []
+        try { facturi = await extractStardeskInvoices(bytes) } catch {}
+        if (facturi.length) {
+          await sb.from('stardesk_facturi').insert(facturi.map(f => ({
+            luna_id: lunaId, firma_id: firmaId, document_id: doc.id,
+            numar_factura: f.numarFactura || '', nume_client: f.numeClient || '', suma: Number(f.suma) || null, id_rezervare: f.idRezervare || '',
+          })))
+        }
       }
     }
 
-    for (const doc of stardeskDocs || []) {
-      if (extractedFactDocIds.has(doc.id)) continue
-      const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
-      if (!file) continue
-      const bytes = Buffer.from(await file.arrayBuffer())
-      let facturi: StardeskFacturaRow[] = []
-      try { facturi = await extractStardeskInvoices(bytes) } catch {}
-      if (facturi.length) {
-        await sb.from('stardesk_facturi').insert(facturi.map(f => ({
-          luna_id: lunaId, firma_id: firmaId, document_id: doc.id,
-          numar_factura: f.numarFactura || '', nume_client: f.numeClient || '', suma: Number(f.suma) || null, id_rezervare: f.idRezervare || '',
-        })))
-      }
-    }
+    if (categorie === 'comision-airbnb' || categorie === 'comision-booking') {
+      const pathPattern = categorie === 'comision-airbnb' ? '%/airbnb-facturi/%' : '%/booking-facturi/%'
+      const platformaFixa: 'airbnb' | 'booking' = categorie === 'comision-airbnb' ? 'airbnb' : 'booking'
+      const { data: comisionDocs } = await sb.from('documente')
+        .select('id,fisier_path,fisier_nume')
+        .eq('luna_id', lunaId)
+        .like('fisier_path', pathPattern)
+      const { data: existingComision } = await sb.from('comision_facturi').select('document_id').eq('luna_id', lunaId)
+      const extractedComisionDocIds = new Set((existingComision || []).map(r => r.document_id))
 
-    for (const doc of comisionDocs || []) {
-      if (extractedComisionDocIds.has(doc.id)) continue
-      const platforma: 'airbnb' | 'booking' = doc.fisier_path.includes('/airbnb-facturi/') ? 'airbnb' : 'booking'
-      const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
-      if (!file) continue
-      const bytes = Buffer.from(await file.arrayBuffer())
-      let facturi: ComisionFacturaRow[] = []
-      try { facturi = await extractComisionInvoices(bytes, platforma) } catch {}
-      if (facturi.length) {
-        await sb.from('comision_facturi').insert(facturi.map(f => ({
-          luna_id: lunaId, firma_id: firmaId, document_id: doc.id, platforma,
-          numar_factura: f.numarFactura || '', cod_rezervare: f.codRezervare || '', suma: Number(f.suma) || null,
-        })))
+      for (const doc of comisionDocs || []) {
+        if (extractedComisionDocIds.has(doc.id)) continue
+        const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
+        if (!file) continue
+        const bytes = Buffer.from(await file.arrayBuffer())
+        let facturi: ComisionFacturaRow[] = []
+        try { facturi = await extractComisionInvoices(bytes, platformaFixa) } catch {}
+        if (facturi.length) {
+          await sb.from('comision_facturi').insert(facturi.map(f => ({
+            luna_id: lunaId, firma_id: firmaId, document_id: doc.id, platforma: platformaFixa,
+            numar_factura: f.numarFactura || '', cod_rezervare: f.codRezervare || '', suma: Number(f.suma) || null,
+          })))
+        }
       }
     }
 

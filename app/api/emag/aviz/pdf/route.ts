@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   const { data: facturi } = await sb.from('emag_avize_facturi').select('factura_document_id').eq('document_id', documentId).not('factura_document_id', 'is', null)
   const facturaIds = (facturi || []).map(f => f.factura_document_id).filter(Boolean) as string[]
   const { data: facturaDocs } = facturaIds.length
-    ? await sb.from('documente').select('id,fisier_path,fisier_nume,fisier_tip').in('id', facturaIds)
+    ? await sb.from('documente').select('id,fisier_path,fisier_nume,fisier_tip,created_at').in('id', facturaIds).order('created_at', { ascending: true })
     : { data: [] }
 
   const merged = await PDFDocument.create()
