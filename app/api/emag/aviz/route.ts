@@ -6,7 +6,6 @@ interface ExtractedInvoice {
   categorie?: string
   idDocument?: string
   serieDocument?: string
-  numarCautare?: string
   dataDocument?: string
   valoare?: number
 }
@@ -24,10 +23,10 @@ async function analyzeAviz(bytes: Buffer) {
       { type:'document', source:{ type:'base64', media_type:'application/pdf', data:bytes.toString('base64') } },
       { type:'text', text:`Analizeaza avizul de plata eMAG Marketplace (tabelul cu documentele platite).
 Returneaza DOAR JSON valid:
-{"numarAviz":"2027-4100118186","dataAviz":"2026-07-03","facturi":[{"categorie":"Factura comision","idDocument":"2027-1000507403","serieDocument":"C-MKTP-5683369","numarCautare":"5683369","dataDocument":"2026-07-02","valoare":-34.82}]}
+{"numarAviz":"2027-4100118186","dataAviz":"2026-07-03","facturi":[{"categorie":"Factura comision","idDocument":"2027-1000507403","serieDocument":"C-MKTP-5683369","dataDocument":"2026-07-02","valoare":-34.82}]}
 Extrage DOAR liniile care au "Serie document" real (nu "n/a") - acestea sunt facturile pentru care trebuie cautat si descarcat documentul din portalul eMAG.
 Ignora liniile cu Serie document = "n/a" (incasari ramburs, incasari card online, retineri curier etc - nu sunt facturi de descarcat).
-numarCautare = doar partea numerica finala din serieDocument (ex: din "C-MKTP-5683369" extrage "5683369").
+serieDocument = intreaga valoare din coloana "Serie document", COMPLETA, caracter cu caracter, fara sa scoti sau sa scurtezi vreo parte (prefixe precum "C-MKTP-" sau cifre precum "100" de la inceput NU se elimina).
 valoare = numar (poate fi negativ), fara simbol monetar.` },
     ] }],
   })
@@ -125,7 +124,7 @@ export async function POST(req: NextRequest) {
         categorie: inv.categorie || '',
         id_document: inv.idDocument || '',
         serie_document: inv.serieDocument || '',
-        numar_cautare: inv.numarCautare || String(inv.serieDocument || '').match(/(\d+)$/)?.[1] || '',
+        numar_cautare: inv.serieDocument || '',
         data_document: inv.dataDocument || '',
         valoare: Number(inv.valoare) || 0,
       }))
