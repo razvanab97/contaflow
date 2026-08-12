@@ -1,8 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
 const SB = 'https://aqlmuoaaipbanjdptleg.supabase.co'
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const H = { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/json' }
+
+function fmtDataRo(s: string) {
+  const [y, m, d] = String(s || '').split('-')
+  return y && m && d ? `${d}.${m}.${y}` : String(s || '')
+}
+
+// Adauga o stampila discreta cu data tranzactiei pe prima pagina a PDF-ului,
+// ca sa fie vizibila direct pe document, nu doar in numele fisierului.
+async function stampPdfWithDate(buf: Buffer, dataTranzactie: string): Promise<Buffer> {
+  try {
+    const pdfDoc = await PDFDocument.load(buf, { ignoreEncryption: true })
+    const page = pdfDoc.getPages()[0]
+    if (!page) return buf
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const label = `Tranzactie extras: ${fmtDataRo(dataTranzactie)}`
+    const size = 8
+    const width = page.getWidth()
+    page.drawText(label, {
+      x: Math.max(8, width - font.widthOfTextAtSize(label, size) - 12),
+      y: 10,
+      size,
+      font,
+      color: rgb(0.55, 0.55, 0.55),
+    })
+    return Buffer.from(await pdfDoc.save())
+  } catch {
+    // PDF criptat/corupt, nu poate fi editat - il incarcam nemodificat
+    return buf
+  }
+}
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
 function filenamePart(value: string, fallback = '') {
@@ -40,7 +71,8 @@ export async function POST(req: NextRequest) {
     if (!tx?.id)
       return NextResponse.json({ error: 'Tranzacția nu a fost găsită pentru firma selectată' }, { status: 404 })
 
-    const buf = Buffer.from(await file.arrayBuffer())
+    let buf: Buffer = Buffer.from(await file.arrayBuffer())
+    if (file.type === 'application/pdf') buf = await stampPdfWithDate(buf, tx.data_tranzactie)
     const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
     const details = furnizor || tx.descriere_curatata || tx.descriere || 'document'
     const renamedFile = [
@@ -54,7 +86,7 @@ export async function POST(req: NextRequest) {
     const upRes = await fetch(`${SB}/storage/v1/object/documente/${path}`, {
       method: 'POST',
       headers: { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': file.type, 'x-upsert': 'true' },
-      body: buf
+      body: new Uint8Array(buf)
     })
     if (!upRes.ok) return NextResponse.json({ error: 'Storage: ' + await upRes.text() }, { status: 500 })
 
@@ -62,7 +94,7 @@ export async function POST(req: NextRequest) {
       firma_id: firmaId, luna_id: lunaId, tranzactie_id: txId,
       modul: 'extras', tip_document: tip, furnizor, numar_document: numDoc,
       fisier_path: path, fisier_nume: renamedFile, fisier_tip: file.type,
-      fisier_marime: file.size, in_zip: true
+      fisier_marime: buf.length, in_zip: true
     }
     const docRes = await fetch(
       tx.document_id

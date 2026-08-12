@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import UploadExtras from './UploadExtras'
+import CopyButton from '@/components/CopyButton'
 import { legibil } from '@/lib/colors'
 
 const CAT: Record<string, { bg: string; c: string }> = {
@@ -818,8 +819,11 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
 
             {tx.referinta && (
               <div>
-                <div style={{ fontSize:'10px', fontWeight:600, color:'#555', textTransform:'uppercase', marginBottom:'2px' }}>Referință internă</div>
-                <div style={{ fontSize:'11px', color:'#555', fontFamily:'monospace', wordBreak:'break-all' }}>{tx.referinta}</div>
+                <div style={{ fontSize:'10px', fontWeight:600, color:'#777', textTransform:'uppercase', marginBottom:'3px' }}>Referință internă</div>
+                <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                  <div style={{ fontSize:'15px', fontWeight:600, color:'#FFF', fontFamily:'monospace', wordBreak:'break-all' }}>{tx.referinta}</div>
+                  <CopyButton value={tx.referinta} />
+                </div>
               </div>
             )}
           </div>
