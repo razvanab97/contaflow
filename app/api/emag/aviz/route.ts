@@ -53,13 +53,20 @@ export async function GET(req: NextRequest) {
     ? await sb.from('emag_avize_facturi').select('*').in('document_id', documentIds)
     : { data: [] }
 
-  const result: Record<string, { documentId:string; avizNumber:string; fisierNume:string; invoices:typeof facturi }> = {}
+  const facturaDocIds = [...new Set((facturi || []).map(f => f.factura_document_id).filter(Boolean))]
+  const { data: facturaDocs } = facturaDocIds.length
+    ? await sb.from('documente').select('id,fisier_nume').in('id', facturaDocIds)
+    : { data: [] }
+  const facturaDocById = new Map((facturaDocs || []).map(d => [d.id, d.fisier_nume]))
+  const facturiEnriched = (facturi || []).map(f => ({ ...f, factura_fisier_nume: f.factura_document_id ? facturaDocById.get(f.factura_document_id) || null : null }))
+
+  const result: Record<string, { documentId:string; avizNumber:string; fisierNume:string; invoices:typeof facturiEnriched }> = {}
   for (const a of avize || []) {
     result[a.furnizor || ''] = {
       documentId: a.id,
       avizNumber: a.numar_document || '',
       fisierNume: a.fisier_nume,
-      invoices: (facturi || []).filter(f => f.document_id === a.id),
+      invoices: facturiEnriched.filter(f => f.document_id === a.id),
     }
   }
   return NextResponse.json(result)

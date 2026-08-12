@@ -9,7 +9,7 @@ interface ChecklistItem { id:string; completat:boolean; checklist_templates?:{ t
 interface EmagDoc { id:string; fisier_nume:string; category:string; effect:'cheltuiala'|'reducere'; amount:number; invoiceNumber:string; date:string; notes:string }
 interface EmagSummary { bankReceipts:number; bankPayments:number; bankCashflow:number; emagExpenses:number; emagReductions:number; emagNetCost:number }
 interface OldDoc { id:string; fisier_nume:string; tip_document?:string }
-interface AvizFactura { id:string; categorie:string; id_document:string; serie_document:string; numar_cautare:string; data_document:string; valoare:number }
+interface AvizFactura { id:string; categorie:string; id_document:string; serie_document:string; numar_cautare:string; data_document:string; valoare:number; copiat:boolean; factura_document_id:string|null; factura_fisier_nume:string|null }
 interface AvizData { documentId:string; avizNumber:string; fisierNume:string; invoices:AvizFactura[] }
 
 interface Props {
@@ -119,6 +119,74 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
   )
 }
 
+function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
+  inv: AvizFactura; firmaId:string; lunaId:string; culoare:string; onChange:()=>void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [drag, setDrag] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function markCopied() {
+    if (inv.copiat) return
+    await fetch('/api/emag/aviz/factura', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:inv.id, copiat:true }) })
+    onChange()
+  }
+  async function unmarkCopied() {
+    await fetch('/api/emag/aviz/factura', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:inv.id, copiat:false }) })
+    onChange()
+  }
+  async function uploadFactura(file: File) {
+    setUploading(true)
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('facturaId', inv.id)
+    fd.append('firmaId', firmaId)
+    fd.append('lunaId', lunaId)
+    await fetch('/api/emag/aviz/factura', { method:'POST', body:fd })
+    onChange()
+    setUploading(false)
+  }
+  async function removeFactura() {
+    if (!confirm('Ștergi factura încărcată?')) return
+    await fetch(`/api/emag/aviz/factura?facturaId=${encodeURIComponent(inv.id)}`, { method:'DELETE' })
+    onChange()
+  }
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'#161616', borderRadius:'7px', flexWrap:'wrap' }}>
+      <span style={{ flex:1, minWidth:'140px', fontSize:'12px', color:'#CCC', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {money(inv.valoare)} RON</span>
+      <span style={{ fontSize:'13px', fontWeight:700, color:'#FFF', fontFamily:'monospace' }}>{inv.numar_cautare}</span>
+      <div style={{ position:'relative', display:'inline-flex' }}>
+        <CopyButton value={inv.numar_cautare} onCopy={markCopied}/>
+        {inv.copiat && (
+          <button onClick={unmarkCopied} title="Cod deja folosit — click pentru anulare" style={{ position:'absolute', top:'-6px', right:'-6px', width:'14px', height:'14px', borderRadius:'50%', background:'#F87171', border:'1px solid #0D0D0D', color:'#fff', fontSize:'9px', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', lineHeight:1, padding:0 }}>
+            ✕
+          </button>
+        )}
+      </div>
+      {inv.factura_document_id ? (
+        <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+          <a href={`/api/emag?docId=${encodeURIComponent(inv.factura_document_id)}`} style={{ fontSize:'11px', fontWeight:600, color:'#6EE7B0' }}>✓ {inv.factura_fisier_nume || 'factură'}</a>
+          <button onClick={removeFactura} style={{ fontSize:'10px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
+        </div>
+      ) : (
+        <>
+          <button
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDrag(true) }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && uploadFactura(e.dataTransfer.files[0]) }}
+            style={{ fontSize:'11px', fontWeight:600, padding:'5px 10px', borderRadius:'6px', border:`1px dashed ${drag ? culoare : '#333'}`, background: drag ? 'rgba(255,255,255,.04)' : 'transparent', color:'#888', cursor:'pointer' }}
+          >
+            {uploading ? '...' : '+ Factură'}
+          </button>
+          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e => e.target.files?.[0] && uploadFactura(e.target.files[0])}/>
+        </>
+      )}
+    </div>
+  )
+}
+
 function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoare, onChange }: {
   taskKey:string; label:string; descriere?:string; data?:AvizData; firmaId:string; lunaId:string; culoare:string
   onChange:()=>void
@@ -180,11 +248,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
                   {data.invoices.map(inv => (
-                    <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'#161616', borderRadius:'7px' }}>
-                      <span style={{ flex:1, fontSize:'12px', color:'#CCC', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {money(inv.valoare)} RON</span>
-                      <span style={{ fontSize:'13px', fontWeight:700, color:'#FFF', fontFamily:'monospace' }}>{inv.numar_cautare}</span>
-                      <CopyButton value={inv.numar_cautare}/>
-                    </div>
+                    <FacturaRow key={inv.id} inv={inv} firmaId={firmaId} lunaId={lunaId} culoare={culoare} onChange={onChange}/>
                   ))}
                 </div>
               )}

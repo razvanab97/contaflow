@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
 
   if (docId) {
-    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip').eq('id', docId).or('fisier_path.like.%/emag-calcul/%,fisier_path.like.%/emag-avize/%').single()
+    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip').eq('id', docId).or('fisier_path.like.%/emag-calcul/%,fisier_path.like.%/emag-avize/%,fisier_path.like.%/emag-facturi/%').single()
     if (!doc?.fisier_path) return NextResponse.json({ error: 'Factura nu a fost găsită' }, { status: 404 })
     const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
     if (!file) return NextResponse.json({ error: 'Eroare descărcare' }, { status: 500 })

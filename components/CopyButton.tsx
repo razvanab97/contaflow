@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 
-export default function CopyButton({ value }: { value: string }) {
+export default function CopyButton({ value, onCopy }: { value: string; onCopy?: () => void }) {
   const [copied, setCopied] = useState(false)
 
   async function copy() {
@@ -10,6 +10,7 @@ export default function CopyButton({ value }: { value: string }) {
       await navigator.clipboard.writeText(value)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
+      onCopy?.()
     } catch {}
   }
 

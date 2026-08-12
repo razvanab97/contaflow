@@ -45,7 +45,7 @@ function pathToSection(path: string): string {
   if (p.includes('/airbnb-borderou/')) return 'airbnb-borderou'
   if (p.includes('/5stardesk/')) return '5stardesk'
   if (p.includes('/trendyol/')) return 'trendyol'
-  if (p.includes('/emag-calcul/') || p.includes('/emag-avize/')) return 'emag'
+  if (p.includes('/emag-calcul/') || p.includes('/emag-avize/') || p.includes('/emag-facturi/')) return 'emag'
   if (p.includes('/acte-contabile/')) return 'acte-contabile'
   if (p.includes('/angajati/')) return 'angajati'
   if (p.includes('/extras/')) return 'extras'
@@ -56,7 +56,7 @@ function pathToSection(path: string): string {
 function matchesSection(filePath: string, section: string): boolean {
   const p = String(filePath)
   if (section === 'dispozitie-plata') return p.includes('/dispozitii-plata/')
-  if (section === 'emag' || section === 'emag-calcul') return p.includes('/emag-calcul/') || p.includes('/emag-avize/')
+  if (section === 'emag' || section === 'emag-calcul') return p.includes('/emag-calcul/') || p.includes('/emag-avize/') || p.includes('/emag-facturi/')
   return p.includes(`/${section}/`)
 }
 
