@@ -221,8 +221,12 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     const previous = finalizat
     setFinalizat(value)
     try {
-      const res = await fetch('/api/tasks/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId, taskKey:'extras.tranzactii_documentate', completat:value }) })
-      if (!res.ok) setFinalizat(previous)
+      // Daca marcam finalizat, extrasul e evident si incarcat (altfel n-ar exista tranzactii de documentat)
+      const taskKeys = value ? ['extras.tranzactii_documentate', 'extras.incarcat'] : ['extras.tranzactii_documentate']
+      const results = await Promise.all(taskKeys.map(taskKey =>
+        fetch('/api/tasks/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId, taskKey, completat:value }) })
+      ))
+      if (results.some(res => !res.ok)) setFinalizat(previous)
     } catch {
       setFinalizat(previous)
     }
