@@ -47,12 +47,12 @@ export async function POST(req: NextRequest) {
   let txs: any[] = []
   for (const e of extrase) {
     const r = await fetch(
-      `${SB}/tranzactii?extras_id=eq.${e.id}&note=not.is.null&select=data_tranzactie,descriere_curatata,descriere,suma,valuta,tip,note&order=data_tranzactie`,
+      `${SB}/tranzactii?extras_id=eq.${e.id}&status_note=not.is.null&select=data_tranzactie,descriere_curatata,descriere,suma,valuta,tip,status_note&order=data_tranzactie`,
       { headers: H }
     )
     if (r.ok) txs = [...txs, ...(await r.json())]
   }
-  txs = txs.filter(t => t.note && t.note !== 'na')
+  txs = txs.filter(t => t.status_note)
   txs.sort((a, b) => new Date(a.data_tranzactie).getTime() - new Date(b.data_tranzactie).getTime())
 
   const pdfDoc = await PDFDocument.create()
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
   for (const t of txs) {
     const desc = safe(t.descriere_curatata || t.descriere)
-    const note = safe(t.note)
+    const note = safe(t.status_note)
     const descLines = wrapText(desc, fontRegular, rowFontSize, maxDescWidth)
     const noteLines = wrapText(note, fontRegular, rowFontSize, maxNoteWidth)
     const rowLines = Math.max(descLines.length, noteLines.length, 1)

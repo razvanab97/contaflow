@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   let all: any[] = []
   for (const e of extrase) {
     const r = await fetch(
-      `${SB}/tranzactii?extras_id=eq.${e.id}&select=id,extras_id,data_tranzactie,descriere,descriere_curatata,tip,suma,valuta,referinta,categorie,document_id,note&order=data_tranzactie,id`,
+      `${SB}/tranzactii?extras_id=eq.${e.id}&select=id,extras_id,data_tranzactie,descriere,descriere_curatata,tip,suma,valuta,referinta,categorie,document_id,note,status_note&order=data_tranzactie,id`,
       { headers: H }
     )
     if (!r.ok)

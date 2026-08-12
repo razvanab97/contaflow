@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     const updateRes = await fetch(`${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}`, {
       method: 'PATCH',
       headers: { ...H, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ document_id: doc.id, note: null })
+      body: JSON.stringify({ document_id: doc.id, note: null, status_note: null })
     })
     if (!updateRes.ok)
       return NextResponse.json({ error: 'Tranzacția nu a putut fi actualizată' }, { status: 500 })

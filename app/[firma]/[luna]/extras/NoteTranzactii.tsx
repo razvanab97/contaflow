@@ -5,14 +5,14 @@ interface Tx {
   id: string; extras_id: string; data_tranzactie: string
   descriere: string; descriere_curatata: string
   tip: 'debit'|'credit'; suma: number; valuta: string
-  note: string|null
+  status_note: string|null
 }
 
 const QUICK_NOTES = ['Aștept factura', 'Nu am primit factura', 'Am trimis email furnizor', 'De verificat cu clientul']
 
-export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culoare, onUpdateNote }: {
+export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culoare, onSetStatusNote }: {
   txs: Tx[]; firmaNume: string; lunaId: string; lunaLabel: string; culoare: string
-  onUpdateNote: (id: string, note: string|null) => void
+  onSetStatusNote: (id: string, statusNote: string|null) => void
 }) {
   const [search, setSearch] = useState('')
   const [pickedId, setPickedId] = useState<string|null>(null)
@@ -20,19 +20,19 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState('')
 
-  const noted = txs.filter(t => t.note && t.note !== 'na')
+  const noted = txs.filter(t => t.status_note)
     .sort((a, b) => new Date(a.data_tranzactie).getTime() - new Date(b.data_tranzactie).getTime())
 
   const q = search.trim().toLowerCase()
   const results = q.length < 2 ? [] : txs
-    .filter(t => !(t.note && t.note !== 'na'))
+    .filter(t => !t.status_note)
     .filter(t => (t.descriere_curatata || t.descriere || '').toLowerCase().includes(q) || String(t.suma).includes(q))
     .slice(0, 8)
 
   const picked = txs.find(t => t.id === pickedId) || null
 
   function saveNote(id: string, note: string) {
-    onUpdateNote(id, note)
+    onSetStatusNote(id, note)
     setPickedId(null)
     setCustomText('')
     setSearch('')
@@ -138,8 +138,8 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
                 <p style={{ fontSize: '12px', fontWeight: 600, color: '#DDD', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.descriere_curatata || t.descriere}</p>
                 <p style={{ fontSize: '10.5px', color: '#777', marginTop: '2px' }}>{t.data_tranzactie} · {t.tip === 'credit' ? '+' : '-'}{Number(t.suma).toFixed(2)} {t.valuta}</p>
               </div>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#D8A657', background: 'rgba(216,166,87,.1)', padding: '4px 10px', borderRadius: '7px', flexShrink: 0, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.note}</span>
-              <button onClick={() => onUpdateNote(t.id, null)} style={{ fontSize: '11px', fontWeight: 600, padding: '5px 9px', borderRadius: '7px', border: '1px solid #2A2A2A', background: '#1A1A1A', color: '#666', cursor: 'pointer', flexShrink: 0 }}>Șterge</button>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#D8A657', background: 'rgba(216,166,87,.1)', padding: '4px 10px', borderRadius: '7px', flexShrink: 0, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.status_note}</span>
+              <button onClick={() => onSetStatusNote(t.id, null)} style={{ fontSize: '11px', fontWeight: 600, padding: '5px 9px', borderRadius: '7px', border: '1px solid #2A2A2A', background: '#1A1A1A', color: '#666', cursor: 'pointer', flexShrink: 0 }}>Șterge</button>
             </div>
           ))}
         </div>

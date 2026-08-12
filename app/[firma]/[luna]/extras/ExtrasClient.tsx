@@ -27,7 +27,7 @@ interface Tx {
   descriere: string; descriere_curatata: string
   tip: 'debit'|'credit'; suma: number; valuta: string
   referinta: string|null
-  categorie: string; document_id: string|null; note: string|null
+  categorie: string; document_id: string|null; note: string|null; status_note: string|null
   documente: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }|null
 }
 interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
@@ -212,6 +212,17 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     updateNote(id, null)
   }
 
+  async function updateStatusNote(id: string, statusNote: string|null) {
+    const previous = txs.find(tx => tx.id === id)?.status_note || null
+    setTxs(current => current.map(tx => tx.id === id ? { ...tx, status_note: statusNote } : tx))
+    try {
+      const res = await fetch('/api/tranzactii/status-note', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, statusNote}) })
+      if (!res.ok) setTxs(current => current.map(tx => tx.id === id ? { ...tx, status_note:previous } : tx))
+    } catch {
+      setTxs(current => current.map(tx => tx.id === id ? { ...tx, status_note:previous } : tx))
+    }
+  }
+
   const onUploadSuccess = useCallback((uploadedTxId: string) => {
     // Mergi pur si simplu la urmatoarea tranzactie in ordine, nu la urmatoarea "nerezolvata"
     const nextIdx = activeTxIndex + 1
@@ -283,7 +294,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         {pageTab === 'facturi' ? (
           <FacturiModule firma={firma} lunaId={lunaId} tasks={facturiTasks} section="facturi-chitanta"/>
         ) : pageTab === 'note' ? (
-          <NoteTranzactii txs={txs} firmaNume={firma.nume} lunaId={lunaId} lunaLabel={lunaLabel} culoare={c} onUpdateNote={updateNote}/>
+          <NoteTranzactii txs={txs} firmaNume={firma.nume} lunaId={lunaId} lunaLabel={lunaLabel} culoare={c} onSetStatusNote={updateStatusNote}/>
         ) : (
         <>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px' }}>
