@@ -33,10 +33,12 @@ interface Tx {
 interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 
-export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: initExtrase, slug, facturiTasks }: {
-  firma: Firma; lunaId: string; luna: string; lunaLabel: string; extrase: Extras[]; slug: string; facturiTasks: TaskItem[]
+export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: initExtrase, slug, facturiTasks, extrasFinalizat: initFinalizat }: {
+  firma: Firma; lunaId: string; luna: string; lunaLabel: string; extrase: Extras[]; slug: string; facturiTasks: TaskItem[]; extrasFinalizat: boolean
 }) {
   const [pageTab, setPageTab] = useState<'extras'|'facturi'|'note'>('extras')
+  const [finalizat, setFinalizat] = useState(initFinalizat)
+  const [finalizing, setFinalizing] = useState(false)
   const [txs, setTxs] = useState<Tx[]>([])
   const [extrase, setExtrase] = useState<Extras[]>(initExtrase)
   const [newSlots, setNewSlots] = useState(0)
@@ -129,6 +131,8 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   }
   const rez = counts.ok + counts.na
   const pct = scopedTxs.length > 0 ? Math.round((rez/scopedTxs.length)*100) : 0
+  const overallRez = txs.filter(t => !!t.document_id || t.note === 'na').length
+  const overallGata = txs.length > 0 && overallRez === txs.length
   const activeTx = filtered[Math.min(activeTxIndex, Math.max(filtered.length - 1, 0))]
 
   useEffect(() => {
@@ -212,6 +216,19 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     updateNote(id, null)
   }
 
+  async function toggleFinalizat(value: boolean) {
+    setFinalizing(true)
+    const previous = finalizat
+    setFinalizat(value)
+    try {
+      const res = await fetch('/api/tasks/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId, taskKey:'extras.tranzactii_documentate', completat:value }) })
+      if (!res.ok) setFinalizat(previous)
+    } catch {
+      setFinalizat(previous)
+    }
+    setFinalizing(false)
+  }
+
   async function updateStatusNote(id: string, statusNote: string|null) {
     const previous = txs.find(tx => tx.id === id)?.status_note || null
     setTxs(current => current.map(tx => tx.id === id ? { ...tx, status_note: statusNote } : tx))
@@ -270,6 +287,18 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
             </div>
             <div style={{ fontSize:'14px', fontWeight:700, color:'#FFF' }}>{rez}/{scopedTxs.length}</div>
             <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>{pct}% rezolvate</div>
+          </div>
+          <div style={{ padding:'12px 18px 0' }}>
+            {finalizat ? (
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'8px 10px', background:'rgba(110,231,176,.06)', border:'1px solid rgba(110,231,176,.2)', borderRadius:'8px' }}>
+                <span style={{ fontSize:'11px', fontWeight:600, color:'#6EE7B0' }}>✓ Extras finalizat</span>
+                <button onClick={()=>toggleFinalizat(false)} disabled={finalizing} style={{ border:'none', background:'transparent', color:'#666', fontSize:'10px', cursor:'pointer', textDecoration:'underline' }}>anulează</button>
+              </div>
+            ) : overallGata ? (
+              <button onClick={()=>toggleFinalizat(true)} disabled={finalizing} style={{ width:'100%', fontSize:'11px', fontWeight:700, padding:'9px 10px', borderRadius:'8px', border:`1px solid ${c}`, background:c, color:'#fff', cursor:'pointer', opacity:finalizing?.6:1 }}>
+                Marchează extras finalizat
+              </button>
+            ) : null}
           </div>
         </>}
         <div style={{ marginTop:'auto', padding:'12px 18px 26px', fontSize:'11px', color:'#555' }}>{lunaLabel}</div>

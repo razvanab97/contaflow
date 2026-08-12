@@ -30,6 +30,7 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
   const taskMap: Record<string, boolean> = {}
   for (const ts of taskStariRaw) taskMap[ts.task_key] = ts.completat
   const facturiTasks = MODULE_DEFS['facturi-chitanta'].tasks.map(t => ({ ...t, completat: taskMap[t.key] ?? false }))
+  const extrasFinalizat = taskMap['extras.tranzactii_documentate'] ?? false
 
   const [y, m] = luna.split('-')
   const LUNI = ['','Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec']
@@ -44,6 +45,7 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
       extrase={extrase}
       slug={slug}
       facturiTasks={facturiTasks}
+      extrasFinalizat={extrasFinalizat}
     />
   )
 }
