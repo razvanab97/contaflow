@@ -76,7 +76,9 @@ export async function POST(req: NextRequest) {
           { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buf.toString('base64') } },
           { type: 'text', text: `Extrage TOATE tranzactiile din acest extras de cont bancar roman.
 Returneaza DOAR JSON, fara text extra, fara markdown:
-{"iban":"RO...","valuta":"RON","sold_final":275.54,"tranzactii":[{"data_tranzactie":"2026-05-04","descriere_curatata":"Trendyol plata","tip":"credit","suma":300.15,"valuta":"RON","categorie":"client"}]}
+{"iban":"RO...","valuta":"RON","sold_final":275.54,"tranzactii":[{"data_tranzactie":"2026-05-04","descriere_curatata":"Trendyol plata","referinta":"Order 147612;241","tip":"credit","suma":300.15,"valuta":"RON","categorie":"client"}]}
+"descriere_curatata" = doar numele beneficiarului/platitorului, curatat (fara coduri, IBAN-uri, numere de comanda).
+"referinta" = codul de comanda/factura mentionat langa numele beneficiarului in descriere (ex: "Order 147612;241") - de obicei primul segment din descriere, inainte de numele companiei. NU folosi codul "REF:" de la finalul blocului tranzactiei (acela e referinta interna a bancii, nu comanda) - foloseste-l doar daca nu exista alt cod de comanda/factura in descriere. Lasa string gol "" daca nu exista niciun cod.
 Categorii: client|furnizor|taxa|angajat|transfer|comision|banca|altele
 Exclude randurile: RULAJ ZI, SOLD FINAL, SOLD ANTERIOR, SOLD INITIAL.` }
         ]
