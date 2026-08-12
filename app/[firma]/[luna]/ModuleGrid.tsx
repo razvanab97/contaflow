@@ -13,6 +13,7 @@ interface Props {
   lunaId: string
   taskMap: Record<string, boolean>
   restanteCount?: number
+  dezactivate?: string[]
 }
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
@@ -30,14 +31,29 @@ function loadOrder(slug: string, modules: ModuleDef[]): string[] {
   return modules.map(m => m.slug)
 }
 
-export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap, restanteCount }: Props) {
+export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap, restanteCount, dezactivate = [] }: Props) {
   const [reordering, setReordering] = useState(false)
   const [order, setOrder] = useState<string[]>(modules.map(m => m.slug))
   const [dragOver, setDragOver] = useState<number | null>(null)
   const [busyPdf, setBusyPdf] = useState<string | null>(null)
+  const [busyToggle, setBusyToggle] = useState<string | null>(null)
   const dragIdx = useRef<number | null>(null)
   const r = rgb(firma.culoare)
   const router = useRouter()
+
+  async function toggleModul(e: React.MouseEvent, modSlug: string, next: boolean) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (busyToggle) return
+    setBusyToggle(modSlug)
+    await fetch('/api/module/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lunaId, modulSlug: modSlug, dezactivat: next }),
+    })
+    router.refresh()
+    setBusyToggle(null)
+  }
 
   useEffect(() => { setOrder(loadOrder(slug, modules)) }, [slug, modules])
 
@@ -184,9 +200,12 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
             const modPct = modTotal > 0 ? Math.round((modDone/modTotal)*100) : 0
             const isComplete = modDone === modTotal
             const isStarted = modDone > 0
+            const isDeactivated = dezactivate.includes(mod.slug)
 
-            const statusLabel = isComplete ? 'Gata' : isStarted ? 'În lucru' : 'Neînceput'
-            const statusStyle = isComplete
+            const statusLabel = isDeactivated ? 'Dezactivat' : isComplete ? 'Gata' : isStarted ? 'În lucru' : 'Neînceput'
+            const statusStyle = isDeactivated
+              ? { bg:'#161616', c:'#555', border:'#242424' }
+              : isComplete
               ? { bg:'rgba(110,231,176,.08)', c:'#6EE7B0', border:'rgba(110,231,176,.18)' }
               : isStarted
               ? { bg:'rgba(245,201,106,.07)', c:'#F5C96A', border:'rgba(245,201,106,.18)' }
@@ -197,6 +216,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
               : `/${slug}/${luna}/${mod.slug}`
 
             const isBusy = busyPdf === mod.slug
+            const isToggling = busyToggle === mod.slug
 
             return (
               <div
@@ -206,6 +226,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                   background:'#111', border:'1px solid #1E1E1E', borderRadius:'14px',
                   padding:'20px 22px', cursor:'pointer', height:'100%',
                   display:'flex', flexDirection:'column', gap:'14px',
+                  opacity: isDeactivated ? .5 : 1, transition:'opacity .15s',
                 }}
               >
                 <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
@@ -222,6 +243,14 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                         {restanteCount} neachitate
                       </span>
                     )}
+                    <button
+                      onClick={e => toggleModul(e, mod.slug, !isDeactivated)}
+                      disabled={isToggling}
+                      title={isDeactivated ? 'Reactivează modulul' : 'Nu am acest modul luna asta'}
+                      style={{ fontSize:'10px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', border:'1px solid #2A2A2A', background:'transparent', color:'#555', cursor: isToggling ? 'wait' : 'pointer', opacity: isToggling ? .5 : 1 }}
+                    >
+                      {isDeactivated ? '↺ Activează' : '⊘ Nu am' }
+                    </button>
                   </div>
                 </div>
 

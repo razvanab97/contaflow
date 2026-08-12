@@ -1,10 +1,115 @@
 'use client'
+import { useState, useEffect, useCallback } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import UploadPanel from './UploadPanel'
 import OldItemDocs, { ChecklistItem } from './OldItemDocs'
+import { legibil } from '@/lib/colors'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string; tasks: TaskItem[]; checklistItems: ChecklistItem[] }
+interface Nefacturata { id:string; codRezervare:string; numeOaspete:string; suma:number|null; platforma:string }
+interface VerificareResult {
+  totalRezervari:number; totalFacturiClient:number; totalFacturiComision:number
+  faraFacturaClient:Nefacturata[]; faraComisionAirbnb:Nefacturata[]
+  comisionBookingLipsa:boolean; totalRezervariBooking:number
+}
+
+function money(v: number|null) { return v == null ? '—' : new Intl.NumberFormat('ro-RO', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(v) }
+
+function ListaLipsa({ items }: { items: Nefacturata[] }) {
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
+      {items.map(n => (
+        <div key={n.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'#161616', borderRadius:'7px' }}>
+          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background: n.platforma==='airbnb' ? 'rgba(248,113,113,.1)' : 'rgba(96,165,250,.1)', color: n.platforma==='airbnb' ? '#F87171' : '#60A5FA', flexShrink:0 }}>
+            {n.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
+          </span>
+          <span style={{ flex:1, fontSize:'12px', color:'#DDD' }}>{n.numeOaspete || '—'}</span>
+          <span style={{ fontSize:'12px', fontWeight:600, color:'#FFF', fontFamily:'monospace' }}>{n.codRezervare}</span>
+          <span style={{ fontSize:'11px', color:'#888', flexShrink:0 }}>{money(n.suma)} RON</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }) {
+  const [result, setResult] = useState<VerificareResult|null>(null)
+  const [checking, setChecking] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/5stardesk/verifica?lunaId=${encodeURIComponent(lunaId)}`)
+    const d = await res.json().catch(() => null)
+    if (d) setResult(d)
+  }, [lunaId])
+
+  useEffect(() => { load() }, [load])
+
+  async function verifica() {
+    setChecking(true); setError('')
+    const res = await fetch('/api/5stardesk/verifica', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lunaId, firmaId: firma.id }),
+    })
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok) setError(d.error || 'Verificarea a eșuat')
+    else setResult(d)
+    setChecking(false)
+  }
+
+  return (
+    <div style={{ background:'#111', border:'1px solid #1E1E1E', borderRadius:'12px', overflow:'hidden' }}>
+      <div style={{ padding:'16px 20px', borderBottom:'1px solid #1A1A1A', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
+        <div>
+          <div style={{ fontSize:'13px', fontWeight:600, color:'#E0E0E0' }}>Rezervări nefacturate</div>
+          <div style={{ fontSize:'12px', color:'#888', marginTop:'2px' }}>
+            Verifică borderourile Airbnb + Booking, după cod rezervare și sumă, împotriva facturilor de client (5StarDesk) și de comision (Airbnb/Booking) deja încărcate.
+          </div>
+        </div>
+        <button onClick={verifica} disabled={checking} style={{ flexShrink:0, fontSize:'11px', fontWeight:600, padding:'7px 14px', borderRadius:'8px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer', opacity:checking?.6:1 }}>
+          {checking ? 'Se verifică...' : 'Verifică'}
+        </button>
+      </div>
+
+      <div style={{ padding:'16px 20px', display:'flex', flexDirection:'column', gap:'20px' }}>
+        {error && <p style={{ fontSize:'11px', color:'#F87171' }}>{error}</p>}
+        {result && (
+          <>
+            <p style={{ fontSize:'11px', color:'#666' }}>
+              {result.totalRezervari} rezervări în borderouri · {result.totalFacturiClient} facturi client (5StarDesk) · {result.totalFacturiComision} facturi comision
+            </p>
+
+            <div>
+              <div style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'8px' }}>Fără factură client (5StarDesk)</div>
+              {result.faraFacturaClient.length === 0
+                ? <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Toate rezervările au factură client asociată.</p>
+                : <ListaLipsa items={result.faraFacturaClient}/>}
+            </div>
+
+            <div>
+              <div style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'8px' }}>Fără factură de comision Airbnb</div>
+              {result.faraComisionAirbnb.length === 0
+                ? <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Toate rezervările Airbnb au factură de comision asociată.</p>
+                : <ListaLipsa items={result.faraComisionAirbnb}/>}
+            </div>
+
+            <div>
+              <div style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'8px' }}>Factură de comision Booking</div>
+              {result.totalRezervariBooking === 0 ? (
+                <p style={{ fontSize:'12px', color:'#666' }}>Nicio rezervare Booking în borderoul acestei luni.</p>
+              ) : result.comisionBookingLipsa ? (
+                <p style={{ fontSize:'12px', color:'#F87171' }}>⚠ Nu a fost găsită nicio factură de comision Booking pentru această lună — verifică secțiunea Booking · Facturi.</p>
+              ) : (
+                <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Factură de comision Booking găsită pentru această lună. (Booking facturează agregat, nu per rezervare — nu se poate verifica fiecare rezervare individual.)</p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function StarsdeskModule({ firma, lunaId, tasks, checklistItems }: Props) {
   const sorted = [...checklistItems].sort((a, b) => (a.checklist_templates?.ordine || 0) - (b.checklist_templates?.ordine || 0))
@@ -12,6 +117,8 @@ export default function StarsdeskModule({ firma, lunaId, tasks, checklistItems }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
+
+      <VerificareRezervari firma={firma} lunaId={lunaId}/>
 
       {sorted.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

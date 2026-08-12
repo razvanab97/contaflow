@@ -30,10 +30,15 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
   const lunaData = luni.find((l: any) => l.firma_id === firma.id && l.luna?.startsWith(luna))
   if (!lunaData) return <InitLuna firma={firma} luna={luna} />
 
-  const taskStariRaw = await dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' })
+  const [taskStariRaw, moduleStariRaw] = await Promise.all([
+    dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
+    dbSelect('module_stari', { eq: { luna_id: lunaData.id }, select: 'modul_slug,dezactivat' }),
+  ])
 
   const taskMap: Record<string, boolean> = {}
   for (const ts of taskStariRaw) taskMap[ts.task_key] = ts.completat
+
+  const dezactivate = moduleStariRaw.filter((m: any) => m.dezactivat).map((m: any) => m.modul_slug)
 
   const luniMap: Record<string, any> = {}
   for (const l of luni) luniMap[`${l.firma_id}_${l.luna?.slice(0,7)}`] = l
@@ -54,8 +59,9 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
 
   const modules = getFirmaModules(slug)
   const restanteCount = await getRestanteCount(firma.id)
-  const total = getFirmaTotalTasks(slug)
-  const done = taskStariRaw.filter((ts: any) => ts.completat).length
+  const activeModules = modules.filter(m => !dezactivate.includes(m.slug))
+  const total = activeModules.reduce((sum, m) => sum + m.tasks.length, 0)
+  const done = activeModules.reduce((sum, m) => sum + m.tasks.filter(t => taskMap[t.key]).length, 0)
   const pct = total > 0 ? Math.round((done/total)*100) : 0
   const ll = lunaLabel(luna)
 
@@ -122,6 +128,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
           lunaId={lunaData.id}
           taskMap={taskMap}
           restanteCount={restanteCount}
+          dezactivate={dezactivate}
         />
       </main>
     </div>
