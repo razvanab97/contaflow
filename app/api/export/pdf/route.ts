@@ -1,12 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { FIRMA_CONFIGS } from '@/lib/firma-config'
+import { FIRMA_CONFIGS, MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
 
 export const maxDuration = 120
 
 function safeName(value: string) {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'documente'
+}
+
+const DIACRITICS: Record<string, string> = {
+  'ă':'a','â':'a','î':'i','ș':'s','ş':'s','ț':'t','ţ':'t',
+  'Ă':'A','Â':'A','Î':'I','Ș':'S','Ş':'S','Ț':'T','Ţ':'T',
+}
+function safeText(value: string) {
+  const withDiacritics = value.replace(/[ăâîșşțţĂÂÎȘŞȚŢ]/g, ch => DIACRITICS[ch] || ch)
+  return withDiacritics.replace(/[^\x20-\x7E]/g, '')
+}
+
+function sectionLabel(section: string): string {
+  const def = MODULE_DEFS[section as ModuleSlug]
+  if (def) return def.label
+  if (section === 'altele') return 'Alte documente'
+  return section
+}
+
+// Pagină de separare cu numele categoriei, adăugată înainte de documentele fiecărei secțiuni
+function addSectionCover(merged: PDFDocument, font: PDFFont, label: string) {
+  const page = merged.addPage([595, 842])
+  const text = safeText(label)
+  const size = 22
+  const textWidth = font.widthOfTextAtSize(text, size)
+  page.drawText(text, { x: (595 - textWidth) / 2, y: 842 / 2, size, font, color: rgb(0.15, 0.15, 0.15) })
 }
 
 function pathToSection(path: string): string {
@@ -97,8 +122,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nu există documente în această categorie' }, { status: 404 })
 
   const merged = await PDFDocument.create()
+  const coverFont = await merged.embedFont(StandardFonts.HelveticaBold)
 
-  // PDF complet (fără scope) — grupare pe secțiuni în ordinea modulelor, pagină albă între categorii
+  // PDF complet (fără scope) — grupare pe secțiuni în ordinea modulelor, pagină cu numele categoriei înainte de fiecare
   if (!scope && firmaSlug) {
     const moduleOrder = FIRMA_CONFIGS[firmaSlug]?.module || []
 
@@ -128,16 +154,18 @@ export async function POST(req: NextRequest) {
     }
 
     const nonEmpty = ordered.filter(s => (sectionMap.get(s) || []).length > 0)
-    for (let i = 0; i < nonEmpty.length; i++) {
-      if (i > 0) merged.addPage([595, 842]) // pagină albă separator
-      for (const entry of sectionMap.get(nonEmpty[i]) || []) {
+    for (const section of nonEmpty) {
+      addSectionCover(merged, coverFont, sectionLabel(section))
+      for (const entry of sectionMap.get(section) || []) {
         const { data } = await sb.storage.from(entry.bucket).download(entry.path)
         if (!data) continue
         await embedDoc(merged, Buffer.from(await data.arrayBuffer()), entry.type, entry.name)
       }
     }
   } else {
-    // PDF per-secțiune (sau fără firmaSlug): extras + documente secțiunii
+    // PDF per-secțiune (sau fără firmaSlug): pagină cu numele categoriei, apoi extras + documente secțiunii
+    const label = scope?.section ? sectionLabel(scope.section) : isExtras ? sectionLabel('extras') : 'Documente'
+    addSectionCover(merged, coverFont, label)
     for (const s of statements || []) {
       if (!s.pdf_path) continue
       const { data } = await sb.storage.from('extrase-pdf').download(s.pdf_path)
