@@ -1,6 +1,7 @@
 'use client'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
+import CopyButton from '@/components/CopyButton'
 import { legibil } from '@/lib/colors'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string }
@@ -8,6 +9,8 @@ interface ChecklistItem { id:string; completat:boolean; checklist_templates?:{ t
 interface EmagDoc { id:string; fisier_nume:string; category:string; effect:'cheltuiala'|'reducere'; amount:number; invoiceNumber:string; date:string; notes:string }
 interface EmagSummary { bankReceipts:number; bankPayments:number; bankCashflow:number; emagExpenses:number; emagReductions:number; emagNetCost:number }
 interface OldDoc { id:string; fisier_nume:string; tip_document?:string }
+interface AvizFactura { id:string; categorie:string; id_document:string; serie_document:string; numar_cautare:string; data_document:string; valoare:number }
+interface AvizData { documentId:string; avizNumber:string; fisierNume:string; invoices:AvizFactura[] }
 
 interface Props {
   firma: Firma
@@ -116,9 +119,101 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
   )
 }
 
+function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoare, onChange }: {
+  taskKey:string; label:string; descriere?:string; data?:AvizData; firmaId:string; lunaId:string; culoare:string
+  onChange:()=>void
+}) {
+  const [open, setOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [drag, setDrag] = useState(false)
+  const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const r = rgb(culoare)
+
+  async function upload(file: File) {
+    setUploading(true); setError('')
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('firmaId', firmaId)
+    fd.append('lunaId', lunaId)
+    fd.append('taskKey', taskKey)
+    const res = await fetch('/api/emag/aviz', { method:'POST', body:fd })
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok) setError(d.error || 'Eroare la procesarea avizului')
+    else onChange()
+    setUploading(false)
+  }
+
+  async function removeAviz() {
+    if (!data || !confirm('Ștergi avizul și facturile extrase din el?')) return
+    const res = await fetch(`/api/emag/aviz?id=${encodeURIComponent(data.documentId)}`, { method:'DELETE' })
+    if (res.ok) onChange()
+  }
+
+  return (
+    <div style={{ background:'#111', border:`1px solid ${open ? `rgba(${r},.25)` : '#1E1E1E'}`, borderRadius:'10px', overflow:'hidden', transition:'border-color .2s' }}>
+      <button onClick={() => setOpen(v => !v)} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'14px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
+        <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: data ? '#6EE7B0' : '#2A2A2A' }}/>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:'13px', fontWeight:600, color:'#E0E0E0' }}>{label}</div>
+          {descriere && <div style={{ fontSize:'11px', color:'#777', marginTop:'2px' }}>{descriere}</div>}
+        </div>
+        {data && <span style={{ fontSize:'11px', fontWeight:600, color:'#6EE7B0', flexShrink:0 }}>{data.invoices.length} factur{data.invoices.length===1?'ă':'i'}</span>}
+        <svg width="14" height="14" fill="none" stroke="#555" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0, transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s' }}>
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{ padding:'0 18px 16px', borderTop:'1px solid #1A1A1A' }}>
+          {data ? (
+            <div style={{ padding:'12px 0 4px' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
+                <span style={{ fontSize:'11px', color:'#888' }}>Aviz {data.avizNumber || data.fisierNume}</span>
+                <div style={{ display:'flex', gap:'12px', alignItems:'center' }}>
+                  <a href={`/api/emag?docId=${encodeURIComponent(data.documentId)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓ PDF</a>
+                  <button onClick={removeAviz} style={{ fontSize:'11px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
+                </div>
+              </div>
+              {data.invoices.length === 0 ? (
+                <p style={{ fontSize:'12px', color:'#666' }}>Nicio factură detectată în aviz.</p>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
+                  {data.invoices.map(inv => (
+                    <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'#161616', borderRadius:'7px' }}>
+                      <span style={{ flex:1, fontSize:'12px', color:'#CCC', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {money(inv.valoare)} RON</span>
+                      <span style={{ fontSize:'13px', fontWeight:700, color:'#FFF', fontFamily:'monospace' }}>{inv.numar_cautare}</span>
+                      <CopyButton value={inv.numar_cautare}/>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div
+              onClick={() => fileRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDrag(true) }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]) }}
+              style={{ border:`1.5px dashed ${drag ? culoare : '#252525'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `rgba(${r},.04)` : '#0D0D0D', marginTop:'12px' }}
+            >
+              <p style={{ fontSize:'12px', color: uploading ? '#777' : '#888', fontWeight:600 }}>
+                {uploading ? 'Se procesează avizul...' : '+ Adaugă aviz PDF'}
+              </p>
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ display:'none' }} onChange={e => e.target.files?.[0] && upload(e.target.files[0])}/>
+          {error && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'6px' }}>{error}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Props) {
   const [summary, setSummary] = useState<EmagSummary|null>(null)
   const [docs, setDocs] = useState<EmagDoc[]>([])
+  const [avizData, setAvizData] = useState<Record<string, AvizData>>({})
   const [file, setFile] = useState<File|null>(null)
   const [drag, setDrag] = useState(false)
   const [amount, setAmount] = useState('')
@@ -137,7 +232,13 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
     if (res.ok) { setDocs(data.documents || []); setSummary(data.summary || null) }
   }, [lunaId])
 
-  useEffect(() => { load() }, [load])
+  const loadAvize = useCallback(async () => {
+    const res = await fetch(`/api/emag/aviz?lunaId=${encodeURIComponent(lunaId)}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) setAvizData(data)
+  }, [lunaId])
+
+  useEffect(() => { load(); loadAvize() }, [load, loadAvize])
 
   async function addDoc() {
     if (!file) return
@@ -180,6 +281,21 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
 
       {/* Task-uri bifabile */}
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
+
+      {/* Avize de plată — încarcă PDF-ul, AI-ul extrage facturile de căutat + copy */}
+      <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'2px' }}>
+          <span style={{ fontSize:'11px', fontWeight:700, color:'#666', textTransform:'uppercase', letterSpacing:'.1em' }}>
+            Avize de plată
+          </span>
+          <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'11px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer', opacity:pdfBusy?.6:1 }}>
+            {pdfBusy ? 'Se generează...' : 'Descarcă tot'}
+          </button>
+        </div>
+        {tasks.filter(t => t.key.startsWith('emag.aviz_')).map(t => (
+          <AvizUploadRow key={t.key} taskKey={t.key} label={t.label} descriere={t.descriere} data={avizData[t.key]} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} onChange={loadAvize}/>
+        ))}
+      </div>
 
       {/* Avize de plată din sistemul vechi (cu documente deja încărcate) */}
       {sortedItems.length > 0 && (
