@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import ExtrasClient from './ExtrasClient'
+import { MODULE_DEFS } from '@/lib/firma-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,11 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
 
   const extrase = await get(`extrase?luna_id=eq.${lunaData.id}&select=id,valuta,iban,pdf_nume,nr_tranzactii,nr_documentate,procesat_ai,sold_final&order=valuta`)
 
+  const taskStariRaw = await get(`task_stari?luna_id=eq.${lunaData.id}&select=task_key,completat`)
+  const taskMap: Record<string, boolean> = {}
+  for (const ts of taskStariRaw) taskMap[ts.task_key] = ts.completat
+  const facturiTasks = MODULE_DEFS['facturi-chitanta'].tasks.map(t => ({ ...t, completat: taskMap[t.key] ?? false }))
+
   const [y, m] = luna.split('-')
   const LUNI = ['','Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec']
   const ll = `${LUNI[+m]} ${y}`
@@ -37,6 +43,7 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
       lunaLabel={ll}
       extrase={extrase}
       slug={slug}
+      facturiTasks={facturiTasks}
     />
   )
 }

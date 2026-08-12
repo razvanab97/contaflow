@@ -3,7 +3,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import UploadExtras from './UploadExtras'
 import CopyButton from '@/components/CopyButton'
+import FacturiModule from '../modules/FacturiModule'
+import type { TaskItem } from '../modules/TaskSection'
 import { legibil } from '@/lib/colors'
+import { APP_UPDATE } from '@/lib/version'
 
 const CAT: Record<string, { bg: string; c: string }> = {
   client:   { bg: 'rgba(74,222,128,.15)',  c: '#4ADE80' },
@@ -29,9 +32,10 @@ interface Tx {
 interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 
-export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: initExtrase, slug }: {
-  firma: Firma; lunaId: string; luna: string; lunaLabel: string; extrase: Extras[]; slug: string
+export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: initExtrase, slug, facturiTasks }: {
+  firma: Firma; lunaId: string; luna: string; lunaLabel: string; extrase: Extras[]; slug: string; facturiTasks: TaskItem[]
 }) {
+  const [pageTab, setPageTab] = useState<'extras'|'facturi'>('extras')
   const [txs, setTxs] = useState<Tx[]>([])
   const [extrase, setExtrase] = useState<Extras[]>(initExtrase)
   const [newSlots, setNewSlots] = useState(0)
@@ -236,6 +240,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   })
 
   return (
+    <>
     <div style={{ display:'flex', minHeight:'100vh', background:'#0A0A0A' }}>
       {/* Sidebar */}
       <aside style={{ width:'220px', flexShrink:0, background:'#0D0D0D', borderRight:'1px solid #1E1E1E', display:'flex', flexDirection:'column', padding:'20px 0', position:'sticky', top:0, height:'100vh' }}>
@@ -281,6 +286,15 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           <p style={{ fontSize:'13px', color:'#888', marginLeft:'17px' }}>{firma.nume} · {lunaLabel}</p>
         </div>
 
+        <div style={{ display:'flex', background:'#161616', border:'1px solid #242424', padding:'3px', borderRadius:'10px', gap:'3px', marginBottom:'24px', width:'fit-content' }}>
+          <button onClick={()=>setPageTab('extras')} style={{ padding:'7px 16px', borderRadius:'7px', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, background:pageTab==='extras'?c:'transparent', color:pageTab==='extras'?'#FFF':'#888' }}>Extras de cont</button>
+          <button onClick={()=>setPageTab('facturi')} style={{ padding:'7px 16px', borderRadius:'7px', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, background:pageTab==='facturi'?c:'transparent', color:pageTab==='facturi'?'#FFF':'#888' }}>Facturi + chitanță</button>
+        </div>
+
+        {pageTab === 'facturi' ? (
+          <FacturiModule firma={firma} lunaId={lunaId} tasks={facturiTasks} section="facturi-chitanta"/>
+        ) : (
+        <>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px' }}>
           {/* Conturi existente din BD */}
           {extrase.map(e => (
@@ -426,8 +440,12 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
             )}
           </>
         )}
+        </>
+        )}
       </main>
     </div>
+    <div style={{ position:'fixed', bottom:'8px', right:'10px', fontSize:'10px', color:'#444', zIndex:30, pointerEvents:'none' }}>Update {APP_UPDATE}</div>
+    </>
   )
 }
 
