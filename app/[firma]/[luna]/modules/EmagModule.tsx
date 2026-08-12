@@ -19,15 +19,6 @@ interface Props {
 function money(v: number) { return new Intl.NumberFormat('ro-RO', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(v||0) }
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 
-// Mapare task_key → titlu afișat + descriere
-const TASK_META: Record<string, { label:string; descriere:string }> = {
-  'emag.aviz_ro_inceput': { label:'Aviz plată Emag RO — început lună', descriere:'Descarcă avizul de plată prima jumătate' },
-  'emag.aviz_ro_jumatate': { label:'Aviz plată Emag RO — jumătate lună', descriere:'Descarcă avizul de plată a doua jumătate' },
-  'emag.aviz_bg_inceput': { label:'Aviz plată Emag BG — început lună', descriere:'Bulgaria' },
-  'emag.aviz_bg_jumatate': { label:'Aviz plată Emag BG — jumătate lună', descriere:'Bulgaria' },
-  'emag.aviz_hu_sold': { label:'Aviz plată Emag HU — verificare Soldul meu', descriere:'Ungaria — selectează luna precedentă' },
-}
-
 function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaId:string; firmaId:string; culoare:string }) {
   const [open, setOpen] = useState(false)
   const [docs, setDocs] = useState<OldDoc[]>([])

@@ -60,6 +60,24 @@ function matchesSection(filePath: string, section: string): boolean {
   return p.includes(`/${section}/`)
 }
 
+// Documentele atașate individual pe tranzacții (facturi/chitanțe din extras), ordonate după data tranzacției
+async function getExtrasTxDocs(sb: ReturnType<typeof getServiceSupabase>, lunaId: string) {
+  const { data: txDocs } = await sb.from('documente')
+    .select('fisier_path,fisier_nume,fisier_tip,tranzactie_id')
+    .eq('luna_id', lunaId)
+    .eq('modul', 'extras')
+    .not('tranzactie_id', 'is', null)
+  if (!txDocs?.length) return []
+  const txIds = [...new Set(txDocs.map(d => d.tranzactie_id).filter(Boolean))]
+  const { data: txs } = await sb.from('tranzactii').select('id,data_tranzactie').in('id', txIds)
+  const dateById = new Map((txs || []).map(t => [t.id, t.data_tranzactie]))
+  return txDocs.slice().sort((a, b) => {
+    const da = dateById.get(a.tranzactie_id) || ''
+    const db = dateById.get(b.tranzactie_id) || ''
+    return da < db ? -1 : da > db ? 1 : 0
+  })
+}
+
 async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: string) {
   try {
     if (type === 'application/pdf' || name?.toLowerCase().endsWith('.pdf')) {
@@ -117,8 +135,9 @@ export async function POST(req: NextRequest) {
   const { data: statements } = includeExtras
     ? await sb.from('extrase').select('pdf_path,pdf_nume').eq('luna_id', lunaId)
     : { data: [] }
+  const extrasTxDocs = includeExtras ? await getExtrasTxDocs(sb, lunaId) : []
 
-  if (!docs?.length && !statements?.length)
+  if (!docs?.length && !statements?.length && !extrasTxDocs.length)
     return NextResponse.json({ error: 'Nu există documente în această categorie' }, { status: 404 })
 
   const merged = await PDFDocument.create()
@@ -136,6 +155,12 @@ export async function POST(req: NextRequest) {
       if (!s.pdf_path) continue
       if (!sectionMap.has('extras')) sectionMap.set('extras', [])
       sectionMap.get('extras')!.push({ path: s.pdf_path, name: s.pdf_nume || 'extras.pdf', type: 'application/pdf', bucket: 'extrase-pdf' })
+    }
+    // Documente atașate pe tranzacții (facturi/chitanțe), în ordine cronologică, după extrasul brut
+    if (extrasTxDocs.length) {
+      if (!sectionMap.has('extras')) sectionMap.set('extras', [])
+      for (const doc of extrasTxDocs)
+        sectionMap.get('extras')!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente' })
     }
     // Documente din categorii
     for (const doc of docs || []) {
@@ -171,6 +196,11 @@ export async function POST(req: NextRequest) {
       const { data } = await sb.storage.from('extrase-pdf').download(s.pdf_path)
       if (!data) continue
       await embedDoc(merged, Buffer.from(await data.arrayBuffer()), 'application/pdf', s.pdf_nume || 'extras.pdf')
+    }
+    for (const doc of extrasTxDocs) {
+      const { data } = await sb.storage.from('documente').download(doc.fisier_path)
+      if (!data) continue
+      await embedDoc(merged, Buffer.from(await data.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)
     }
     for (const doc of docs || []) {
       const { data } = await sb.storage.from('documente').download(doc.fisier_path)

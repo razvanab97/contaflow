@@ -6,6 +6,7 @@ export interface TaskItem {
   key: string
   label: string
   completat: boolean
+  descriere?: string
 }
 
 interface Props {
@@ -62,14 +63,14 @@ export default function TaskSection({ tasks, lunaId, culoare }: Props) {
             onClick={() => toggle(task.key)}
             disabled={loading === task.key}
             style={{
-              display: 'flex', alignItems: 'center', gap: '12px',
+              display: 'flex', alignItems: 'flex-start', gap: '12px',
               background: 'transparent', border: 'none', cursor: 'pointer',
               padding: '6px 0', textAlign: 'left', width: '100%',
               opacity: loading === task.key ? 0.5 : 1,
             }}
           >
             <div style={{
-              width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0,
+              width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
               background: task.completat ? `rgba(${r},.12)` : '#1A1A1A',
               border: task.completat ? `1.5px solid rgba(${r},.4)` : '1.5px solid #2A2A2A',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -81,13 +82,20 @@ export default function TaskSection({ tasks, lunaId, culoare }: Props) {
                 </svg>
               )}
             </div>
-            <span style={{
-              fontSize: '13px', fontWeight: 500,
-              color: task.completat ? '#777' : '#CCC',
-              textDecoration: task.completat ? 'line-through' : 'none',
-            }}>
-              {task.label}
-            </span>
+            <div style={{ minWidth: 0 }}>
+              <span style={{
+                fontSize: '13px', fontWeight: 500,
+                color: task.completat ? '#777' : '#CCC',
+                textDecoration: task.completat ? 'line-through' : 'none',
+              }}>
+                {task.label}
+              </span>
+              {task.descriere && (
+                <div style={{ fontSize: '11px', color: '#666', marginTop: '2px', lineHeight: 1.4 }}>
+                  {task.descriere}
+                </div>
+              )}
+            </div>
           </button>
         ))}
       </div>

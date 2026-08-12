@@ -10,6 +10,7 @@ export type ModuleSlug =
 export interface TaskDef {
   key: string
   label: string
+  descriere?: string
 }
 
 export interface ModuleDef {
@@ -121,11 +122,14 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     label: 'eMAG Facturi',
     description: 'Avize de plată și facturi Dante International',
     tasks: [
-      { key: 'emag.aviz_ro_inceput', label: 'Aviz plată Emag RO — început lună' },
-      { key: 'emag.aviz_ro_jumatate', label: 'Aviz plată Emag RO — jumătate lună' },
-      { key: 'emag.aviz_bg_inceput', label: 'Aviz plată Emag BG — început lună' },
-      { key: 'emag.aviz_bg_jumatate', label: 'Aviz plată Emag BG — jumătate lună' },
-      { key: 'emag.aviz_hu_sold', label: 'Aviz plată Emag HU — verificare Soldul meu' },
+      { key: 'emag.aviz_ro_inceput', label: 'Aviz plată Emag RO — început lună', descriere: 'Financiar → Plăți: descarcă avizul de plată (prima jumătate)' },
+      { key: 'emag.aviz_ro_jumatate', label: 'Aviz plată Emag RO — jumătate lună', descriere: 'Financiar → Plăți: descarcă avizul de plată (a doua jumătate)' },
+      { key: 'emag.facturi_ro', label: 'Facturi Emag RO descărcate', descriere: 'Deschide avizul de plată → în secțiunea Facturi pune numărul facturii + caută → descarcă documentul, pentru fiecare factură din aviz' },
+      { key: 'emag.aviz_bg_inceput', label: 'Aviz plată Emag BG — început lună', descriere: 'Financiar → Plăți: descarcă avizul de plată (prima jumătate) — Bulgaria' },
+      { key: 'emag.aviz_bg_jumatate', label: 'Aviz plată Emag BG — jumătate lună', descriere: 'Financiar → Plăți: descarcă avizul de plată (a doua jumătate) — Bulgaria' },
+      { key: 'emag.facturi_bg', label: 'Facturi Emag BG descărcate', descriere: 'Deschide avizul de plată → în secțiunea Facturi pune numărul facturii + caută → descarcă documentul, pentru fiecare factură din aviz' },
+      { key: 'emag.aviz_hu_sold', label: 'Aviz plată Emag HU — verificare Soldul meu', descriere: 'Financiar → Soldul meu: selectează luna precedentă (ex: pe 02 ale lunii → luna anterioară; pe 17 → luna curentă), apoi descarcă avizul de plată (început + jumătate lună)' },
+      { key: 'emag.facturi_hu', label: 'Facturi Emag HU descărcate', descriere: 'Deschide avizul de plată → în secțiunea Facturi pune numărul facturii + caută → descarcă documentul, pentru fiecare factură din aviz' },
     ],
   },
   trendyol: {
