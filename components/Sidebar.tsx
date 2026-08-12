@@ -206,7 +206,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
       )}
 
       {/* Bottom */}
-      <div style={{ marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid #1A1A1A' }}>
+      <div style={{ marginTop: 'auto', padding: '16px 20px 26px', borderTop: '1px solid #1A1A1A' }}>
         <Link href="/dashboard" style={{
           display: 'flex', alignItems: 'center', gap: '7px',
           fontSize: '12px', color: isDashboard ? '#999' : '#888',
@@ -223,7 +223,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
     </aside>
 
     {/* Contor update — fix pe ecran, vizibil pe orice pagina fara a depinde de scroll-ul din sidebar sau de meniul mobil deschis */}
-    <div style={{ position: 'fixed', bottom: '8px', right: '10px', fontSize: '10px', color: '#444', zIndex: 30, pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', bottom: '6px', left: '20px', fontSize: '10px', color: '#444', zIndex: 30, pointerEvents: 'none' }}>
       Update {APP_UPDATE}
     </div>
     </>

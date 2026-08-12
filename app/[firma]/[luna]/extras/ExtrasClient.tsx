@@ -212,22 +212,9 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   }
 
   const onUploadSuccess = useCallback((uploadedTxId: string) => {
-    let nextIdx = -1
-    for (let i = activeTxIndex + 1; i < filtered.length; i++) {
-      if (!filtered[i].document_id && filtered[i].note !== 'na' && filtered[i].id !== uploadedTxId) {
-        nextIdx = i
-        break
-      }
-    }
-    if (nextIdx === -1) {
-      for (let i = 0; i < activeTxIndex; i++) {
-        if (!filtered[i].document_id && filtered[i].note !== 'na' && filtered[i].id !== uploadedTxId) {
-          nextIdx = i
-          break
-        }
-      }
-    }
-    if (nextIdx !== -1) {
+    // Mergi pur si simplu la urmatoarea tranzactie in ordine, nu la urmatoarea "nerezolvata"
+    const nextIdx = activeTxIndex + 1
+    if (nextIdx < filtered.length && filtered[nextIdx].id !== uploadedTxId) {
       pendingFocusId.current = filtered[nextIdx].id
     }
     load(true)
@@ -273,7 +260,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
             <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>{pct}% rezolvate</div>
           </div>
         </>}
-        <div style={{ marginTop:'auto', padding:'12px 18px', fontSize:'11px', color:'#555' }}>{lunaLabel}</div>
+        <div style={{ marginTop:'auto', padding:'12px 18px 26px', fontSize:'11px', color:'#555' }}>{lunaLabel}</div>
       </aside>
 
       {/* Main */}
@@ -444,7 +431,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         )}
       </main>
     </div>
-    <div style={{ position:'fixed', bottom:'8px', right:'10px', fontSize:'10px', color:'#444', zIndex:30, pointerEvents:'none' }}>Update {APP_UPDATE}</div>
+    <div style={{ position:'fixed', bottom:'6px', left:'18px', fontSize:'10px', color:'#444', zIndex:30, pointerEvents:'none' }}>Update {APP_UPDATE}</div>
     </>
   )
 }
