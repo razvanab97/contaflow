@@ -119,13 +119,15 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
 export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Props) {
   const [summary, setSummary] = useState<EmagSummary|null>(null)
   const [docs, setDocs] = useState<EmagDoc[]>([])
-  const [url, setUrl] = useState('')
+  const [file, setFile] = useState<File|null>(null)
+  const [drag, setDrag] = useState(false)
   const [amount, setAmount] = useState('')
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [date, setDate] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [pdfBusy, setPdfBusy] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
   const INP: React.CSSProperties = { fontSize:'12px', background:'#0F0F0F', border:'1px solid #2A2A2A', borderRadius:'8px', padding:'9px 12px', color:'#BBB', outline:'none', width:'100%' }
 
@@ -138,12 +140,21 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
   useEffect(() => { load() }, [load])
 
   async function addDoc() {
-    if (!url) return
+    if (!file) return
     setBusy(true); setError('')
-    const res = await fetch('/api/emag', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ url, firmaId:firma.id, lunaId, category:'automat', effect:'automat', amount, invoiceNumber, date }) })
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('firmaId', firma.id)
+    fd.append('lunaId', lunaId)
+    fd.append('category', 'automat')
+    fd.append('effect', 'automat')
+    fd.append('amount', amount)
+    fd.append('invoiceNumber', invoiceNumber)
+    fd.append('date', date)
+    const res = await fetch('/api/emag', { method:'POST', body:fd })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setError(data.error || 'Importul nu a reușit')
-    else { setUrl(''); setAmount(''); setInvoiceNumber(''); await load() }
+    else { setFile(null); setAmount(''); setInvoiceNumber(''); await load() }
     setBusy(false)
   }
 
@@ -194,7 +205,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
           <div style={{ fontSize:'12px', color:'#888', marginTop:'2px' }}>
             {docs.length > 0
               ? `${docs.length} facturi · cost net ${money(summary?.emagNetCost || 0)} RON`
-              : 'Adaugă facturi Dante prin link PDF'}
+              : 'Adaugă facturi Dante prin PDF'}
           </div>
         </div>
 
@@ -212,13 +223,25 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
             </div>
           ))}
 
-          <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px', marginTop: docs.length > 0 ? '10px' : '0' }}>
-            <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Link PDF factură Dante" style={INP}/>
-            <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Suma RON" style={INP}/>
-            <input value={invoiceNumber} onChange={e=>setInvoiceNumber(e.target.value)} placeholder="Nr. factură" style={INP}/>
+          <div
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDrag(true) }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && setFile(e.dataTransfer.files[0]) }}
+            style={{ border:`1.5px dashed ${drag ? firma.culoare : '#252525'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `rgba(${r},.04)` : '#0D0D0D', marginTop: docs.length > 0 ? '10px' : '0' }}
+          >
+            <p style={{ fontSize:'12px', color: file ? '#CCC' : '#888', fontWeight:600 }}>
+              {file ? file.name : '+ Adaugă PDF factură Dante'}
+            </p>
           </div>
-          <button onClick={addDoc} disabled={busy || !url} style={{ marginTop:'8px', width:'100%', padding:'9px', borderRadius:'8px', border:'none', background: busy || !url ? '#1A1A1A' : firma.culoare, color: busy || !url ? '#555' : '#FFF', fontSize:'12px', fontWeight:600, cursor: busy || !url ? 'not-allowed' : 'pointer' }}>
-            {busy ? 'Se importă...' : '+ Adaugă factură din link'}
+          <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ display:'none' }} onChange={e => e.target.files?.[0] && setFile(e.target.files[0])}/>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginTop:'8px' }}>
+            <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Suma RON (opțional, se detectează automat)" style={INP}/>
+            <input value={invoiceNumber} onChange={e=>setInvoiceNumber(e.target.value)} placeholder="Nr. factură (opțional)" style={INP}/>
+          </div>
+          <button onClick={addDoc} disabled={busy || !file} style={{ marginTop:'8px', width:'100%', padding:'9px', borderRadius:'8px', border:'none', background: busy || !file ? '#1A1A1A' : firma.culoare, color: busy || !file ? '#555' : '#FFF', fontSize:'12px', fontWeight:600, cursor: busy || !file ? 'not-allowed' : 'pointer' }}>
+            {busy ? 'Se importă...' : '+ Adaugă factură'}
           </button>
           {error && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'8px' }}>{error}</p>}
         </div>

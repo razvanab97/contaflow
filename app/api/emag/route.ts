@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isIP } from 'node:net'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 
 const CATEGORIES = new Set(['comision', 'cupoane', 'publicitate', 'transport', 'servicii', 'altele'])
 const EFFECTS = new Set(['cheltuiala', 'reducere'])
-
-function isPrivateSource(source: URL) {
-  const hostname = source.hostname.toLowerCase()
-  if (hostname === 'localhost' || hostname.endsWith('.local')) return true
-  if (isIP(hostname) === 4) {
-    return /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(hostname) ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
-  }
-  return isIP(hostname) === 6 && (hostname === '::1' || hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('fe80:'))
-}
 
 function safePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || fallback
@@ -114,19 +103,23 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { url, firmaId, lunaId, category, effect, amount, invoiceNumber, date, notes } = await req.json()
-    if (!url || !firmaId || !lunaId)
-      return NextResponse.json({ error: 'Completează linkul PDF, firma și luna' }, { status: 400 })
+    const fd = await req.formData()
+    const file = fd.get('file') as File | null
+    const firmaId = fd.get('firmaId') as string
+    const lunaId = fd.get('lunaId') as string
+    const category = fd.get('category') as string
+    const effect = fd.get('effect') as string
+    const amount = fd.get('amount') as string
+    const invoiceNumber = fd.get('invoiceNumber') as string
+    const date = fd.get('date') as string
+    const notes = fd.get('notes') as string
 
-    let source: URL
-    try { source = new URL(url) } catch { return NextResponse.json({ error: 'Link PDF invalid' }, { status: 400 }) }
-    if (source.protocol !== 'https:' || isPrivateSource(source))
-      return NextResponse.json({ error: 'Este acceptat doar un link HTTPS public către un PDF' }, { status: 400 })
-    const response = await fetch(source, { redirect: 'error', signal: AbortSignal.timeout(30_000) })
-    if (!response.ok) return NextResponse.json({ error: `Platforma sursă a răspuns cu status ${response.status}` }, { status: 502 })
-    const bytes = Buffer.from(await response.arrayBuffer())
-    if (!(response.headers.get('content-type') || '').toLowerCase().includes('pdf') && !bytes.subarray(0, 5).equals(Buffer.from('%PDF-')))
-      return NextResponse.json({ error: 'Linkul nu a returnat un PDF' }, { status: 422 })
+    if (!file || !firmaId || !lunaId)
+      return NextResponse.json({ error: 'Adaugă PDF-ul facturii, firma și luna' }, { status: 400 })
+
+    const bytes = Buffer.from(await file.arrayBuffer())
+    if (file.type !== 'application/pdf' && !bytes.subarray(0, 5).equals(Buffer.from('%PDF-')))
+      return NextResponse.json({ error: 'Este acceptat doar un fișier PDF' }, { status: 422 })
     let extracted: Record<string, unknown> = {}
     if (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || category === 'automat' || effect === 'automat' || !invoiceNumber || !date) {
       try { extracted = await analyzeInvoice(bytes) } catch {}
@@ -148,7 +141,6 @@ export async function POST(req: NextRequest) {
       `Suma: ${numericAmount.toFixed(2)}`,
       resolvedDate && `Data: ${resolvedDate}`,
       resolvedNotes && `Note: ${resolvedNotes.replace(/\|/g, '/')}`,
-      `Sursa: ${source.hostname.replace(/^www\./, '')}`,
     ].filter(Boolean).join(' | ')
     const sb = getServiceSupabase()
     const { error: storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType: 'application/pdf' })
