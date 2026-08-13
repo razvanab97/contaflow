@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { PDFDocument } from 'pdf-lib'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
@@ -10,6 +11,20 @@ const ALLOWED_SECTIONS = new Set([
   'airbnb-facturi', 'airbnb-borderou',
   '5stardesk', 'trendyol', 'acte-contabile', 'angajati',
 ])
+
+// Facturile Booking au constant o ultima pagina cu un singur bloc de text (disclaimer legal),
+// fara continut de factura - o eliminam la incarcare, nu doar la export.
+async function stripLastPageIfExtra(bytes: Uint8Array): Promise<Uint8Array | null> {
+  try {
+    const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true })
+    const pageCount = pdfDoc.getPageCount()
+    if (pageCount <= 1) return null
+    pdfDoc.removePage(pageCount - 1)
+    return await pdfDoc.save()
+  } catch {
+    return null
+  }
+}
 
 function safeFilePart(value: string, fallback: string) {
   return value
@@ -77,7 +92,13 @@ export async function POST(req: NextRequest) {
   const path = `${firmaId}/${lunaId}/${section}/${fileName}`
   const sb = getServiceSupabase()
 
-  const { error: storageError } = await sb.storage.from('documente').upload(path, file, {
+  let uploadBytes: Uint8Array = new Uint8Array(await file.arrayBuffer())
+  if (section === 'booking-facturi' && file.type === 'application/pdf') {
+    const stripped = await stripLastPageIfExtra(uploadBytes)
+    if (stripped) uploadBytes = stripped
+  }
+
+  const { error: storageError } = await sb.storage.from('documente').upload(path, uploadBytes, {
     contentType: file.type,
     upsert: false,
   })
@@ -95,7 +116,7 @@ export async function POST(req: NextRequest) {
       fisier_path: path,
       fisier_nume: fileName,
       fisier_tip: file.type,
-      fisier_marime: file.size,
+      fisier_marime: uploadBytes.length,
       in_zip: true,
     })
     .select('id,fisier_nume,tip_document,furnizor,modul,created_at')
