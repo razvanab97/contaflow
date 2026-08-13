@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
 import { rgb, legibil } from '@/lib/colors'
+import DocumentSearch from './DocumentSearch'
 
 export interface FirmaNav {
   id: string
@@ -137,6 +138,14 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
           </Link>
         )
       })}
+
+      {/* Cautare documente (cand suntem in contextul unei firme) */}
+      {firmaAtiva && (
+        <>
+          <div style={{ height: '1px', background: '#1A1A1A', margin: '14px 16px 12px' }}/>
+          <DocumentSearch firmaId={firme.find(f => f.slug === firmaAtiva)?.id || ''} culoare={firme.find(f => f.slug === firmaAtiva)?.culoare || '#888'}/>
+        </>
+      )}
 
       {/* Furnizori link (when in a firm context) */}
       {firmaAtiva && (

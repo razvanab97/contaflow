@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import UploadExtras from './UploadExtras'
 import CopyButton from '@/components/CopyButton'
+import DocumentSearch from '@/components/DocumentSearch'
 import FacturiModule from '../modules/FacturiModule'
 import NoteTranzactii from './NoteTranzactii'
 import type { TaskItem } from '../modules/TaskSection'
@@ -274,6 +275,8 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           {firma.nume.replace(' SRL','')}
         </Link>
+        <div style={{ height:'1px', background:'#1E1E1E', margin:'8px 14px' }}/>
+        <DocumentSearch firmaId={firma.id} culoare={c}/>
         <div style={{ height:'1px', background:'#1E1E1E', margin:'8px 14px' }}/>
         <div style={{ padding:'8px 18px 4px', fontSize:'13px', fontWeight:600, color:'#DDD' }}>Extras de cont</div>
         {extrase.map(e => (
