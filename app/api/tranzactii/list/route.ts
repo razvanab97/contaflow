@@ -41,8 +41,26 @@ export async function GET(req: NextRequest) {
     for (const document of documents) documentsById.set(document.id, document)
   }
 
+  // Toate documentele atasate pe fiecare tranzactie (nu doar cel principal) - o tranzactie poate avea mai multe facturi
+  const txIds = all.map(tx => tx.id)
+  const allDocsByTx = new Map<string, any[]>()
+  if (txIds.length > 0) {
+    const adRes = await fetch(
+      `${SB}/documente?tranzactie_id=in.(${txIds.join(',')})&select=id,tranzactie_id,tip_document,furnizor,numar_document,fisier_nume&order=created_at`,
+      { headers: H }
+    )
+    if (adRes.ok) {
+      const allTxDocs = await adRes.json()
+      for (const d of allTxDocs) {
+        if (!allDocsByTx.has(d.tranzactie_id)) allDocsByTx.set(d.tranzactie_id, [])
+        allDocsByTx.get(d.tranzactie_id)!.push(d)
+      }
+    }
+  }
+
   return NextResponse.json(all.map(tx => ({
     ...tx,
-    documente: tx.document_id ? documentsById.get(tx.document_id) || null : null
+    documente: tx.document_id ? documentsById.get(tx.document_id) || null : null,
+    documenteToate: allDocsByTx.get(tx.id) || [],
   })))
 }

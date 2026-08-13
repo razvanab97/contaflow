@@ -41,7 +41,7 @@ function downloadHeaders(source: URL) {
 export async function POST(req: NextRequest) {
   const {
     url, firmaId, lunaId, section, supplier, description, reference, transactionId,
-    itemId, documentType = 'factura',
+    itemId, documentType = 'factura', mode = 'replace',
   } = await req.json()
   const isAccountingSection = ACCOUNTING_SECTIONS.has(section)
   if (!url || !firmaId || !lunaId || (!isAccountingSection && !itemId && !transactionId))
@@ -105,7 +105,9 @@ export async function POST(req: NextRequest) {
     fisier_marime:bytes.length,
     in_zip:true,
   }
-  const oldDocumentId = transaction?.document_id
+  // mode='add': tranzactia poate avea mai multe facturi - nu suprascrie documentul existent, adauga unul nou
+  const shouldReplace = mode === 'replace' && !!transaction?.document_id
+  const oldDocumentId = shouldReplace ? transaction?.document_id : null
   const oldDocument = oldDocumentId
     ? await sb.from('documente').select('fisier_path').eq('id', oldDocumentId).maybeSingle()
     : null
@@ -119,7 +121,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (transactionId && transaction) {
-    await sb.from('tranzactii').update({ document_id:data.id, note:null }).eq('id', transactionId)
+    if (mode !== 'add' || !transaction.document_id) {
+      await sb.from('tranzactii').update({ document_id:data.id, note:null }).eq('id', transactionId)
+    }
     const { count } = await sb.from('tranzactii').select('id', { count:'exact', head:true }).eq('extras_id', transaction.extras_id).not('document_id', 'is', null)
     if (count !== null) await sb.from('extrase').update({ nr_documentate:count }).eq('id', transaction.extras_id)
     const oldPath = oldDocument?.data?.fisier_path

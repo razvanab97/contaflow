@@ -28,6 +28,7 @@ interface Tx {
   referinta: string|null
   categorie: string; document_id: string|null; note: string|null; status_note: string|null
   documente: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }|null
+  documenteToate?: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }[]
 }
 interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
@@ -434,9 +435,10 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
                 firmaId={firma.id} 
                 lunaId={lunaId} 
                 culoare={c}
-                onNA={(id)=>markNA(id)} 
-                onClearNA={(id)=>clearNA(id)} 
+                onNA={(id)=>markNA(id)}
+                onClearNA={(id)=>clearNA(id)}
                 onUploadSuccess={onUploadSuccess}
+                onRefresh={()=>load(true)}
               />
             ) : (
               <>
@@ -622,9 +624,10 @@ interface WorkspaceViewProps {
   onNA: (id: string) => void
   onClearNA: (id: string) => void
   onUploadSuccess: (id: string) => void
+  onRefresh: () => void
 }
 
-function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, culoare, onNA, onClearNA, onUploadSuccess }: WorkspaceViewProps) {
+function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, culoare, onNA, onClearNA, onUploadSuccess, onRefresh }: WorkspaceViewProps) {
   const safeIndex = Math.min(activeTxIndex, Math.max(txs.length - 1, 0))
   const activeTx = txs[safeIndex]
   const selectorRef = useRef<HTMLDivElement>(null)
@@ -744,12 +747,13 @@ function WorkspaceView({ txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, 
         onNA={() => onNA(activeTx.id)}
         onClearNA={() => onClearNA(activeTx.id)}
         onUploadSuccess={() => onUploadSuccess(activeTx.id)}
+        onRefresh={onRefresh}
       />
     </div>
   )
 }
 
-function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onNext, onNA, onClearNA, onUploadSuccess }: {
+function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onNext, onNA, onClearNA, onUploadSuccess, onRefresh }: {
   tx: Tx
   index: number
   total: number
@@ -761,6 +765,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   onNA: () => void
   onClearNA: () => void
   onUploadSuccess: () => void
+  onRefresh: () => void
 }) {
   const [uploading, setUploading] = useState(false)
   const [editDoc, setEditDoc] = useState(false)
@@ -771,6 +776,13 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   const [drag, setDrag] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const [showAddMore, setShowAddMore] = useState(false)
+  const [addUrl, setAddUrl] = useState('')
+  const [addBusy, setAddBusy] = useState(false)
+  const [addError, setAddError] = useState('')
+  const [addDrag, setAddDrag] = useState(false)
+  const addFileRef = useRef<HTMLInputElement>(null)
 
   const isNA = tx.note==='na', isDone=!!tx.document_id
   const cat = tx.categorie ? CAT[tx.categorie]||CAT.altele : CAT.altele
@@ -785,7 +797,34 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     setSourceUrl('')
     setEditDoc(false)
     setUploadError('')
+    setShowAddMore(false)
+    setAddUrl('')
+    setAddError('')
   }, [tx])
+
+  async function addMoreUrl() {
+    if (!addUrl) return
+    setAddBusy(true); setAddError('')
+    const res = await fetch('/api/chitante/import-url', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      url:addUrl, firmaId, lunaId, transactionId:tx.id, documentType:'factura', mode:'add',
+    }) })
+    setAddBusy(false)
+    if (res.ok) { setAddUrl(''); onRefresh(); return }
+    setAddError((await res.json().catch(()=>({}))).error || 'Importul din link nu a reușit')
+  }
+
+  async function addMoreFile(files: FileList) {
+    if (!files.length) return
+    setAddBusy(true); setAddError('')
+    const fd = new FormData()
+    fd.append('file', files[0]); fd.append('txId', tx.id)
+    fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
+    fd.append('tip', 'factura'); fd.append('mode', 'add')
+    const res = await fetch('/api/tranzactii/doc', { method:'POST', body:fd })
+    setAddBusy(false)
+    if (res.ok) { onRefresh(); return }
+    setAddError((await res.json().catch(()=>({}))).error || 'Documentul nu a putut fi asociat')
+  }
 
   async function upload(files: FileList) {
     if (!files.length) return
@@ -923,37 +962,53 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
             <h3 style={{ fontSize:'16px', fontWeight:700, color:'#FFF', marginBottom:'8px' }}>Tranzacție Rezolvată</h3>
             <p style={{ fontSize:'13px', color:'#888', marginBottom:'20px' }}>Documentul a fost asociat cu succes în arhivă.</p>
             
-            {/* Associated Doc Details */}
-            <div style={{ background:'#0D0D0D', border:'1px solid #1A1A1A', borderRadius:'10px', padding:'12px 16px', display:'flex', flexDirection:'column', gap:'6px', textAlign:'left', marginBottom:'24px' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                <svg width="14" height="14" fill="none" stroke="#4ADE80" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
-                <span style={{ fontSize:'12px', fontWeight:600, color:'#4ADE80', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tx.documente?.fisier_nume}</span>
-              </div>
-              <div style={{ fontSize:'11px', color:'#666' }}>
-                Tip: <span style={{ color:'#888', fontWeight:500 }}>{tx.documente?.tip_document || '—'}</span>
-              </div>
-              {tx.documente?.furnizor && (
-                <div style={{ fontSize:'11px', color:'#666' }}>
-                  Furnizor: <span style={{ color:'#888', fontWeight:500 }}>{tx.documente.furnizor}</span>
+            {/* Associated Doc(s) Details — o tranzactie poate avea mai multe facturi atasate */}
+            <div style={{ display:'flex', flexDirection:'column', gap:'6px', textAlign:'left', marginBottom:'16px' }}>
+              {(tx.documenteToate?.length ? tx.documenteToate : tx.documente ? [tx.documente] : []).map(doc => (
+                <div key={doc.id} style={{ background:'#0D0D0D', border:'1px solid #1A1A1A', borderRadius:'10px', padding:'10px 14px', display:'flex', alignItems:'center', gap:'10px' }}>
+                  <svg width="14" height="14" fill="none" stroke="#4ADE80" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:'12px', fontWeight:600, color:'#4ADE80', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</div>
+                    {(doc.furnizor || doc.numar_document) && (
+                      <div style={{ fontSize:'10px', color:'#666', marginTop:'2px' }}>{[doc.furnizor, doc.numar_document && `nr. ${doc.numar_document}`].filter(Boolean).join(' · ')}</div>
+                    )}
+                  </div>
+                  <a href={`/api/tranzactii/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare), flexShrink:0 }}>↓</a>
                 </div>
-              )}
-              {tx.documente?.numar_document && (
-                <div style={{ fontSize:'11px', color:'#666' }}>
-                  Număr doc: <span style={{ color:'#888', fontWeight:500 }}>{tx.documente.numar_document}</span>
-                </div>
-              )}
+              ))}
             </div>
 
-            <div style={{ display:'flex', justifyContent:'center', gap:'8px', flexWrap:'wrap' }}>
-              {tx.documente && (
-                <a href={`/api/tranzactii/document?id=${encodeURIComponent(tx.documente.id)}`} style={{ ...BTN, background:culoare, color:'#fff', textDecoration:'none' }}>
-                  Descarcă Documentul ↓
-                </a>
-              )}
-              <button onClick={() => setEditDoc(true)} style={{ ...BTN, background:'transparent', border:`1px solid rgba(${r},.3)`, color:legibil(culoare) }}>
-                Schimbă Documentul
+            <div style={{ display:'flex', justifyContent:'center', gap:'8px', flexWrap:'wrap', marginBottom: showAddMore ? '16px' : 0 }}>
+              <button onClick={() => setShowAddMore(v=>!v)} style={{ ...BTN, background:'transparent', border:`1px solid rgba(${r},.3)`, color:legibil(culoare) }}>
+                {showAddMore ? 'Ascunde' : '+ Adaugă altă factură'}
+              </button>
+              <button onClick={() => setEditDoc(true)} style={{ ...BTN, background:'transparent', border:'1px solid #2A2A2A', color:'#888' }}>
+                Schimbă documentul principal
               </button>
             </div>
+
+            {showAddMore && (
+              <div style={{ textAlign:'left', padding:'14px', background:'#0F0F0F', border:'1px solid #1E1E1E', borderRadius:'10px' }}>
+                <div style={{ fontSize:'11px', color:'#666', marginBottom:'9px' }}>Adaugă încă o factură pentru această plată — link sau fișier. Poți repeta pentru fiecare factură.</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginBottom:'10px' }}>
+                  <input value={addUrl} onChange={e=>setAddUrl(e.target.value)} placeholder="Lipește linkul facturii PDF" style={INP}/>
+                  <button onClick={addMoreUrl} disabled={addBusy||!addUrl} style={{ ...BTN, background:culoare, color:'#FFF', opacity:(addBusy||!addUrl)?.5:1 }}>
+                    Adaugă din link
+                  </button>
+                </div>
+                <div
+                  onClick={()=>addFileRef.current?.click()}
+                  onDragOver={e=>{e.preventDefault();setAddDrag(true)}}
+                  onDragLeave={()=>setAddDrag(false)}
+                  onDrop={e=>{e.preventDefault();setAddDrag(false);e.dataTransfer.files.length&&addMoreFile(e.dataTransfer.files)}}
+                  style={{ border:`1.5px dashed ${addDrag?culoare:'#2A2A2A'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background:addDrag?`rgba(${r},.06)`:'#0D0D0D' }}
+                >
+                  <p style={{ fontSize:'12px', color: addBusy ? '#777' : '#888', fontWeight:600 }}>{addBusy ? 'Se adaugă...' : 'sau adaugă fișier'}</p>
+                </div>
+                <input ref={addFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>{ if (e.target.files?.length) addMoreFile(e.target.files); e.target.value='' }}/>
+                {addError && <p style={{ fontSize:'11px', color:'#F87171', marginTop:'8px' }}>{addError}</p>}
+              </div>
+            )}
           </div>
         ) : isNA ? (
           /* N/A Card */

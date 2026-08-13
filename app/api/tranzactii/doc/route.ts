@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
     const tip = (fd.get('tip') as string) || 'factura'
     const furnizor = (fd.get('furnizor') as string) || ''
     const numDoc = (fd.get('numDoc') as string) || ''
+    const mode = (fd.get('mode') as string) || 'replace'
 
     if (!file || !txId || !firmaId || !lunaId)
       return NextResponse.json({ error: 'Date lipsă pentru asocierea documentului' }, { status: 400 })
@@ -96,12 +97,14 @@ export async function POST(req: NextRequest) {
       fisier_path: path, fisier_nume: renamedFile, fisier_tip: file.type,
       fisier_marime: buf.length, in_zip: true
     }
+    // mode='add': tranzactia poate avea mai multe facturi - nu suprascrie documentul existent, adauga unul nou
+    const shouldReplace = mode === 'replace' && tx.document_id
     const docRes = await fetch(
-      tx.document_id
+      shouldReplace
         ? `${SB}/rest/v1/documente?id=eq.${encodeURIComponent(tx.document_id)}`
         : `${SB}/rest/v1/documente`,
       {
-        method: tx.document_id ? 'PATCH' : 'POST',
+        method: shouldReplace ? 'PATCH' : 'POST',
         headers: { ...H, 'Prefer': 'return=representation' },
         body: JSON.stringify(documentBody)
       }
@@ -110,13 +113,16 @@ export async function POST(req: NextRequest) {
     const doc = Array.isArray(docs) ? docs[0] : docs
     if (!docRes.ok || !doc?.id) return NextResponse.json({ error: 'DB doc: ' + JSON.stringify(doc) }, { status: 500 })
 
-    const updateRes = await fetch(`${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}`, {
-      method: 'PATCH',
-      headers: { ...H, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ document_id: doc.id, note: null, status_note: null })
-    })
-    if (!updateRes.ok)
-      return NextResponse.json({ error: 'Tranzacția nu a putut fi actualizată' }, { status: 500 })
+    // La adaugare suplimentara, document_id (documentul "principal") se seteaza doar daca tranzactia nu avea deja unul
+    if (mode !== 'add' || !tx.document_id) {
+      const updateRes = await fetch(`${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}`, {
+        method: 'PATCH',
+        headers: { ...H, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ document_id: doc.id, note: null, status_note: null })
+      })
+      if (!updateRes.ok)
+        return NextResponse.json({ error: 'Tranzacția nu a putut fi actualizată' }, { status: 500 })
+    }
 
     const countRes = await fetch(
       `${SB}/rest/v1/tranzactii?extras_id=eq.${encodeURIComponent(tx.extras_id)}&document_id=not.is.null&select=id`,
