@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
   if (dateQuery) orParts.push(`data_document.eq.${dateQuery}`)
 
   const url = `${SB}/documente?firma_id=eq.${encodeURIComponent(firmaId)}&or=(${orParts.join(',')})` +
+    `&fisier_path=not.like.*%2Fconfig%2F*&fisier_path=not.like.*%2Fdispozitii-plata%2Fresetari%2F*` +
     `&select=id,fisier_nume,furnizor,numar_document,suma,locatie,utilitate,data_document,fisier_path,luna_id,created_at` +
     `&order=created_at.desc&limit=40`
   const res = await fetch(url, { headers: H })

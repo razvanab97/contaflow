@@ -150,6 +150,8 @@ export async function POST(req: NextRequest) {
         .eq('luna_id', lunaId)
         .not('fisier_path', 'like', '%/tx/%')
         .not('fisier_path', 'like', '%/checklist/%')
+        .not('fisier_path', 'like', '%/config/%')
+        .not('fisier_path', 'like', '%/dispozitii-plata/resetari/%')
         .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
