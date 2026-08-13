@@ -64,11 +64,28 @@ export async function POST(req: NextRequest) {
     let extracted:{category?:string;amount?:number;supplier?:string;series?:string;invoiceNumber?:string;apartment?:string;invoiceDate?:string;representingPeriod?:string} = {}
     try { extracted = match ? JSON.parse(match[0]) : {} } catch {}
     const purpose = dispositionPurpose(extracted)
+    const sb = getServiceSupabase()
+
+    // Verificare duplicat: aceeasi factura (dupa numar) sau aceeasi suma deja atasata la o dispozitie in aceasta luna
+    let duplicateWarning: { fisierNume:string; motiv:'numar_factura'|'suma' } | null = null
+    if (extracted.invoiceNumber || extracted.amount) {
+      const { data: existing } = await sb.from('documente')
+        .select('fisier_nume,numar_document,suma')
+        .eq('firma_id', firmaId).eq('luna_id', lunaId).eq('tip_document', 'factura')
+        .like('fisier_path', '%/dispozitii-plata/atasamente/%')
+      const numarMatch = extracted.invoiceNumber
+        ? (existing || []).find(e => e.numar_document && String(e.numar_document) === String(extracted.invoiceNumber))
+        : undefined
+      const sumaMatch = !numarMatch && extracted.amount
+        ? (existing || []).find(e => e.suma != null && Math.abs(Number(e.suma) - Number(extracted.amount)) < 0.01)
+        : undefined
+      const match = numarMatch || sumaMatch
+      if (match) duplicateWarning = { fisierNume: match.fisier_nume, motiv: numarMatch ? 'numar_factura' : 'suma' }
+    }
 
     const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
     const fileName = `${safePart(extracted.supplier || 'factura', 'factura')}_${safePart(extracted.invoiceNumber || file.name, 'document')}_${Date.now()}.${extension}`
     const path = `${firmaId}/${lunaId}/dispozitii-plata/atasamente/${safePart(number, 'draft')}/${fileName}`
-    const sb = getServiceSupabase()
     const { error:storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType:file.type })
     if (storageError) return NextResponse.json({ error:storageError.message }, { status:500 })
     const utilitate = dispositionUtility(extracted)
@@ -80,7 +97,7 @@ export async function POST(req: NextRequest) {
       suma: extracted.amount || null, locatie: extracted.apartment || null, utilitate: utilitate || null,
     }).select('id,fisier_nume').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error:error.message }, { status:500 }) }
-    return NextResponse.json({ document, purpose, amount:extracted.amount || null, locatie:extracted.apartment || null, utilitate: utilitate || null })
+    return NextResponse.json({ document, purpose, amount:extracted.amount || null, locatie:extracted.apartment || null, utilitate: utilitate || null, duplicateWarning })
   } catch (error) {
     return NextResponse.json({ error:String(error) }, { status:500 })
   }

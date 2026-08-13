@@ -7,7 +7,6 @@ import FacturiModule from '../modules/FacturiModule'
 import NoteTranzactii from './NoteTranzactii'
 import type { TaskItem } from '../modules/TaskSection'
 import { legibil } from '@/lib/colors'
-import { APP_UPDATE } from '@/lib/version'
 
 const CAT: Record<string, { bg: string; c: string }> = {
   client:   { bg: 'rgba(74,222,128,.15)',  c: '#4ADE80' },
@@ -479,7 +478,6 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         )}
       </main>
     </div>
-    <div style={{ position:'fixed', bottom:'6px', left:'18px', fontSize:'10px', color:'#444', zIndex:30, pointerEvents:'none' }}>Update {APP_UPDATE}</div>
     </>
   )
 }

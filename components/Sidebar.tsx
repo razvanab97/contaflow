@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
 import { rgb, legibil } from '@/lib/colors'
-import { APP_UPDATE } from '@/lib/version'
 
 export interface FirmaNav {
   id: string
@@ -232,11 +231,6 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
         <div style={{ fontSize: '12px', color: '#777' }}>{lunaLabel}</div>
       </div>
     </aside>
-
-    {/* Contor update — fix pe ecran, vizibil pe orice pagina fara a depinde de scroll-ul din sidebar sau de meniul mobil deschis */}
-    <div style={{ position: 'fixed', bottom: '6px', left: '20px', fontSize: '10px', color: '#444', zIndex: 30, pointerEvents: 'none' }}>
-      Update {APP_UPDATE}
-    </div>
     </>
   )
 }

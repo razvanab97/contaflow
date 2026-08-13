@@ -35,6 +35,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
   const [editId, setEditId] = useState('')
   const [attachedInvoices, setAttachedInvoices] = useState<{id:string;fisier_nume:string}[]>([])
   const [invoiceBusy, setInvoiceBusy] = useState(false)
+  const [duplicateWarnings, setDuplicateWarnings] = useState<string[]>([])
   const [deletingId, setDeletingId] = useState('')
   const [templateBusy, setTemplateBusy] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
@@ -156,7 +157,8 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
   }
 
   async function analyzeInvoices(files: FileList) {
-    setInvoiceBusy(true); setError('')
+    setInvoiceBusy(true); setError(''); setDuplicateWarnings([])
+    const newWarnings: string[] = []
     for (const file of Array.from(files)) {
       const fd = new FormData()
       fd.append('file', file); fd.append('firmaId', selectedFirma.id); fd.append('lunaId', selectedLunaId); fd.append('number', number)
@@ -166,7 +168,12 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
       setAttachedInvoices(prev=>[...prev, data.document])
       if (data.purpose) setPurpose(prev=>prev ? `${prev}; ${data.purpose}` : data.purpose)
       if (data.amount) setAmount(prev => String(Math.round(((Number(prev) || 0) + data.amount) * 100) / 100))
+      if (data.duplicateWarning) {
+        const motiv = data.duplicateWarning.motiv === 'numar_factura' ? 'același număr de factură' : 'aceeași sumă'
+        newWarnings.push(`„${data.document?.fisier_nume || file.name}" pare identică cu „${data.duplicateWarning.fisierNume}" (${motiv}) — verifică să nu fie dublură.`)
+      }
     }
+    if (newWarnings.length) setDuplicateWarnings(newWarnings)
     setInvoiceBusy(false)
   }
 
@@ -237,6 +244,13 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
             <input ref={invoiceRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files&&analyzeInvoices(e.target.files)}/>
           </div>
           {attachedInvoices.length>0 && <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>{attachedInvoices.map(i=><span key={i.id} style={{ fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:'#1A1A1A', color:'#888' }}>{i.fisier_nume}</span>)}</div>}
+          {duplicateWarnings.length>0 && (
+            <div style={{ marginTop:'8px', padding:'8px 12px', borderRadius:'8px', background:'rgba(248,113,113,.08)', border:'1px solid rgba(248,113,113,.3)', display:'flex', flexDirection:'column', gap:'4px' }}>
+              {duplicateWarnings.map((w,i)=>(
+                <span key={i} style={{ fontSize:'11px', color:'#F87171' }}>⚠ {w}</span>
+              ))}
+            </div>
+          )}
 
           {/* Proprietari locali salvați */}
           {localProprietari.length>0 && (
