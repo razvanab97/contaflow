@@ -7,8 +7,13 @@ import { legibil } from '@/lib/colors'
 interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:string; cui?:string|null; nrRegCom?:string|null; adresa?:string|null; judet?:string|null; tara?:string|null }
 interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[]; proprietari?: Proprietar[] }
 
-type DispDoc = { id:string; fisier_nume:string; numar_document:string; furnizor:string; data?:Record<string,string|number>; attachments?:{id:string;fisier_nume:string}[] }
+type DispDoc = { id:string; fisier_nume:string; numar_document:string; furnizor:string; suma?:number|null; locatie?:string|null; utilitate?:string|null; data?:Record<string,string|number>; attachments?:{id:string;fisier_nume:string}[] }
 type BuletinResult = { prenume:string; nume:string; serieCi:string; numarCi:string }
+
+function dpLabel(doc: DispDoc): string {
+  const parts = [doc.utilitate, doc.locatie ? `ap. ${doc.locatie}` : null, doc.suma != null ? `${Number(doc.suma).toFixed(2)} RON` : null].filter(Boolean)
+  return parts.length ? parts.join(' · ') : String(doc.data?.purpose || doc.furnizor || doc.fisier_nume)
+}
 
 export default function DispozitieModule({ firma, firmeDisponibile, lunaId, tasks, proprietari = [] }: Props) {
   const [firmaId, setFirmaId] = useState(firma.id)
@@ -194,8 +199,8 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
         <div style={{ padding:'18px 22px' }}>
           {documents.map(doc => (
             <div key={doc.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'#161616', borderRadius:'8px' }}>
-              <span style={{ flex:1, fontSize:'11px', color:'#CCC' }}>DP nr. {doc.numar_document} · {String(doc.data?.purpose||doc.furnizor||doc.fisier_nume)}{doc.attachments?.length?` · ${doc.attachments.length} anexe`:''}</span>
-              <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare) }}>↓</a>
+              <span style={{ flex:1, fontSize:'11px', color:'#CCC' }}>DP nr. {doc.numar_document} · {dpLabel(doc)}{doc.attachments?.length?` · ${doc.attachments.length} anexe`:''}</span>
+              <a href={`/api/chitante/dispozitie?download=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare) }}>↓</a>
               <button onClick={()=>editDisposition(doc)} style={{ fontSize:'10px', color:'#8DB8FF', background:'transparent', border:'none', cursor:'pointer' }}>Modifică</button>
               <button onClick={()=>deleteDisposition(doc)} disabled={deletingId===doc.id} style={{ fontSize:'10px', color:'#F87171', background:'transparent', border:'none', cursor:'pointer' }}>{deletingId===doc.id?'...':'✕'}</button>
             </div>

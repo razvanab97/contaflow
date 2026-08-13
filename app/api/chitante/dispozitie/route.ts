@@ -58,14 +58,65 @@ async function getNextNumber(lunaId: string) {
   return String(maximum + 1).padStart(2, '0')
 }
 
+// Descarcă dispoziția + facturile atașate ei (PDF simplu daca nu are atasamente, altfel zip)
+async function downloadDispositionWithAttachments(sb: ReturnType<typeof getServiceSupabase>, id: string) {
+  const { data: document, error } = await sb
+    .from('documente')
+    .select('id,luna_id,fisier_path,fisier_nume,numar_document')
+    .eq('id', id)
+    .eq('tip_document', 'dispozitie_plata')
+    .single()
+  if (error || !document) return NextResponse.json({ error: 'Dispoziția de plată nu a fost găsită' }, { status: 404 })
+
+  const { data: attachments } = await sb
+    .from('documente')
+    .select('fisier_path,fisier_nume,furnizor,numar_document')
+    .eq('luna_id', document.luna_id)
+    .eq('modul', 'acte_contabile')
+    .eq('tip_document', 'factura')
+    .like('furnizor', 'Atașament DP %')
+  const linkedAttachments = (attachments || []).filter(a =>
+    String(a.furnizor).startsWith(`Atașament DP ${document.id} `)
+    || (String(a.furnizor).startsWith('Atașament DP nr.') && a.numar_document === document.numar_document)
+  )
+
+  const { data: dpFile, error: dpError } = await sb.storage.from('documente').download(document.fisier_path)
+  if (dpError || !dpFile) return NextResponse.json({ error: 'Fișierul nu a putut fi descărcat' }, { status: 500 })
+  const dpBytes = Buffer.from(await dpFile.arrayBuffer())
+
+  if (!linkedAttachments.length) {
+    return new NextResponse(dpBytes, {
+      headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${document.fisier_nume}"` },
+    })
+  }
+
+  const zip = new JSZip()
+  zip.file(document.fisier_nume, dpBytes)
+  for (const att of linkedAttachments) {
+    const { data: attFile } = await sb.storage.from('documente').download(att.fisier_path)
+    if (attFile) zip.file(att.fisier_nume, Buffer.from(await attFile.arrayBuffer()))
+  }
+  const zipBuffer = await zip.generateAsync({ type: 'arraybuffer' })
+  const zipName = `dispozitie_plata_${document.numar_document || ''}.zip`
+  return new NextResponse(zipBuffer, {
+    headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${zipName}"` },
+  })
+}
+
 export async function GET(req: NextRequest) {
+  const downloadId = req.nextUrl.searchParams.get('download')
+  if (downloadId) {
+    const sb = getServiceSupabase()
+    return downloadDispositionWithAttachments(sb, downloadId)
+  }
+
   const lunaId = req.nextUrl.searchParams.get('lunaId')
   if (!lunaId) return NextResponse.json({ error: 'Luna contabilă lipsește' }, { status: 400 })
   try {
     const sb = getServiceSupabase()
     const { data: documents, error } = await sb
       .from('documente')
-      .select('id,fisier_nume,numar_document,furnizor,created_at')
+      .select('id,fisier_nume,numar_document,furnizor,created_at,suma,locatie,utilitate')
       .eq('luna_id', lunaId)
       .eq('modul', 'acte_contabile')
       .eq('tip_document', 'dispozitie_plata')
@@ -285,6 +336,17 @@ export async function POST(req: NextRequest) {
     })
     if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
 
+    const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.filter(Boolean) : []
+    let locatieAgregata: string | null = null
+    let utilitateAgregata: string | null = null
+    if (attachmentIds.length) {
+      const { data: attMeta } = await sb.from('documente').select('locatie,utilitate').in('id', attachmentIds).eq('firma_id', firmaId)
+      const locatii = [...new Set((attMeta || []).map(a => a.locatie).filter(Boolean))]
+      const utilitati = [...new Set((attMeta || []).map(a => a.utilitate).filter(Boolean))]
+      locatieAgregata = locatii.length ? locatii.join(', ') : null
+      utilitateAgregata = utilitati.length ? utilitati.join(', ') : null
+    }
+
     const dispositionData = JSON.stringify({ purpose:body.purpose, beneficiary:body.beneficiary, function:body.function, amount, date:body.date, identitySeries:body.identitySeries, identityNumber:body.identityNumber })
     const values = {
       firma_id: firmaId,
@@ -298,6 +360,9 @@ export async function POST(req: NextRequest) {
       fisier_tip: 'application/pdf',
       fisier_marime: bytes.length,
       in_zip: true,
+      suma: amount,
+      locatie: locatieAgregata,
+      utilitate: utilitateAgregata,
     }
     const { data:disposition, error: databaseError } = existing
       ? await sb.from('documente').update(values).eq('id', existing.id).select('id').single()
@@ -306,7 +371,6 @@ export async function POST(req: NextRequest) {
       if (!existing) await sb.storage.from('documente').remove([path])
       return NextResponse.json({ error: databaseError.message }, { status: 500 })
     }
-    const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.filter(Boolean) : []
     if (attachmentIds.length) {
       await sb.from('documente').update({ furnizor:`Atașament DP ${disposition.id} nr. ${dispositionNumber} | ${safe(body.purpose)}`, numar_document:dispositionNumber, in_zip:true }).in('id', attachmentIds).eq('firma_id', firmaId).eq('luna_id', lunaId)
       const { data: attDocs } = await sb.from('documente').select('fisier_path,fisier_nume').in('id', attachmentIds).eq('firma_id', firmaId)

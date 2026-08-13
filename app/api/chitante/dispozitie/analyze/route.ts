@@ -22,6 +22,18 @@ function dispositionPurpose(extracted: { category?:string; supplier?:string; ser
   return [prefix, invoice, extracted.apartment ? `ap. ${extracted.apartment}` : '', period].filter(Boolean).join(' - ')
 }
 
+// Nume scurt al utilitatii pentru afisare (ex: "URBICA", "E.ON curent", "Gaz") - foloseste furnizorul daca il avem,
+// altfel un nume generic dupa categorie.
+function dispositionUtility(extracted: { category?:string; supplier?:string }) {
+  const category = String(extracted.category || '').toLowerCase()
+  const supplier = String(extracted.supplier || '').trim()
+  if (supplier) return supplier
+  if (category === 'gaz') return 'Gaz'
+  if (category === 'curent') return 'Curent'
+  if (category === 'asociatie') return 'Asociatie'
+  return ''
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!req.headers.get('content-type')?.includes('multipart/form-data'))
@@ -59,14 +71,16 @@ export async function POST(req: NextRequest) {
     const sb = getServiceSupabase()
     const { error:storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType:file.type })
     if (storageError) return NextResponse.json({ error:storageError.message }, { status:500 })
+    const utilitate = dispositionUtility(extracted)
     const { data:document, error } = await sb.from('documente').insert({
       firma_id:firmaId, luna_id:lunaId, modul:'acte_contabile', tip_document:'factura',
       furnizor:`Atașament dispoziție ${number} | ${purpose}`,
       numar_document:String(extracted.invoiceNumber || ''), fisier_path:path, fisier_nume:fileName,
       fisier_tip:file.type, fisier_marime:bytes.length, in_zip:false,
+      suma: extracted.amount || null, locatie: extracted.apartment || null, utilitate: utilitate || null,
     }).select('id,fisier_nume').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error:error.message }, { status:500 }) }
-    return NextResponse.json({ document, purpose, amount:extracted.amount || null })
+    return NextResponse.json({ document, purpose, amount:extracted.amount || null, locatie:extracted.apartment || null, utilitate: utilitate || null })
   } catch (error) {
     return NextResponse.json({ error:String(error) }, { status:500 })
   }
