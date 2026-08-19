@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 interface Rezultat {
   id: string; fisierNume: string; furnizor: string|null; numarDocument: string|null
   suma: number|null; locatie: string|null; utilitate: string|null; dataDocument: string|null
-  sectiune: string; luna: string|null
+  sectiune: string; luna: string|null; downloadUrl: string
 }
 
 const LUNI = ['','Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec']
@@ -73,7 +73,7 @@ export default function DocumentSearch({ firmaId, culoare = 'var(--c-888888)' }:
             results.map(r => (
               <a
                 key={r.id}
-                href={`/api/chitante/document?id=${encodeURIComponent(r.id)}`}
+                href={r.downloadUrl}
                 onClick={() => setOpen(false)}
                 style={{ display: 'block', padding: '9px 12px', borderBottom: '1px solid var(--c-1e1e1e)', textDecoration: 'none' }}
               >
@@ -84,6 +84,7 @@ export default function DocumentSearch({ firmaId, culoare = 'var(--c-888888)' }:
                   <span style={{ color: culoare, fontWeight: 600 }}>{r.sectiune}</span>
                   {r.luna && <span>· {fmtLuna(r.luna)}</span>}
                   {r.dataDocument && <span>· {fmtData(r.dataDocument)}</span>}
+                  {r.numarDocument && <span>· nr. {r.numarDocument}</span>}
                   {r.suma != null && <span>· {Number(r.suma).toFixed(2)} RON</span>}
                   {r.locatie && <span>· ap. {r.locatie}</span>}
                 </div>

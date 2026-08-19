@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
-function safeHeaders(fileName: string, contentType: string) {
+function safeHeaders(fileName: string, contentType: string, inline: boolean) {
   const safeName = fileName.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^\x20-\x7E]/g, '_')
   return {
     'Content-Type': contentType || 'application/octet-stream',
-    'Content-Disposition': `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
   }
 }
 
 export async function GET(req: NextRequest) {
   const tip = req.nextUrl.searchParams.get('tip')
+  const inline = req.nextUrl.searchParams.get('preview') === '1'
   const sb = getServiceSupabase()
 
   if (tip === 'certificat') {
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     if (error || !file) return NextResponse.json({ error: 'Fișierul nu a putut fi descărcat' }, { status: 500 })
 
     const fileName = firma.certificat_nume || 'certificat-inregistrare'
-    return new NextResponse(Buffer.from(await file.arrayBuffer()), { headers: safeHeaders(fileName, file.type) })
+    return new NextResponse(Buffer.from(await file.arrayBuffer()), { headers: safeHeaders(fileName, file.type, inline) })
   }
 
   if (tip === 'buletin') {
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
     if (error || !file) return NextResponse.json({ error: 'Fișierul nu a putut fi descărcat' }, { status: 500 })
 
     const fileName = proprietar.buletin_nume || 'buletin'
-    return new NextResponse(Buffer.from(await file.arrayBuffer()), { headers: safeHeaders(fileName, file.type) })
+    return new NextResponse(Buffer.from(await file.arrayBuffer()), { headers: safeHeaders(fileName, file.type, inline) })
   }
 
   return NextResponse.json({ error: 'tip invalid (certificat/buletin)' }, { status: 400 })

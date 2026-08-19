@@ -18,6 +18,12 @@ interface Props {
 }
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
+function isPreviewable(nume: string): 'pdf' | 'image' | null {
+  const lower = nume.toLowerCase()
+  if (lower.endsWith('.pdf')) return 'pdf'
+  if (/\.(jpe?g|png)$/.test(lower)) return 'image'
+  return null
+}
 
 export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
   const [open, setOpen] = useState(false)
@@ -26,9 +32,14 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
   const [error, setError] = useState('')
+  const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
   const t = item.checklist_templates
+
+  function togglePreview(id: string) {
+    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
 
   const loadDocs = useCallback(async () => {
     setLoading(true)
@@ -81,18 +92,31 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
           {loading && <p style={{ fontSize: '12px', color: 'var(--c-777777)', padding: '12px 0 4px' }}>Se încarcă...</p>}
           {docs.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', padding: '12px 0 10px' }}>
-              {docs.map(doc => (
-                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'var(--c-161616)', borderRadius: '7px' }}>
-                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: culoare, flexShrink: 0 }}/>
-                  <input
-                    defaultValue={doc.fisier_nume}
-                    onBlur={e => renameDoc(doc.id, e.target.value.trim())}
-                    style={{ flex: 1, minWidth: 0, fontSize: '12px', color: 'var(--c-cccccc)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
-                  />
-                  <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
-                  <button onClick={() => deleteDoc(doc.id)} style={{ fontSize: '11px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
-                </div>
-              ))}
+              {docs.map(doc => {
+                const kind = isPreviewable(doc.fisier_nume)
+                const open = previewIds.has(doc.id)
+                return (
+                  <div key={doc.id}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'var(--c-161616)', borderRadius: '7px' }}>
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: culoare, flexShrink: 0 }}/>
+                      <input
+                        defaultValue={doc.fisier_nume}
+                        onBlur={e => renameDoc(doc.id, e.target.value.trim())}
+                        style={{ flex: 1, minWidth: 0, fontSize: '12px', color: 'var(--c-cccccc)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                      />
+                      {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize: '11px', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
+                      <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
+                      <button onClick={() => deleteDoc(doc.id)} style={{ fontSize: '11px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+                    </div>
+                    {open && kind === 'pdf' && (
+                      <iframe src={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}&preview=1`} style={{ width: '100%', height: '60vh', border: '1px solid var(--c-1a1a1a)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
+                    )}
+                    {open && kind === 'image' && (
+                      <img src={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}&preview=1`} alt={doc.fisier_nume} style={{ width: '100%', maxHeight: '60vh', objectFit: 'contain', border: '1px solid var(--c-1a1a1a)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
           <div onClick={() => fileRef.current?.click()} onDragOver={e => { e.preventDefault(); setDrag(true) }} onDragLeave={() => setDrag(false)} onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files.length && upload(e.dataTransfer.files) }}

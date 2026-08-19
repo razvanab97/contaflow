@@ -12,6 +12,7 @@ const DELETABLE_SECTIONS = [
 
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
+  const inline = req.nextUrl.searchParams.get('preview') === '1'
   if (!id) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
 
   const sb = getServiceSupabase()
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(Buffer.from(await file.arrayBuffer()), {
     headers: {
       'Content-Type': doc.fisier_tip || 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${fileName}"`,
+      'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${fileName}"`,
     },
   })
 }

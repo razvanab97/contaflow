@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
     const downloadId = req.nextUrl.searchParams.get('download')
 
     if (downloadId) {
+      const inline = req.nextUrl.searchParams.get('preview') === '1'
       const { data: doc } = await sb.from('documente')
         .select('fisier_path,fisier_nume,fisier_tip').eq('id', downloadId).eq('modul', 'general').single()
       if (!doc?.fisier_path) return NextResponse.json({ error: 'Document negăsit' }, { status: 404 })
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
       if (error || !file) return NextResponse.json({ error: 'Eroare descărcare' }, { status: 500 })
       const fileName = String(doc.fisier_nume || 'document').replace(/["\r\n]/g, '_')
       return new NextResponse(Buffer.from(await file.arrayBuffer()), {
-        headers: { 'Content-Type': doc.fisier_tip || 'application/octet-stream', 'Content-Disposition': `attachment; filename="${fileName}"` },
+        headers: { 'Content-Type': doc.fisier_tip || 'application/octet-stream', 'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${fileName}"` },
       })
     }
 
@@ -47,7 +48,10 @@ export async function POST(req: NextRequest) {
     modul: 'general', tip_document: 'general',
     fisier_path: path, fisier_nume: file.name, fisier_tip: file.type, fisier_marime: file.size,
   }).select('id,fisier_nume,fisier_tip,fisier_marime,created_at').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    await sb.storage.from('documente').remove([path])
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true, doc: data })
 }

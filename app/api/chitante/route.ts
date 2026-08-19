@@ -68,6 +68,39 @@ async function analyzeAngajatiDoc(bytes: Uint8Array, mediaType: string): Promise
   }
 }
 
+type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null }
+
+// Citeste orice factura/document (facturi restante, facturi+chitanta, booking, airbnb, trendyol,
+// acte contabile) cu AI, ca titlul fisierului sa reflecte continutul real, nu doar tipul ales manual.
+async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<GenericExtractie | null> {
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const source = mediaType === 'application/pdf'
+      ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: Buffer.from(bytes).toString('base64') } }
+      : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as 'image/jpeg' | 'image/png', data: Buffer.from(bytes).toString('base64') } }
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: [
+        source,
+        { type: 'text', text: 'Extrage datele acestui document (factura, chitanta, borderou sau alt act contabil). Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului sau al platformei","numarDocument":"seria si numarul documentului, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ"}. "suma" e suma totala. "dataDocument" e data emiterii (format ISO). Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+      ] }],
+    })
+    const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (!match) return null
+    const parsed = JSON.parse(match[0])
+    return {
+      furnizor: typeof parsed.furnizor === 'string' ? parsed.furnizor : null,
+      numarDocument: typeof parsed.numarDocument === 'string' ? parsed.numarDocument : null,
+      suma: typeof parsed.suma === 'number' ? parsed.suma : null,
+      dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
+    }
+  } catch {
+    return null
+  }
+}
+
 // Facturile Booking au constant o ultima pagina cu un singur bloc de text (disclaimer legal),
 // fara continut de factura - o eliminam la incarcare, nu doar la export.
 async function stripLastPageIfExtra(bytes: Uint8Array): Promise<Uint8Array | null> {
@@ -100,7 +133,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
   let query = sb
     .from('documente')
-    .select('id,fisier_nume,tip_document,furnizor,modul,created_at,platit,data_platii')
+    .select('id,fisier_nume,fisier_tip,tip_document,furnizor,modul,created_at,platit,data_platii')
     .not('fisier_path', 'like', '%/tx/%')
     .not('fisier_path', 'like', '%/checklist/%')
     .like('fisier_path', `%/${section}/%`)
@@ -157,17 +190,21 @@ export async function POST(req: NextRequest) {
   let effectiveDocumentType = documentType
   let effectiveDocumentTypeLabel = documentTypeLabel
   let angajatiExtractie: AngajatiExtractie | null = null
+  let genericExtractie: GenericExtractie | null = null
   if (section === 'angajati') {
     angajatiExtractie = await analyzeAngajatiDoc(uploadBytes, file.type)
     if (angajatiExtractie) {
       effectiveDocumentType = angajatiExtractie.tipDocument
       effectiveDocumentTypeLabel = ANGAJATI_TYPE_LABELS[angajatiExtractie.tipDocument] || effectiveDocumentTypeLabel
     }
+  } else {
+    genericExtractie = await analyzeGenericDoc(uploadBytes, file.type)
   }
 
-  // Numele fisierului trebuie sa spuna ce e documentul — daca nu s-a completat furnizor/descriere,
-  // folosim eticheta tipului de document (ex. "Stat de plata") in loc de un fallback generic
-  const details = [effectiveDocumentTypeLabel, supplier, description, reference].filter(Boolean).join(' ')
+  // Numele fisierului trebuie sa spuna ce e documentul — preferam ce a citit AI-ul (furnizor + numar
+  // document), completat cu ce ai scris tu manual; daca AI-ul n-a gasit nimic, ramane eticheta tipului
+  const effectiveSupplier = supplier || genericExtractie?.furnizor || ''
+  const details = [effectiveDocumentTypeLabel, genericExtractie?.furnizor, genericExtractie?.numarDocument, supplier, description, reference].filter(Boolean).join(' ')
   const fileName = `${safeFilePart(details, effectiveType)}_${Date.now()}.${extension}`
   const path = `${firmaId}/${lunaId}/${section}/${fileName}`
 
@@ -185,7 +222,10 @@ export async function POST(req: NextRequest) {
       tranzactie_id: transactionId || null,
       modul: 'acte_contabile',
       tip_document: effectiveDocumentType,
-      furnizor: [supplier, description && `Descriere: ${description}`, reference && `Referinta: ${reference}`, `Categorie: ${category}`].filter(Boolean).join(' | '),
+      furnizor: [effectiveSupplier, description && `Descriere: ${description}`, reference && `Referinta: ${reference}`, `Categorie: ${category}`].filter(Boolean).join(' | '),
+      numar_document: reference || genericExtractie?.numarDocument || null,
+      suma: genericExtractie?.suma ?? null,
+      data_document: genericExtractie?.dataDocument || null,
       fisier_path: path,
       fisier_nume: fileName,
       fisier_tip: file.type,

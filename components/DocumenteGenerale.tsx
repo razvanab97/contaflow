@@ -9,11 +9,22 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function isPreviewable(tip: string, nume: string): 'pdf' | 'image' | null {
+  if (tip === 'application/pdf' || nume.toLowerCase().endsWith('.pdf')) return 'pdf'
+  if (tip?.startsWith('image/')) return 'image'
+  return null
+}
+
 export default function DocumenteGenerale() {
   const [docs, setDocs] = useState<Doc[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
   const inputRef = useRef<HTMLInputElement>(null)
+
+  function togglePreview(id: string) {
+    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
 
   const load = async () => {
     setLoading(true)
@@ -76,18 +87,31 @@ export default function DocumenteGenerale() {
         <div style={{ fontSize: '12px', color: 'var(--c-666666)' }}>Niciun document general încă</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {docs.map(d => (
-            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: 'var(--c-161616)', border: '1px solid var(--c-222222)' }}>
-              <input
-                defaultValue={d.fisier_nume}
-                onBlur={e => handleRename(d.id, e.target.value.trim())}
-                style={{ flex: 1, minWidth: 0, fontSize: '13px', color: 'var(--c-cccccc)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
-              />
-              <span style={{ fontSize: '11px', color: 'var(--c-666666)', flexShrink: 0 }}>{formatSize(d.fisier_marime)}</span>
-              <a href={`/api/documente-generale?download=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: '#9DB9F6', flexShrink: 0 }}>↓</a>
-              <button onClick={() => handleDelete(d.id)} style={{ fontSize: '12px', color: 'var(--c-888888)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>✕</button>
-            </div>
-          ))}
+          {docs.map(d => {
+            const kind = isPreviewable(d.fisier_tip, d.fisier_nume)
+            const open = previewIds.has(d.id)
+            return (
+              <div key={d.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: 'var(--c-161616)', border: '1px solid var(--c-222222)' }}>
+                  <input
+                    defaultValue={d.fisier_nume}
+                    onBlur={e => handleRename(d.id, e.target.value.trim())}
+                    style={{ flex: 1, minWidth: 0, fontSize: '13px', color: 'var(--c-cccccc)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--c-666666)', flexShrink: 0 }}>{formatSize(d.fisier_marime)}</span>
+                  {kind && <button onClick={() => togglePreview(d.id)} style={{ fontSize: '12px', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}>{open ? 'Ascunde' : 'Vezi'}</button>}
+                  <a href={`/api/documente-generale?download=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', flexShrink: 0 }}>↓</a>
+                  <button onClick={() => handleDelete(d.id)} style={{ fontSize: '12px', color: 'var(--c-888888)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                </div>
+                {open && kind === 'pdf' && (
+                  <iframe src={`/api/documente-generale?download=${d.id}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-222222)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
+                )}
+                {open && kind === 'image' && (
+                  <img src={`/api/documente-generale?download=${d.id}&preview=1`} alt={d.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-222222)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

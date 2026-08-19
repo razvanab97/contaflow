@@ -5,10 +5,17 @@ import { legibil, tint } from '@/lib/colors'
 interface Doc {
   id: string
   fisier_nume: string
+  fisier_tip?: string | null
   tip_document?: string
   furnizor?: string
   platit?: boolean
   data_platii?: string|null
+}
+
+function isPreviewable(tip: string | null | undefined, nume: string) {
+  if (tip === 'application/pdf' || nume.toLowerCase().endsWith('.pdf')) return 'pdf'
+  if (tip?.startsWith('image/')) return 'image'
+  return null
 }
 
 interface Props {
@@ -40,6 +47,7 @@ export default function UploadPanel({
   const [documentType, setDocumentType] = useState(documentTypeOptions?.[0]?.value || 'altul')
   const [error, setError] = useState('')
   const [drag, setDrag] = useState(false)
+  const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
   const INP: React.CSSProperties = { fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-bbbbbb)', outline: 'none', width: '100%' }
@@ -118,6 +126,10 @@ export default function UploadPanel({
     await fetch('/api/documente/rename', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: doc.id, fisier_nume }) })
   }
 
+  function togglePreview(id: string) {
+    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
+
   return (
     <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', overflow: 'hidden' }}>
       <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--c-1a1a1a)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
@@ -138,22 +150,37 @@ export default function UploadPanel({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
             {(showPaidToggle ? [...docs].sort((a, b) => Number(!!a.platit) - Number(!!b.platit)) : docs).map(doc => {
               const isPaid = showPaidToggle && !!doc.platit
+              const kind = isPreviewable(doc.fisier_tip, doc.fisier_nume)
+              const open = previewIds.has(doc.id)
               return (
-                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: isPaid ? 'var(--c-141414)' : 'var(--c-161616)', border: `1px solid ${isPaid ? 'var(--c-1e1e1e)' : 'var(--c-222222)'}`, borderRadius: '8px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? 'var(--c-333333)' : culoare, flexShrink: 0 }}/>
-                  <input
-                    defaultValue={doc.fisier_nume}
-                    onBlur={e => renameDoc(doc, e.target.value.trim())}
-                    style={{ flex: 1, minWidth: 0, fontSize: '12px', color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
-                  />
-                  {doc.tip_document && <span style={{ fontSize: '10px', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
-                  {showPaidToggle && (
-                    <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>
-                      {isPaid ? 'Anulează' : 'Marchează achitat'}
-                    </button>
+                <div key={doc.id}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: isPaid ? 'var(--c-141414)' : 'var(--c-161616)', border: `1px solid ${isPaid ? 'var(--c-1e1e1e)' : 'var(--c-222222)'}`, borderRadius: '8px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? 'var(--c-333333)' : culoare, flexShrink: 0 }}/>
+                    <input
+                      defaultValue={doc.fisier_nume}
+                      onBlur={e => renameDoc(doc, e.target.value.trim())}
+                      style={{ flex: 1, minWidth: 0, fontSize: '12px', color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                    />
+                    {doc.tip_document && <span style={{ fontSize: '10px', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
+                    {showPaidToggle && (
+                      <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>
+                        {isPaid ? 'Anulează' : 'Marchează achitat'}
+                      </button>
+                    )}
+                    {kind && (
+                      <button onClick={() => togglePreview(doc.id)} style={{ fontSize: '11px', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                        {open ? 'Ascunde' : 'Vezi'}
+                      </button>
+                    )}
+                    <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
+                    <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+                  </div>
+                  {open && kind === 'pdf' && (
+                    <iframe src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
                   )}
-                  <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
-                  <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+                  {open && kind === 'image' && (
+                    <img src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} alt={doc.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
+                  )}
                 </div>
               )
             })}

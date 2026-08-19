@@ -7,13 +7,14 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
 
   if (docId) {
+    const inline = req.nextUrl.searchParams.get('preview') === '1'
     const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip').eq('id', docId).single()
     if (!doc?.fisier_path) return NextResponse.json({ error: 'Document negăsit' }, { status: 404 })
     const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
     if (!file) return NextResponse.json({ error: 'Eroare descărcare' }, { status: 500 })
     const fileName = String(doc.fisier_nume || 'document').replace(/["\r\n]/g, '_')
     return new NextResponse(Buffer.from(await file.arrayBuffer()), {
-      headers: { 'Content-Type': doc.fisier_tip || 'application/octet-stream', 'Content-Disposition': `attachment; filename="${fileName}"` },
+      headers: { 'Content-Type': doc.fisier_tip || 'application/octet-stream', 'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${fileName}"` },
     })
   }
 

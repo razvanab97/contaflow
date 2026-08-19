@@ -24,6 +24,13 @@ function inputStyle(): React.CSSProperties {
   return { flex: 1, background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', color: 'var(--c-ffffff)', outline: 'none' }
 }
 
+function isPreviewable(nume: string | null): 'pdf' | 'image' | null {
+  const lower = (nume || '').toLowerCase()
+  if (lower.endsWith('.pdf')) return 'pdf'
+  if (/\.(jpe?g|png)$/.test(lower)) return 'image'
+  return null
+}
+
 export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
   const [firma, setFirma] = useState<FirmaDate | null>(null)
   const [proprietari, setProprietari] = useState<Proprietar[]>([])
@@ -32,8 +39,14 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<FirmaDate>>({})
   const [savingCert, setSavingCert] = useState(false)
+  const [previewCert, setPreviewCert] = useState(false)
+  const [previewBuletinIds, setPreviewBuletinIds] = useState<Set<string>>(new Set())
   const certInputRef = useRef<HTMLInputElement>(null)
   const buletinInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  function toggleBuletinPreview(id: string) {
+    setPreviewBuletinIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
 
   function load() {
     Promise.all([
@@ -148,6 +161,9 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                 onBlur={e => renameCertificat(e.target.value.trim())}
                 style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
               />
+              {isPreviewable(firma.certificat_nume) && (
+                <button onClick={() => setPreviewCert(v => !v)} style={{ fontSize: '12px', fontWeight: 600, color: previewCert ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewCert ? 'Ascunde' : 'Vezi'}</button>
+              )}
               <a href={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
             </>
           ) : (
@@ -160,6 +176,13 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
             borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
           }}>{savingCert ? '...' : (firma.certificat_path ? 'Înlocuiește' : 'Încarcă')}</button>
         </div>
+        {previewCert && firma.certificat_path && (
+          isPreviewable(firma.certificat_nume) === 'pdf' ? (
+            <iframe src={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-1e1e1e)', borderRadius: '8px', marginTop: '10px', background: 'var(--c-ffffff)' }} />
+          ) : (
+            <img src={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}&preview=1`} alt="Certificat" style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-1e1e1e)', borderRadius: '8px', marginTop: '10px', background: 'var(--c-ffffff)' }} />
+          )
+        )}
       </div>
 
       {/* Proprietari */}
@@ -214,6 +237,9 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                       onBlur={e => e.target.value.trim() && e.target.value !== p.buletin_nume && updateProprietar(p.id, { buletin_nume: e.target.value.trim() })}
                       style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
                     />
+                    {isPreviewable(p.buletin_nume) && (
+                      <button onClick={() => toggleBuletinPreview(p.id)} style={{ fontSize: '12px', fontWeight: 600, color: previewBuletinIds.has(p.id) ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewBuletinIds.has(p.id) ? 'Ascunde' : 'Vezi'}</button>
+                    )}
                     <a href={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
                   </>
                 ) : (
@@ -229,6 +255,13 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                   borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
                 }}>{p.buletin_path ? 'Înlocuiește' : 'Încarcă'}</button>
               </div>
+              {previewBuletinIds.has(p.id) && p.buletin_path && (
+                isPreviewable(p.buletin_nume) === 'pdf' ? (
+                  <iframe src={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}&preview=1`} style={{ width: '100%', height: '60vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '10px', background: 'var(--c-ffffff)' }} />
+                ) : (
+                  <img src={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}&preview=1`} alt="Buletin" style={{ width: '100%', maxHeight: '60vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '10px', background: 'var(--c-ffffff)' }} />
+                )
+              )}
             </div>
           ))}
         </div>

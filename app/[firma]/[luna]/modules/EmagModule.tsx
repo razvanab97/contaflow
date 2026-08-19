@@ -21,6 +21,17 @@ interface Props {
 
 function money(v: number) { return new Intl.NumberFormat('ro-RO', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(v||0) }
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
+// Tipul nu e mereu disponibil in listele mai vechi — deducem si dupa extensia din nume
+function isPreviewable(tip: string | undefined, nume: string): 'pdf' | 'image' | null {
+  const lower = nume.toLowerCase()
+  if (tip === 'application/pdf' || lower.endsWith('.pdf')) return 'pdf'
+  if (tip?.startsWith('image/') || /\.(jpe?g|png)$/.test(lower)) return 'image'
+  return null
+}
+function PreviewBox({ src, kind }: { src: string; kind: 'pdf' | 'image' }) {
+  if (kind === 'pdf') return <iframe src={src} style={{ width:'100%', height:'65vh', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />
+  return <img src={src} alt="" style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />
+}
 
 function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaId:string; firmaId:string; culoare:string }) {
   const [open, setOpen] = useState(false)
@@ -29,9 +40,14 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
   const [error, setError] = useState('')
+  const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
   const t = item.checklist_templates
+
+  function togglePreview(id: string) {
+    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
 
   const loadDocs = useCallback(async () => {
     setLoading(true)
@@ -94,19 +110,27 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
 
           {docs.length > 0 && (
             <div style={{ display:'flex', flexDirection:'column', gap:'5px', padding:'12px 0 10px' }}>
-              {docs.map(doc => (
-                <div key={doc.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
-                  <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:culoare, flexShrink:0 }}/>
-                  <input
-                    defaultValue={doc.fisier_nume}
-                    onBlur={e => renameDoc(doc.id, e.target.value.trim())}
-                    style={{ flex:1, minWidth:0, fontSize:'12px', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
-                  />
-                  {doc.tip_document && <span style={{ fontSize:'10px', color:'var(--c-666666)' }}>{doc.tip_document}</span>}
-                  <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓</a>
-                  <button onClick={() => deleteDoc(doc.id)} style={{ fontSize:'11px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
-                </div>
-              ))}
+              {docs.map(doc => {
+                const kind = isPreviewable(undefined, doc.fisier_nume)
+                const open = previewIds.has(doc.id)
+                return (
+                  <div key={doc.id}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
+                      <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:culoare, flexShrink:0 }}/>
+                      <input
+                        defaultValue={doc.fisier_nume}
+                        onBlur={e => renameDoc(doc.id, e.target.value.trim())}
+                        style={{ flex:1, minWidth:0, fontSize:'12px', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                      />
+                      {doc.tip_document && <span style={{ fontSize:'10px', color:'var(--c-666666)' }}>{doc.tip_document}</span>}
+                      {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'11px', fontWeight:600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
+                      <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓</a>
+                      <button onClick={() => deleteDoc(doc.id)} style={{ fontSize:'11px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
+                    </div>
+                    {open && kind && <PreviewBox src={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}&preview=1`} kind={kind}/>}
+                  </div>
+                )
+              })}
             </div>
           )}
 
@@ -134,6 +158,7 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
 }) {
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
+  const [preview, setPreview] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function markCopied() {
@@ -172,48 +197,54 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
     onChange()
   }
 
+  const kind = inv.factura_document_id ? isPreviewable(undefined, inv.factura_fisier_nume || '') : null
+
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px', flexWrap:'wrap' }}>
-      <span style={{ flex:1, minWidth:'140px', fontSize:'12px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {money(inv.valoare)} RON</span>
-      <input
-        defaultValue={inv.numar_cautare}
-        onBlur={e => renameNumarCautare(e.target.value.trim())}
-        title="Numărul de căutat — corectează dacă AI-ul l-a citit greșit"
-        style={{ width:'110px', fontSize:'13px', fontWeight:700, color:'var(--c-ffffff)', fontFamily:'monospace', background:'transparent', border:'none', outline:'none', padding:0 }}
-      />
-      <div style={{ position:'relative', display:'inline-flex' }}>
-        <CopyButton value={inv.numar_cautare} onCopy={markCopied}/>
-        {inv.copiat && (
-          <button onClick={unmarkCopied} title="Cod deja folosit — click pentru anulare" style={{ position:'absolute', top:'-6px', right:'-6px', width:'14px', height:'14px', borderRadius:'50%', background:'var(--accent-red)', border:'1px solid var(--c-0d0d0d)', color:'var(--c-ffffff)', fontSize:'9px', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', lineHeight:1, padding:0 }}>
-            ✕
-          </button>
+    <div>
+      <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px', flexWrap:'wrap' }}>
+        <span style={{ flex:1, minWidth:'140px', fontSize:'12px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {money(inv.valoare)} RON</span>
+        <input
+          defaultValue={inv.numar_cautare}
+          onBlur={e => renameNumarCautare(e.target.value.trim())}
+          title="Numărul de căutat — corectează dacă AI-ul l-a citit greșit"
+          style={{ width:'110px', fontSize:'13px', fontWeight:700, color:'var(--c-ffffff)', fontFamily:'monospace', background:'transparent', border:'none', outline:'none', padding:0 }}
+        />
+        <div style={{ position:'relative', display:'inline-flex' }}>
+          <CopyButton value={inv.numar_cautare} onCopy={markCopied}/>
+          {inv.copiat && (
+            <button onClick={unmarkCopied} title="Cod deja folosit — click pentru anulare" style={{ position:'absolute', top:'-6px', right:'-6px', width:'14px', height:'14px', borderRadius:'50%', background:'var(--accent-red)', border:'1px solid var(--c-0d0d0d)', color:'var(--c-ffffff)', fontSize:'9px', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', lineHeight:1, padding:0 }}>
+              ✕
+            </button>
+          )}
+        </div>
+        {inv.factura_document_id ? (
+          <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+            <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)' }}>✓</span>
+            <input
+              defaultValue={inv.factura_fisier_nume || ''}
+              onBlur={e => renameFacturaFisier(e.target.value.trim())}
+              style={{ width:'130px', fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', background:'transparent', border:'none', outline:'none', padding:0 }}
+            />
+            {kind && <button onClick={() => setPreview(v => !v)} style={{ fontSize:'11px', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi'}</button>}
+            <a href={`/api/emag?docId=${encodeURIComponent(inv.factura_document_id)}`} style={{ fontSize:'11px', color:'var(--accent-mint)' }}>↓</a>
+            <button onClick={removeFactura} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={() => fileRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDrag(true) }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && uploadFactura(e.dataTransfer.files[0]) }}
+              style={{ fontSize:'11px', fontWeight:600, padding:'5px 10px', borderRadius:'6px', border:`1px dashed ${drag ? culoare : 'var(--c-333333)'}`, background: drag ? 'var(--overlay-hover)' : 'transparent', color:'var(--c-888888)', cursor:'pointer' }}
+            >
+              {uploading ? '...' : '+ Factură'}
+            </button>
+            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files?.[0] && uploadFactura(e.target.files[0])}/>
+          </>
         )}
       </div>
-      {inv.factura_document_id ? (
-        <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-          <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)' }}>✓</span>
-          <input
-            defaultValue={inv.factura_fisier_nume || ''}
-            onBlur={e => renameFacturaFisier(e.target.value.trim())}
-            style={{ width:'130px', fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', background:'transparent', border:'none', outline:'none', padding:0 }}
-          />
-          <a href={`/api/emag?docId=${encodeURIComponent(inv.factura_document_id)}`} style={{ fontSize:'11px', color:'var(--accent-mint)' }}>↓</a>
-          <button onClick={removeFactura} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
-        </div>
-      ) : (
-        <>
-          <button
-            onClick={() => fileRef.current?.click()}
-            onDragOver={e => { e.preventDefault(); setDrag(true) }}
-            onDragLeave={() => setDrag(false)}
-            onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && uploadFactura(e.dataTransfer.files[0]) }}
-            style={{ fontSize:'11px', fontWeight:600, padding:'5px 10px', borderRadius:'6px', border:`1px dashed ${drag ? culoare : 'var(--c-333333)'}`, background: drag ? 'var(--overlay-hover)' : 'transparent', color:'var(--c-888888)', cursor:'pointer' }}
-          >
-            {uploading ? '...' : '+ Factură'}
-          </button>
-          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files?.[0] && uploadFactura(e.target.files[0])}/>
-        </>
-      )}
+      {preview && kind && inv.factura_document_id && <PreviewBox src={`/api/emag?docId=${encodeURIComponent(inv.factura_document_id)}&preview=1`} kind={kind}/>}
     </div>
   )
 }
@@ -284,6 +315,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
   const [error, setError] = useState('')
+  const [preview, setPreview] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
 
@@ -352,10 +384,12 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                   />
                 </div>
                 <div style={{ display:'flex', gap:'12px', alignItems:'center', flexShrink:0 }}>
+                  <button onClick={() => setPreview(v => !v)} style={{ fontSize:'11px', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi aviz'}</button>
                   <a href={`/api/emag/aviz/pdf?documentId=${encodeURIComponent(data.documentId)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓ PDF (aviz + facturi)</a>
                   <button onClick={removeAviz} style={{ fontSize:'11px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
                 </div>
               </div>
+              {preview && <PreviewBox src={`/api/emag?docId=${encodeURIComponent(data.documentId)}&preview=1`} kind="pdf"/>}
               {data.invoices.length === 0 ? (
                 <p style={{ fontSize:'12px', color:'var(--c-666666)' }}>Nicio factură detectată în aviz.</p>
               ) : (
@@ -402,9 +436,14 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
   const INP: React.CSSProperties = { fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'9px 12px', color:'var(--c-bbbbbb)', outline:'none', width:'100%' }
+
+  function togglePreview(id: string) {
+    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/emag?lunaId=${encodeURIComponent(lunaId)}`)
@@ -512,20 +551,28 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
         </div>
 
         <div style={{ padding:'16px 20px' }}>
-          {docs.map(doc => (
-            <div key={doc.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'var(--c-161616)', borderRadius:'8px' }}>
-              <strong style={{ flexShrink:0, fontSize:'12px', color: doc.effect==='reducere' ? 'var(--accent-mint)' : 'var(--accent-red)' }}>
-                {doc.effect==='reducere' ? '−' : '+'}{money(doc.amount)} RON
-              </strong>
-              <input
-                defaultValue={doc.fisier_nume}
-                onBlur={e => renameDoc(doc.id, e.target.value.trim())}
-                style={{ flex:1, minWidth:0, fontSize:'12px', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
-              />
-              <a href={`/api/emag?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare) }}>↓</a>
-              <button onClick={() => removeDoc(doc.id)} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
-            </div>
-          ))}
+          {docs.map(doc => {
+            const kind = isPreviewable(undefined, doc.fisier_nume)
+            const open = previewIds.has(doc.id)
+            return (
+              <div key={doc.id}>
+                <div style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'var(--c-161616)', borderRadius:'8px' }}>
+                  <strong style={{ flexShrink:0, fontSize:'12px', color: doc.effect==='reducere' ? 'var(--accent-mint)' : 'var(--accent-red)' }}>
+                    {doc.effect==='reducere' ? '−' : '+'}{money(doc.amount)} RON
+                  </strong>
+                  <input
+                    defaultValue={doc.fisier_nume}
+                    onBlur={e => renameDoc(doc.id, e.target.value.trim())}
+                    style={{ flex:1, minWidth:0, fontSize:'12px', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                  />
+                  {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'11px', fontWeight:600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
+                  <a href={`/api/emag?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare) }}>↓</a>
+                  <button onClick={() => removeDoc(doc.id)} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
+                </div>
+                {open && kind && <PreviewBox src={`/api/emag?docId=${encodeURIComponent(doc.id)}&preview=1`} kind={kind}/>}
+              </div>
+            )
+          })}
 
           <div
             onClick={() => fileRef.current?.click()}

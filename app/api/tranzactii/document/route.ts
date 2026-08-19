@@ -3,6 +3,7 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
   const documentId = req.nextUrl.searchParams.get('id')
+  const inline = req.nextUrl.searchParams.get('preview') === '1'
   if (!documentId) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
 
   const sb = getServiceSupabase()
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(Buffer.from(await file.arrayBuffer()), {
     headers: {
       'Content-Type': doc.fisier_tip || 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
     },
   })
 }
