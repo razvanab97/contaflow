@@ -112,6 +112,12 @@ export default function UploadPanel({
     if (!res.ok) setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, platit: doc.platit } : d))
   }
 
+  async function renameDoc(doc: Doc, fisier_nume: string) {
+    if (!fisier_nume.trim() || fisier_nume === doc.fisier_nume) return
+    setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, fisier_nume } : d))
+    await fetch('/api/documente/rename', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: doc.id, fisier_nume }) })
+  }
+
   return (
     <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', overflow: 'hidden' }}>
       <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--c-1a1a1a)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
@@ -135,7 +141,11 @@ export default function UploadPanel({
               return (
                 <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: isPaid ? 'var(--c-141414)' : 'var(--c-161616)', border: `1px solid ${isPaid ? 'var(--c-1e1e1e)' : 'var(--c-222222)'}`, borderRadius: '8px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? 'var(--c-333333)' : culoare, flexShrink: 0 }}/>
-                  <span style={{ flex: 1, fontSize: '12px', color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
+                  <input
+                    defaultValue={doc.fisier_nume}
+                    onBlur={e => renameDoc(doc, e.target.value.trim())}
+                    style={{ flex: 1, minWidth: 0, fontSize: '12px', color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                  />
                   {doc.tip_document && <span style={{ fontSize: '10px', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
                   {showPaidToggle && (
                     <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>

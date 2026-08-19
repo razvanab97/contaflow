@@ -63,6 +63,12 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
     if (res.ok) setDocs(prev => prev.filter(d => d.id !== id))
   }
 
+  async function renameDoc(id: string, fisier_nume: string) {
+    if (!fisier_nume.trim()) return
+    setDocs(prev => prev.map(d => d.id === id ? { ...d, fisier_nume } : d))
+    await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id, fisier_nume }) })
+  }
+
   const INP: React.CSSProperties = { fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'7px', padding:'8px 11px', color:'var(--c-bbbbbb)', outline:'none', width:'100%' }
 
   return (
@@ -91,7 +97,11 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
               {docs.map(doc => (
                 <div key={doc.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
                   <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:culoare, flexShrink:0 }}/>
-                  <span style={{ flex:1, fontSize:'12px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</span>
+                  <input
+                    defaultValue={doc.fisier_nume}
+                    onBlur={e => renameDoc(doc.id, e.target.value.trim())}
+                    style={{ flex:1, minWidth:0, fontSize:'12px', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                  />
                   {doc.tip_document && <span style={{ fontSize:'10px', color:'var(--c-666666)' }}>{doc.tip_document}</span>}
                   <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓</a>
                   <button onClick={() => deleteDoc(doc.id)} style={{ fontSize:'11px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
@@ -135,6 +145,16 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
     await fetch('/api/emag/aviz/factura', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:inv.id, copiat:false }) })
     onChange()
   }
+  async function renameNumarCautare(numar_cautare: string) {
+    if (!numar_cautare.trim() || numar_cautare === inv.numar_cautare) return
+    await fetch('/api/emag/aviz/factura', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:inv.id, numar_cautare }) })
+    onChange()
+  }
+  async function renameFacturaFisier(fisier_nume: string) {
+    if (!inv.factura_document_id || !fisier_nume.trim() || fisier_nume === inv.factura_fisier_nume) return
+    await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:inv.factura_document_id, fisier_nume }) })
+    onChange()
+  }
   async function uploadFactura(file: File) {
     setUploading(true)
     const fd = new FormData()
@@ -155,7 +175,12 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
   return (
     <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px', flexWrap:'wrap' }}>
       <span style={{ flex:1, minWidth:'140px', fontSize:'12px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {money(inv.valoare)} RON</span>
-      <span style={{ fontSize:'13px', fontWeight:700, color:'var(--c-ffffff)', fontFamily:'monospace' }}>{inv.numar_cautare}</span>
+      <input
+        defaultValue={inv.numar_cautare}
+        onBlur={e => renameNumarCautare(e.target.value.trim())}
+        title="Numărul de căutat — corectează dacă AI-ul l-a citit greșit"
+        style={{ width:'110px', fontSize:'13px', fontWeight:700, color:'var(--c-ffffff)', fontFamily:'monospace', background:'transparent', border:'none', outline:'none', padding:0 }}
+      />
       <div style={{ position:'relative', display:'inline-flex' }}>
         <CopyButton value={inv.numar_cautare} onCopy={markCopied}/>
         {inv.copiat && (
@@ -166,7 +191,13 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
       </div>
       {inv.factura_document_id ? (
         <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-          <a href={`/api/emag?docId=${encodeURIComponent(inv.factura_document_id)}`} style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)' }}>✓ {inv.factura_fisier_nume || 'factură'}</a>
+          <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)' }}>✓</span>
+          <input
+            defaultValue={inv.factura_fisier_nume || ''}
+            onBlur={e => renameFacturaFisier(e.target.value.trim())}
+            style={{ width:'130px', fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', background:'transparent', border:'none', outline:'none', padding:0 }}
+          />
+          <a href={`/api/emag?docId=${encodeURIComponent(inv.factura_document_id)}`} style={{ fontSize:'11px', color:'var(--accent-mint)' }}>↓</a>
           <button onClick={removeFactura} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
         </div>
       ) : (
@@ -276,6 +307,17 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
     if (res.ok) onChange()
   }
 
+  async function renameAvizNumber(numar_document: string) {
+    if (!data || !numar_document.trim() || numar_document === data.avizNumber) return
+    await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:data.documentId, numar_document }) })
+    onChange()
+  }
+  async function renameAvizFisier(fisier_nume: string) {
+    if (!data || !fisier_nume.trim() || fisier_nume === data.fisierNume) return
+    await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:data.documentId, fisier_nume }) })
+    onChange()
+  }
+
   return (
     <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius:'10px', overflow:'hidden', transition:'border-color .2s' }}>
       <button onClick={() => setOpen(v => !v)} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'14px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
@@ -294,9 +336,22 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
         <div style={{ padding:'0 18px 16px', borderTop:'1px solid var(--c-1a1a1a)' }}>
           {data ? (
             <div style={{ padding:'12px 0 4px' }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
-                <span style={{ fontSize:'11px', color:'var(--c-888888)' }}>Aviz {data.avizNumber || data.fisierNume}</span>
-                <div style={{ display:'flex', gap:'12px', alignItems:'center' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px', gap:'12px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'6px', flex:1, minWidth:0 }}>
+                  <span style={{ fontSize:'11px', color:'var(--c-888888)', flexShrink:0 }}>Aviz</span>
+                  <input
+                    defaultValue={data.avizNumber}
+                    onBlur={e => renameAvizNumber(e.target.value.trim())}
+                    placeholder="nr. aviz"
+                    style={{ width:'70px', fontSize:'11px', fontWeight:600, color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                  />
+                  <input
+                    defaultValue={data.fisierNume}
+                    onBlur={e => renameAvizFisier(e.target.value.trim())}
+                    style={{ flex:1, minWidth:0, fontSize:'11px', color:'var(--c-888888)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                  />
+                </div>
+                <div style={{ display:'flex', gap:'12px', alignItems:'center', flexShrink:0 }}>
                   <a href={`/api/emag/aviz/pdf?documentId=${encodeURIComponent(data.documentId)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓ PDF (aviz + facturi)</a>
                   <button onClick={removeAviz} style={{ fontSize:'11px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
                 </div>
@@ -390,6 +445,12 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
     if (res.ok) await load()
   }
 
+  async function renameDoc(id: string, fisier_nume: string) {
+    if (!fisier_nume.trim()) return
+    setDocs(prev => prev.map(d => d.id === id ? { ...d, fisier_nume } : d))
+    await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id, fisier_nume }) })
+  }
+
   async function savePdf() {
     setPdfBusy(true)
     const res = await fetch('/api/export/pdf', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId, title:`Facturi_eMAG_Dante_${firma.nume}`, scope:{ section:'emag-calcul' } }) })
@@ -453,12 +514,14 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
         <div style={{ padding:'16px 20px' }}>
           {docs.map(doc => (
             <div key={doc.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'var(--c-161616)', borderRadius:'8px' }}>
-              <span style={{ flex:1, fontSize:'12px', color:'var(--c-cccccc)' }}>
-                <strong style={{ color: doc.effect==='reducere' ? 'var(--accent-mint)' : 'var(--accent-red)' }}>
-                  {doc.effect==='reducere' ? '−' : '+'}{money(doc.amount)} RON
-                </strong>
-                {' · '}{doc.fisier_nume}
-              </span>
+              <strong style={{ flexShrink:0, fontSize:'12px', color: doc.effect==='reducere' ? 'var(--accent-mint)' : 'var(--accent-red)' }}>
+                {doc.effect==='reducere' ? '−' : '+'}{money(doc.amount)} RON
+              </strong>
+              <input
+                defaultValue={doc.fisier_nume}
+                onBlur={e => renameDoc(doc.id, e.target.value.trim())}
+                style={{ flex:1, minWidth:0, fontSize:'12px', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
+              />
               <a href={`/api/emag?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare) }}>↓</a>
               <button onClick={() => removeDoc(doc.id)} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
             </div>

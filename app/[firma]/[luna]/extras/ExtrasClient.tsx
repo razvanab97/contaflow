@@ -971,7 +971,15 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                 <div key={doc.id} style={{ background:'var(--c-0d0d0d)', border:'1px solid var(--c-1a1a1a)', borderRadius:'10px', padding:'10px 14px', display:'flex', alignItems:'center', gap:'10px' }}>
                   <svg width="14" height="14" fill="none" stroke="var(--accent-green)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:'12px', fontWeight:600, color:'var(--accent-green)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</div>
+                    <input
+                      defaultValue={doc.fisier_nume}
+                      onBlur={e => {
+                        const fisier_nume = e.target.value.trim()
+                        if (!fisier_nume || fisier_nume === doc.fisier_nume) return
+                        fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:doc.id, fisier_nume }) }).then(onRefresh)
+                      }}
+                      style={{ width:'100%', fontSize:'12px', fontWeight:600, color:'var(--accent-green)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                    />
                     {(doc.furnizor || doc.numar_document) && (
                       <div style={{ fontSize:'10px', color:'var(--c-666666)', marginTop:'2px' }}>{[doc.furnizor, doc.numar_document && `nr. ${doc.numar_document}`].filter(Boolean).join(' · ')}</div>
                     )}

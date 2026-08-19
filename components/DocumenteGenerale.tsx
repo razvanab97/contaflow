@@ -48,6 +48,12 @@ export default function DocumenteGenerale() {
     setDocs(prev => prev.filter(d => d.id !== id))
   }
 
+  const handleRename = async (id: string, fisier_nume: string) => {
+    if (!fisier_nume.trim()) return
+    setDocs(prev => prev.map(d => d.id === id ? { ...d, fisier_nume } : d))
+    await fetch('/api/documente/rename', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, fisier_nume }) })
+  }
+
   return (
     <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '16px', padding: '24px 28px', marginBottom: '12px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -72,7 +78,11 @@ export default function DocumenteGenerale() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {docs.map(d => (
             <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: 'var(--c-161616)', border: '1px solid var(--c-222222)' }}>
-              <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
+              <input
+                defaultValue={d.fisier_nume}
+                onBlur={e => handleRename(d.id, e.target.value.trim())}
+                style={{ flex: 1, minWidth: 0, fontSize: '13px', color: 'var(--c-cccccc)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+              />
               <span style={{ fontSize: '11px', color: 'var(--c-666666)', flexShrink: 0 }}>{formatSize(d.fisier_marime)}</span>
               <a href={`/api/documente-generale?download=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: '#9DB9F6', flexShrink: 0 }}>↓</a>
               <button onClick={() => handleDelete(d.id)} style={{ fontSize: '12px', color: 'var(--c-888888)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>✕</button>

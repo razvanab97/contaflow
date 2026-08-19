@@ -17,13 +17,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { firmaId, cui, nr_reg_com, adresa, judet, tara } = await req.json()
+  const { firmaId, cui, nr_reg_com, adresa, judet, tara, certificat_nume } = await req.json()
   if (!firmaId) return NextResponse.json({ error: 'firmaId lipsește' }, { status: 400 })
 
   const sb = getServiceSupabase()
   const { error } = await sb
     .from('firme')
-    .update({ cui, nr_reg_com, adresa, judet, tara })
+    .update({ cui, nr_reg_com, adresa, judet, tara, certificat_nume })
     .eq('id', firmaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

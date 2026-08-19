@@ -6,11 +6,17 @@ function safePart(value: string, fallback: string) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { id, copiat } = await req.json()
-  if (!id || typeof copiat !== 'boolean')
-    return NextResponse.json({ error: 'Date invalide' }, { status: 400 })
+  const { id, copiat, numar_cautare } = await req.json()
+  if (!id) return NextResponse.json({ error: 'Date invalide' }, { status: 400 })
   const sb = getServiceSupabase()
-  const { error } = await sb.from('emag_avize_facturi').update({ copiat }).eq('id', id)
+
+  const patch: Record<string, unknown> = {}
+  if (typeof copiat === 'boolean') patch.copiat = copiat
+  // Corectare manuala — pentru cand AI-ul citeste gresit numarul de cautat din aviz
+  if (typeof numar_cautare === 'string' && numar_cautare.trim()) patch.numar_cautare = numar_cautare.trim()
+  if (!Object.keys(patch).length) return NextResponse.json({ error: 'Date invalide' }, { status: 400 })
+
+  const { error } = await sb.from('emag_avize_facturi').update(patch).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

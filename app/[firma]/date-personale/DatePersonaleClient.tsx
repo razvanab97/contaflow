@@ -67,6 +67,12 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
     if (res.ok) load()
   }
 
+  async function renameCertificat(certificat_nume: string) {
+    if (!firma || !certificat_nume.trim() || certificat_nume === firma.certificat_nume) return
+    setFirma({ ...firma, certificat_nume })
+    await fetch('/api/firma-date', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, certificat_nume }) })
+  }
+
   async function addProprietar() {
     const nume = prompt('Nume proprietar:')
     if (!nume) return
@@ -137,7 +143,11 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
           <span style={{ width: '120px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>Certificat</span>
           {firma.certificat_path ? (
             <>
-              <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)' }}>{firma.certificat_nume}</span>
+              <input
+                defaultValue={firma.certificat_nume ?? ''}
+                onBlur={e => renameCertificat(e.target.value.trim())}
+                style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+              />
               <a href={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
             </>
           ) : (
@@ -199,7 +209,11 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                 <span style={{ width: '90px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>Buletin</span>
                 {p.buletin_path ? (
                   <>
-                    <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)' }}>{p.buletin_nume}</span>
+                    <input
+                      defaultValue={p.buletin_nume ?? ''}
+                      onBlur={e => e.target.value.trim() && e.target.value !== p.buletin_nume && updateProprietar(p.id, { buletin_nume: e.target.value.trim() })}
+                      style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                    />
                     <a href={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
                   </>
                 ) : (

@@ -57,6 +57,12 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
     if (res.ok) setDocs(prev => prev.filter(d => d.id !== id))
   }
 
+  async function renameDoc(id: string, fisier_nume: string) {
+    if (!fisier_nume.trim()) return
+    setDocs(prev => prev.map(d => d.id === id ? { ...d, fisier_nume } : d))
+    await fetch('/api/documente/rename', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, fisier_nume }) })
+  }
+
   return (
     <div style={{ background: 'var(--c-111111)', border: `1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius: '10px', overflow: 'hidden' }}>
       <button onClick={toggle} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
@@ -78,7 +84,11 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
               {docs.map(doc => (
                 <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'var(--c-161616)', borderRadius: '7px' }}>
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: culoare, flexShrink: 0 }}/>
-                  <span style={{ flex: 1, fontSize: '12px', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
+                  <input
+                    defaultValue={doc.fisier_nume}
+                    onBlur={e => renameDoc(doc.id, e.target.value.trim())}
+                    style={{ flex: 1, minWidth: 0, fontSize: '12px', color: 'var(--c-cccccc)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                  />
                   <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
                   <button onClick={() => deleteDoc(doc.id)} style={{ fontSize: '11px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
                 </div>

@@ -34,11 +34,11 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { id, nume, serie_ci, numar_ci } = await req.json()
+  const { id, nume, serie_ci, numar_ci, buletin_nume } = await req.json()
   if (!id) return NextResponse.json({ error: 'id lipsește' }, { status: 400 })
 
   const sb = getServiceSupabase()
-  const { error } = await sb.from('proprietari').update({ nume, serie_ci, numar_ci }).eq('id', id)
+  const { error } = await sb.from('proprietari').update({ nume, serie_ci, numar_ci, buletin_nume }).eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
