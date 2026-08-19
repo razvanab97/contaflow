@@ -37,7 +37,7 @@ export default function ExportButtons({ firmaId, firmaNume, firmaSlug, lunaId, l
 
   return (
     <div style={{ display:'flex', gap:'8px' }}>
-      <button onClick={downloadZip} disabled={zipBusy} style={{ fontSize:'12px', fontWeight:600, padding:'8px 14px', borderRadius:'8px', border:'1px solid #2A2A2A', background:'#161616', color:'#CCC', cursor:'pointer', opacity:zipBusy?.6:1 }}>
+      <button onClick={downloadZip} disabled={zipBusy} style={{ fontSize:'12px', fontWeight:600, padding:'8px 14px', borderRadius:'8px', border:'1px solid var(--c-2a2a2a)', background:'var(--c-161616)', color:'var(--c-cccccc)', cursor:'pointer', opacity:zipBusy?.6:1 }}>
         {zipBusy ? '...' : '↓ ZIP categorii'}
       </button>
       <button onClick={downloadPdf} disabled={pdfBusy} style={{ fontSize:'12px', fontWeight:600, padding:'8px 14px', borderRadius:'8px', border:`1px solid ${culoare}`, background:'transparent', color:legibil(culoare), cursor:'pointer', opacity:pdfBusy?.6:1 }}>

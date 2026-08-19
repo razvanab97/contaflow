@@ -145,7 +145,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   }
 
   return (
-    <div style={{ display:'flex', minHeight:'100vh', background:'#0A0A0A' }}>
+    <div style={{ display:'flex', minHeight:'100vh', background:'var(--c-0a0a0a)' }}>
       <Sidebar
         firme={firmeNav}
         lunaCurenta={luna}
@@ -159,17 +159,17 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       <main style={{ flex:1, padding:'44px 52px', maxWidth:'900px' }}>
         {/* Header */}
         <div style={{ marginBottom:'32px' }}>
-          <Link href={`/${slug}/${luna}`} style={{ display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'#888', marginBottom:'16px' }}>
+          <Link href={`/${slug}/${luna}`} style={{ display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'var(--c-888888)', marginBottom:'16px' }}>
             <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
             {firma.nume.replace(' SRL','')} · {ll}
           </Link>
           <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
             <div style={{ width:'10px', height:'10px', borderRadius:'50%', background:firma.culoare, flexShrink:0 }}/>
-            <h1 style={{ fontSize:'24px', fontWeight:700, color:'#FFF', letterSpacing:'-0.5px' }}>
+            <h1 style={{ fontSize:'24px', fontWeight:700, color:'var(--c-ffffff)', letterSpacing:'-0.5px' }}>
               {modulDef.label}
             </h1>
           </div>
-          <p style={{ fontSize:'14px', fontWeight:500, color:'#888', marginTop:'6px', marginLeft:'22px' }}>
+          <p style={{ fontSize:'14px', fontWeight:500, color:'var(--c-888888)', marginTop:'6px', marginLeft:'22px' }}>
             {modulDef.description}
           </p>
         </div>

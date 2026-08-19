@@ -21,7 +21,7 @@ const FIELDS: { key: keyof FirmaDate; label: string }[] = [
 ]
 
 function inputStyle(): React.CSSProperties {
-  return { flex: 1, background: '#0D0D0D', border: '1px solid #2A2A2A', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', color: '#FFF', outline: 'none' }
+  return { flex: 1, background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', color: 'var(--c-ffffff)', outline: 'none' }
 }
 
 export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
@@ -97,20 +97,20 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
     if (res.ok) load()
   }
 
-  if (loading) return <div style={{ color: '#555', fontSize: '14px', padding: '32px 0' }}>Se încarcă...</div>
-  if (error) return <div style={{ color: '#F87171', fontSize: '13px', padding: '24px 0' }}>{error}</div>
+  if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: '14px', padding: '32px 0' }}>Se încarcă...</div>
+  if (error) return <div style={{ color: 'var(--accent-red)', fontSize: '13px', padding: '24px 0' }}>{error}</div>
   if (!firma) return null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Date firmă */}
-      <div style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '20px 22px' }}>
+      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '.1em' }}>Date firmă</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Date firmă</span>
           {editing ? (
-            <button onClick={saveFirma} style={{ fontSize: '12px', fontWeight: 600, color: '#6EE7B0', background: 'transparent', border: 'none', cursor: 'pointer' }}>Salvează</button>
+            <button onClick={saveFirma} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Salvează</button>
           ) : (
-            <button onClick={() => { setDraft(firma); setEditing(true) }} style={{ fontSize: '12px', fontWeight: 600, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer' }}>Editează</button>
+            <button onClick={() => { setDraft(firma); setEditing(true) }} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--c-888888)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Editează</button>
           )}
         </div>
 
@@ -119,11 +119,11 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
             const value = String((editing ? draft[key] : firma[key]) ?? '')
             return (
               <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ width: '120px', flexShrink: 0, fontSize: '12px', color: '#888' }}>{label}</span>
+                <span style={{ width: '120px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>{label}</span>
                 {editing ? (
                   <input value={value} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))} style={inputStyle()} />
                 ) : (
-                  <span style={{ flex: 1, fontSize: '13px', color: value ? '#DDD' : '#555' }}>{value || '—'}</span>
+                  <span style={{ flex: 1, fontSize: '13px', color: value ? 'var(--c-dddddd)' : 'var(--c-555555)' }}>{value || '—'}</span>
                 )}
                 {!editing && <CopyButton value={value} />}
               </div>
@@ -131,41 +131,41 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
           })}
         </div>
 
-        <div style={{ height: '1px', background: '#1E1E1E', margin: '16px 0' }} />
+        <div style={{ height: '1px', background: 'var(--c-1e1e1e)', margin: '16px 0' }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ width: '120px', flexShrink: 0, fontSize: '12px', color: '#888' }}>Certificat</span>
+          <span style={{ width: '120px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>Certificat</span>
           {firma.certificat_path ? (
             <>
-              <span style={{ flex: 1, fontSize: '13px', color: '#DDD' }}>{firma.certificat_nume}</span>
-              <a href={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`} style={{ fontSize: '12px', fontWeight: 600, color: '#60A5FA', textDecoration: 'none' }}>Descarcă</a>
+              <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)' }}>{firma.certificat_nume}</span>
+              <a href={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
             </>
           ) : (
-            <span style={{ flex: 1, fontSize: '13px', color: '#555' }}>Niciun fișier încărcat</span>
+            <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-555555)' }}>Niciun fișier încărcat</span>
           )}
           <input ref={certInputRef} type="file" accept="application/pdf,image/*" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }}
             onChange={e => e.target.files?.[0] && uploadCertificat(e.target.files[0])} />
           <button onClick={() => certInputRef.current?.click()} disabled={savingCert} style={{
-            fontSize: '12px', fontWeight: 600, color: '#888', background: '#161616', border: '1px solid #262626',
+            fontSize: '12px', fontWeight: 600, color: 'var(--c-888888)', background: 'var(--c-161616)', border: '1px solid var(--c-262626)',
             borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
           }}>{savingCert ? '...' : (firma.certificat_path ? 'Înlocuiește' : 'Încarcă')}</button>
         </div>
       </div>
 
       {/* Proprietari */}
-      <div style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '20px 22px' }}>
+      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '.1em' }}>Proprietari</span>
-          <button onClick={addProprietar} style={{ fontSize: '12px', fontWeight: 600, color: '#6EE7B0', background: 'transparent', border: 'none', cursor: 'pointer' }}>+ Adaugă proprietar</button>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Proprietari</span>
+          <button onClick={addProprietar} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>+ Adaugă proprietar</button>
         </div>
 
         {proprietari.length === 0 && (
-          <p style={{ fontSize: '13px', color: '#555', padding: '8px 0' }}>Niciun proprietar adăugat încă.</p>
+          <p style={{ fontSize: '13px', color: 'var(--c-555555)', padding: '8px 0' }}>Niciun proprietar adăugat încă.</p>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {proprietari.map(p => (
-            <div key={p.id} style={{ background: '#161616', border: '1px solid #262626', borderRadius: '10px', padding: '14px 16px' }}>
+            <div key={p.id} style={{ background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '10px', padding: '14px 16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                 <input
                   defaultValue={p.nume}
@@ -173,13 +173,13 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                   style={{ ...inputStyle(), fontWeight: 600 }}
                 />
                 <button onClick={() => deleteProprietar(p.id)} title="Șterge" style={{
-                  width: '26px', height: '26px', flexShrink: 0, background: '#1A1A1A', border: '1px solid #2A2A2A',
-                  borderRadius: '6px', cursor: 'pointer', color: '#F87171', fontSize: '14px',
+                  width: '26px', height: '26px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)',
+                  borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '14px',
                 }}>×</button>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <span style={{ width: '90px', flexShrink: 0, fontSize: '12px', color: '#888' }}>Serie+Nr. CI</span>
+                <span style={{ width: '90px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>Serie+Nr. CI</span>
                 <input
                   defaultValue={p.serie_ci ?? ''}
                   placeholder="Serie"
@@ -196,14 +196,14 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ width: '90px', flexShrink: 0, fontSize: '12px', color: '#888' }}>Buletin</span>
+                <span style={{ width: '90px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>Buletin</span>
                 {p.buletin_path ? (
                   <>
-                    <span style={{ flex: 1, fontSize: '13px', color: '#DDD' }}>{p.buletin_nume}</span>
-                    <a href={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}`} style={{ fontSize: '12px', fontWeight: 600, color: '#60A5FA', textDecoration: 'none' }}>Descarcă</a>
+                    <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)' }}>{p.buletin_nume}</span>
+                    <a href={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
                   </>
                 ) : (
-                  <span style={{ flex: 1, fontSize: '13px', color: '#555' }}>Niciun fișier încărcat</span>
+                  <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-555555)' }}>Niciun fișier încărcat</span>
                 )}
                 <input
                   ref={el => { buletinInputRefs.current[p.id] = el }}
@@ -211,7 +211,7 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                   onChange={e => e.target.files?.[0] && uploadBuletin(p.id, e.target.files[0])}
                 />
                 <button onClick={() => buletinInputRefs.current[p.id]?.click()} style={{
-                  fontSize: '12px', fontWeight: 600, color: '#888', background: '#0D0D0D', border: '1px solid #262626',
+                  fontSize: '12px', fontWeight: 600, color: 'var(--c-888888)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-262626)',
                   borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
                 }}>{p.buletin_path ? 'Înlocuiește' : 'Încarcă'}</button>
               </div>

@@ -58,39 +58,39 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
   }
 
   return (
-    <div style={{ background: '#111', border: `1px solid ${open ? `rgba(${r},.25)` : '#1E1E1E'}`, borderRadius: '10px', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--c-111111)', border: `1px solid ${open ? `rgba(${r},.25)` : 'var(--c-1e1e1e)'}`, borderRadius: '10px', overflow: 'hidden' }}>
       <button onClick={toggle} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-        <div style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, background: docs.length > 0 ? '#6EE7B0' : '#2A2A2A' }}/>
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, background: docs.length > 0 ? 'var(--accent-mint)' : 'var(--c-2a2a2a)' }}/>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#E0E0E0' }}>{t?.titlu}</div>
-          {t?.descriere && <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>{t.descriere}</div>}
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-e0e0e0)' }}>{t?.titlu}</div>
+          {t?.descriere && <div style={{ fontSize: '11px', color: 'var(--c-777777)', marginTop: '2px' }}>{t.descriere}</div>}
         </div>
-        {docs.length > 0 && <span style={{ fontSize: '11px', fontWeight: 600, color: '#6EE7B0', flexShrink: 0 }}>{docs.length} doc{docs.length > 1 ? 'umente' : ''}</span>}
-        <svg width="14" height="14" fill="none" stroke="#555" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>
+        {docs.length > 0 && <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-mint)', flexShrink: 0 }}>{docs.length} doc{docs.length > 1 ? 'umente' : ''}</span>}
+        <svg width="14" height="14" fill="none" stroke="var(--c-555555)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>
           <path d="M6 9l6 6 6-6"/>
         </svg>
       </button>
       {open && (
-        <div style={{ padding: '0 18px 16px', borderTop: '1px solid #1A1A1A' }}>
-          {loading && <p style={{ fontSize: '12px', color: '#777', padding: '12px 0 4px' }}>Se încarcă...</p>}
+        <div style={{ padding: '0 18px 16px', borderTop: '1px solid var(--c-1a1a1a)' }}>
+          {loading && <p style={{ fontSize: '12px', color: 'var(--c-777777)', padding: '12px 0 4px' }}>Se încarcă...</p>}
           {docs.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', padding: '12px 0 10px' }}>
               {docs.map(doc => (
-                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: '#161616', borderRadius: '7px' }}>
+                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'var(--c-161616)', borderRadius: '7px' }}>
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: culoare, flexShrink: 0 }}/>
-                  <span style={{ flex: 1, fontSize: '12px', color: '#CCC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
+                  <span style={{ flex: 1, fontSize: '12px', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
                   <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
-                  <button onClick={() => deleteDoc(doc.id)} style={{ fontSize: '11px', color: '#F87171', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+                  <button onClick={() => deleteDoc(doc.id)} style={{ fontSize: '11px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
                 </div>
               ))}
             </div>
           )}
           <div onClick={() => fileRef.current?.click()} onDragOver={e => { e.preventDefault(); setDrag(true) }} onDragLeave={() => setDrag(false)} onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files.length && upload(e.dataTransfer.files) }}
-            style={{ border: `1.5px dashed ${drag ? culoare : '#252525'}`, borderRadius: '8px', padding: '14px', textAlign: 'center', cursor: 'pointer', background: drag ? `rgba(${r},.04)` : '#0D0D0D', marginTop: docs.length > 0 ? '4px' : '12px' }}>
-            <p style={{ fontSize: '12px', color: uploading ? '#777' : '#888', fontWeight: 600 }}>{uploading ? 'Se încarcă...' : '+ Adaugă document'}</p>
+            style={{ border: `1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius: '8px', padding: '14px', textAlign: 'center', cursor: 'pointer', background: drag ? `rgba(${r},.04)` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '4px' : '12px' }}>
+            <p style={{ fontSize: '12px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight: 600 }}>{uploading ? 'Se încarcă...' : '+ Adaugă document'}</p>
           </div>
           <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>
-          {error && <p style={{ fontSize: '11px', color: '#F87171', marginTop: '6px' }}>{error}</p>}
+          {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '6px' }}>{error}</p>}
         </div>
       )}
     </div>

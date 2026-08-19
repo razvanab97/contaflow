@@ -37,7 +37,7 @@ export default function AirbnbModule({ firma, lunaId, tasks, section, checklistI
 
       {sorted.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '2px', display: 'block' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '2px', display: 'block' }}>
             Documente salvate anterior
           </span>
           {sorted.map(item => (

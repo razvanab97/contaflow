@@ -29,8 +29,8 @@ const FIELDS: { key: 'cui' | 'nrRegCom' | 'adresa' | 'judet' | 'tara'; label: st
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <span title={label} style={{ width: '96px', flexShrink: 0, fontSize: '11px', color: '#777', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-      <span title={value} style={{ flex: 1, minWidth: 0, fontSize: '12px', color: value ? '#CCC' : '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '—'}</span>
+      <span title={label} style={{ width: '96px', flexShrink: 0, fontSize: '11px', color: 'var(--c-777777)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <span title={value} style={{ flex: 1, minWidth: 0, fontSize: '12px', color: value ? 'var(--c-cccccc)' : 'var(--c-555555)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '—'}</span>
       {value && <CopyButton value={value} />}
     </div>
   )
@@ -44,7 +44,7 @@ export default function FirmaQuickInfo({ cui, nrRegCom, adresa, judet, tara, pro
     <div>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: '#888', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--c-888888)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
       >
         <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>
           <path d="M9 18l6-6-6-6" />
@@ -53,14 +53,14 @@ export default function FirmaQuickInfo({ cui, nrRegCom, adresa, judet, tara, pro
       </button>
 
       {open && (
-        <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '7px', background: '#0D0D0D', border: '1px solid #1E1E1E', borderRadius: '8px', padding: '12px 14px' }}>
+        <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '7px', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-1e1e1e)', borderRadius: '8px', padding: '12px 14px' }}>
           {FIELDS.map(({ key, label }) => (
             <Row key={key} label={label} value={values[key] || ''} />
           ))}
 
           {proprietari.length > 0 && (
             <>
-              <div style={{ height: '1px', background: '#1E1E1E', margin: '3px 0' }} />
+              <div style={{ height: '1px', background: 'var(--c-1e1e1e)', margin: '3px 0' }} />
               {proprietari.map(p => (
                 <Row key={p.id} label={p.nume} value={`${p.serie_ci ?? ''} ${p.numar_ci ?? ''}`.trim()} />
               ))}

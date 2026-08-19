@@ -49,33 +49,33 @@ export default function DocumenteGenerale() {
   }
 
   return (
-    <div style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '16px', padding: '24px 28px', marginBottom: '12px' }}>
+    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '16px', padding: '24px 28px', marginBottom: '12px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <div>
-          <div style={{ fontSize: '15px', fontWeight: 600, color: '#EFEFEF', letterSpacing: '-0.2px' }}>Documente generale</div>
-          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>Fișiere care nu țin de o firmă anume</div>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--c-efefef)', letterSpacing: '-0.2px' }}>Documente generale</div>
+          <div style={{ fontSize: '12px', color: 'var(--c-888888)', marginTop: '2px' }}>Fișiere care nu țin de o firmă anume</div>
         </div>
         <input ref={inputRef} type="file" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
         <button onClick={() => inputRef.current?.click()} disabled={uploading} style={{
-          fontSize: '12px', fontWeight: 600, color: '#DDD', padding: '7px 16px', borderRadius: '8px',
-          border: '1px solid #2A2A2A', background: '#1A1A1A', cursor: uploading ? 'not-allowed' : 'pointer',
+          fontSize: '12px', fontWeight: 600, color: 'var(--c-dddddd)', padding: '7px 16px', borderRadius: '8px',
+          border: '1px solid var(--c-2a2a2a)', background: 'var(--c-1a1a1a)', cursor: uploading ? 'not-allowed' : 'pointer',
         }}>
           {uploading ? 'Se încarcă...' : '+ Adaugă document'}
         </button>
       </div>
 
       {loading ? (
-        <div style={{ fontSize: '12px', color: '#666' }}>Se încarcă...</div>
+        <div style={{ fontSize: '12px', color: 'var(--c-666666)' }}>Se încarcă...</div>
       ) : docs.length === 0 ? (
-        <div style={{ fontSize: '12px', color: '#666' }}>Niciun document general încă</div>
+        <div style={{ fontSize: '12px', color: 'var(--c-666666)' }}>Niciun document general încă</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {docs.map(d => (
-            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: '#161616', border: '1px solid #222' }}>
-              <span style={{ flex: 1, fontSize: '13px', color: '#CCC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
-              <span style={{ fontSize: '11px', color: '#666', flexShrink: 0 }}>{formatSize(d.fisier_marime)}</span>
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: 'var(--c-161616)', border: '1px solid var(--c-222222)' }}>
+              <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
+              <span style={{ fontSize: '11px', color: 'var(--c-666666)', flexShrink: 0 }}>{formatSize(d.fisier_marime)}</span>
               <a href={`/api/documente-generale?download=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: '#9DB9F6', flexShrink: 0 }}>↓</a>
-              <button onClick={() => handleDelete(d.id)} style={{ fontSize: '12px', color: '#888', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+              <button onClick={() => handleDelete(d.id)} style={{ fontSize: '12px', color: 'var(--c-888888)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>✕</button>
             </div>
           ))}
         </div>

@@ -41,7 +41,7 @@ export default function UploadPanel({
   const [drag, setDrag] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
-  const INP: React.CSSProperties = { fontSize: '12px', background: '#0F0F0F', border: '1px solid #2A2A2A', borderRadius: '8px', padding: '9px 12px', color: '#BBB', outline: 'none', width: '100%' }
+  const INP: React.CSSProperties = { fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-bbbbbb)', outline: 'none', width: '100%' }
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/chitante?lunaId=${encodeURIComponent(lunaId)}&firmaId=${encodeURIComponent(firmaId)}&section=${section}`)
@@ -109,11 +109,11 @@ export default function UploadPanel({
   }
 
   return (
-    <div style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '12px', overflow: 'hidden' }}>
-      <div style={{ padding: '18px 22px', borderBottom: '1px solid #1A1A1A', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
+    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', overflow: 'hidden' }}>
+      <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--c-1a1a1a)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
         <div>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#E0E0E0', marginBottom: '2px' }}>{title}</div>
-          {description && <div style={{ fontSize: '11px', color: '#888' }}>{description}</div>}
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-e0e0e0)', marginBottom: '2px' }}>{title}</div>
+          {description && <div style={{ fontSize: '11px', color: 'var(--c-888888)' }}>{description}</div>}
         </div>
         {loaded && docs.length > 0 && (
           <button onClick={savePdf} disabled={pdfBusy} style={{ flexShrink:0, fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:legibil(culoare), cursor:'pointer', opacity:pdfBusy?.6:1 }}>
@@ -129,23 +129,23 @@ export default function UploadPanel({
             {(showPaidToggle ? [...docs].sort((a, b) => Number(!!a.platit) - Number(!!b.platit)) : docs).map(doc => {
               const isPaid = showPaidToggle && !!doc.platit
               return (
-                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: isPaid ? '#141414' : '#161616', border: `1px solid ${isPaid ? '#1E1E1E' : '#222'}`, borderRadius: '8px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? '#333' : culoare, flexShrink: 0 }}/>
-                  <span style={{ flex: 1, fontSize: '12px', color: isPaid ? '#666' : '#CCC', textDecoration: isPaid ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
-                  {doc.tip_document && <span style={{ fontSize: '10px', color: '#888' }}>{doc.tip_document}</span>}
+                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: isPaid ? 'var(--c-141414)' : 'var(--c-161616)', border: `1px solid ${isPaid ? 'var(--c-1e1e1e)' : 'var(--c-222222)'}`, borderRadius: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? 'var(--c-333333)' : culoare, flexShrink: 0 }}/>
+                  <span style={{ flex: 1, fontSize: '12px', color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
+                  {doc.tip_document && <span style={{ fontSize: '10px', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
                   {showPaidToggle && (
-                    <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? '#2A2A2A' : 'rgba(110,231,176,.35)'}`, background: isPaid ? '#1A1A1A' : 'rgba(110,231,176,.08)', color: isPaid ? '#888' : '#6EE7B0', cursor: 'pointer', flexShrink: 0 }}>
+                    <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'rgba(110,231,176,.35)'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'rgba(110,231,176,.08)', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>
                       {isPaid ? 'Anulează' : 'Marchează achitat'}
                     </button>
                   )}
                   <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
-                  <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: '#F87171', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+                  <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
                 </div>
               )
             })}
           </div>
         )}
-        {!loaded && <div style={{ fontSize: '12px', color: '#999', marginBottom: '12px' }}>Se încarcă...</div>}
+        {!loaded && <div style={{ fontSize: '12px', color: 'var(--c-999999)', marginBottom: '12px' }}>Se încarcă...</div>}
 
         {/* Options row */}
         <div style={{ display: 'grid', gridTemplateColumns: supplier !== undefined ? '1fr' + (documentTypeOptions ? ' 1fr' : '') : '1fr', gap: '8px', marginBottom: '10px' }}>
@@ -161,7 +161,7 @@ export default function UploadPanel({
         {showLinkImport && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginBottom: '10px' }}>
             <input value={link} onChange={e => setLink(e.target.value)} placeholder={linkPlaceholder || 'Link PDF (HTTPS)'} style={INP}/>
-            <button onClick={importLink} disabled={busy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: '8px', background: culoare, color: '#FFF', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: busy || !link ? .5 : 1 }}>
+            <button onClick={importLink} disabled={busy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: '8px', background: culoare, color: 'var(--c-ffffff)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: busy || !link ? .5 : 1 }}>
               Import
             </button>
           </div>
@@ -174,21 +174,21 @@ export default function UploadPanel({
           onDragLeave={() => setDrag(false)}
           onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) upload(e.dataTransfer.files) }}
           style={{
-            border: `1.5px dashed ${drag ? culoare : '#252525'}`,
+            border: `1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`,
             borderRadius: '10px', padding: '18px',
             textAlign: 'center', cursor: 'pointer',
-            background: drag ? `rgba(${r},.04)` : '#0D0D0D',
+            background: drag ? `rgba(${r},.04)` : 'var(--c-0d0d0d)',
             transition: 'all .15s',
           }}
         >
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#666', marginBottom: '3px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-666666)', marginBottom: '3px' }}>
             {busy ? 'Se încarcă...' : 'Adaugă fișiere'}
           </div>
-          <div style={{ fontSize: '12px', color: '#888' }}>PDF, JPG, PNG · drag & drop sau click</div>
+          <div style={{ fontSize: '12px', color: 'var(--c-888888)' }}>PDF, JPG, PNG · drag & drop sau click</div>
         </div>
         <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>
 
-        {error && <p style={{ fontSize: '11px', color: '#F87171', marginTop: '8px' }}>{error}</p>}
+        {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{error}</p>}
       </div>
     </div>
   )

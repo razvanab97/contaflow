@@ -46,12 +46,12 @@ export default function TaskSection({ tasks, lunaId, culoare }: Props) {
   const r = parseInt(culoare.slice(1,3),16) + ',' + parseInt(culoare.slice(3,5),16) + ',' + parseInt(culoare.slice(5,7),16)
 
   return (
-    <div style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '20px 22px', marginBottom: '20px' }}>
+    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px', marginBottom: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '.1em' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>
           Task-uri modul
         </span>
-        <span style={{ fontSize: '12px', fontWeight: 600, color: done === total ? '#6EE7B0' : culoare }}>
+        <span style={{ fontSize: '12px', fontWeight: 600, color: done === total ? 'var(--accent-mint)' : culoare }}>
           {done}/{total}
         </span>
       </div>
@@ -71,8 +71,8 @@ export default function TaskSection({ tasks, lunaId, culoare }: Props) {
           >
             <div style={{
               width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
-              background: task.completat ? `rgba(${r},.12)` : '#1A1A1A',
-              border: task.completat ? `1.5px solid rgba(${r},.4)` : '1.5px solid #2A2A2A',
+              background: task.completat ? `rgba(${r},.12)` : 'var(--c-1a1a1a)',
+              border: task.completat ? `1.5px solid rgba(${r},.4)` : '1.5px solid var(--c-2a2a2a)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all .15s',
             }}>
@@ -85,13 +85,13 @@ export default function TaskSection({ tasks, lunaId, culoare }: Props) {
             <div style={{ minWidth: 0 }}>
               <span style={{
                 fontSize: '13px', fontWeight: 500,
-                color: task.completat ? '#777' : '#CCC',
+                color: task.completat ? 'var(--c-777777)' : 'var(--c-cccccc)',
                 textDecoration: task.completat ? 'line-through' : 'none',
               }}>
                 {task.label}
               </span>
               {task.descriere && (
-                <div style={{ fontSize: '11px', color: '#666', marginTop: '2px', lineHeight: 1.4 }}>
+                <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px', lineHeight: 1.4 }}>
                   {task.descriere}
                 </div>
               )}
@@ -102,7 +102,7 @@ export default function TaskSection({ tasks, lunaId, culoare }: Props) {
 
       {done === total && (
         <div style={{ marginTop: '14px', padding: '8px 12px', background: 'rgba(110,231,176,.05)', borderRadius: '8px', border: '1px solid rgba(110,231,176,.12)' }}>
-          <span style={{ fontSize: '12px', color: '#6EE7B0', fontWeight: 500 }}>✓ Modul complet</span>
+          <span style={{ fontSize: '12px', color: 'var(--accent-mint)', fontWeight: 500 }}>✓ Modul complet</span>
         </div>
       )}
     </div>

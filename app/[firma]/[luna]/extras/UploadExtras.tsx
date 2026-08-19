@@ -60,24 +60,24 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
   const hasPdf = !!extras?.pdf_path
 
   return (
-    <div style={{ background: '#161616', border: `1px solid rgba(${r},.2)`, borderRadius: '14px', padding: '20px' }}>
+    <div style={{ background: 'var(--c-161616)', border: `1px solid rgba(${r},.2)`, borderRadius: '14px', padding: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: extras?.nr_tranzactii ? '#4ADE80' : '#333' }} />
-        <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFF' }}>
+        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: extras?.nr_tranzactii ? 'var(--accent-green)' : 'var(--c-333333)' }} />
+        <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--c-ffffff)' }}>
           {valuta === 'AUTO' ? 'Citire extras cu AI' : `Extras ${valuta}`}
           {extras?.id && extras.valuta && extras.valuta !== valuta ? ` (${extras.valuta})` : ''}
         </span>
         {extras?.nr_tranzactii ? (
-          <span style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: 'rgba(74,222,128,.15)', color: '#4ADE80' }}>
+          <span style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: 'rgba(74,222,128,.15)', color: 'var(--accent-green)' }}>
             {extras.nr_tranzactii} tx ✓
           </span>
         ) : (
-          <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#555' }}>neîncărcat</span>
+          <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--c-555555)' }}>neîncărcat</span>
         )}
       </div>
 
       {valuta === 'AUTO' && (
-        <p style={{ margin: '0 0 14px', fontSize: '11px', lineHeight: 1.5, color: '#777' }}>
+        <p style={{ margin: '0 0 14px', fontSize: '11px', lineHeight: 1.5, color: 'var(--c-777777)' }}>
           Încarcă extrasul PDF, iar AI identifică automat moneda și tranzacțiile.
         </p>
       )}
@@ -85,9 +85,9 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
       {extras?.nr_tranzactii ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
           {[{ l: 'Tranzacții', v: extras.nr_tranzactii }, { l: 'Documentate', v: extras.nr_documentate }].map(s => (
-            <div key={s.l} style={{ background: '#111', borderRadius: '9px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 600, color: '#555', marginBottom: '4px', textTransform: 'uppercase' as const }}>{s.l}</div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#FFF' }}>{s.v}</div>
+            <div key={s.l} style={{ background: 'var(--c-111111)', borderRadius: '9px', padding: '10px 12px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--c-555555)', marginBottom: '4px', textTransform: 'uppercase' as const }}>{s.l}</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-ffffff)' }}>{s.v}</div>
             </div>
           ))}
         </div>
@@ -96,14 +96,14 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
       {loading ? (
         <div style={{ textAlign: 'center', padding: '10px 0' }}>
           <div style={{ width: '18px', height: '18px', border: `2px solid ${culoare}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite', margin: '0 auto 8px' }} />
-          <p style={{ fontSize: '12px', color: '#CCC' }}>{status}</p>
+          <p style={{ fontSize: '12px', color: 'var(--c-cccccc)' }}>{status}</p>
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       ) : (
         <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
           <div style={{ display: 'flex', gap: '8px' }}>
             {valuta !== 'AUTO' && (
-              <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: '9px', border: 'none', background: culoare, color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: '9px', border: 'none', background: culoare, color: 'var(--c-ffffff)', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
                 ↑ Import CSV
               </button>
             )}
@@ -116,7 +116,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
               <button
                 onClick={() => savePdfRef.current?.click()}
                 disabled={savingPdf}
-                style={{ flex: 1, padding: '7px', borderRadius: '9px', border: `1px solid ${hasPdf ? 'rgba(74,222,128,.3)' : '#2A2A2A'}`, background: hasPdf ? 'rgba(74,222,128,.06)' : '#111', color: hasPdf ? '#4ADE80' : '#666', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                style={{ flex: 1, padding: '7px', borderRadius: '9px', border: `1px solid ${hasPdf ? 'rgba(74,222,128,.3)' : 'var(--c-2a2a2a)'}`, background: hasPdf ? 'rgba(74,222,128,.06)' : 'var(--c-111111)', color: hasPdf ? 'var(--accent-green)' : 'var(--c-666666)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
                 {savingPdf ? 'Se salvează...' : hasPdf ? `📄 ${extras?.pdf_nume || 'PDF salvat'}` : '📎 Atașează PDF extras bancar'}
               </button>
@@ -124,7 +124,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
                 <a
                   href={`/api/extras/pdf-download?extrasId=${extrasId}`}
                   download={extras?.pdf_nume || 'extras.pdf'}
-                  style={{ padding: '7px 12px', borderRadius: '9px', border: '1px solid rgba(74,222,128,.3)', background: 'rgba(74,222,128,.06)', color: '#4ADE80', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', textDecoration: 'none' }}
+                  style={{ padding: '7px 12px', borderRadius: '9px', border: '1px solid rgba(74,222,128,.3)', background: 'rgba(74,222,128,.06)', color: 'var(--accent-green)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', textDecoration: 'none' }}
                 >
                   ↓
                 </a>
@@ -136,7 +136,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
 
       {err && (
         <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', borderRadius: '8px' }}>
-          <p style={{ fontSize: '11px', color: '#F87171', wordBreak: 'break-all' as const }}>{err}</p>
+          <p style={{ fontSize: '11px', color: 'var(--accent-red)', wordBreak: 'break-all' as const }}>{err}</p>
         </div>
       )}
 

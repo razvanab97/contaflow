@@ -19,7 +19,7 @@ function fmtData(s: string|null) {
   return y && m && d ? `${d}.${m}.${y}` : s
 }
 
-export default function DocumentSearch({ firmaId, culoare = '#888' }: { firmaId: string; culoare?: string }) {
+export default function DocumentSearch({ firmaId, culoare = 'var(--c-888888)' }: { firmaId: string; culoare?: string }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Rezultat[]>([])
   const [open, setOpen] = useState(false)
@@ -61,26 +61,26 @@ export default function DocumentSearch({ firmaId, culoare = '#888' }: { firmaId:
         onChange={e => setQ(e.target.value)}
         onFocus={() => q.trim().length >= 2 && setOpen(true)}
         placeholder="Caută documente..."
-        style={{ width: '100%', fontSize: '12px', padding: '8px 10px', borderRadius: '8px', border: '1px solid #242424', background: '#111', color: '#DDD', outline: 'none' }}
+        style={{ width: '100%', fontSize: '12px', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--c-242424)', background: 'var(--c-111111)', color: 'var(--c-dddddd)', outline: 'none' }}
       />
       {open && (
-        <div style={{ position: 'absolute', top: '100%', left: '18px', right: '18px', marginTop: '6px', maxHeight: '360px', overflowY: 'auto', background: '#161616', border: '1px solid #2A2A2A', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 200 }}>
+        <div style={{ position: 'absolute', top: '100%', left: '18px', right: '18px', marginTop: '6px', maxHeight: '360px', overflowY: 'auto', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 200 }}>
           {loading ? (
-            <div style={{ padding: '14px', fontSize: '12px', color: '#666', textAlign: 'center' }}>Se caută...</div>
+            <div style={{ padding: '14px', fontSize: '12px', color: 'var(--c-666666)', textAlign: 'center' }}>Se caută...</div>
           ) : results.length === 0 ? (
-            <div style={{ padding: '14px', fontSize: '12px', color: '#666', textAlign: 'center' }}>Niciun document găsit.</div>
+            <div style={{ padding: '14px', fontSize: '12px', color: 'var(--c-666666)', textAlign: 'center' }}>Niciun document găsit.</div>
           ) : (
             results.map(r => (
               <a
                 key={r.id}
                 href={`/api/chitante/document?id=${encodeURIComponent(r.id)}`}
                 onClick={() => setOpen(false)}
-                style={{ display: 'block', padding: '9px 12px', borderBottom: '1px solid #1E1E1E', textDecoration: 'none' }}
+                style={{ display: 'block', padding: '9px 12px', borderBottom: '1px solid var(--c-1e1e1e)', textDecoration: 'none' }}
               >
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#DDD', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--c-dddddd)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {r.furnizor || r.fisierNume}
                 </div>
-                <div style={{ fontSize: '10px', color: '#777', marginTop: '2px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '10px', color: 'var(--c-777777)', marginTop: '2px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   <span style={{ color: culoare, fontWeight: 600 }}>{r.sectiune}</span>
                   {r.luna && <span>· {fmtLuna(r.luna)}</span>}
                   {r.dataDocument && <span>· {fmtData(r.dataDocument)}</span>}

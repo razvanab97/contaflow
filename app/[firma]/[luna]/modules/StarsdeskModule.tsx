@@ -32,17 +32,17 @@ function ListaLipsa({ items, tip, onResolved }: { items: Nefacturata[]; tip:'cli
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
       {items.map(n => (
-        <div key={n.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'#161616', borderRadius:'7px' }}>
-          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background: n.platforma==='airbnb' ? 'rgba(248,113,113,.1)' : 'rgba(96,165,250,.1)', color: n.platforma==='airbnb' ? '#F87171' : '#60A5FA', flexShrink:0 }}>
+        <div key={n.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
+          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background: n.platforma==='airbnb' ? 'rgba(248,113,113,.1)' : 'rgba(96,165,250,.1)', color: n.platforma==='airbnb' ? 'var(--accent-red)' : 'var(--accent-blue)', flexShrink:0 }}>
             {n.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
           </span>
-          <span style={{ flex:1, fontSize:'12px', color:'#DDD' }}>{n.numeOaspete || '—'}</span>
-          <span style={{ fontSize:'12px', fontWeight:600, color:'#FFF', fontFamily:'monospace' }}>{n.codRezervare}</span>
-          <span style={{ fontSize:'11px', color:'#888', flexShrink:0 }}>{money(n.suma)} RON</span>
+          <span style={{ flex:1, fontSize:'12px', color:'var(--c-dddddd)' }}>{n.numeOaspete || '—'}</span>
+          <span style={{ fontSize:'12px', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace' }}>{n.codRezervare}</span>
+          <span style={{ fontSize:'11px', color:'var(--c-888888)', flexShrink:0 }}>{money(n.suma)} RON</span>
           <button
             onClick={() => marcheaza(n.id)}
             disabled={resolving === n.id}
-            style={{ fontSize:'11px', fontWeight:600, padding:'4px 10px', borderRadius:'6px', border:'1px solid rgba(110,231,176,.35)', background:'rgba(110,231,176,.08)', color:'#6EE7B0', cursor:'pointer', flexShrink:0, opacity: resolving===n.id ? .5 : 1 }}
+            style={{ fontSize:'11px', fontWeight:600, padding:'4px 10px', borderRadius:'6px', border:'1px solid rgba(110,231,176,.35)', background:'rgba(110,231,176,.08)', color:'var(--accent-mint)', cursor:'pointer', flexShrink:0, opacity: resolving===n.id ? .5 : 1 }}
           >
             {resolving === n.id ? '...' : '✓ Am facturat'}
           </button>
@@ -92,54 +92,54 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
   }
 
   return (
-    <div style={{ background:'#111', border:'1px solid #1E1E1E', borderRadius:'12px', overflow:'hidden' }}>
-      <div style={{ padding:'16px 20px', borderBottom:'1px solid #1A1A1A' }}>
-        <div style={{ fontSize:'13px', fontWeight:600, color:'#E0E0E0' }}>Rezervări nefacturate</div>
-        <div style={{ fontSize:'12px', color:'#888', marginTop:'2px' }}>
+    <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'12px', overflow:'hidden' }}>
+      <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--c-1a1a1a)' }}>
+        <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>Rezervări nefacturate</div>
+        <div style={{ fontSize:'12px', color:'var(--c-888888)', marginTop:'2px' }}>
           Verifică borderourile Airbnb + Booking, după cod rezervare și sumă, împotriva facturilor deja încărcate — pe fiecare categorie separat.
         </div>
       </div>
 
       <div style={{ padding:'16px 20px', display:'flex', flexDirection:'column', gap:'20px' }}>
-        {error && <p style={{ fontSize:'11px', color:'#F87171' }}>{error}</p>}
+        {error && <p style={{ fontSize:'11px', color:'var(--accent-red)' }}>{error}</p>}
         {result && (
-          <p style={{ fontSize:'11px', color:'#666' }}>
+          <p style={{ fontSize:'11px', color:'var(--c-666666)' }}>
             {result.totalRezervari} rezervări în borderouri · {result.totalFacturiClient} facturi client (5StarDesk) · {result.totalFacturiComision} facturi comision
           </p>
         )}
 
         <div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
-            <span style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em' }}>Fără factură client (5StarDesk)</span>
+            <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>Fără factură client (5StarDesk)</span>
             <VerificaButon firma={firma} checking={checking==='client'} onClick={()=>verifica('client')}/>
           </div>
           {result && (result.faraFacturaClient.length === 0
-            ? <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Toate rezervările au factură client asociată.</p>
+            ? <p style={{ fontSize:'12px', color:'var(--accent-mint)' }}>✓ Toate rezervările au factură client asociată.</p>
             : <ListaLipsa items={result.faraFacturaClient} tip="client" onResolved={id=>eliminaDinLista(id,'faraFacturaClient')}/>)}
         </div>
 
         <div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
-            <span style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em' }}>Fără factură de comision Airbnb</span>
+            <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>Fără factură de comision Airbnb</span>
             <VerificaButon firma={firma} checking={checking==='comision-airbnb'} onClick={()=>verifica('comision-airbnb')}/>
           </div>
           {result && (result.faraComisionAirbnb.length === 0
-            ? <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Toate rezervările Airbnb au factură de comision asociată.</p>
+            ? <p style={{ fontSize:'12px', color:'var(--accent-mint)' }}>✓ Toate rezervările Airbnb au factură de comision asociată.</p>
             : <ListaLipsa items={result.faraComisionAirbnb} tip="comision" onResolved={id=>eliminaDinLista(id,'faraComisionAirbnb')}/>)}
         </div>
 
         <div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
-            <span style={{ fontSize:'11px', fontWeight:700, color:'#999', textTransform:'uppercase', letterSpacing:'.06em' }}>Factură de comision Booking</span>
+            <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>Factură de comision Booking</span>
             <VerificaButon firma={firma} checking={checking==='comision-booking'} onClick={()=>verifica('comision-booking')}/>
           </div>
           {result && (
             result.totalRezervariBooking === 0 ? (
-              <p style={{ fontSize:'12px', color:'#666' }}>Nicio rezervare Booking în borderoul acestei luni.</p>
+              <p style={{ fontSize:'12px', color:'var(--c-666666)' }}>Nicio rezervare Booking în borderoul acestei luni.</p>
             ) : result.comisionBookingLipsa ? (
-              <p style={{ fontSize:'12px', color:'#F87171' }}>⚠ Nu a fost găsită nicio factură de comision Booking pentru această lună — verifică secțiunea Booking · Facturi.</p>
+              <p style={{ fontSize:'12px', color:'var(--accent-red)' }}>⚠ Nu a fost găsită nicio factură de comision Booking pentru această lună — verifică secțiunea Booking · Facturi.</p>
             ) : (
-              <p style={{ fontSize:'12px', color:'#6EE7B0' }}>✓ Factură de comision Booking găsită pentru această lună. (Booking facturează agregat, nu per rezervare — nu se poate verifica fiecare rezervare individual.)</p>
+              <p style={{ fontSize:'12px', color:'var(--accent-mint)' }}>✓ Factură de comision Booking găsită pentru această lună. (Booking facturează agregat, nu per rezervare — nu se poate verifica fiecare rezervare individual.)</p>
             )
           )}
         </div>
@@ -159,7 +159,7 @@ export default function StarsdeskModule({ firma, lunaId, tasks, checklistItems }
 
       {sorted.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '2px', display: 'block' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '2px', display: 'block' }}>
             Documente salvate anterior
           </span>
           {sorted.map(item => (

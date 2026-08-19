@@ -19,21 +19,21 @@ export default function LunaSummary({ lunaId, culoare }: { lunaId: string; culoa
 
   return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'10px' }}>
-      <div style={{ fontSize:'10px', fontWeight:700, color:'#555', textTransform:'uppercase', letterSpacing:'.12em' }}>
+      <div style={{ fontSize:'10px', fontWeight:700, color:'var(--c-555555)', textTransform:'uppercase', letterSpacing:'.12em' }}>
         Concluzia lunară
       </div>
       <div style={{ display:'flex', gap:'24px' }}>
         {([
-          ['Încasări', summary.bankReceipts, '#6EE7B0'],
-          ['Plăți', summary.bankPayments, '#F87171'],
-          ['Cashflow', summary.bankCashflow, summary.bankCashflow >= 0 ? '#6EE7B0' : '#F87171'],
+          ['Încasări', summary.bankReceipts, 'var(--accent-mint)'],
+          ['Plăți', summary.bankPayments, 'var(--accent-red)'],
+          ['Cashflow', summary.bankCashflow, summary.bankCashflow >= 0 ? 'var(--accent-mint)' : 'var(--accent-red)'],
           ['Cost net eMAG', summary.emagNetCost, culoare],
         ] as [string, number, string][]).map(([label, value, color]) => (
           <div key={label} style={{ textAlign:'center' }}>
             <div style={{ fontSize:'18px', fontWeight:800, color, letterSpacing:'-0.5px', lineHeight:1 }}>
               {money(value as number)}
             </div>
-            <div style={{ fontSize:'10px', fontWeight:600, color:'#555', marginTop:'4px', textTransform:'uppercase', letterSpacing:'.08em' }}>
+            <div style={{ fontSize:'10px', fontWeight:600, color:'var(--c-555555)', marginTop:'4px', textTransform:'uppercase', letterSpacing:'.08em' }}>
               {label}
             </div>
           </div>

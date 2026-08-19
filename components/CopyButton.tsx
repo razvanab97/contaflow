@@ -21,8 +21,8 @@ export default function CopyButton({ value, onCopy }: { value: string; onCopy?: 
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: '26px', height: '26px', flexShrink: 0,
-        background: copied ? 'rgba(34,197,94,.15)' : '#161616',
-        border: `1px solid ${copied ? 'rgba(34,197,94,.4)' : '#262626'}`,
+        background: copied ? 'rgba(34,197,94,.15)' : 'var(--c-161616)',
+        border: `1px solid ${copied ? 'rgba(34,197,94,.4)' : 'var(--c-262626)'}`,
         borderRadius: '6px', cursor: 'pointer', transition: 'all .15s',
       }}
     >
@@ -31,7 +31,7 @@ export default function CopyButton({ value, onCopy }: { value: string; onCopy?: 
           <path d="M20 6L9 17l-5-5" />
         </svg>
       ) : (
-        <svg width="12" height="12" fill="none" stroke="#999" strokeWidth="2" viewBox="0 0 24 24">
+        <svg width="12" height="12" fill="none" stroke="var(--c-999999)" strokeWidth="2" viewBox="0 0 24 24">
           <rect x="9" y="9" width="13" height="13" rx="2" />
           <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
         </svg>

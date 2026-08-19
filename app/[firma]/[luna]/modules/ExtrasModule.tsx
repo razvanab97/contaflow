@@ -23,11 +23,11 @@ export default function ExtrasModule({ firma, lunaId, tasks, extrase, slug, luna
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
           {([
             ['Extrase', extrase.length.toString(), firma.culoare],
-            ['Tranzacții', totalTx.toString(), '#AAA'],
-            ['Documentate', `${docTx}/${totalTx}`, docTx===totalTx?'#4ADE80':firma.culoare],
+            ['Tranzacții', totalTx.toString(), 'var(--c-aaaaaa)'],
+            ['Documentate', `${docTx}/${totalTx}`, docTx===totalTx?'var(--accent-green)':firma.culoare],
           ] as [string,string,string][]).map(([label,value,color]) => (
-            <div key={label} style={{ padding:'14px', background:'#111', border:'1px solid #1E1E1E', borderRadius:'10px' }}>
-              <div style={{ fontSize:'11px', fontWeight:500, color:'#777', marginBottom:'6px' }}>{label}</div>
+            <div key={label} style={{ padding:'14px', background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'10px' }}>
+              <div style={{ fontSize:'11px', fontWeight:500, color:'var(--c-777777)', marginBottom:'6px' }}>{label}</div>
               <div style={{ fontSize:'18px', fontWeight:700, color, letterSpacing:'-0.4px' }}>{value}</div>
             </div>
           ))}
@@ -36,17 +36,17 @@ export default function ExtrasModule({ firma, lunaId, tasks, extrase, slug, luna
 
       {/* Extras list */}
       {extrase.length > 0 && (
-        <div style={{ background:'#111', border:'1px solid #1E1E1E', borderRadius:'12px', overflow:'hidden' }}>
-          <div style={{ padding:'16px 20px', borderBottom:'1px solid #1A1A1A' }}>
-            <div style={{ fontSize:'13px', fontWeight:600, color:'#E0E0E0' }}>Extrase procesate</div>
+        <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'12px', overflow:'hidden' }}>
+          <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--c-1a1a1a)' }}>
+            <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>Extrase procesate</div>
           </div>
           <div style={{ padding:'12px 20px', display:'flex', flexDirection:'column', gap:'8px' }}>
             {extrase.map(e => (
-              <div key={e.id} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'10px 14px', background:'#161616', borderRadius:'8px' }}>
+              <div key={e.id} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'10px 14px', background:'var(--c-161616)', borderRadius:'8px' }}>
                 <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:firma.culoare, flexShrink:0 }}/>
-                <span style={{ flex:1, fontSize:'13px', fontWeight:600, color:'#DDD' }}>{e.valuta}</span>
-                <span style={{ fontSize:'12px', color:'#666' }}>{e.nr_tranzactii} tranzacții</span>
-                <span style={{ fontSize:'12px', fontWeight:600, color:e.nr_documentate===e.nr_tranzactii?'#4ADE80':firma.culoare }}>
+                <span style={{ flex:1, fontSize:'13px', fontWeight:600, color:'var(--c-dddddd)' }}>{e.valuta}</span>
+                <span style={{ fontSize:'12px', color:'var(--c-666666)' }}>{e.nr_tranzactii} tranzacții</span>
+                <span style={{ fontSize:'12px', fontWeight:600, color:e.nr_documentate===e.nr_tranzactii?'var(--accent-green)':firma.culoare }}>
                   {e.nr_documentate}/{e.nr_tranzactii} documentate
                 </span>
               </div>
@@ -68,7 +68,7 @@ export default function ExtrasModule({ firma, lunaId, tasks, extrase, slug, luna
       </Link>
 
       {extrase.length === 0 && (
-        <div style={{ padding:'32px', textAlign:'center', color:'#888', fontSize:'13px' }}>
+        <div style={{ padding:'32px', textAlign:'center', color:'var(--c-888888)', fontSize:'13px' }}>
           Niciun extras încărcat pentru luna aceasta.
         </div>
       )}

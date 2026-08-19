@@ -74,19 +74,19 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
     await fetch('/api/model-documente/notite', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, sectiune, continut }) })
   }
 
-  if (loading) return <div style={{ color: '#555', fontSize: '14px', padding: '32px 0' }}>Se încarcă...</div>
-  if (error) return <div style={{ color: '#F87171', fontSize: '13px', padding: '24px 0' }}>{error}</div>
+  if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: '14px', padding: '32px 0' }}>Se încarcă...</div>
+  if (error) return <div style={{ color: 'var(--accent-red)', fontSize: '13px', padding: '24px 0' }}>{error}</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {SECTIUNI.map(s => {
         const docs = fisiere[s.key] || []
         return (
-          <div key={s.key} style={{ background: '#111', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '20px 22px' }}>
+          <div key={s.key} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '.1em' }}>{s.titlu}</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>{s.titlu}</span>
               <button onClick={() => inputRefs.current[s.key]?.click()} disabled={!!uploading[s.key]} style={{
-                fontSize: '12px', fontWeight: 600, color: '#6EE7B0', background: 'transparent', border: 'none', cursor: 'pointer',
+                fontSize: '12px', fontWeight: 600, color: 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer',
               }}>{uploading[s.key] ? 'Se încarcă...' : '+ Adaugă fișier'}</button>
               <input
                 ref={el => { inputRefs.current[s.key] = el }}
@@ -94,24 +94,24 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
                 onChange={e => e.target.files?.length && uploadFiles(s.key, e.target.files)}
               />
             </div>
-            <p style={{ fontSize: '12px', color: '#555', marginBottom: '14px' }}>{s.hint}</p>
+            <p style={{ fontSize: '12px', color: 'var(--c-555555)', marginBottom: '14px' }}>{s.hint}</p>
 
             {docs.length === 0 ? (
-              <p style={{ fontSize: '13px', color: '#555', padding: '4px 0 8px' }}>Niciun fișier încărcat încă.</p>
+              <p style={{ fontSize: '13px', color: 'var(--c-555555)', padding: '4px 0 8px' }}>Niciun fișier încărcat încă.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: s.key === 'stat_plata_angajati' ? '16px' : 0 }}>
                 {docs.map(d => (
-                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#161616', border: '1px solid #262626', borderRadius: '8px', padding: '8px 12px' }}>
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '8px', padding: '8px 12px' }}>
                     <input
                       defaultValue={d.fisier_nume}
                       onBlur={e => e.target.value.trim() && e.target.value !== d.fisier_nume && renameFile(d.id, s.key, e.target.value.trim())}
-                      style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '13px', color: '#DDD', minWidth: 0 }}
+                      style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '13px', color: 'var(--c-dddddd)', minWidth: 0 }}
                     />
-                    <span style={{ fontSize: '11px', color: '#555', flexShrink: 0 }}>{fmtSize(d.fisier_marime)}</span>
-                    <a href={`/api/model-documente/download?id=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: '#60A5FA', textDecoration: 'none', flexShrink: 0 }}>Descarcă</a>
+                    <span style={{ fontSize: '11px', color: 'var(--c-555555)', flexShrink: 0 }}>{fmtSize(d.fisier_marime)}</span>
+                    <a href={`/api/model-documente/download?id=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none', flexShrink: 0 }}>Descarcă</a>
                     <button onClick={() => deleteFile(d.id, s.key)} title="Șterge" style={{
-                      width: '24px', height: '24px', flexShrink: 0, background: '#1A1A1A', border: '1px solid #2A2A2A',
-                      borderRadius: '6px', cursor: 'pointer', color: '#F87171', fontSize: '13px', lineHeight: 1,
+                      width: '24px', height: '24px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)',
+                      borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '13px', lineHeight: 1,
                     }}>×</button>
                   </div>
                 ))}
@@ -120,13 +120,13 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
 
             {s.key === 'stat_plata_angajati' && (
               <div>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '.1em', display: 'block', marginBottom: '8px' }}>Notițe generale</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', display: 'block', marginBottom: '8px' }}>Notițe generale</span>
                 <textarea
                   defaultValue={notite[s.key] || ''}
                   onBlur={e => e.target.value !== (notite[s.key] || '') && saveNotite(s.key, e.target.value)}
                   placeholder="Informații generale despre statele de plată..."
                   rows={4}
-                  style={{ width: '100%', background: '#0D0D0D', border: '1px solid #2A2A2A', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#DDD', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                  style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
                 />
               </div>
             )}
