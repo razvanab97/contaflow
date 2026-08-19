@@ -8,6 +8,7 @@ interface ModelDoc {
 const SECTIUNI: { key: string; titlu: string; hint: string; accept: string }[] = [
   { key: 'raport_lunar', titlu: 'Raport lunar', hint: 'Word + PDF', accept: '.doc,.docx,application/pdf' },
   { key: 'stat_plata_angajati', titlu: 'Stat plată angajați', hint: 'PDF-uri + Excel', accept: '.xls,.xlsx,application/pdf' },
+  { key: 'reges_angajati', titlu: 'Registru angajați (REGES)', hint: 'Extras Reges salariat, extras Reges salariați angajator, contracte angajator', accept: '' },
   { key: 'acte_contabile', titlu: 'Acte contabile', hint: 'orice document', accept: '' },
 ]
 

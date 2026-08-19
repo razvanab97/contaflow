@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
-const SECTIUNI = ['raport_lunar', 'stat_plata_angajati', 'acte_contabile']
+const SECTIUNI = ['raport_lunar', 'stat_plata_angajati', 'reges_angajati', 'acte_contabile']
 
 export async function GET(req: NextRequest) {
   const firmaId = req.nextUrl.searchParams.get('firmaId')
