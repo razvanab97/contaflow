@@ -30,6 +30,7 @@ interface Tx {
   categorie: string; document_id: string|null; note: string|null; status_note: string|null
   documente: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }|null
   documenteToate?: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }[]
+  sugestieFactura?: { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_factura:string|null }|null
 }
 interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
@@ -786,6 +787,15 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   const [addError, setAddError] = useState('')
   const [addDrag, setAddDrag] = useState(false)
   const addFileRef = useRef<HTMLInputElement>(null)
+  const [sugestieBusy, setSugestieBusy] = useState(false)
+
+  async function confirmSugestie() {
+    if (!tx.sugestieFactura) return
+    setSugestieBusy(true)
+    await fetch('/api/facturi-asteptate/asociaza', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ facturaId:tx.sugestieFactura.id, tranzactieId:tx.id }) })
+    setSugestieBusy(false)
+    onUploadSuccess()
+  }
 
   const isNA = tx.note==='na', isDone=!!tx.document_id
   const cat = tx.categorie ? CAT[tx.categorie]||CAT.altele : CAT.altele
@@ -1036,6 +1046,20 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
         ) : (
           /* Upload Form */
           <div>
+            {tx.sugestieFactura && (
+              <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', padding:'12px 14px', marginBottom:'16px', background:'light-dark(rgba(5,150,105,.1), rgba(110,231,176,.06))', border:'1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.2))', borderRadius:'10px' }}>
+                <svg width="16" height="16" fill="none" stroke="var(--accent-mint)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0 }}><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                <div style={{ flex:1, minWidth:'180px' }}>
+                  <div style={{ fontSize:'12px', fontWeight:600, color:'var(--c-dddddd)' }}>Am găsit o factură care se potrivește</div>
+                  <div style={{ fontSize:'11px', color:'var(--c-888888)', marginTop:'2px' }}>
+                    {[tx.sugestieFactura.furnizor, tx.sugestieFactura.suma != null ? `${tx.sugestieFactura.suma.toFixed(2)} RON` : null].filter(Boolean).join(' · ') || tx.sugestieFactura.fisier_nume}
+                  </div>
+                </div>
+                <button onClick={confirmSugestie} disabled={sugestieBusy} style={{ fontSize:'12px', fontWeight:600, padding:'7px 14px', borderRadius:'7px', border:'none', background:'var(--accent-mint)', color:'var(--c-0a0a0a)', cursor: sugestieBusy ? 'wait' : 'pointer', opacity: sugestieBusy ? .6 : 1 }}>
+                  {sugestieBusy ? 'Se asociază...' : 'Asociază'}
+                </button>
+              </div>
+            )}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
               <h3 style={{ fontSize:'14px', fontWeight:700, color:'var(--c-ffffff)' }}>Asociază Document</h3>
               {editDoc && (

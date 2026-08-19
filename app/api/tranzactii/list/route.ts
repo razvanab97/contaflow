@@ -4,6 +4,42 @@ const SB = 'https://aqlmuoaaipbanjdptleg.supabase.co/rest/v1'
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const H = { 'apikey': KEY, 'Authorization': `Bearer ${KEY}` }
 
+const MS_DAY = 86400000
+// Diferenta in zile calendaristice intre doua date (ignora ora, ca sa nu strice pragul de toleranta
+// cand factura a fost incarcata spre finalul zilei).
+function daysBetween(a: string, b: string) {
+  const da = new Date(String(a).slice(0, 10) + 'T00:00:00Z').getTime()
+  const db = new Date(String(b).slice(0, 10) + 'T00:00:00Z').getTime()
+  return Math.abs(da - db) / MS_DAY
+}
+
+// Potriveste facturile adaugate in avans (luna trecuta) cu tranzactiile nedocumentate ale lunii curente,
+// dupa suma exacta si data la care a fost INCARCATA factura (nu data emisa pe factura) - se presupune
+// ca plata s-a facut in ziua incarcarii, iar tranzactia bancara poate aparea la 2-3 zile dupa - ca sugestie,
+// nu asociere automata.
+async function matchFacturiAsteptate(firmaId: string, txs: any[]) {
+  const fRes = await fetch(`${SB}/facturi_asteptate?firma_id=eq.${firmaId}&status=eq.asteptare&select=id,fisier_nume,furnizor,suma,data_factura,created_at`, { headers: H })
+  if (!fRes.ok) return new Map<string, any>()
+  const facturi: any[] = await fRes.json()
+  if (!facturi?.length) return new Map<string, any>()
+
+  const used = new Set<string>()
+  const sugestii = new Map<string, any>()
+  for (const tx of txs) {
+    if (tx.document_id || tx.tip !== 'debit' || tx.suma == null) continue
+    let best: any = null
+    for (const f of facturi) {
+      if (used.has(f.id) || f.suma == null) continue
+      if (Math.abs(Number(f.suma) - Number(tx.suma)) > 0.01) continue
+      if (daysBetween(f.created_at, tx.data_tranzactie) > 3) continue
+      best = f
+      break
+    }
+    if (best) { used.add(best.id); sugestii.set(tx.id, best) }
+  }
+  return sugestii
+}
+
 export async function GET(req: NextRequest) {
   const lunaId = new URL(req.url).searchParams.get('lunaId')
   if (!lunaId) return NextResponse.json([], { status: 400 })
@@ -58,9 +94,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Sugestii de asociere cu facturi adaugate in avans luna trecuta (dupa suma + data apropiata)
+  const lunaRes = await fetch(`${SB}/luni_contabile?id=eq.${lunaId}&select=firma_id`, { headers: H })
+  const [lunaRow] = lunaRes.ok ? await lunaRes.json() : []
+  const sugestii = lunaRow?.firma_id ? await matchFacturiAsteptate(lunaRow.firma_id, all) : new Map<string, any>()
+
   return NextResponse.json(all.map(tx => ({
     ...tx,
     documente: tx.document_id ? documentsById.get(tx.document_id) || null : null,
     documenteToate: allDocsByTx.get(tx.id) || [],
+    sugestieFactura: sugestii.get(tx.id) || null,
   })))
 }

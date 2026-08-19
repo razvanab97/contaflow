@@ -185,6 +185,17 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
             </svg>
             <span style={{ fontSize: '12px', fontWeight: 400, color: pathname.endsWith('/model-documente') ? 'var(--c-dddddd)' : 'var(--c-777777)' }}>Model documente</span>
           </Link>
+          <Link href={`/${firmaAtiva}/facturi-de-asociat`} style={{
+            display: 'flex', alignItems: 'center', gap: '9px',
+            padding: '7px 20px',
+            background: pathname.endsWith('/facturi-de-asociat') ? 'var(--overlay-hover)' : 'transparent',
+            borderLeft: pathname.endsWith('/facturi-de-asociat') ? '2px solid var(--c-555555)' : '2px solid transparent',
+          }}>
+            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/facturi-de-asociat') ? 'var(--c-cccccc)' : 'var(--c-555555)'} strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+            <span style={{ fontSize: '12px', fontWeight: 400, color: pathname.endsWith('/facturi-de-asociat') ? 'var(--c-dddddd)' : 'var(--c-777777)' }}>Facturi de asociat</span>
+          </Link>
         </>
       )}
 
