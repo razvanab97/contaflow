@@ -22,13 +22,14 @@ interface Props {
   linkPlaceholder?: string
   documentTypeOptions?: { value: string; label: string }[]
   showPaidToggle?: boolean
+  onChange?: () => void
 }
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 
 export default function UploadPanel({
   firmaId, lunaId, section, culoare, title, description,
-  showLinkImport = false, linkPlaceholder, documentTypeOptions, showPaidToggle = false,
+  showLinkImport = false, linkPlaceholder, documentTypeOptions, showPaidToggle = false, onChange,
 }: Props) {
   const [docs, setDocs] = useState<Doc[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -70,6 +71,7 @@ export default function UploadPanel({
     }
     await load()
     setBusy(false)
+    onChange?.()
   }
 
   async function importLink() {
@@ -99,7 +101,7 @@ export default function UploadPanel({
   async function deleteDoc(doc: Doc) {
     if (!confirm(`Ștergi „${doc.fisier_nume}"?`)) return
     const res = await fetch(`/api/chitante/document?id=${encodeURIComponent(doc.id)}`, { method: 'DELETE' })
-    if (res.ok) setDocs(prev => prev.filter(d => d.id !== doc.id))
+    if (res.ok) { setDocs(prev => prev.filter(d => d.id !== doc.id)); onChange?.() }
     else { const d = await res.json().catch(() => ({})); setError(d.error || 'Documentul nu a putut fi șters') }
   }
 
