@@ -32,8 +32,16 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState<Record<string, boolean>>({})
-  const [previewId, setPreviewId] = useState<string | null>(null)
+  const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  function togglePreview(id: string) {
+    setPreviewIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
 
   function load() {
     fetch(`/api/model-documente?firmaId=${encodeURIComponent(firmaId)}`)
@@ -55,27 +63,33 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
 
   async function uploadFiles(sectiune: string, files: FileList) {
     setUploading(u => ({ ...u, [sectiune]: true }))
-    let lastUploaded: ModelDoc | null = null
+    const uploaded: ModelDoc[] = []
     for (const file of Array.from(files)) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('firmaId', firmaId)
       fd.append('sectiune', sectiune)
       const res = await fetch('/api/model-documente', { method: 'POST', body: fd })
-      if (res.ok) lastUploaded = await res.json()
+      if (res.ok) uploaded.push(await res.json())
     }
     setUploading(u => ({ ...u, [sectiune]: false }))
     load()
-    // deschide automat previzualizarea ultimului fișier încărcat, ca sa vezi imediat cum arată
-    if (lastUploaded && isPreviewable(lastUploaded.fisier_tip, lastUploaded.fisier_nume)) {
-      setPreviewId(lastUploaded.id)
+    // deschide automat previzualizarea fiecărui fișier încărcat acum, ca sa vezi imediat cum arată —
+    // se adaugă la cele deja deschise, nu le înlocuiește
+    const newlyPreviewable = uploaded.filter(d => isPreviewable(d.fisier_tip, d.fisier_nume))
+    if (newlyPreviewable.length) {
+      setPreviewIds(prev => {
+        const next = new Set(prev)
+        for (const d of newlyPreviewable) next.add(d.id)
+        return next
+      })
     }
   }
 
   async function deleteFile(id: string, sectiune: string) {
     if (!confirm('Ștergi acest document?')) return
     setFisiere(f => ({ ...f, [sectiune]: (f[sectiune] || []).filter(d => d.id !== id) }))
-    if (previewId === id) setPreviewId(null)
+    setPreviewIds(prev => { if (!prev.has(id)) return prev; const next = new Set(prev); next.delete(id); return next })
     await fetch(`/api/model-documente?id=${id}`, { method: 'DELETE' })
   }
 
@@ -116,7 +130,7 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: s.key === 'stat_plata_angajati' ? '16px' : 0 }}>
                 {docs.map(d => {
                   const kind = isPreviewable(d.fisier_tip, d.fisier_nume)
-                  const open = previewId === d.id
+                  const open = previewIds.has(d.id)
                   return (
                     <div key={d.id}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '8px', padding: '8px 12px' }}>
@@ -127,7 +141,7 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
                         />
                         <span style={{ fontSize: '11px', color: 'var(--c-555555)', flexShrink: 0 }}>{fmtSize(d.fisier_marime)}</span>
                         {kind && (
-                          <button onClick={() => setPreviewId(open ? null : d.id)} style={{
+                          <button onClick={() => togglePreview(d.id)} style={{
                             fontSize: '12px', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)',
                             background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0,
                           }}>{open ? 'Ascunde' : 'Previzualizează'}</button>
