@@ -19,7 +19,7 @@ async function analyzeFactura(bytes: Uint8Array, mediaType: string) {
       max_tokens: 500,
       messages: [{ role: 'user', content: [
         source,
-        { type: 'text', text: 'Extrage datele acestei facturi. Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului","suma":123.45,"dataFactura":"AAAA-LL-ZZ"}. "suma" e suma totala de plata a facturii. "dataFactura" e data emiterii facturii (sau, daca exista, data scadenta/data platii) in format ISO. Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+        { type: 'text', text: 'Extrage datele acestei facturi. Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului","numarDocument":"seria si numarul facturii, copiate exact cum apar (ex: AAA 1234567 sau doar 1234567 daca nu are serie)","suma":123.45,"dataFactura":"AAAA-LL-ZZ"}. "suma" e suma totala de plata a facturii. "dataFactura" e data emiterii facturii (sau, daca exista, data scadenta/data platii) in format ISO. Lasa null campurile pe care nu le gasesti. Nu inventa date, copiaza numarul documentului exact caracter cu caracter.' },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -28,6 +28,7 @@ async function analyzeFactura(bytes: Uint8Array, mediaType: string) {
     const parsed = JSON.parse(match[0])
     return {
       furnizor: typeof parsed.furnizor === 'string' ? parsed.furnizor : null,
+      numarDocument: typeof parsed.numarDocument === 'string' ? parsed.numarDocument : null,
       suma: typeof parsed.suma === 'number' ? parsed.suma : null,
       dataFactura: typeof parsed.dataFactura === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataFactura) ? parsed.dataFactura : null,
     }
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
   const { data, error } = await sb
     .from('facturi_asteptate')
-    .select('id,fisier_nume,fisier_tip,furnizor,suma,data_factura,status,tranzactie_id,created_at')
+    .select('id,fisier_nume,fisier_tip,furnizor,numar_document,suma,data_factura,status,tranzactie_id,created_at')
     .eq('firma_id', firmaId)
     .order('created_at', { ascending: false })
 
@@ -76,9 +77,10 @@ export async function POST(req: NextRequest) {
     fisier_nume: fileName,
     fisier_tip: file.type,
     furnizor: extracted?.furnizor || null,
+    numar_document: extracted?.numarDocument || null,
     suma: extracted?.suma ?? null,
     data_factura: extracted?.dataFactura || null,
-  }).select('id,fisier_nume,fisier_tip,furnizor,suma,data_factura,status,tranzactie_id,created_at').single()
+  }).select('id,fisier_nume,fisier_tip,furnizor,numar_document,suma,data_factura,status,tranzactie_id,created_at').single()
 
   if (error) {
     await sb.storage.from('documente').remove([path])
@@ -88,12 +90,13 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { id, fisier_nume, furnizor, suma, data_factura } = await req.json()
+  const { id, fisier_nume, furnizor, numar_document, suma, data_factura } = await req.json()
   if (!id) return NextResponse.json({ error: 'id lipsește' }, { status: 400 })
 
   const patch: Record<string, unknown> = {}
   if (typeof fisier_nume === 'string' && fisier_nume.trim()) patch.fisier_nume = fisier_nume.trim()
   if (typeof furnizor === 'string') patch.furnizor = furnizor.trim() || null
+  if (typeof numar_document === 'string') patch.numar_document = numar_document.trim() || null
   if (suma === null || typeof suma === 'number') patch.suma = suma
   if (data_factura === null || (typeof data_factura === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data_factura))) patch.data_factura = data_factura
   if (!Object.keys(patch).length) return NextResponse.json({ error: 'Niciun câmp de actualizat' }, { status: 400 })

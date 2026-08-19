@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
   const sb = getServiceSupabase()
   const { data: factura, error: facturaError } = await sb.from('facturi_asteptate')
-    .select('id,fisier_path,fisier_nume,fisier_tip,furnizor,suma,firma_id')
+    .select('id,fisier_path,fisier_nume,fisier_tip,furnizor,numar_document,suma,firma_id')
     .eq('id', facturaId).single()
   if (facturaError || !factura) return NextResponse.json({ error: 'Factura nu a fost găsită' }, { status: 404 })
 
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
     modul: 'extras',
     tip_document: 'factura',
     furnizor: factura.furnizor || '',
+    numar_document: factura.numar_document || '',
     fisier_path: path,
     fisier_nume: renamedFile,
     fisier_tip: factura.fisier_tip || 'application/pdf',

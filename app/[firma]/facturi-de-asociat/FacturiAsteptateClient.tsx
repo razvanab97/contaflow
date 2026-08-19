@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 
 interface Factura {
   id: string; fisier_nume: string; fisier_tip: string | null
-  furnizor: string | null; suma: number | null; data_factura: string | null
+  furnizor: string | null; numar_document: string | null; suma: number | null; data_factura: string | null
   status: 'asteptare' | 'asociata'; tranzactie_id: string | null; created_at: string
 }
 
@@ -60,7 +60,7 @@ export default function FacturiAsteptateClient({ firmaId }: { firmaId: string })
     await fetch(`/api/facturi-asteptate?id=${id}`, { method: 'DELETE' })
   }
 
-  async function patchFactura(id: string, patch: Partial<Pick<Factura, 'fisier_nume' | 'furnizor' | 'suma' | 'data_factura'>>) {
+  async function patchFactura(id: string, patch: Partial<Pick<Factura, 'fisier_nume' | 'furnizor' | 'numar_document' | 'suma' | 'data_factura'>>) {
     setFacturi(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f))
     await fetch('/api/facturi-asteptate', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...patch }) })
   }
@@ -120,6 +120,13 @@ export default function FacturiAsteptateClient({ firmaId }: { firmaId: string })
                       placeholder="furnizor"
                       onBlur={e => e.target.value.trim() !== (f.furnizor || '') && patchFactura(f.id, { furnizor: e.target.value.trim() })}
                       style={{ width: '120px', fontSize: '12px', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '4px 8px', outline: 'none' }}
+                    />
+                    <input
+                      defaultValue={f.numar_document || ''}
+                      placeholder="serie + număr"
+                      title="Seria și numărul facturii — citite de AI, ca să poți identifica factura și după acestea"
+                      onBlur={e => e.target.value.trim() !== (f.numar_document || '') && patchFactura(f.id, { numar_document: e.target.value.trim() })}
+                      style={{ width: '110px', fontSize: '12px', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '4px 8px', outline: 'none' }}
                     />
                     <input
                       type="number" step="0.01"
