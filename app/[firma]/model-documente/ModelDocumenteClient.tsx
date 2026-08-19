@@ -33,6 +33,9 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState<Record<string, boolean>>({})
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
+  const [editingNotite, setEditingNotite] = useState<Record<string, boolean>>({})
+  const [draftNotite, setDraftNotite] = useState<Record<string, string>>({})
+  const [savingNotite, setSavingNotite] = useState<Record<string, boolean>>({})
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   function togglePreview(id: string) {
@@ -98,8 +101,35 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
     await fetch('/api/model-documente', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, fisier_nume }) })
   }
 
-  async function saveNotite(sectiune: string, continut: string) {
+  async function persistNotite(sectiune: string, continut: string) {
     await fetch('/api/model-documente/notite', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, sectiune, continut }) })
+  }
+
+  function startEditNotite(sectiune: string) {
+    setDraftNotite(d => ({ ...d, [sectiune]: notite[sectiune] || '' }))
+    setEditingNotite(e => ({ ...e, [sectiune]: true }))
+  }
+
+  function cancelEditNotite(sectiune: string) {
+    setEditingNotite(e => ({ ...e, [sectiune]: false }))
+  }
+
+  async function saveNotiteAction(sectiune: string) {
+    const continut = (draftNotite[sectiune] ?? '').trim()
+    setSavingNotite(s => ({ ...s, [sectiune]: true }))
+    await persistNotite(sectiune, continut)
+    setNotite(n => ({ ...n, [sectiune]: continut }))
+    setSavingNotite(s => ({ ...s, [sectiune]: false }))
+    setEditingNotite(e => ({ ...e, [sectiune]: false }))
+  }
+
+  async function deleteNotiteAction(sectiune: string) {
+    if (!confirm('Ștergi notița?')) return
+    setSavingNotite(s => ({ ...s, [sectiune]: true }))
+    await persistNotite(sectiune, '')
+    setNotite(n => ({ ...n, [sectiune]: '' }))
+    setSavingNotite(s => ({ ...s, [sectiune]: false }))
+    setEditingNotite(e => ({ ...e, [sectiune]: false }))
   }
 
   if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: '14px', padding: '32px 0' }}>Se încarcă...</div>
@@ -164,16 +194,62 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
               </div>
             )}
 
-            <div style={{ marginTop: docs.length === 0 ? '4px' : '14px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', display: 'block', marginBottom: '8px' }}>Notițe generale</span>
-              <textarea
-                defaultValue={notite[s.key] || ''}
-                onBlur={e => e.target.value !== (notite[s.key] || '') && saveNotite(s.key, e.target.value)}
-                placeholder="Informații generale..."
-                rows={4}
-                style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
-              />
-            </div>
+            {(() => {
+              const isEditing = !!editingNotite[s.key]
+              const hasContent = !!(notite[s.key] && notite[s.key].trim())
+              const busy = !!savingNotite[s.key]
+              return (
+                <div style={{ marginTop: docs.length === 0 ? '4px' : '14px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', display: 'block', marginBottom: '8px' }}>Notițe generale</span>
+
+                  {isEditing ? (
+                    <div>
+                      <textarea
+                        value={draftNotite[s.key] ?? ''}
+                        onChange={e => setDraftNotite(d => ({ ...d, [s.key]: e.target.value }))}
+                        placeholder="Informații generale..."
+                        rows={4}
+                        autoFocus
+                        style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                      />
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button onClick={() => saveNotiteAction(s.key)} disabled={busy} style={{
+                          fontSize: '12px', fontWeight: 600, padding: '6px 14px', borderRadius: '7px', border: 'none',
+                          background: 'var(--accent-mint)', color: 'var(--c-0a0a0a)', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1,
+                        }}>{busy ? 'Se salvează...' : 'Salvează'}</button>
+                        {hasContent && (
+                          <button onClick={() => cancelEditNotite(s.key)} disabled={busy} style={{
+                            fontSize: '12px', fontWeight: 600, padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)',
+                            background: 'transparent', color: 'var(--c-888888)', cursor: 'pointer',
+                          }}>Anulează</button>
+                        )}
+                      </div>
+                    </div>
+                  ) : hasContent ? (
+                    <div>
+                      <div style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--c-dddddd)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {notite[s.key]}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button onClick={() => startEditNotite(s.key)} disabled={busy} style={{
+                          fontSize: '12px', fontWeight: 600, padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)',
+                          background: 'transparent', color: 'var(--accent-mint)', cursor: 'pointer',
+                        }}>Editează</button>
+                        <button onClick={() => deleteNotiteAction(s.key)} disabled={busy} style={{
+                          fontSize: '12px', fontWeight: 600, padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)',
+                          background: 'transparent', color: 'var(--accent-red)', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1,
+                        }}>{busy ? '...' : 'Șterge'}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => startEditNotite(s.key)} style={{
+                      fontSize: '12px', fontWeight: 600, color: 'var(--accent-mint)', background: 'transparent', border: '1px dashed var(--c-2a2a2a)',
+                      borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', width: '100%', textAlign: 'left',
+                    }}>+ Adaugă notiță</button>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         )
       })}
