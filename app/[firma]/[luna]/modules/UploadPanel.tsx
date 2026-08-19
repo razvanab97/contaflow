@@ -54,6 +54,7 @@ export default function UploadPanel({
 
   async function upload(files: FileList) {
     setBusy(true); setError('')
+    const documentTypeLabel = documentTypeOptions?.find(o => o.value === documentType)?.label || ''
     for (const file of Array.from(files)) {
       const fd = new FormData()
       fd.append('file', file)
@@ -62,6 +63,7 @@ export default function UploadPanel({
       fd.append('section', section)
       fd.append('category', 'altul')
       fd.append('documentType', documentType)
+      fd.append('documentTypeLabel', documentTypeLabel)
       fd.append('supplier', supplier)
       const res = await fetch('/api/chitante', { method: 'POST', body: fd })
       if (!res.ok) { const d = await res.json().catch(()=>({})); setError(d.error || 'Eroare upload'); break }
@@ -98,7 +100,7 @@ export default function UploadPanel({
     if (!confirm(`Ștergi „${doc.fisier_nume}"?`)) return
     const res = await fetch(`/api/chitante/document?id=${encodeURIComponent(doc.id)}`, { method: 'DELETE' })
     if (res.ok) setDocs(prev => prev.filter(d => d.id !== doc.id))
-    else setError('Documentul nu a putut fi șters')
+    else { const d = await res.json().catch(() => ({})); setError(d.error || 'Documentul nu a putut fi șters') }
   }
 
   async function togglePaid(doc: Doc) {

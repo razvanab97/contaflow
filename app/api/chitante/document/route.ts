@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
+// Secțiunile gestionate prin UploadPanel — singurele din care acest endpoint generic
+// are voie să șteargă (documentele din emag-avize/dispozitii-plata/etc. au rutele lor proprii)
+const DELETABLE_SECTIONS = [
+  'facturi-chitanta', 'facturi-restante',
+  'booking-facturi', 'booking-borderou',
+  'airbnb-facturi', 'airbnb-borderou',
+  '5stardesk', 'trendyol', 'acte-contabile', 'angajati',
+]
+
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
@@ -38,7 +47,7 @@ export async function DELETE(req: NextRequest) {
   if (error || !doc) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
 
   const path = String(doc.fisier_path || '')
-  if (!path.includes('/facturi-chitanta/') && !path.includes('/facturi-restante/'))
+  if (!DELETABLE_SECTIONS.some(section => path.includes(`/${section}/`)))
     return NextResponse.json({ error: 'Acest document nu poate fi șters din această secțiune' }, { status: 403 })
 
   const { error: unlinkError } = await sb.from('tranzactii').update({ document_id: null }).eq('document_id', id)

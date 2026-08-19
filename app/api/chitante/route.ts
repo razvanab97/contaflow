@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
   const lunaId = String(fd.get('lunaId') || '')
   const category = String(fd.get('category') || '')
   const documentType = String(fd.get('documentType') || '')
+  const documentTypeLabel = String(fd.get('documentTypeLabel') || '').trim()
   const supplier = String(fd.get('supplier') || '').trim()
   const section = String(fd.get('section') || 'facturi-chitanta')
   const description = String(fd.get('description') || '').trim()
@@ -87,8 +88,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG și PNG' }, { status: 400 })
 
   const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
-  const details = [supplier, description, reference].filter(Boolean).join(' ')
-  const fileName = `${effectiveCategory}_${effectiveType}_${safeFilePart(details, 'fara_detalii')}_${Date.now()}.${extension}`
+  // Numele fisierului trebuie sa spuna ce e documentul — daca nu s-a completat furnizor/descriere,
+  // folosim eticheta tipului de document (ex. "Stat de plata") in loc de un fallback generic
+  const details = [documentTypeLabel, supplier, description, reference].filter(Boolean).join(' ')
+  const fileName = `${safeFilePart(details, effectiveType)}_${Date.now()}.${extension}`
   const path = `${firmaId}/${lunaId}/${section}/${fileName}`
   const sb = getServiceSupabase()
 
