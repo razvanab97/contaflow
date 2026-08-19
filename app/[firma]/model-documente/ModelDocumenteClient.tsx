@@ -20,12 +20,19 @@ function fmtSize(bytes: number | null) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
+function isPreviewable(tip: string | null, nume: string) {
+  if (tip === 'application/pdf' || nume.toLowerCase().endsWith('.pdf')) return 'pdf'
+  if (tip?.startsWith('image/')) return 'image'
+  return null
+}
+
 export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
   const [fisiere, setFisiere] = useState<Record<string, ModelDoc[]>>({})
   const [notite, setNotite] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState<Record<string, boolean>>({})
+  const [previewId, setPreviewId] = useState<string | null>(null)
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   function load() {
@@ -48,20 +55,27 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
 
   async function uploadFiles(sectiune: string, files: FileList) {
     setUploading(u => ({ ...u, [sectiune]: true }))
+    let lastUploaded: ModelDoc | null = null
     for (const file of Array.from(files)) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('firmaId', firmaId)
       fd.append('sectiune', sectiune)
-      await fetch('/api/model-documente', { method: 'POST', body: fd })
+      const res = await fetch('/api/model-documente', { method: 'POST', body: fd })
+      if (res.ok) lastUploaded = await res.json()
     }
     setUploading(u => ({ ...u, [sectiune]: false }))
     load()
+    // deschide automat previzualizarea ultimului fișier încărcat, ca sa vezi imediat cum arată
+    if (lastUploaded && isPreviewable(lastUploaded.fisier_tip, lastUploaded.fisier_nume)) {
+      setPreviewId(lastUploaded.id)
+    }
   }
 
   async function deleteFile(id: string, sectiune: string) {
     if (!confirm('Ștergi acest document?')) return
     setFisiere(f => ({ ...f, [sectiune]: (f[sectiune] || []).filter(d => d.id !== id) }))
+    if (previewId === id) setPreviewId(null)
     await fetch(`/api/model-documente?id=${id}`, { method: 'DELETE' })
   }
 
@@ -100,21 +114,39 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
               <p style={{ fontSize: '13px', color: 'var(--c-555555)', padding: '4px 0 8px' }}>Niciun fișier încărcat încă.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: s.key === 'stat_plata_angajati' ? '16px' : 0 }}>
-                {docs.map(d => (
-                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '8px', padding: '8px 12px' }}>
-                    <input
-                      defaultValue={d.fisier_nume}
-                      onBlur={e => e.target.value.trim() && e.target.value !== d.fisier_nume && renameFile(d.id, s.key, e.target.value.trim())}
-                      style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '13px', color: 'var(--c-dddddd)', minWidth: 0 }}
-                    />
-                    <span style={{ fontSize: '11px', color: 'var(--c-555555)', flexShrink: 0 }}>{fmtSize(d.fisier_marime)}</span>
-                    <a href={`/api/model-documente/download?id=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none', flexShrink: 0 }}>Descarcă</a>
-                    <button onClick={() => deleteFile(d.id, s.key)} title="Șterge" style={{
-                      width: '24px', height: '24px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)',
-                      borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '13px', lineHeight: 1,
-                    }}>×</button>
-                  </div>
-                ))}
+                {docs.map(d => {
+                  const kind = isPreviewable(d.fisier_tip, d.fisier_nume)
+                  const open = previewId === d.id
+                  return (
+                    <div key={d.id}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '8px', padding: '8px 12px' }}>
+                        <input
+                          defaultValue={d.fisier_nume}
+                          onBlur={e => e.target.value.trim() && e.target.value !== d.fisier_nume && renameFile(d.id, s.key, e.target.value.trim())}
+                          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '13px', color: 'var(--c-dddddd)', minWidth: 0 }}
+                        />
+                        <span style={{ fontSize: '11px', color: 'var(--c-555555)', flexShrink: 0 }}>{fmtSize(d.fisier_marime)}</span>
+                        {kind && (
+                          <button onClick={() => setPreviewId(open ? null : d.id)} style={{
+                            fontSize: '12px', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)',
+                            background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0,
+                          }}>{open ? 'Ascunde' : 'Previzualizează'}</button>
+                        )}
+                        <a href={`/api/model-documente/download?id=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none', flexShrink: 0 }}>Descarcă</a>
+                        <button onClick={() => deleteFile(d.id, s.key)} title="Șterge" style={{
+                          width: '24px', height: '24px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)',
+                          borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '13px', lineHeight: 1,
+                        }}>×</button>
+                      </div>
+                      {open && kind === 'pdf' && (
+                        <iframe src={`/api/model-documente/download?id=${d.id}&preview=1`} style={{ width: '100%', height: '70vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', background: 'var(--c-ffffff)' }} />
+                      )}
+                      {open && kind === 'image' && (
+                        <img src={`/api/model-documente/download?id=${d.id}&preview=1`} alt={d.fisier_nume} style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', background: 'var(--c-ffffff)' }} />
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
 
