@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { tint } from '@/lib/colors'
 
 export interface TaskItem {
   key: string
@@ -71,8 +72,8 @@ export default function TaskSection({ tasks, lunaId, culoare }: Props) {
           >
             <div style={{
               width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
-              background: task.completat ? `rgba(${r},.12)` : 'var(--c-1a1a1a)',
-              border: task.completat ? `1.5px solid rgba(${r},.4)` : '1.5px solid var(--c-2a2a2a)',
+              background: task.completat ? tint(r, .12) : 'var(--c-1a1a1a)',
+              border: task.completat ? `1.5px solid ${tint(r, .4)}` : '1.5px solid var(--c-2a2a2a)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all .15s',
             }}>
@@ -101,7 +102,7 @@ export default function TaskSection({ tasks, lunaId, culoare }: Props) {
       </div>
 
       {done === total && (
-        <div style={{ marginTop: '14px', padding: '8px 12px', background: 'rgba(110,231,176,.05)', borderRadius: '8px', border: '1px solid rgba(110,231,176,.12)' }}>
+        <div style={{ marginTop: '14px', padding: '8px 12px', background: 'light-dark(rgba(5,150,105,.125), rgba(110,231,176,.05))', borderRadius: '8px', border: '1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.12))' }}>
           <span style={{ fontSize: '12px', color: 'var(--accent-mint)', fontWeight: 500 }}>✓ Modul complet</span>
         </div>
       )}

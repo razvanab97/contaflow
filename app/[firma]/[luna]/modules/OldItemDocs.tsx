@@ -1,6 +1,6 @@
 'use client'
 import { useState, useCallback, useRef } from 'react'
-import { legibil } from '@/lib/colors'
+import { legibil, tint } from '@/lib/colors'
 
 export interface ChecklistItem {
   id: string
@@ -58,7 +58,7 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
   }
 
   return (
-    <div style={{ background: 'var(--c-111111)', border: `1px solid ${open ? `rgba(${r},.25)` : 'var(--c-1e1e1e)'}`, borderRadius: '10px', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--c-111111)', border: `1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius: '10px', overflow: 'hidden' }}>
       <button onClick={toggle} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <div style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, background: docs.length > 0 ? 'var(--accent-mint)' : 'var(--c-2a2a2a)' }}/>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -86,7 +86,7 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
             </div>
           )}
           <div onClick={() => fileRef.current?.click()} onDragOver={e => { e.preventDefault(); setDrag(true) }} onDragLeave={() => setDrag(false)} onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files.length && upload(e.dataTransfer.files) }}
-            style={{ border: `1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius: '8px', padding: '14px', textAlign: 'center', cursor: 'pointer', background: drag ? `rgba(${r},.04)` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '4px' : '12px' }}>
+            style={{ border: `1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius: '8px', padding: '14px', textAlign: 'center', cursor: 'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '4px' : '12px' }}>
             <p style={{ fontSize: '12px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight: 600 }}>{uploading ? 'Se încarcă...' : '+ Adaugă document'}</p>
           </div>
           <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>

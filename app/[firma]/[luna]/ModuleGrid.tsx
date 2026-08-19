@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
-import { legibil } from '@/lib/colors'
+import { legibil, tint } from '@/lib/colors'
 
 interface FirmaInfo { id: string; slug: string; nume: string; culoare: string }
 interface Props {
@@ -137,7 +137,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
           )}
           <button
             onClick={() => setReordering(v => !v)}
-            style={{ fontSize:'11px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border: reordering ? `1px solid ${firma.culoare}` : '1px solid var(--c-2a2a2a)', background: reordering ? `rgba(${r},.1)` : 'transparent', color: reordering ? firma.culoare : 'var(--c-888888)', cursor:'pointer', transition:'all .15s' }}
+            style={{ fontSize:'11px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border: reordering ? `1px solid ${firma.culoare}` : '1px solid var(--c-2a2a2a)', background: reordering ? tint(r, .1) : 'transparent', color: reordering ? firma.culoare : 'var(--c-888888)', cursor:'pointer', transition:'all .15s' }}
           >
             {reordering ? '✓ Gata' : '⠿ Setează ordinea'}
           </button>
@@ -163,8 +163,8 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                 style={{
                   display:'flex', alignItems:'center', gap:'12px',
                   padding:'12px 16px',
-                  background: isOver ? `rgba(${r},.08)` : 'var(--c-111111)',
-                  border: isOver ? `1px solid rgba(${r},.4)` : '1px solid var(--c-1e1e1e)',
+                  background: isOver ? tint(r, .08) : 'var(--c-111111)',
+                  border: isOver ? `1px solid ${tint(r, .4)}` : '1px solid var(--c-1e1e1e)',
                   borderRadius:'10px',
                   cursor:'grab',
                   transition:'background .1s, border-color .1s',
@@ -206,10 +206,10 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
             const statusStyle = isDeactivated
               ? { bg:'var(--c-161616)', c:'var(--c-555555)', border:'var(--c-242424)' }
               : isComplete
-              ? { bg:'rgba(110,231,176,.08)', c:'var(--accent-mint)', border:'rgba(110,231,176,.18)' }
+              ? { bg:'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', c:'var(--accent-mint)', border:'light-dark(rgba(5,150,105,.27), rgba(110,231,176,.18))' }
               : isStarted
-              ? { bg:'rgba(245,201,106,.07)', c:'#F5C96A', border:'rgba(245,201,106,.18)' }
-              : { bg:'var(--c-161616)', c:'var(--c-3a3a3a)', border:'var(--c-222222)' }
+              ? { bg:'light-dark(rgba(180,83,9,.175), rgba(245,201,106,.07))', c:'light-dark(#B45309, #F5C96A)', border:'light-dark(rgba(180,83,9,.27), rgba(245,201,106,.18))' }
+              : { bg:'var(--c-161616)', c:'light-dark(#6B7280, var(--c-3a3a3a))', border:'var(--c-222222)' }
 
             const href = mod.linkDirect
               ? `/${slug}/${luna}/${mod.linkDirect}`
@@ -239,7 +239,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                       {statusLabel}
                     </span>
                     {mod.slug === 'facturi-restante' && !!restanteCount && (
-                      <span style={{ fontSize:'10px', fontWeight:700, padding:'3px 9px', borderRadius:'20px', background:'rgba(248,113,113,.1)', color:'var(--accent-red)', border:'1px solid rgba(248,113,113,.3)' }}>
+                      <span style={{ fontSize:'10px', fontWeight:700, padding:'3px 9px', borderRadius:'20px', background:'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))', color:'var(--accent-red)', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))' }}>
                         {restanteCount} neachitate
                       </span>
                     )}
@@ -267,7 +267,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                 <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
                   {modTasks.map(t => (
                     <div key={t.key} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                      <div style={{ width:'14px', height:'14px', borderRadius:'4px', flexShrink:0, background: taskMap[t.key] ? `rgba(${r},.15)` : 'var(--c-1a1a1a)', border: taskMap[t.key] ? `1px solid rgba(${r},.4)` : '1px solid var(--c-252525)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <div style={{ width:'14px', height:'14px', borderRadius:'4px', flexShrink:0, background: taskMap[t.key] ? tint(r, .15) : 'var(--c-1a1a1a)', border: taskMap[t.key] ? `1px solid ${tint(r, .4)}` : '1px solid var(--c-252525)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                         {taskMap[t.key] && <svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke={firma.culoare} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       </div>
                       <span style={{ fontSize:'12px', fontWeight:500, color: taskMap[t.key] ? 'var(--c-777777)' : 'var(--c-aaaaaa)', textDecoration: taskMap[t.key] ? 'line-through' : 'none' }}>{t.label}</span>
@@ -281,7 +281,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                     disabled={isBusy}
                     style={{
                       fontSize:'11px', fontWeight:600, padding:'5px 11px', borderRadius:'7px',
-                      border:`1px solid rgba(${r},.35)`, background:`rgba(${r},.06)`,
+                      border:`1px solid ${tint(r, .35)}`, background: tint(r, .06),
                       color: legibil(firma.culoare), cursor: isBusy ? 'wait' : 'pointer',
                       opacity: isBusy ? .6 : 1, transition:'opacity .15s',
                     }}

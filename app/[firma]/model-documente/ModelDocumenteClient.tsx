@@ -127,7 +127,7 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
             {docs.length === 0 ? (
               <p style={{ fontSize: '13px', color: 'var(--c-555555)', padding: '4px 0 8px' }}>Niciun fișier încărcat încă.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: s.key === 'stat_plata_angajati' ? '16px' : 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                 {docs.map(d => {
                   const kind = isPreviewable(d.fisier_tip, d.fisier_nume)
                   const open = previewIds.has(d.id)
@@ -164,18 +164,16 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
               </div>
             )}
 
-            {s.key === 'stat_plata_angajati' && (
-              <div>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', display: 'block', marginBottom: '8px' }}>Notițe generale</span>
-                <textarea
-                  defaultValue={notite[s.key] || ''}
-                  onBlur={e => e.target.value !== (notite[s.key] || '') && saveNotite(s.key, e.target.value)}
-                  placeholder="Informații generale despre statele de plată..."
-                  rows={4}
-                  style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
-                />
-              </div>
-            )}
+            <div style={{ marginTop: docs.length === 0 ? '4px' : '14px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', display: 'block', marginBottom: '8px' }}>Notițe generale</span>
+              <textarea
+                defaultValue={notite[s.key] || ''}
+                onBlur={e => e.target.value !== (notite[s.key] || '') && saveNotite(s.key, e.target.value)}
+                placeholder="Informații generale..."
+                rows={4}
+                style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            </div>
           </div>
         )
       })}

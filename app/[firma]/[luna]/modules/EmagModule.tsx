@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import CopyButton from '@/components/CopyButton'
-import { legibil } from '@/lib/colors'
+import { legibil, tint } from '@/lib/colors'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 interface ChecklistItem { id:string; completat:boolean; checklist_templates?:{ titlu:string; descriere?:string; modul:string; ordine:number } }
@@ -66,7 +66,7 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
   const INP: React.CSSProperties = { fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'7px', padding:'8px 11px', color:'var(--c-bbbbbb)', outline:'none', width:'100%' }
 
   return (
-    <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `rgba(${r},.25)` : 'var(--c-1e1e1e)'}`, borderRadius:'10px', overflow:'hidden', transition:'border-color .2s' }}>
+    <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius:'10px', overflow:'hidden', transition:'border-color .2s' }}>
       <button onClick={toggle} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'14px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
         {/* Status dot */}
         <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: docs.length > 0 ? 'var(--accent-mint)' : item.completat ? culoare : 'var(--c-2a2a2a)' }}/>
@@ -105,7 +105,7 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
             onDragOver={e => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}
             onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files.length && upload(e.dataTransfer.files) }}
-            style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `rgba(${r},.04)` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '4px' : '12px' }}
+            style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '4px' : '12px' }}
           >
             <p style={{ fontSize:'12px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
               {uploading ? 'Se încarcă...' : '+ Adaugă aviz PDF / JPG'}
@@ -217,7 +217,7 @@ function BulkUploadZone({ documentId, firmaId, lunaId, culoare, onChange }: {
         onDragOver={e => { e.preventDefault(); setDrag(true) }}
         onDragLeave={() => setDrag(false)}
         onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files.length && uploadBulk(e.dataTransfer.files) }}
-        style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'12px', textAlign:'center', cursor:'pointer', background: drag ? `rgba(${r},.04)` : 'var(--c-0d0d0d)' }}
+        style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'12px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)' }}
       >
         <p style={{ fontSize:'11px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
           {uploading ? 'Se asociază facturile...' : '+ Adaugă toate facturile deodată (se asociază automat)'}
@@ -277,7 +277,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
   }
 
   return (
-    <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `rgba(${r},.25)` : 'var(--c-1e1e1e)'}`, borderRadius:'10px', overflow:'hidden', transition:'border-color .2s' }}>
+    <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius:'10px', overflow:'hidden', transition:'border-color .2s' }}>
       <button onClick={() => setOpen(v => !v)} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'14px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
         <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: data ? 'var(--accent-mint)' : 'var(--c-2a2a2a)' }}/>
         <div style={{ flex:1, minWidth:0 }}>
@@ -320,7 +320,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
               onDragOver={e => { e.preventDefault(); setDrag(true) }}
               onDragLeave={() => setDrag(false)}
               onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]) }}
-              style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `rgba(${r},.04)` : 'var(--c-0d0d0d)', marginTop:'12px' }}
+              style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)', marginTop:'12px' }}
             >
               <p style={{ fontSize:'12px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
                 {uploading ? 'Se procesează avizul...' : '+ Adaugă aviz PDF'}
@@ -469,7 +469,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
             onDragOver={e => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}
             onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && setFile(e.dataTransfer.files[0]) }}
-            style={{ border:`1.5px dashed ${drag ? firma.culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `rgba(${r},.04)` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '10px' : '0' }}
+            style={{ border:`1.5px dashed ${drag ? firma.culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '10px' : '0' }}
           >
             <p style={{ fontSize:'12px', color: file ? 'var(--c-cccccc)' : 'var(--c-888888)', fontWeight:600 }}>
               {file ? file.name : '+ Adaugă PDF factură Dante'}

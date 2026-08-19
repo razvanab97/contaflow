@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import { Proprietar } from '@/lib/firma-config'
-import { legibil } from '@/lib/colors'
+import { legibil, rgb, tint } from '@/lib/colors'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:string; cui?:string|null; nrRegCom?:string|null; adresa?:string|null; judet?:string|null; tara?:string|null }
 interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[]; proprietari?: Proprietar[] }
@@ -245,7 +245,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
           </div>
           {attachedInvoices.length>0 && <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>{attachedInvoices.map(i=><span key={i.id} style={{ fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:'var(--c-1a1a1a)', color:'var(--c-888888)' }}>{i.fisier_nume}</span>)}</div>}
           {duplicateWarnings.length>0 && (
-            <div style={{ marginTop:'8px', padding:'8px 12px', borderRadius:'8px', background:'rgba(248,113,113,.08)', border:'1px solid rgba(248,113,113,.3)', display:'flex', flexDirection:'column', gap:'4px' }}>
+            <div style={{ marginTop:'8px', padding:'8px 12px', borderRadius:'8px', background:'light-dark(rgba(220,38,38,.2), rgba(248,113,113,.08))', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))', display:'flex', flexDirection:'column', gap:'4px' }}>
               {duplicateWarnings.map((w,i)=>(
                 <span key={i} style={{ fontSize:'11px', color:'var(--accent-red)' }}>⚠ {w}</span>
               ))}
@@ -256,7 +256,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
           {localProprietari.length>0 && (
             <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>
               {localProprietari.map(p=>(
-                <span key={p.nume} style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:`rgba(${parseInt(firma.culoare.slice(1,3),16)},${parseInt(firma.culoare.slice(3,5),16)},${parseInt(firma.culoare.slice(5,7),16)},.12)`, color:legibil(firma.culoare) }}>
+                <span key={p.nume} style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:tint(rgb(firma.culoare),.12), color:legibil(firma.culoare) }}>
                   {p.nume} · {p.serieCi} {p.numarCi}
                   <button onClick={()=>deleteLocalProprietar(p.nume)} style={{ background:'none', border:'none', color:legibil(firma.culoare), cursor:'pointer', padding:'0 2px', fontSize:'10px', lineHeight:1 }}>✕</button>
                 </span>

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TaskDef } from '@/lib/firma-config'
+import { tint } from '@/lib/colors'
 
 export interface ImpozitStare {
   tip_key: string
@@ -62,8 +63,8 @@ export default function ImpoziteModule({ firma, lunaId, tasks, stari }: Props) {
               <div key={task.key} style={{
                 display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
                 padding: '12px', borderRadius: '10px',
-                background: row.platit ? `rgba(${r},.06)` : 'var(--c-161616)',
-                border: `1px solid ${row.platit ? `rgba(${r},.25)` : 'var(--c-262626)'}`,
+                background: row.platit ? `${tint(r,.06)}` : 'var(--c-161616)',
+                border: `1px solid ${row.platit ? `${tint(r,.25)}` : 'var(--c-262626)'}`,
                 opacity: isSaving ? 0.6 : 1,
               }}>
                 <button
@@ -71,8 +72,8 @@ export default function ImpoziteModule({ firma, lunaId, tasks, stari }: Props) {
                   disabled={isSaving}
                   style={{
                     width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0, cursor: 'pointer',
-                    background: row.platit ? `rgba(${r},.15)` : 'var(--c-1a1a1a)',
-                    border: row.platit ? `1.5px solid rgba(${r},.5)` : '1.5px solid var(--c-2a2a2a)',
+                    background: row.platit ? `${tint(r,.15)}` : 'var(--c-1a1a1a)',
+                    border: row.platit ? `1.5px solid ${tint(r,.5)}` : '1.5px solid var(--c-2a2a2a)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >

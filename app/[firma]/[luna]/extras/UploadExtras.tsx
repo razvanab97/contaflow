@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
-import { legibil } from '@/lib/colors'
+import { legibil, tint } from '@/lib/colors'
 
 interface Extras { id: string; nr_tranzactii: number; nr_documentate: number; procesat_ai?: boolean; sold_final?: number; valuta?: string; pdf_path?: string | null; pdf_nume?: string | null }
 
@@ -60,7 +60,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
   const hasPdf = !!extras?.pdf_path
 
   return (
-    <div style={{ background: 'var(--c-161616)', border: `1px solid rgba(${r},.2)`, borderRadius: '14px', padding: '20px' }}>
+    <div style={{ background: 'var(--c-161616)', border: `1px solid ${tint(r,.2)}`, borderRadius: '14px', padding: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
         <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: extras?.nr_tranzactii ? 'var(--accent-green)' : 'var(--c-333333)' }} />
         <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--c-ffffff)' }}>
@@ -107,7 +107,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
                 ↑ Import CSV
               </button>
             )}
-            <button onClick={() => pdfRef.current?.click()} style={{ flex: valuta === 'AUTO' ? 1 : undefined, padding: '9px 14px', borderRadius: '9px', border: `1px solid rgba(${r},.3)`, background: 'transparent', color: legibil(culoare), fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => pdfRef.current?.click()} style={{ flex: valuta === 'AUTO' ? 1 : undefined, padding: '9px 14px', borderRadius: '9px', border: `1px solid ${tint(r,.3)}`, background: 'transparent', color: legibil(culoare), fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
               {valuta === 'AUTO' ? 'Alege PDF · AI detectează moneda' : 'PDF + citire AI'}
             </button>
           </div>
@@ -135,7 +135,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
       )}
 
       {err && (
-        <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', borderRadius: '8px' }}>
+        <div style={{ marginTop: '10px', padding: '8px 12px', background: 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))', border: '1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))', borderRadius: '8px' }}>
           <p style={{ fontSize: '11px', color: 'var(--accent-red)', wordBreak: 'break-all' as const }}>{err}</p>
         </div>
       )}

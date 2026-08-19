@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import TaskSection, { TaskItem } from './TaskSection'
-import { legibil } from '@/lib/colors'
+import { legibil, tint } from '@/lib/colors'
 
 interface Extras { id:string; valuta:string; nr_tranzactii:number; nr_documentate:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
@@ -59,8 +59,8 @@ export default function ExtrasModule({ firma, lunaId, tasks, extrase, slug, luna
       <Link href={`/${slug}/${luna}/extras`} style={{
         display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
         padding:'14px', borderRadius:'12px',
-        border:`1px solid rgba(${r},.3)`,
-        background:`rgba(${r},.05)`,
+        border:`1px solid ${tint(r,.3)}`,
+        background:`${tint(r,.05)}`,
         fontSize:'13px', fontWeight:600, color:legibil(firma.culoare),
       }}>
         <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>

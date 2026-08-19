@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
-import { rgb, legibil } from '@/lib/colors'
+import { rgb, legibil, tint } from '@/lib/colors'
 import DocumentSearch from './DocumentSearch'
 
 export interface FirmaNav {
@@ -118,7 +118,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
           <Link key={f.id} href={`/${f.slug}/${lunaCurenta}`} style={{
             display: 'flex', alignItems: 'center', gap: '10px',
             padding: '9px 20px',
-            background: isActive ? `rgba(${r},.06)` : 'transparent',
+            background: isActive ? `${tint(r,.06)}` : 'transparent',
             borderLeft: isActive ? `2px solid ${f.culoare}` : '2px solid transparent',
             transition: 'background .15s',
           }}>
@@ -206,7 +206,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
               <Link key={m.slug} href={href} style={{
                 display: 'flex', alignItems: 'center', gap: '9px',
                 padding: '7px 20px',
-                background: isCurrentMod ? `rgba(${r2},.08)` : 'transparent',
+                background: isCurrentMod ? `${tint(r2,.08)}` : 'transparent',
                 borderLeft: isCurrentMod ? `2px solid ${firmaColor}` : '2px solid transparent',
               }}>
                 <div style={{
@@ -223,7 +223,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
                 {m.slug === 'facturi-restante' && !!restanteCount && (
                   <span style={{
                     fontSize: '10px', fontWeight: 700, color: 'var(--accent-red)',
-                    background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.3)',
+                    background: 'light-dark(rgba(220,38,38,.3), rgba(248,113,113,.12))', border: '1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))',
                     borderRadius: '20px', padding: '1px 7px', flexShrink: 0,
                   }}>
                     {restanteCount}

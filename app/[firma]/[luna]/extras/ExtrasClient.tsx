@@ -7,12 +7,12 @@ import DocumentSearch from '@/components/DocumentSearch'
 import FacturiModule from '../modules/FacturiModule'
 import NoteTranzactii from './NoteTranzactii'
 import type { TaskItem } from '../modules/TaskSection'
-import { legibil } from '@/lib/colors'
+import { legibil, tint } from '@/lib/colors'
 
 const CAT: Record<string, { bg: string; c: string }> = {
   client:   { bg: 'rgba(74,222,128,.15)',  c: 'var(--accent-green)' },
-  furnizor: { bg: 'rgba(96,165,250,.15)',  c: 'var(--accent-blue)' },
-  taxa:     { bg: 'rgba(248,113,113,.15)', c: 'var(--accent-red)' },
+  furnizor: { bg: 'light-dark(rgba(37,99,235,.35), rgba(96,165,250,.15))',  c: 'var(--accent-blue)' },
+  taxa:     { bg: 'light-dark(rgba(220,38,38,.35), rgba(248,113,113,.15))', c: 'var(--accent-red)' },
   angajat:  { bg: 'rgba(167,139,250,.15)', c: '#A78BFA' },
   transfer: { bg: 'rgba(150,150,150,.15)', c: 'var(--c-aaaaaa)' },
   comision: { bg: 'rgba(251,146,60,.15)',  c: '#FB923C' },
@@ -297,7 +297,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           </div>
           <div style={{ padding:'12px 18px 0' }}>
             {finalizat ? (
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'8px 10px', background:'rgba(110,231,176,.06)', border:'1px solid rgba(110,231,176,.2)', borderRadius:'8px' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'8px 10px', background:'light-dark(rgba(5,150,105,.15), rgba(110,231,176,.06))', border:'1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.2))', borderRadius:'8px' }}>
                 <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)' }}>✓ Extras finalizat</span>
                 <button onClick={()=>toggleFinalizat(false)} disabled={finalizing} style={{ border:'none', background:'transparent', color:'var(--c-666666)', fontSize:'10px', cursor:'pointer', textDecoration:'underline' }}>anulează</button>
               </div>
@@ -383,7 +383,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
             <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
           </div>
         ) : error ? (
-          <div style={{ padding:'24px', background:'rgba(248,113,113,.08)', border:'1px solid rgba(248,113,113,.3)', borderRadius:'12px' }}>
+          <div style={{ padding:'24px', background:'light-dark(rgba(220,38,38,.2), rgba(248,113,113,.08))', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))', borderRadius:'12px' }}>
             <p style={{ fontSize:'13px', color:'var(--accent-red)' }}>Eroare: {error}</p>
             <button onClick={()=>load()} style={{ marginTop:'10px', fontSize:'12px', padding:'6px 14px', borderRadius:'7px', border:'none', background:c, color:'var(--c-ffffff)', cursor:'pointer' }}>Reîncearcă</button>
           </div>
@@ -593,7 +593,7 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
           <div onClick={()=>fileRef.current?.click()}
             onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)}
             onDrop={e=>{e.preventDefault();setDrag(false);e.dataTransfer.files.length&&upload(e.dataTransfer.files)}}
-            style={{ border:`1.5px dashed ${drag?culoare:'var(--c-2a2a2a)'}`, borderRadius:'10px', padding:'18px', textAlign:'center', cursor:'pointer', background:drag?`rgba(${r},.06)`:'var(--c-0d0d0d)' }}>
+            style={{ border:`1.5px dashed ${drag?culoare:'var(--c-2a2a2a)'}`, borderRadius:'10px', padding:'18px', textAlign:'center', cursor:'pointer', background:drag?`${tint(r,.06)}`:'var(--c-0d0d0d)' }}>
             {uploading?<p style={{fontSize:'12px',color:'var(--c-777777)'}}>Se încarcă...</p>:<p style={{fontSize:'12px',fontWeight:600,color:'var(--c-888888)'}}>drag & drop sau click · PDF / JPG / PNG</p>}
           </div>
           <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files&&upload(e.target.files)}/>
@@ -866,7 +866,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   return (
     <div style={{ background:'var(--c-141414)', border:'1px solid var(--c-222222)', borderRadius:'16px', display:'flex', flexDirection:'column', padding:'28px 32px', minHeight:'420px', position:'relative', overflow:'hidden', maxWidth:'100%' }}>
       {/* Background radial highlight */}
-      <div style={{ position:'absolute', width:'300px', height:'300px', background:`radial-gradient(circle, rgba(${r},0.04) 0%, rgba(0,0,0,0) 70%)`, top:'-100px', left:'-100px', pointerEvents:'none' }} />
+      <div style={{ position:'absolute', width:'300px', height:'300px', background:`radial-gradient(circle, ${tint(r,0.04)} 0%, rgba(0,0,0,0) 70%)`, top:'-100px', left:'-100px', pointerEvents:'none' }} />
 
       {/* Left Column: Details & Nav */}
       <div style={{ display:'flex', flexDirection:'column', justifyContent:'space-between', zIndex:1, minWidth:0 }}>
@@ -885,7 +885,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
           {/* Info Rows */}
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
             {/* Entitate / Furnizor — mereu vizibil, prioritate maximă */}
-            <div style={{ padding:'12px 16px', background: tx.documente?.furnizor ? `rgba(${r},.06)` : 'var(--c-111111)', border:`1px solid ${tx.documente?.furnizor ? `rgba(${r},.25)` : 'var(--c-222222)'}`, borderRadius:'10px' }}>
+            <div style={{ padding:'12px 16px', background: tx.documente?.furnizor ? `${tint(r,.06)}` : 'var(--c-111111)', border:`1px solid ${tx.documente?.furnizor ? `${tint(r,.25)}` : 'var(--c-222222)'}`, borderRadius:'10px' }}>
               <div style={{ fontSize:'10px', fontWeight:700, color: tx.documente?.furnizor ? culoare : 'var(--c-555555)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:'4px' }}>
                 {tx.documente?.furnizor ? 'Furnizor' : 'Entitate (extras bancă)'}
               </div>
@@ -982,7 +982,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
             </div>
 
             <div style={{ display:'flex', justifyContent:'center', gap:'8px', flexWrap:'wrap', marginBottom: showAddMore ? '16px' : 0 }}>
-              <button onClick={() => setShowAddMore(v=>!v)} style={{ ...BTN, background:'transparent', border:`1px solid rgba(${r},.3)`, color:legibil(culoare) }}>
+              <button onClick={() => setShowAddMore(v=>!v)} style={{ ...BTN, background:'transparent', border:`1px solid ${tint(r,.3)}`, color:legibil(culoare) }}>
                 {showAddMore ? 'Ascunde' : '+ Adaugă altă factură'}
               </button>
               <button onClick={() => setEditDoc(true)} style={{ ...BTN, background:'transparent', border:'1px solid var(--c-2a2a2a)', color:'var(--c-888888)' }}>
@@ -1004,7 +1004,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                   onDragOver={e=>{e.preventDefault();setAddDrag(true)}}
                   onDragLeave={()=>setAddDrag(false)}
                   onDrop={e=>{e.preventDefault();setAddDrag(false);e.dataTransfer.files.length&&addMoreFile(e.dataTransfer.files)}}
-                  style={{ border:`1.5px dashed ${addDrag?culoare:'var(--c-2a2a2a)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background:addDrag?`rgba(${r},.06)`:'var(--c-0d0d0d)' }}
+                  style={{ border:`1.5px dashed ${addDrag?culoare:'var(--c-2a2a2a)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background:addDrag?`${tint(r,.06)}`:'var(--c-0d0d0d)' }}
                 >
                   <p style={{ fontSize:'12px', color: addBusy ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>{addBusy ? 'Se adaugă...' : 'sau adaugă fișier'}</p>
                 </div>
@@ -1085,7 +1085,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                 padding:'24px', 
                 textAlign:'center', 
                 cursor:'pointer', 
-                background:drag?`rgba(${r},.06)`:'var(--c-0d0d0d)',
+                background:drag?`${tint(r,.06)}`:'var(--c-0d0d0d)',
                 transition:'all .2s'
               }}
             >

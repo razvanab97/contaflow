@@ -33,7 +33,7 @@ function ListaLipsa({ items, tip, onResolved }: { items: Nefacturata[]; tip:'cli
     <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
       {items.map(n => (
         <div key={n.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
-          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background: n.platforma==='airbnb' ? 'rgba(248,113,113,.1)' : 'rgba(96,165,250,.1)', color: n.platforma==='airbnb' ? 'var(--accent-red)' : 'var(--accent-blue)', flexShrink:0 }}>
+          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background: n.platforma==='airbnb' ? 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))' : 'light-dark(rgba(37,99,235,.25), rgba(96,165,250,.1))', color: n.platforma==='airbnb' ? 'var(--accent-red)' : 'var(--accent-blue)', flexShrink:0 }}>
             {n.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
           </span>
           <span style={{ flex:1, fontSize:'12px', color:'var(--c-dddddd)' }}>{n.numeOaspete || '—'}</span>
@@ -42,7 +42,7 @@ function ListaLipsa({ items, tip, onResolved }: { items: Nefacturata[]; tip:'cli
           <button
             onClick={() => marcheaza(n.id)}
             disabled={resolving === n.id}
-            style={{ fontSize:'11px', fontWeight:600, padding:'4px 10px', borderRadius:'6px', border:'1px solid rgba(110,231,176,.35)', background:'rgba(110,231,176,.08)', color:'var(--accent-mint)', cursor:'pointer', flexShrink:0, opacity: resolving===n.id ? .5 : 1 }}
+            style={{ fontSize:'11px', fontWeight:600, padding:'4px 10px', borderRadius:'6px', border:'1px solid light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))', background:'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color:'var(--accent-mint)', cursor:'pointer', flexShrink:0, opacity: resolving===n.id ? .5 : 1 }}
           >
             {resolving === n.id ? '...' : '✓ Am facturat'}
           </button>

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { legibil } from '@/lib/colors'
+import { legibil, tint } from '@/lib/colors'
 
 interface Doc {
   id: string
@@ -134,7 +134,7 @@ export default function UploadPanel({
                   <span style={{ flex: 1, fontSize: '12px', color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</span>
                   {doc.tip_document && <span style={{ fontSize: '10px', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
                   {showPaidToggle && (
-                    <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'rgba(110,231,176,.35)'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'rgba(110,231,176,.08)', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>
+                    <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>
                       {isPaid ? 'Anulează' : 'Marchează achitat'}
                     </button>
                   )}
@@ -177,7 +177,7 @@ export default function UploadPanel({
             border: `1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`,
             borderRadius: '10px', padding: '18px',
             textAlign: 'center', cursor: 'pointer',
-            background: drag ? `rgba(${r},.04)` : 'var(--c-0d0d0d)',
+            background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)',
             transition: 'all .15s',
           }}
         >

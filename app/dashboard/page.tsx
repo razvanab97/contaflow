@@ -4,7 +4,7 @@ import DocumenteGenerale from '@/components/DocumenteGenerale'
 import FirmaQuickInfo from '@/components/FirmaQuickInfo'
 import { dbSelect } from '@/lib/db'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
-import { rgb, legibil } from '@/lib/colors'
+import { rgb, legibil, tint } from '@/lib/colors'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,8 +73,8 @@ export default async function Dashboard() {
             const isStarted = done > 0
             const statusLabel = !lunaData ? 'Neîncepută' : isFinalizata ? 'Finalizată' : isStarted ? 'În lucru' : 'Neîncepută'
             const statusStyle = isFinalizata
-              ? { bg: 'rgba(110,231,176,.09)', c: 'var(--accent-mint)' }
-              : isStarted ? { bg: 'rgba(245,201,106,.08)', c: '#F5C96A' }
+              ? { bg: 'light-dark(rgba(5,150,105,.225), rgba(110,231,176,.09))', c: 'var(--accent-mint)' }
+              : isStarted ? { bg: 'light-dark(rgba(180,83,9,.2), rgba(245,201,106,.08))', c: '#F5C96A' }
               : { bg: 'var(--c-161616)', c: 'var(--c-3a3a3a)' }
             const modules = getFirmaModules(f.slug)
 
@@ -83,7 +83,7 @@ export default async function Dashboard() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '18px' }}>
                   <div style={{
                     width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0,
-                    background: `rgba(${r},.12)`,
+                    background: `${tint(r,.12)}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '13px', fontWeight: 700, color: legibil(f.culoare),
                   }}>
@@ -140,8 +140,8 @@ export default async function Dashboard() {
                   <Link href={`/${f.slug}/${LUNA}`} style={{
                     fontSize: '12px', fontWeight: 600, color: legibil(f.culoare),
                     padding: '7px 16px', borderRadius: '8px',
-                    border: `1px solid rgba(${r},.25)`,
-                    background: `rgba(${r},.06)`,
+                    border: `1px solid ${tint(r,.25)}`,
+                    background: `${tint(r,.06)}`,
                     letterSpacing: '-0.1px',
                   }}>
                     Deschide →
