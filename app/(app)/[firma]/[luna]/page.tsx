@@ -48,7 +48,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
   return (
     <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1000px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '36px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px', marginBottom: '36px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: firma.culoare }}/>
@@ -69,7 +69,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
 
         <LunaSummary lunaId={lunaData.id} culoare={firma.culoare} />
 
-        <div style={{ textAlign: 'right' }}>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div style={{ fontSize: '32px', fontWeight: 700, letterSpacing: '-1px', color: pct === 100 ? 'var(--accent-mint)' : firma.culoare, lineHeight: 1 }}>
             {pct}%
           </div>

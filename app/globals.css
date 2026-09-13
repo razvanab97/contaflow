@@ -156,4 +156,12 @@ select, input, textarea {
   outline: none;
 }
 
+.module-row {
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.module-row:hover {
+  background: var(--c-141414);
+  border-color: var(--c-282828);
+}
+
 select:focus, input:focus { border-color: var(--c-444444); }

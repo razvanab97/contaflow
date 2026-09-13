@@ -22,7 +22,7 @@ export default function LunaSummary({ lunaId, culoare }: { lunaId: string; culoa
       <div style={{ fontSize:'10px', fontWeight:700, color:'var(--c-555555)', textTransform:'uppercase', letterSpacing:'.12em' }}>
         Concluzia lunară
       </div>
-      <div style={{ display:'flex', gap:'24px' }}>
+      <div style={{ display:'flex', gap:'24px', flexWrap:'wrap', justifyContent:'center' }}>
         {([
           ['Încasări', summary.bankReceipts, 'var(--accent-mint)'],
           ['Plăți', summary.bankPayments, 'var(--accent-red)'],

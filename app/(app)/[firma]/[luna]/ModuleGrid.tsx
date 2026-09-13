@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { ModuleDef } from '@/lib/firma-config'
 import { legibil, tint } from '@/lib/colors'
 
@@ -190,9 +191,9 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
         </div>
       )}
 
-      {/* NORMAL MODE — cards grid */}
+      {/* NORMAL MODE — compact rows */}
       {!reordering && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:'12px' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
           {sorted.map(mod => {
             const modTasks = mod.tasks
             const modDone = modTasks.filter(t => taskMap[t.key]).length
@@ -221,74 +222,82 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
             return (
               <div
                 key={mod.slug}
+                className="module-row"
                 onClick={() => router.push(href)}
                 style={{
-                  background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'14px',
-                  padding:'20px 22px', cursor:'pointer', height:'100%',
-                  display:'flex', flexDirection:'column', gap:'14px',
-                  opacity: isDeactivated ? .5 : 1, transition:'opacity .15s',
+                  background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'12px',
+                  padding:'12px 16px', cursor:'pointer',
+                  display:'flex', flexDirection:'column', gap:'8px',
+                  opacity: isDeactivated ? .5 : 1,
                 }}
               >
-                <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
-                  <div>
-                    <div style={{ fontSize:'14px', fontWeight:600, color:'var(--c-e8e8e8)', letterSpacing:'-0.2px', marginBottom:'3px' }}>{mod.label}</div>
-                    <div style={{ fontSize:'12px', color:'var(--c-888888)', lineHeight:1.4 }}>{mod.description}</div>
-                  </div>
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'5px', flexShrink:0 }}>
-                    <span style={{ fontSize:'10px', fontWeight:600, padding:'3px 9px', borderRadius:'20px', background:statusStyle.bg, color:statusStyle.c, border:`1px solid ${statusStyle.border}` }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+                  <div style={{ width:'6px', height:'6px', borderRadius:'50%', flexShrink:0, background: isComplete ? 'var(--accent-mint)' : isStarted ? firma.culoare : 'var(--c-333333)' }}/>
+                  <span style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e8e8e8)', letterSpacing:'-0.1px', flexShrink:0 }}>{mod.label}</span>
+                  <span style={{ fontSize:'12px', color:'var(--c-777777)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, minWidth:0 }}>{mod.description}</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
+                    <span style={{ fontSize:'10px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', background:statusStyle.bg, color:statusStyle.c, border:`1px solid ${statusStyle.border}` }}>
                       {statusLabel}
                     </span>
                     {mod.slug === 'facturi-restante' && !!restanteCount && (
-                      <span style={{ fontSize:'10px', fontWeight:700, padding:'3px 9px', borderRadius:'20px', background:'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))', color:'var(--accent-red)', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))' }}>
+                      <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 8px', borderRadius:'20px', background:'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))', color:'var(--accent-red)', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))' }}>
                         {restanteCount} neachitate
                       </span>
                     )}
+                  </div>
+                </div>
+
+                <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
+                  {modTotal > 0 && (
+                    <>
+                      <span style={{ fontSize:'11px', color:'var(--c-777777)', flexShrink:0 }}>{modDone}/{modTotal}</span>
+                      <div style={{ width:'44px', height:'3px', background:'var(--c-1a1a1a)', borderRadius:'2px', flexShrink:0 }}>
+                        <div style={{ height:'3px', borderRadius:'2px', background: isComplete ? 'var(--accent-mint)' : firma.culoare, width:`${modPct}%` }}/>
+                      </div>
+                      <div style={{ display:'flex', gap:'4px', flexWrap:'wrap' }}>
+                        {modTasks.map(t => (
+                          <span key={t.key} style={{
+                            fontSize:'10px', fontWeight:500, padding:'2px 8px', borderRadius:'20px',
+                            background: taskMap[t.key] ? tint(r, .1) : 'var(--c-161616)',
+                            border: `1px solid ${taskMap[t.key] ? tint(r, .3) : 'var(--c-242424)'}`,
+                            color: taskMap[t.key] ? 'var(--c-bbbbbb)' : 'var(--c-999999)',
+                            textDecoration: taskMap[t.key] ? 'line-through' : 'none',
+                          }}>
+                            {t.label}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <div style={{ display:'flex', alignItems:'center', gap:'6px', marginLeft:'auto', flexShrink:0 }}>
                     <button
                       onClick={e => toggleModul(e, mod.slug, !isDeactivated)}
                       disabled={isToggling}
                       title={isDeactivated ? 'Reactivează modulul' : 'Nu am acest modul luna asta'}
-                      style={{ fontSize:'10px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-555555)', cursor: isToggling ? 'wait' : 'pointer', opacity: isToggling ? .5 : 1 }}
+                      style={{ fontSize:'10px', fontWeight:600, padding:'3px 9px', borderRadius:'20px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-555555)', cursor: isToggling ? 'wait' : 'pointer', opacity: isToggling ? .5 : 1 }}
                     >
                       {isDeactivated ? '↺ Activează' : '⊘ Nu am' }
                     </button>
+                    <button
+                      onClick={e => downloadSectionPdf(e, mod.slug, mod.label)}
+                      disabled={isBusy}
+                      style={{
+                        fontSize:'11px', fontWeight:600, padding:'4px 10px', borderRadius:'7px',
+                        border:`1px solid ${tint(r, .35)}`, background: tint(r, .06),
+                        color: legibil(firma.culoare), cursor: isBusy ? 'wait' : 'pointer',
+                        opacity: isBusy ? .6 : 1,
+                      }}
+                    >
+                      {isBusy ? '...' : '↓ PDF'}
+                    </button>
+                    <Link
+                      href={href}
+                      onClick={e => e.stopPropagation()}
+                      style={{ fontSize:'11px', fontWeight:600, color:legibil(firma.culoare), whiteSpace:'nowrap' }}
+                    >
+                      Deschide →
+                    </Link>
                   </div>
-                </div>
-
-                <div>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'7px' }}>
-                    <span style={{ fontSize:'12px', color:'var(--c-888888)' }}>{modDone}/{modTotal} task-uri</span>
-                    <span style={{ fontSize:'12px', fontWeight:600, color: isComplete ? 'var(--accent-mint)' : firma.culoare }}>{modPct}%</span>
-                  </div>
-                  <div style={{ height:'2px', background:'var(--c-1a1a1a)', borderRadius:'2px' }}>
-                    <div style={{ height:'2px', borderRadius:'2px', background: isComplete ? 'var(--accent-mint)' : firma.culoare, width:`${modPct}%` }}/>
-                  </div>
-                </div>
-
-                <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
-                  {modTasks.map(t => (
-                    <div key={t.key} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                      <div style={{ width:'14px', height:'14px', borderRadius:'4px', flexShrink:0, background: taskMap[t.key] ? tint(r, .15) : 'var(--c-1a1a1a)', border: taskMap[t.key] ? `1px solid ${tint(r, .4)}` : '1px solid var(--c-252525)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        {taskMap[t.key] && <svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke={firma.culoare} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                      </div>
-                      <span style={{ fontSize:'12px', fontWeight:500, color: taskMap[t.key] ? 'var(--c-777777)' : 'var(--c-aaaaaa)', textDecoration: taskMap[t.key] ? 'line-through' : 'none' }}>{t.label}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ marginTop:'auto', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                  <button
-                    onClick={e => downloadSectionPdf(e, mod.slug, mod.label)}
-                    disabled={isBusy}
-                    style={{
-                      fontSize:'11px', fontWeight:600, padding:'5px 11px', borderRadius:'7px',
-                      border:`1px solid ${tint(r, .35)}`, background: tint(r, .06),
-                      color: legibil(firma.culoare), cursor: isBusy ? 'wait' : 'pointer',
-                      opacity: isBusy ? .6 : 1, transition:'opacity .15s',
-                    }}
-                  >
-                    {isBusy ? '...' : '↓ PDF'}
-                  </button>
-                  <span style={{ fontSize:'12px', fontWeight:600, color:legibil(firma.culoare) }}>Deschide →</span>
                 </div>
               </div>
             )
