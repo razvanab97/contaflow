@@ -3,6 +3,8 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 52, text: 'Raport lunar (proiect): poți selecta orice text din previzualizare și să-l faci "câmp editabil" cu propria etichetă, pe lângă cele 4 fixe' },
+  { v: 51, text: 'Raport lunar (proiect): antetul/subsolul cu sigle apar acum la dimensiunea corectă din Word, aliniate pe orizontală, nu uriașe/stivuite' },
   { v: 50, text: 'Previzualizare Word direct în pagină la Raport lunar (proiect), randată în aplicație, fără server extern' },
   { v: 49, text: 'Viteză: schele de încărcare instant pe toate paginile + module lunare încărcate lazy (cod separat per modul)' },
   { v: 48, text: 'Nou: tab PROIECT AB Textile, cu Raport lunar — document Word unic, se înlocuiește la reîncărcare, nu se acumulează' },
