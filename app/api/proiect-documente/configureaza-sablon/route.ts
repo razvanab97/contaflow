@@ -41,10 +41,14 @@ export async function POST(req: NextRequest) {
     const { error: upErr } = await sb.storage.from('documente').upload(path, templateBuffer, { contentType: doc.fisier_tip })
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
-    await sb.from('proiect_documente').upsert({
+    const { error: sablonErr } = await sb.from('proiect_documente').upsert({
       firma_id: firmaId, sectiune: SECTIUNE_SABLON, fisier_nume: doc.fisier_nume, fisier_path: path,
       fisier_tip: doc.fisier_tip, fisier_marime: templateBuffer.length, updated_at: new Date().toISOString(),
     }, { onConflict: 'firma_id,sectiune' })
+    if (sablonErr) {
+      await sb.storage.from('documente').remove([path])
+      return NextResponse.json({ error: sablonErr.message }, { status: 500 })
+    }
 
     if (existingSablon?.fisier_path) await sb.storage.from('documente').remove([existingSablon.fisier_path])
 

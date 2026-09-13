@@ -13,13 +13,17 @@ function mimeFor(path: string) {
   return 'application/octet-stream'
 }
 
+// 1 EMU (English Metric Unit, unitatea Word pentru dimensiuni) = 1/9525 px la 96dpi
+const EMU_PER_PX = 9525
+
 // Antetul/subsolul (ex. bannerul de finanțare europeană cu sigle) nu sunt parte din
 // word/document.xml - mammoth randeaza doar corpul. Le extragem separat: gasim imaginile
-// referite in header*.xml/footer*.xml (in ordinea in care apar, ca sa pastram ordinea vizuala)
-// si le atasam ca <img> inainte/dupa corpul documentului.
+// referite in header*.xml/footer*.xml (in ordinea in care apar, ca sa pastram ordinea vizuala),
+// impreuna cu dimensiunea reala (<wp:extent>) pe care Word o afiseaza - fara ea, imaginile ies
+// la rezolutia lor nativa (des uriase), nu la marimea mica la care apar de fapt in document.
 async function extractHeaderFooterImages(zip: JSZip, kind: 'header' | 'footer'): Promise<string[]> {
   const files = Object.keys(zip.files).filter(f => new RegExp(`^word/${kind}\\d+\\.xml$`).test(f))
-  const imgsHtml: string[] = []
+  const imgs: { html: string }[] = []
 
   for (const file of files) {
     const relsPath = `word/_rels/${file.split('/').pop()}.rels`
@@ -33,18 +37,28 @@ async function extractHeaderFooterImages(zip: JSZip, kind: 'header' | 'footer'):
     if (!relMap.size) continue
 
     const xml = await zip.file(file)!.async('string')
-    for (const m of xml.matchAll(/r:embed="([^"]+)"/g)) {
-      const target = relMap.get(m[1])
+    // fiecare <w:drawing>...</w:drawing> contine exact un <wp:extent> (dimensiune) si un r:embed (imaginea) - impreuna
+    for (const d of xml.matchAll(/<w:drawing>[\s\S]*?<\/w:drawing>/g)) {
+      const block = d[0]
+      const embed = block.match(/r:embed="([^"]+)"/)?.[1]
+      const extent = block.match(/<wp:extent cx="(\d+)" cy="(\d+)"/)
+      if (!embed) continue
+      const target = relMap.get(embed)
       if (!target) continue
       const imgPath = `word/${target.replace(/^\.?\//, '')}`
       const mime = mimeFor(imgPath)
       const imgFile = zip.file(imgPath)
       if (!mime || !imgFile) continue
       const base64 = await imgFile.async('base64')
-      imgsHtml.push(`<img src="data:${mime};base64,${base64}" style="max-width:100%;display:block;margin:4px auto;"/>`)
+      const sizeStyle = extent
+        ? `width:${(+extent[1] / EMU_PER_PX).toFixed(0)}px;height:${(+extent[2] / EMU_PER_PX).toFixed(0)}px;`
+        : ''
+      imgs.push({ html: `<img src="data:${mime};base64,${base64}" style="${sizeStyle}max-width:100%;object-fit:contain;"/>` })
     }
   }
-  return imgsHtml
+  if (!imgs.length) return []
+  // sigle multiple (subsol) apar de obicei una langa alta, nu stivuite - un singur banner (antet) ramane la fel
+  return [`<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px;margin:8px 0;">${imgs.map(i => i.html).join('')}</div>`]
 }
 
 // Randare Word -> HTML direct in server (fara viewer extern gen Office Online) - documentul ramane

@@ -2,7 +2,23 @@
 -- (document.docx cu marcaje %%CAMP%% in loc de sectiunile care se schimba lunar), ca sa poata fi
 -- regenerat automat dintr-un formular, fara sa mai fie nevoie de editare manuala in Word.
 
-alter table proiect_documente drop constraint if exists proiect_documente_sectiune_check;
+-- Gaseste dinamic constrangerea CHECK existenta pe coloana "sectiune" (indiferent cum se numeste
+-- ea de fapt - numele exact generat automat de Postgres poate diferi) si o inlocuieste, ca sa
+-- acceptam si valoarea noua 'raport_lunar_sablon' pe langa 'raport_lunar'.
+do $$
+declare
+  con_name text;
+begin
+  select conname into con_name
+  from pg_constraint
+  where conrelid = 'proiect_documente'::regclass
+    and contype = 'c'
+    and pg_get_constraintdef(oid) ilike '%sectiune%';
+  if con_name is not null then
+    execute format('alter table proiect_documente drop constraint %I', con_name);
+  end if;
+end $$;
+
 alter table proiect_documente add constraint proiect_documente_sectiune_check
   check (sectiune in ('raport_lunar', 'raport_lunar_sablon'));
 
