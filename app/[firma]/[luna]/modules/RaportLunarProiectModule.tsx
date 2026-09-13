@@ -6,8 +6,104 @@ import { legibil, tint } from '@/lib/colors'
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string; tasks: TaskItem[] }
 interface ProiectDoc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; updated_at: string }
+interface Campuri { perioada: string; autorizatii: string; obiective: string; activitati: string }
 
 const SECTIUNE = 'raport_lunar'
+
+const TEXTAREA_STYLE: React.CSSProperties = { width: '100%', minHeight: '64px', fontSize: '13px', color: 'var(--c-dddddd)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '8px 10px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }
+const LABEL_STYLE: React.CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--c-999999)', marginBottom: '5px', display: 'block' }
+
+function RaportCampuriForm({ firma, onGenerated }: { firma: Firma; onGenerated: () => void }) {
+  const [loading, setLoading] = useState(true)
+  const [sablonConfigurat, setSablonConfigurat] = useState(false)
+  const [campuri, setCampuri] = useState<Campuri>({ perioada: '', autorizatii: '', obiective: '', activitati: '' })
+  const [configuring, setConfiguring] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  function load() {
+    fetch(`/api/proiect-documente/campuri?firmaId=${encodeURIComponent(firma.id)}`)
+      .then(res => res.json())
+      .then(data => {
+        setSablonConfigurat(!!data.sablonConfigurat)
+        if (data.campuri) setCampuri({ perioada: data.campuri.perioada, autorizatii: data.campuri.autorizatii, obiective: data.campuri.obiective, activitati: data.campuri.activitati })
+        setLoading(false)
+      }).catch(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [firma.id])
+
+  async function configureaza() {
+    setConfiguring(true); setError('')
+    const res = await fetch('/api/proiect-documente/configureaza-sablon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId: firma.id }) })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setError(data.error || 'Configurarea a eșuat')
+    else { setSablonConfigurat(true); setCampuri({ perioada: data.campuri.perioada, autorizatii: data.campuri.autorizatii, obiective: data.campuri.obiective, activitati: data.campuri.activitati }) }
+    setConfiguring(false)
+  }
+
+  async function genereaza() {
+    setGenerating(true); setError(''); setSuccess(false)
+    const res = await fetch('/api/proiect-documente/genereaza', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId: firma.id, ...campuri }) })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setError(data.error || 'Generarea a eșuat')
+    else { setSuccess(true); setTimeout(() => setSuccess(false), 3000); onGenerated() }
+    setGenerating(false)
+  }
+
+  if (loading) return null
+
+  return (
+    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '4px' }}>
+        Completare rapidă (fără Word)
+      </div>
+
+      {!sablonConfigurat ? (
+        <>
+          <p style={{ fontSize: '12px', color: 'var(--c-666666)', marginBottom: '14px' }}>
+            Detectez automat, în documentul de mai sus, secțiunile care se schimbă lunar (perioadă, autorizații, obiective, activități) — o singură dată, apoi le completezi dintr-un formular, fără să mai deschizi Word.
+          </p>
+          <button onClick={configureaza} disabled={configuring} style={{ fontSize: '12px', fontWeight: 600, padding: '8px 16px', borderRadius: '8px', border: 'none', background: firma.culoare, color: 'var(--c-ffffff)', cursor: 'pointer', opacity: configuring ? .6 : 1 }}>
+            {configuring ? 'Se configurează...' : 'Configurează formularul din documentul curent'}
+          </button>
+        </>
+      ) : (
+        <>
+          <p style={{ fontSize: '12px', color: 'var(--c-666666)', marginBottom: '14px' }}>
+            Completează pentru luna curentă și generează — documentul de mai sus se actualizează automat, cu formatarea originală păstrată.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '14px' }}>
+            <div>
+              <label style={LABEL_STYLE}>Perioada de raportare</label>
+              <input value={campuri.perioada} onChange={e => setCampuri(c => ({ ...c, perioada: e.target.value }))} placeholder="01.06.2026 – 30.06.2026" style={{ ...TEXTAREA_STYLE, minHeight: 'auto' }}/>
+            </div>
+            <div>
+              <label style={LABEL_STYLE}>Autorizații necesare (o linie per autorizație)</label>
+              <textarea value={campuri.autorizatii} onChange={e => setCampuri(c => ({ ...c, autorizatii: e.target.value }))} style={TEXTAREA_STYLE}/>
+            </div>
+            <div>
+              <label style={LABEL_STYLE}>Obiective realizate în lună (o linie per obiectiv)</label>
+              <textarea value={campuri.obiective} onChange={e => setCampuri(c => ({ ...c, obiective: e.target.value }))} style={TEXTAREA_STYLE}/>
+            </div>
+            <div>
+              <label style={LABEL_STYLE}>Activități derulate în lună (o linie per activitate)</label>
+              <textarea value={campuri.activitati} onChange={e => setCampuri(c => ({ ...c, activitati: e.target.value }))} style={TEXTAREA_STYLE}/>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button onClick={genereaza} disabled={generating} style={{ fontSize: '12px', fontWeight: 600, padding: '8px 16px', borderRadius: '8px', border: 'none', background: firma.culoare, color: 'var(--c-ffffff)', cursor: 'pointer', opacity: generating ? .6 : 1 }}>
+              {generating ? 'Se generează...' : 'Generează raportul'}
+            </button>
+            {success && <span style={{ fontSize: '12px', color: 'var(--accent-mint)' }}>✓ Raport generat și actualizat mai sus</span>}
+          </div>
+        </>
+      )}
+      {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '10px' }}>{error}</p>}
+    </div>
+  )
+}
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 function fmtSize(bytes: number | null) {
@@ -42,6 +138,11 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
   }
 
   useEffect(() => { load() }, [firma.id])
+
+  function handleGenerated() {
+    load()
+    setPreviewOpen(false); setPreviewHtml(null); setPreviewIsPdf(false)
+  }
 
   async function togglePreview() {
     if (previewOpen) { setPreviewOpen(false); return }
@@ -144,6 +245,8 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
         <input ref={inputRef} type="file" accept=".doc,.docx,application/pdf" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }}/>
         {error && doc && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{error}</p>}
       </div>
+
+      {doc && <RaportCampuriForm firma={firma} onGenerated={handleGenerated}/>}
     </div>
   )
 }
