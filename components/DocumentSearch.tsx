@@ -26,13 +26,23 @@ export default function DocumentSearch({ firmaId, culoare = 'var(--c-888888)' }:
   const [loading, setLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const abortRef = useRef<AbortController|null>(null)
 
+  // Anuleaza cererea anterioara la fiecare litera noua tastata - fara asta, un raspuns mai vechi
+  // (pentru un termen mai scurt) poate sosi dupa unul mai nou si suprascrie rezultatele corecte.
   const search = useCallback(async (term: string) => {
     if (term.trim().length < 2) { setResults([]); setLoading(false); return }
-    const res = await fetch(`/api/documente/cautare?firmaId=${encodeURIComponent(firmaId)}&q=${encodeURIComponent(term)}`)
-    const data = await res.json().catch(() => [])
-    setResults(Array.isArray(data) ? data : [])
-    setLoading(false)
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    try {
+      const res = await fetch(`/api/documente/cautare?firmaId=${encodeURIComponent(firmaId)}&q=${encodeURIComponent(term)}`, { signal: controller.signal })
+      const data = await res.json().catch(() => [])
+      setResults(Array.isArray(data) ? data : [])
+      setLoading(false)
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') setLoading(false)
+    }
   }, [firmaId])
 
   useEffect(() => {
