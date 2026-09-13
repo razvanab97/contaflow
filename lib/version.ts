@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 57, text: 'Dashboard: facturi restante vizibile direct pe fiecare card de firmă + total pe prima linie, fără să intri în firmă' },
   { v: 56, text: 'Performanță: comutatorul de lună de la Raport lunar (proiect) precarcă acum luna vecină + căutarea globală de documente nu mai poate afișa un răspuns vechi peste unul nou la tastare rapidă + Extras de cont face 2 interogări în paralel în loc de secvențial' },
   { v: 55, text: 'Shell persistent pe toată aplicația: sidebar-ul nu se mai reconstruiește nici la Dashboard/Furnizori/Date personale/Model documente/Facturi de asociat (nu doar în interiorul unei firme+luni) + comutator rapid de firmă în capul paginii, cu prefetch' },
   { v: 54, text: 'Raport lunar (proiect): redesign complet — workspace cu previzualizare + editor pe secțiuni (nu textarea-uri), liste editabile individual, dată-interval, autosave, tab-uri (Editare/Previzualizare/Istoric/Fișier); arhitectură generică, reutilizabilă pentru viitoare tipuri de documente' },

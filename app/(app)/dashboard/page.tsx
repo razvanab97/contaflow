@@ -2,6 +2,7 @@ import Link from 'next/link'
 import DocumenteGenerale from '@/components/DocumenteGenerale'
 import FirmaQuickInfo from '@/components/FirmaQuickInfo'
 import { dbSelect } from '@/lib/db'
+import { getRestanteCount } from '@/lib/queries'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 import { rgb, legibil, tint } from '@/lib/colors'
 
@@ -35,6 +36,13 @@ export default async function Dashboard() {
     proprietariMap[p.firma_id].push(p)
   }
 
+  // Restante per firma - vizibile direct din dashboard, fara sa intri in fiecare firma.
+  const restanteCounts = await Promise.all(firme.map((f: any) => getRestanteCount(f.id)))
+  const restanteMap: Record<string, number> = {}
+  firme.forEach((f: any, i: number) => { restanteMap[f.id] = restanteCounts[i] })
+  const totalRestante = restanteCounts.reduce((sum, n) => sum + n, 0)
+  const firmeCuRestante = restanteCounts.filter(n => n > 0).length
+
   const ll = lunaLabel(LUNA)
 
   return (
@@ -49,6 +57,11 @@ export default async function Dashboard() {
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--c-999999)', marginTop: '6px' }}>
             {ll} · {firme.length} firme active
+            {totalRestante > 0 && (
+              <span style={{ color: 'var(--accent-red)', fontWeight: 600 }}>
+                {' · '}{totalRestante} facturi restante în {firmeCuRestante} {firmeCuRestante === 1 ? 'firmă' : 'firme'}
+              </span>
+            )}
           </p>
         </div>
 
@@ -67,6 +80,7 @@ export default async function Dashboard() {
               : isStarted ? { bg: 'light-dark(rgba(180,83,9,.2), rgba(245,201,106,.08))', c: '#F5C96A' }
               : { bg: 'var(--c-161616)', c: 'var(--c-3a3a3a)' }
             const modules = getFirmaModules(f.slug)
+            const restante = restanteMap[f.id] || 0
 
             return (
               <div key={f.id} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '16px', padding: '24px 28px' }}>
@@ -87,6 +101,15 @@ export default async function Dashboard() {
                       <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 9px', borderRadius: '20px', background: statusStyle.bg, color: statusStyle.c }}>
                         {statusLabel}
                       </span>
+                      {restante > 0 && (
+                        <span style={{
+                          fontSize: '10px', fontWeight: 700, color: 'var(--accent-red)',
+                          background: 'light-dark(rgba(220,38,38,.3), rgba(248,113,113,.12))', border: '1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))',
+                          borderRadius: '20px', padding: '2px 9px',
+                        }}>
+                          {restante} restante
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--c-888888)' }}>
                       {modules.length} module · {total} task-uri lunare
