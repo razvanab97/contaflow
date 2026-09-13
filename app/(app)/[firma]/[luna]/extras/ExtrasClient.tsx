@@ -1,9 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import Link from 'next/link'
 import UploadExtras from './UploadExtras'
 import CopyButton from '@/components/CopyButton'
-import DocumentSearch from '@/components/DocumentSearch'
 import FacturiModule from '../modules/FacturiModule'
 import NoteTranzactii from './NoteTranzactii'
 import type { TaskItem } from '../modules/TaskSection'
@@ -269,57 +267,6 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   })
 
   return (
-    <>
-    <div style={{ display:'flex', minHeight:'100vh', background:'var(--c-0a0a0a)' }}>
-      {/* Sidebar */}
-      <aside style={{ width:'220px', flexShrink:0, background:'var(--c-0d0d0d)', borderRight:'1px solid var(--c-1e1e1e)', display:'flex', flexDirection:'column', padding:'20px 0', position:'sticky', top:0, height:'100vh' }}>
-        <Link href="/dashboard" style={{ padding:'4px 18px 24px', display:'flex', alignItems:'center', gap:'10px' }}>
-          <div style={{ width:'28px', height:'28px', background:'var(--c-ffffff)', borderRadius:'7px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <img src="/logo-icon.png" alt="ContaFlow" width={19} height={19} />
-          </div>
-          <span style={{ fontSize:'15px', fontWeight:700, color:'var(--c-ffffff)' }}>ContaFlow</span>
-        </Link>
-        <Link href={`/${slug}/${luna}`} style={{ display:'flex', alignItems:'center', gap:'9px', padding:'8px 18px', fontSize:'13px', color:'var(--c-888888)' }}>
-          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          {firma.nume.replace(' SRL','')}
-        </Link>
-        <div style={{ height:'1px', background:'var(--c-1e1e1e)', margin:'8px 14px' }}/>
-        <DocumentSearch firmaId={firma.id} culoare={c}/>
-        <div style={{ height:'1px', background:'var(--c-1e1e1e)', margin:'8px 14px' }}/>
-        <div style={{ padding:'8px 18px 4px', fontSize:'13px', fontWeight:600, color:'var(--c-dddddd)' }}>Extras de cont</div>
-        {extrase.map(e => (
-          <button key={e.id} onClick={()=>selectExtras(e.id)} style={{ padding:'7px 18px 7px 28px', display:'flex', justifyContent:'space-between', gap:'8px', border:'none', borderLeft:`2px solid ${selectedExtras?.id===e.id?c:'transparent'}`, background:selectedExtras?.id===e.id?'var(--c-181818)':'transparent', cursor:'pointer', textAlign:'left' }}>
-            <span style={{ fontSize:'12px', color:selectedExtras?.id===e.id?'var(--c-ffffff)':'var(--c-777777)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.valuta}{e.iban ? ` · ${e.iban.slice(-6)}` : ''}</span>
-            <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-green)' }}>{e.nr_tranzactii} tx</span>
-          </button>
-        ))}
-        {scopedTxs.length > 0 && <>
-          <div style={{ height:'1px', background:'var(--c-1e1e1e)', margin:'12px 14px' }}/>
-          <div style={{ padding:'0 18px' }}>
-            <div style={{ fontSize:'10px', fontWeight:700, color:'var(--c-555555)', marginBottom:'6px', textTransform:'uppercase', letterSpacing:'.08em' }}>Progres</div>
-            <div style={{ height:'3px', background:'var(--c-1e1e1e)', borderRadius:'2px', marginBottom:'6px' }}>
-              <div style={{ height:'3px', background:c, borderRadius:'2px', width:`${pct}%` }}/>
-            </div>
-            <div style={{ fontSize:'14px', fontWeight:700, color:'var(--c-ffffff)' }}>{rez}/{scopedTxs.length}</div>
-            <div style={{ fontSize:'11px', color:'var(--c-888888)', marginTop:'2px' }}>{pct}% rezolvate</div>
-          </div>
-          <div style={{ padding:'12px 18px 0' }}>
-            {finalizat ? (
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'8px 10px', background:'light-dark(rgba(5,150,105,.15), rgba(110,231,176,.06))', border:'1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.2))', borderRadius:'8px' }}>
-                <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)' }}>✓ Extras finalizat</span>
-                <button onClick={()=>toggleFinalizat(false)} disabled={finalizing} style={{ border:'none', background:'transparent', color:'var(--c-666666)', fontSize:'10px', cursor:'pointer', textDecoration:'underline' }}>anulează</button>
-              </div>
-            ) : overallGata ? (
-              <button onClick={()=>toggleFinalizat(true)} disabled={finalizing} style={{ width:'100%', fontSize:'11px', fontWeight:700, padding:'9px 10px', borderRadius:'8px', border:`1px solid ${c}`, background:c, color:'var(--c-ffffff)', cursor:'pointer', opacity:finalizing?.6:1 }}>
-                Marchează extras finalizat
-              </button>
-            ) : null}
-          </div>
-        </>}
-        <div style={{ marginTop:'auto', padding:'12px 18px 26px', fontSize:'11px', color:'var(--c-555555)' }}>{lunaLabel}</div>
-      </aside>
-
-      {/* Main */}
       <main style={{ flex:1, minWidth:0, padding:'40px 44px', background:'var(--c-0f0f0f)', overflowX:'hidden' }}>
         <div style={{ marginBottom:'28px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' }}>
@@ -341,6 +288,27 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           <NoteTranzactii txs={txs} firmaNume={firma.nume} lunaId={lunaId} lunaLabel={lunaLabel} culoare={c} onSetStatusNote={updateStatusNote}/>
         ) : (
         <>
+        {scopedTxs.length > 0 && (
+          <div style={{ display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap', marginBottom:'20px', padding:'12px 16px', background:'var(--c-141414)', border:'1px solid var(--c-232323)', borderRadius:'12px' }}>
+            <div style={{ flexShrink:0 }}>
+              <div style={{ fontSize:'10px', fontWeight:700, color:'var(--c-555555)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:'4px' }}>Progres</div>
+              <div style={{ fontSize:'14px', fontWeight:700, color:'var(--c-ffffff)' }}>{rez}/{scopedTxs.length} <span style={{ fontWeight:400, fontSize:'12px', color:'var(--c-888888)' }}>({pct}% rezolvate)</span></div>
+            </div>
+            <div style={{ flex:1, minWidth:'140px', height:'3px', background:'var(--c-1e1e1e)', borderRadius:'2px' }}>
+              <div style={{ height:'3px', background:c, borderRadius:'2px', width:`${pct}%` }}/>
+            </div>
+            {finalizat ? (
+              <div style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 12px', background:'light-dark(rgba(5,150,105,.15), rgba(110,231,176,.06))', border:'1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.2))', borderRadius:'8px', flexShrink:0 }}>
+                <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)' }}>✓ Extras finalizat</span>
+                <button onClick={()=>toggleFinalizat(false)} disabled={finalizing} style={{ border:'none', background:'transparent', color:'var(--c-666666)', fontSize:'10px', cursor:'pointer', textDecoration:'underline' }}>anulează</button>
+              </div>
+            ) : overallGata ? (
+              <button onClick={()=>toggleFinalizat(true)} disabled={finalizing} style={{ fontSize:'11px', fontWeight:700, padding:'8px 14px', borderRadius:'8px', border:`1px solid ${c}`, background:c, color:'var(--c-ffffff)', cursor:'pointer', opacity:finalizing?.6:1, flexShrink:0 }}>
+                Marchează extras finalizat
+              </button>
+            ) : null}
+          </div>
+        )}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px' }}>
           {/* Conturi existente din BD */}
           {extrase.map(e => (
@@ -490,8 +458,6 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         </>
         )}
       </main>
-    </div>
-    </>
   )
 }
 
