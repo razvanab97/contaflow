@@ -30,13 +30,13 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath }: Pr
           onClick={() => setOpen(o => !o)}
           style={{
             display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
-            background: 'var(--c-141414)', border: '1px solid var(--c-262626)', borderRadius: '8px',
+            background: 'var(--surface-secondary)', border: '1px solid var(--border-strong)', borderRadius: '8px',
             padding: '6px 10px 6px 12px',
           }}
         >
           <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: firmaAtiva.culoare, flexShrink: 0 }} />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-eeeeee)' }}>{firmaAtiva.nume.replace(' SRL', '')}</span>
-          <svg width="11" height="11" fill="none" stroke="var(--c-888888)" strokeWidth="2" viewBox="0 0 24 24" style={{ marginLeft: '2px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{firmaAtiva.nume.replace(' SRL', '')}</span>
+          <svg width="11" height="11" fill="none" stroke="var(--text-muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ marginLeft: '2px' }}>
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
@@ -58,14 +58,14 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath }: Pr
                   onClick={() => setOpen(false)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px',
-                    background: f.slug === firmaAtiva.slug ? 'var(--overlay-hover)' : 'transparent',
+                    background: f.slug === firmaAtiva.slug ? 'var(--accent-soft)' : 'transparent',
                   }}
                 >
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: f.culoare, flexShrink: 0 }} />
-                  <span style={{ flex: 1, fontSize: '13px', fontWeight: f.slug === firmaAtiva.slug ? 600 : 400, color: 'var(--c-dddddd)' }}>
+                  <span style={{ flex: 1, fontSize: '13px', fontWeight: f.slug === firmaAtiva.slug ? 600 : 500, color: f.slug === firmaAtiva.slug ? 'var(--accent-hover)' : 'var(--text-secondary)' }}>
                     {f.nume.replace(' SRL', '')}
                   </span>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: f.pct === 100 ? 'var(--accent-mint)' : 'var(--c-777777)' }}>{f.pct}%</span>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: f.pct === 100 ? 'var(--success)' : f.pct > 0 ? 'var(--accent)' : 'var(--text-muted)' }}>{f.pct}%</span>
                 </Link>
               ))}
             </div>

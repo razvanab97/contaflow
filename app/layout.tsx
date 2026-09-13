@@ -1,6 +1,11 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
 import UpdateWidget from '@/components/UpdateWidget'
+
+// Self-hostat de Next.js (fara cerere externa la Google Fonts in runtime) - subset
+// latin-ext e necesar pentru diacriticele romanesti (ă â î ș ț).
+const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-inter' })
 
 export const metadata: Metadata = {
   title: 'ContaFlow',
@@ -19,7 +24,7 @@ try {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ro" suppressHydrationWarning>
+    <html lang="ro" suppressHydrationWarning className={inter.variable}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

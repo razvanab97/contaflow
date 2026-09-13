@@ -49,16 +49,16 @@ export default async function Dashboard() {
     <>
       <main className="pt-20 px-4 pb-10 md:pt-12 md:px-[52px] md:pb-12" style={{ flex: 1, width: '100%' }}>
         <div style={{ marginBottom: '40px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-666666)', letterSpacing: '.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
             Contaflow · Dashboard
           </div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--c-ffffff)', letterSpacing: '-0.6px', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.6px', lineHeight: 1.25 }}>
             Bună, Razvan
           </h1>
-          <p style={{ fontSize: '13px', color: 'var(--c-999999)', marginTop: '6px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 450, color: 'var(--text-secondary)', marginTop: '6px' }}>
             {ll} · {firme.length} firme active
             {totalRestante > 0 && (
-              <span style={{ color: 'var(--accent-red)', fontWeight: 600 }}>
+              <span style={{ color: 'var(--danger)', fontWeight: 600 }}>
                 {' · '}{totalRestante} facturi restante în {firmeCuRestante} {firmeCuRestante === 1 ? 'firmă' : 'firme'}
               </span>
             )}
@@ -76,14 +76,14 @@ export default async function Dashboard() {
             const isStarted = done > 0
             const statusLabel = !lunaData ? 'Neîncepută' : isFinalizata ? 'Finalizată' : isStarted ? 'În lucru' : 'Neîncepută'
             const statusStyle = isFinalizata
-              ? { bg: 'light-dark(rgba(5,150,105,.225), rgba(110,231,176,.09))', c: 'var(--accent-mint)' }
-              : isStarted ? { bg: 'light-dark(rgba(180,83,9,.2), rgba(245,201,106,.08))', c: '#F5C96A' }
-              : { bg: 'var(--c-161616)', c: 'var(--c-3a3a3a)' }
+              ? { bg: 'var(--success-soft)', c: 'var(--success)' }
+              : isStarted ? { bg: 'var(--warning-soft)', c: 'var(--warning)' }
+              : { bg: 'var(--surface-secondary)', c: 'var(--text-muted)' }
             const modules = getFirmaModules(f.slug)
             const restante = restanteMap[f.id] || 0
 
             return (
-              <div key={f.id} className="glass-elevated" style={{ borderRadius: '16px', padding: '24px 28px' }}>
+              <div key={f.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px 28px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '18px' }}>
                   <div style={{
                     width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0,
@@ -95,43 +95,43 @@ export default async function Dashboard() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--c-efefef)', letterSpacing: '-0.2px' }}>
+                      <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.2px' }}>
                         {f.nume}
                       </span>
-                      <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 9px', borderRadius: '20px', background: statusStyle.bg, color: statusStyle.c }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: 600, padding: '2px 9px', borderRadius: '20px', background: statusStyle.bg, color: statusStyle.c }}>
                         {statusLabel}
                       </span>
                       {restante > 0 && (
                         <span style={{
-                          fontSize: '10px', fontWeight: 700, color: 'var(--accent-red)',
-                          background: 'light-dark(rgba(220,38,38,.3), rgba(248,113,113,.12))', border: '1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))',
+                          fontSize: '11.5px', fontWeight: 600, color: 'var(--danger)',
+                          background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 40%, transparent)',
                           borderRadius: '20px', padding: '2px 9px',
                         }}>
                           {restante} restante
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--c-888888)' }}>
+                    <div style={{ fontSize: '12.5px', fontWeight: 450, color: 'var(--text-muted)' }}>
                       {modules.length} module · {total} task-uri lunare
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: '28px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1, color: pct === 100 ? 'var(--accent-mint)' : legibil(f.culoare) }}>
+                    <div style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1, color: pct === 100 ? 'var(--success)' : 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
                       {pct}%
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--c-888888)', marginTop: '3px' }}>
+                    <div style={{ fontSize: '12.5px', fontWeight: 450, color: 'var(--text-muted)', marginTop: '3px' }}>
                       {done}/{total} task-uri
                     </div>
                   </div>
                 </div>
 
-                <div style={{ height: '2px', background: 'var(--c-1a1a1a)', borderRadius: '2px', marginBottom: '18px' }}>
-                  <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? 'var(--accent-mint)' : f.culoare, width: `${pct}%` }}/>
+                <div style={{ height: '3px', background: 'var(--border)', borderRadius: '2px', marginBottom: '18px' }}>
+                  <div style={{ height: '3px', borderRadius: '2px', background: pct === 100 ? 'var(--success)' : 'var(--accent)', width: `${pct}%` }}/>
                 </div>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '18px' }}>
                   {modules.map(m => (
-                    <span key={m.slug} style={{ fontSize: '11px', fontWeight: 500, padding: '3px 8px', borderRadius: '5px', background: 'var(--c-161616)', border: '1px solid var(--c-222222)', color: 'var(--c-777777)' }}>
+                    <span key={m.slug} style={{ fontSize: '11.5px', fontWeight: 500, padding: '3px 8px', borderRadius: '5px', background: 'var(--surface-secondary)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
                       {m.label}
                     </span>
                   ))}
@@ -150,14 +150,11 @@ export default async function Dashboard() {
                 )}
 
                 <div style={{ marginTop: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--c-999999)' }}>
+                  <span style={{ fontSize: '12.5px', fontWeight: 450, color: 'var(--text-muted)' }}>
                     {lunaData ? ll : `${ll} · lună neîncepută`}
                   </span>
-                  <Link href={`/${f.slug}/${LUNA}`} style={{
-                    fontSize: '12px', fontWeight: 600, color: legibil(f.culoare),
-                    padding: '7px 16px', borderRadius: '8px',
-                    border: `1px solid ${tint(r,.25)}`,
-                    background: `${tint(r,.06)}`,
+                  <Link href={`/${f.slug}/${LUNA}`} className="link-accent" style={{
+                    fontSize: '13px', fontWeight: 600, color: 'var(--accent)',
                     letterSpacing: '-0.1px',
                   }}>
                     Deschide →

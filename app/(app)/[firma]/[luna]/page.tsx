@@ -52,16 +52,16 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: firma.culoare }}/>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--c-ffffff)', letterSpacing: '-0.4px' }}>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.4px', lineHeight: 1.25 }}>
               {firma.nume}
             </h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '20px' }}>
-            <Link href={`/${slug}/${prevLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--c-888888)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Link href={`/${slug}/${prevLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
             </Link>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--c-aaaaaa)' }}>{ll}</span>
-            <Link href={`/${slug}/${nextLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--c-888888)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>{ll}</span>
+            <Link href={`/${slug}/${nextLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
             </Link>
           </div>
@@ -70,18 +70,18 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
         <LunaSummary lunaId={lunaData.id} culoare={firma.culoare} />
 
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: '32px', fontWeight: 700, letterSpacing: '-1px', color: pct === 100 ? 'var(--accent-mint)' : firma.culoare, lineHeight: 1 }}>
+          <div style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '-1px', color: pct === 100 ? 'var(--success)' : 'var(--accent)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
             {pct}%
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--c-888888)', marginTop: '4px' }}>
+          <div style={{ fontSize: '12.5px', fontWeight: 450, color: 'var(--text-muted)', marginTop: '4px' }}>
             {done}/{total} task-uri
           </div>
         </div>
       </div>
 
       {/* Total progress bar */}
-      <div style={{ height: '2px', background: 'var(--c-1a1a1a)', borderRadius: '2px', marginBottom: '36px' }}>
-        <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? 'var(--accent-mint)' : firma.culoare, width: `${pct}%` }}/>
+      <div style={{ height: '3px', background: 'var(--border)', borderRadius: '2px', marginBottom: '36px' }}>
+        <div style={{ height: '3px', borderRadius: '2px', background: pct === 100 ? 'var(--success)' : 'var(--accent)', width: `${pct}%` }}/>
       </div>
 
       {/* Export buttons */}

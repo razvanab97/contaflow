@@ -3,7 +3,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
-import { rgb, legibil, tint } from '@/lib/colors'
 import DocumentSearch from './DocumentSearch'
 import ThemeSelector from './shell/ThemeSelector'
 
@@ -104,7 +103,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
         <Link href={`/${firmaAtiva}/${lunaCurenta}`} style={{
           display: 'flex', alignItems: 'center', gap: '8px',
           padding: '8px 20px', marginBottom: '4px',
-          fontSize: '12px', fontWeight: 500, color: 'var(--c-999999)',
+          fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)',
           transition: 'color .15s',
         }}>
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -117,30 +116,29 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
       <div style={{ height: '1px', background: 'var(--c-1a1a1a)', margin: '0 16px 14px' }}/>
 
       {/* Firme */}
-      <div style={{ padding: '0 20px 8px', fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+      <div style={{ padding: '0 20px 8px', fontSize: '11.5px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
         Firme
       </div>
       {firme.map(f => {
         const isActive = f.slug === firmaAtiva
-        const r = rgb(f.culoare)
         return (
           <Link key={f.id} href={`/${f.slug}/${lunaCurenta}`} style={{
             display: 'flex', alignItems: 'center', gap: '10px',
             padding: '9px 20px',
-            background: isActive ? `${tint(r,.06)}` : 'transparent',
-            borderLeft: isActive ? `2px solid ${f.culoare}` : '2px solid transparent',
-            transition: 'background .15s',
+            background: isActive ? 'var(--accent-soft)' : 'transparent',
+            borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
+            transition: 'background-color .14s ease, border-color .14s ease',
           }}>
             <div style={{
               width: '8px', height: '8px', borderRadius: '50%',
               background: f.culoare, flexShrink: 0,
             }}/>
-            <span style={{ flex: 1, fontSize: '13px', fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--c-eeeeee)' : 'var(--c-888888)', lineHeight: 1.3 }}>
+            <span style={{ flex: 1, fontSize: '13px', fontWeight: isActive ? 600 : 500, color: isActive ? 'var(--accent-hover)' : 'var(--text-secondary)', lineHeight: 1.3 }}>
               {f.nume.replace(' SRL', '')}
             </span>
             <span style={{
-              fontSize: '11px', fontWeight: 600,
-              color: f.pct === 100 ? 'var(--accent-mint)' : f.pct > 0 ? legibil(f.culoare) : 'var(--c-666666)',
+              fontSize: '11.5px', fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+              color: f.pct === 100 ? 'var(--success)' : f.pct > 0 ? 'var(--accent)' : 'var(--text-muted)',
             }}>
               {f.pct}%
             </span>
@@ -159,51 +157,51 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
       {/* Furnizori link (when in a firm context) */}
       {firmaAtiva && (
         <>
-          <div style={{ height: '1px', background: 'var(--c-1a1a1a)', margin: '14px 16px 4px' }}/>
+          <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '14px 16px 4px' }}/>
           <Link href={`/${firmaAtiva}/furnizori`} style={{
             display: 'flex', alignItems: 'center', gap: '9px',
             padding: '7px 20px',
-            background: pathname.endsWith('/furnizori') ? 'var(--overlay-hover)' : 'transparent',
-            borderLeft: pathname.endsWith('/furnizori') ? '2px solid var(--c-555555)' : '2px solid transparent',
+            background: pathname.endsWith('/furnizori') ? 'var(--accent-soft)' : 'transparent',
+            borderLeft: pathname.endsWith('/furnizori') ? '3px solid var(--accent)' : '3px solid transparent',
           }}>
-            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/furnizori') ? 'var(--c-cccccc)' : 'var(--c-555555)'} strokeWidth="2" viewBox="0 0 24 24">
+            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/furnizori') ? 'var(--accent-hover)' : 'var(--text-muted)'} strokeWidth="2" viewBox="0 0 24 24">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
               <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
             </svg>
-            <span style={{ fontSize: '12px', fontWeight: 400, color: pathname.endsWith('/furnizori') ? 'var(--c-dddddd)' : 'var(--c-777777)' }}>Furnizori</span>
+            <span style={{ fontSize: '13px', fontWeight: pathname.endsWith('/furnizori') ? 600 : 500, color: pathname.endsWith('/furnizori') ? 'var(--accent-hover)' : 'var(--text-secondary)' }}>Furnizori</span>
           </Link>
           <Link href={`/${firmaAtiva}/date-personale`} style={{
             display: 'flex', alignItems: 'center', gap: '9px',
             padding: '7px 20px',
-            background: pathname.endsWith('/date-personale') ? 'var(--overlay-hover)' : 'transparent',
-            borderLeft: pathname.endsWith('/date-personale') ? '2px solid var(--c-555555)' : '2px solid transparent',
+            background: pathname.endsWith('/date-personale') ? 'var(--accent-soft)' : 'transparent',
+            borderLeft: pathname.endsWith('/date-personale') ? '3px solid var(--accent)' : '3px solid transparent',
           }}>
-            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/date-personale') ? 'var(--c-cccccc)' : 'var(--c-555555)'} strokeWidth="2" viewBox="0 0 24 24">
+            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/date-personale') ? 'var(--accent-hover)' : 'var(--text-muted)'} strokeWidth="2" viewBox="0 0 24 24">
               <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 14h8M8 17h5"/>
             </svg>
-            <span style={{ fontSize: '12px', fontWeight: 400, color: pathname.endsWith('/date-personale') ? 'var(--c-dddddd)' : 'var(--c-777777)' }}>Date personale</span>
+            <span style={{ fontSize: '13px', fontWeight: pathname.endsWith('/date-personale') ? 600 : 500, color: pathname.endsWith('/date-personale') ? 'var(--accent-hover)' : 'var(--text-secondary)' }}>Date personale</span>
           </Link>
           <Link href={`/${firmaAtiva}/model-documente`} style={{
             display: 'flex', alignItems: 'center', gap: '9px',
             padding: '7px 20px',
-            background: pathname.endsWith('/model-documente') ? 'var(--overlay-hover)' : 'transparent',
-            borderLeft: pathname.endsWith('/model-documente') ? '2px solid var(--c-555555)' : '2px solid transparent',
+            background: pathname.endsWith('/model-documente') ? 'var(--accent-soft)' : 'transparent',
+            borderLeft: pathname.endsWith('/model-documente') ? '3px solid var(--accent)' : '3px solid transparent',
           }}>
-            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/model-documente') ? 'var(--c-cccccc)' : 'var(--c-555555)'} strokeWidth="2" viewBox="0 0 24 24">
+            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/model-documente') ? 'var(--accent-hover)' : 'var(--text-muted)'} strokeWidth="2" viewBox="0 0 24 24">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>
             </svg>
-            <span style={{ fontSize: '12px', fontWeight: 400, color: pathname.endsWith('/model-documente') ? 'var(--c-dddddd)' : 'var(--c-777777)' }}>Model documente</span>
+            <span style={{ fontSize: '13px', fontWeight: pathname.endsWith('/model-documente') ? 600 : 500, color: pathname.endsWith('/model-documente') ? 'var(--accent-hover)' : 'var(--text-secondary)' }}>Model documente</span>
           </Link>
           <Link href={`/${firmaAtiva}/facturi-de-asociat`} style={{
             display: 'flex', alignItems: 'center', gap: '9px',
             padding: '7px 20px',
-            background: pathname.endsWith('/facturi-de-asociat') ? 'var(--overlay-hover)' : 'transparent',
-            borderLeft: pathname.endsWith('/facturi-de-asociat') ? '2px solid var(--c-555555)' : '2px solid transparent',
+            background: pathname.endsWith('/facturi-de-asociat') ? 'var(--accent-soft)' : 'transparent',
+            borderLeft: pathname.endsWith('/facturi-de-asociat') ? '3px solid var(--accent)' : '3px solid transparent',
           }}>
-            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/facturi-de-asociat') ? 'var(--c-cccccc)' : 'var(--c-555555)'} strokeWidth="2" viewBox="0 0 24 24">
+            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/facturi-de-asociat') ? 'var(--accent-hover)' : 'var(--text-muted)'} strokeWidth="2" viewBox="0 0 24 24">
               <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
             </svg>
-            <span style={{ fontSize: '12px', fontWeight: 400, color: pathname.endsWith('/facturi-de-asociat') ? 'var(--c-dddddd)' : 'var(--c-777777)' }}>Facturi de asociat</span>
+            <span style={{ fontSize: '13px', fontWeight: pathname.endsWith('/facturi-de-asociat') ? 600 : 500, color: pathname.endsWith('/facturi-de-asociat') ? 'var(--accent-hover)' : 'var(--text-secondary)' }}>Facturi de asociat</span>
           </Link>
         </>
       )}
@@ -211,8 +209,8 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
       {/* Module sub-nav (when in a firm's hub or module) */}
       {firmaAtiva && moduleFirma && moduleFirma.length > 0 && (
         <>
-          <div style={{ height: '1px', background: 'var(--c-1a1a1a)', margin: '14px 16px 12px' }}/>
-          <div style={{ padding: '0 20px 8px', fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+          <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '14px 16px 12px' }}/>
+          <div style={{ padding: '0 20px 8px', fontSize: '11.5px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
             Module
           </div>
           {moduleFirma.map(m => {
@@ -220,30 +218,28 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
               ? `/${firmaAtiva}/${lunaCurenta}/${m.linkDirect}`
               : `/${firmaAtiva}/${lunaCurenta}/${m.slug}`
             const isCurrentMod = m.slug === modulActiv
-            const firmaColor = firme.find(f => f.slug === firmaAtiva)?.culoare || 'var(--c-ffffff)'
-            const r2 = rgb(firmaColor)
             return (
               <Link key={m.slug} href={href} style={{
                 display: 'flex', alignItems: 'center', gap: '9px',
                 padding: '7px 20px',
-                background: isCurrentMod ? `${tint(r2,.08)}` : 'transparent',
-                borderLeft: isCurrentMod ? `2px solid ${firmaColor}` : '2px solid transparent',
+                background: isCurrentMod ? 'var(--accent-soft)' : 'transparent',
+                borderLeft: isCurrentMod ? '3px solid var(--accent)' : '3px solid transparent',
               }}>
                 <div style={{
                   width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
-                  background: isCurrentMod ? firmaColor : 'var(--c-333333)',
+                  background: isCurrentMod ? 'var(--accent)' : 'var(--border-strong)',
                 }}/>
                 <span style={{
                   flex: 1, minWidth: 0,
-                  fontSize: '12px', fontWeight: isCurrentMod ? 600 : 400,
-                  color: isCurrentMod ? 'var(--c-dddddd)' : 'var(--c-999999)',
+                  fontSize: '13px', fontWeight: isCurrentMod ? 600 : 500,
+                  color: isCurrentMod ? 'var(--accent-hover)' : 'var(--text-secondary)',
                 }}>
                   {m.label}
                 </span>
                 {m.slug === 'facturi-restante' && !!restanteCount && (
                   <span style={{
-                    fontSize: '10px', fontWeight: 700, color: 'var(--accent-red)',
-                    background: 'light-dark(rgba(220,38,38,.3), rgba(248,113,113,.12))', border: '1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))',
+                    fontSize: '11px', fontWeight: 700, color: 'var(--danger)',
+                    background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 40%, transparent)',
                     borderRadius: '20px', padding: '1px 7px', flexShrink: 0,
                   }}>
                     {restanteCount}
@@ -259,7 +255,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
       <div style={{ marginTop: 'auto', padding: '16px 20px 26px', borderTop: '1px solid var(--c-1a1a1a)' }}>
         <Link href="/dashboard" style={{
           display: 'flex', alignItems: 'center', gap: '7px',
-          fontSize: '12px', color: isDashboard ? 'var(--c-999999)' : 'var(--c-888888)',
+          fontSize: '13px', fontWeight: 500, color: isDashboard ? 'var(--accent-hover)' : 'var(--text-secondary)',
           marginBottom: '8px',
         }}>
           <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -268,7 +264,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
           </svg>
           Dashboard
         </Link>
-        <div style={{ fontSize: '12px', color: 'var(--c-777777)' }}>{lunaLabel}</div>
+        <div style={{ fontSize: '12px', fontWeight: 450, color: 'var(--text-muted)' }}>{lunaLabel}</div>
       </div>
     </aside>
     </>

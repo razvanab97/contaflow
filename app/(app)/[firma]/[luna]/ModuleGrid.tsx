@@ -3,7 +3,6 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { ModuleDef } from '@/lib/firma-config'
-import { legibil, tint } from '@/lib/colors'
 
 interface FirmaInfo { id: string; slug: string; nume: string; culoare: string }
 interface Props {
@@ -17,7 +16,6 @@ interface Props {
   dezactivate?: string[]
 }
 
-function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 function storageKey(slug: string) { return `cf_order_${slug}` }
 
 function loadOrder(slug: string, modules: ModuleDef[]): string[] {
@@ -39,7 +37,6 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
   const [busyPdf, setBusyPdf] = useState<string | null>(null)
   const [busyToggle, setBusyToggle] = useState<string | null>(null)
   const dragIdx = useRef<number | null>(null)
-  const r = rgb(firma.culoare)
   const router = useRouter()
 
   async function toggleModul(e: React.MouseEvent, modSlug: string, next: boolean) {
@@ -127,18 +124,18 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
     <div>
       {/* Toolbar */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px' }}>
-        <span style={{ fontSize:'11px', fontWeight:700, color: reordering ? firma.culoare : 'var(--c-666666)', textTransform:'uppercase', letterSpacing:'.1em', transition:'color .2s' }}>
+        <span style={{ fontSize:'12px', fontWeight:700, color: reordering ? 'var(--accent)' : 'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.08em', transition:'color .15s' }}>
           {reordering ? 'Trage sau folosește săgețile' : 'Module lunare'}
         </span>
         <div style={{ display:'flex', gap:'6px' }}>
           {reordering && (
-            <button onClick={resetOrder} style={{ fontSize:'11px', padding:'5px 11px', borderRadius:'7px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-777777)', cursor:'pointer' }}>
+            <button onClick={resetOrder} style={{ fontSize:'12.5px', fontWeight:550, padding:'5px 11px', borderRadius:'7px', border:'1px solid var(--border-strong)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer' }}>
               Reset ordine
             </button>
           )}
           <button
             onClick={() => setReordering(v => !v)}
-            style={{ fontSize:'11px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border: reordering ? `1px solid ${firma.culoare}` : '1px solid var(--c-2a2a2a)', background: reordering ? tint(r, .1) : 'transparent', color: reordering ? firma.culoare : 'var(--c-888888)', cursor:'pointer', transition:'all .15s' }}
+            style={{ fontSize:'12.5px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border: reordering ? '1px solid var(--accent)' : '1px solid var(--border-strong)', background: reordering ? 'var(--accent-soft)' : 'transparent', color: reordering ? 'var(--accent)' : 'var(--text-secondary)', cursor:'pointer', transition:'all .15s' }}
           >
             {reordering ? '✓ Gata' : '⠿ Setează ordinea'}
           </button>
@@ -165,25 +162,25 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                 style={{
                   display:'flex', alignItems:'center', gap:'12px',
                   padding:'12px 16px',
-                  ...(isOver ? { background: tint(r, .08), border: `1px solid ${tint(r, .4)}` } : {}),
+                  ...(isOver ? { background: 'var(--accent-soft)', border: '1px solid var(--accent)' } : {}),
                   borderRadius:'10px',
                   cursor:'grab',
                   transition:'background .1s, border-color .1s',
                   userSelect:'none',
                 }}
               >
-                <div style={{ color:'var(--c-444444)', fontSize:'16px', lineHeight:1, flexShrink:0, cursor:'grab' }}>⠿</div>
-                <div style={{ width:'20px', fontSize:'11px', fontWeight:700, color:'var(--c-555555)', flexShrink:0, textAlign:'center' }}>
+                <div style={{ color:'var(--text-muted)', fontSize:'16px', lineHeight:1, flexShrink:0, cursor:'grab' }}>⠿</div>
+                <div style={{ width:'20px', fontSize:'11.5px', fontWeight:700, color:'var(--text-muted)', flexShrink:0, textAlign:'center' }}>
                   {idx + 1}
                 </div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>{mod.label}</div>
-                  <div style={{ fontSize:'11px', color:'var(--c-777777)', marginTop:'1px' }}>{mod.description}</div>
+                  <div style={{ fontSize:'14px', fontWeight:600, color:'var(--text-primary)' }}>{mod.label}</div>
+                  <div style={{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'1px' }}>{mod.description}</div>
                 </div>
-                <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: isComplete ? 'var(--accent-mint)' : modDone > 0 ? firma.culoare : 'var(--c-2a2a2a)' }}/>
+                <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: isComplete ? 'var(--success)' : modDone > 0 ? 'var(--warning)' : 'var(--border-strong)' }}/>
                 <div style={{ display:'flex', flexDirection:'column', gap:'2px', flexShrink:0 }}>
-                  <button onClick={() => moveUp(idx)} disabled={idx === 0} style={{ width:'22px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center', background:'transparent', border:'1px solid var(--c-2a2a2a)', borderRadius:'4px', cursor: idx===0?'not-allowed':'pointer', color: idx===0?'var(--c-2a2a2a)':'var(--c-888888)', fontSize:'10px' }}>▲</button>
-                  <button onClick={() => moveDown(idx)} disabled={idx === sorted.length-1} style={{ width:'22px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center', background:'transparent', border:'1px solid var(--c-2a2a2a)', borderRadius:'4px', cursor: idx===sorted.length-1?'not-allowed':'pointer', color: idx===sorted.length-1?'var(--c-2a2a2a)':'var(--c-888888)', fontSize:'10px' }}>▼</button>
+                  <button onClick={() => moveUp(idx)} disabled={idx === 0} style={{ width:'22px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center', background:'transparent', border:'1px solid var(--border-strong)', borderRadius:'4px', cursor: idx===0?'not-allowed':'pointer', color: idx===0?'var(--border-strong)':'var(--text-secondary)', fontSize:'10px' }}>▲</button>
+                  <button onClick={() => moveDown(idx)} disabled={idx === sorted.length-1} style={{ width:'22px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center', background:'transparent', border:'1px solid var(--border-strong)', borderRadius:'4px', cursor: idx===sorted.length-1?'not-allowed':'pointer', color: idx===sorted.length-1?'var(--border-strong)':'var(--text-secondary)', fontSize:'10px' }}>▼</button>
                 </div>
               </div>
             )
@@ -205,12 +202,12 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
 
             const statusLabel = isDeactivated ? 'Dezactivat' : isComplete ? 'Gata' : isStarted ? 'În lucru' : 'Neînceput'
             const statusStyle = isDeactivated
-              ? { bg:'var(--c-161616)', c:'var(--c-555555)', border:'var(--c-242424)' }
+              ? { bg:'var(--surface-secondary)', c:'var(--text-muted)', border:'var(--border)' }
               : isComplete
-              ? { bg:'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', c:'var(--accent-mint)', border:'light-dark(rgba(5,150,105,.27), rgba(110,231,176,.18))' }
+              ? { bg:'var(--success-soft)', c:'var(--success)', border:'color-mix(in srgb, var(--success) 40%, transparent)' }
               : isStarted
-              ? { bg:'light-dark(rgba(180,83,9,.175), rgba(245,201,106,.07))', c:'light-dark(#B45309, #F5C96A)', border:'light-dark(rgba(180,83,9,.27), rgba(245,201,106,.18))' }
-              : { bg:'var(--c-161616)', c:'light-dark(#6B7280, var(--c-3a3a3a))', border:'var(--c-222222)' }
+              ? { bg:'var(--warning-soft)', c:'var(--warning)', border:'color-mix(in srgb, var(--warning) 40%, transparent)' }
+              : { bg:'var(--surface-secondary)', c:'var(--text-muted)', border:'var(--border)' }
 
             const href = mod.linkDirect
               ? `/${slug}/${luna}/${mod.linkDirect}`
@@ -232,49 +229,50 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                 }}
               >
                 <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                  <div style={{ width:'6px', height:'6px', borderRadius:'50%', flexShrink:0, background: isComplete ? 'var(--accent-mint)' : isStarted ? firma.culoare : 'var(--c-333333)' }}/>
-                  <span style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e8e8e8)', letterSpacing:'-0.1px', flexShrink:0 }}>{mod.label}</span>
-                  <span style={{ fontSize:'12px', color:'var(--c-777777)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, minWidth:0 }}>{mod.description}</span>
+                  <div style={{ width:'6px', height:'6px', borderRadius:'50%', flexShrink:0, background: isComplete ? 'var(--success)' : isStarted ? 'var(--warning)' : 'var(--border-strong)' }}/>
+                  <span style={{ fontSize:'14px', fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.1px', flexShrink:0 }}>{mod.label}</span>
+                  <span style={{ fontSize:'13px', fontWeight:450, color:'var(--text-secondary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, minWidth:0 }}>{mod.description}</span>
                   <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
-                    <span style={{ fontSize:'10px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', background:statusStyle.bg, color:statusStyle.c, border:`1px solid ${statusStyle.border}` }}>
+                    <span style={{ fontSize:'11.5px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', background:statusStyle.bg, color:statusStyle.c, border:`1px solid ${statusStyle.border}` }}>
                       {statusLabel}
                     </span>
                     {mod.slug === 'facturi-restante' && !!restanteCount && (
-                      <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 8px', borderRadius:'20px', background:'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))', color:'var(--accent-red)', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))' }}>
+                      <span style={{ fontSize:'11.5px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', background:'var(--danger-soft)', color:'var(--danger)', border:'1px solid color-mix(in srgb, var(--danger) 40%, transparent)' }}>
                         {restanteCount} neachitate
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'14px', flexWrap:'wrap' }}>
                   {modTotal > 0 && (
                     <>
-                      <span style={{ fontSize:'11px', color:'var(--c-777777)', flexShrink:0 }}>{modDone}/{modTotal}</span>
-                      <div style={{ width:'44px', height:'3px', background:'var(--c-1a1a1a)', borderRadius:'2px', flexShrink:0 }}>
-                        <div style={{ height:'3px', borderRadius:'2px', background: isComplete ? 'var(--accent-mint)' : firma.culoare, width:`${modPct}%` }}/>
+                      <span style={{ fontSize:'11.5px', fontWeight:500, color:'var(--text-muted)', flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{modDone}/{modTotal}</span>
+                      <div style={{ width:'44px', height:'3px', background:'var(--border)', borderRadius:'2px', flexShrink:0 }}>
+                        <div style={{ height:'3px', borderRadius:'2px', background: isComplete ? 'var(--success)' : 'var(--accent)', width:`${modPct}%` }}/>
                       </div>
-                      <div style={{ display:'flex', gap:'4px', flexWrap:'wrap' }}>
+                      <div style={{ display:'flex', gap:'12px', flexWrap:'wrap' }}>
                         {modTasks.map(t => (
-                          <span key={t.key} style={{
-                            fontSize:'10px', fontWeight:500, padding:'2px 8px', borderRadius:'20px',
-                            background: taskMap[t.key] ? tint(r, .1) : 'var(--c-161616)',
-                            border: `1px solid ${taskMap[t.key] ? tint(r, .3) : 'var(--c-242424)'}`,
-                            color: taskMap[t.key] ? 'var(--c-bbbbbb)' : 'var(--c-999999)',
-                            textDecoration: taskMap[t.key] ? 'line-through' : 'none',
-                          }}>
-                            {t.label}
-                          </span>
+                          <div key={t.key} style={{ display:'flex', alignItems:'center', gap:'5px' }}>
+                            {taskMap[t.key] ? (
+                              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}><path d="M2 6l3 3 5-5" stroke="var(--success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            ) : (
+                              <div style={{ width:'9px', height:'9px', borderRadius:'50%', border:'1.5px solid var(--border-strong)', flexShrink:0 }}/>
+                            )}
+                            <span style={{ fontSize:'12px', fontWeight:500, color: taskMap[t.key] ? 'var(--text-muted)' : 'var(--text-secondary)', textDecoration: taskMap[t.key] ? 'line-through' : 'none' }}>
+                              {t.label}
+                            </span>
+                          </div>
                         ))}
                       </div>
                     </>
                   )}
-                  <div style={{ display:'flex', alignItems:'center', gap:'6px', marginLeft:'auto', flexShrink:0 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'10px', marginLeft:'auto', flexShrink:0 }}>
                     <button
                       onClick={e => toggleModul(e, mod.slug, !isDeactivated)}
                       disabled={isToggling}
                       title={isDeactivated ? 'Reactivează modulul' : 'Nu am acest modul luna asta'}
-                      style={{ fontSize:'10px', fontWeight:600, padding:'3px 9px', borderRadius:'20px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-555555)', cursor: isToggling ? 'wait' : 'pointer', opacity: isToggling ? .5 : 1 }}
+                      style={{ fontSize:'11.5px', fontWeight:550, padding:'3px 9px', borderRadius:'20px', border:'1px solid var(--border)', background:'transparent', color:'var(--text-muted)', cursor: isToggling ? 'wait' : 'pointer', opacity: isToggling ? .5 : 1 }}
                     >
                       {isDeactivated ? '↺ Activează' : '⊘ Nu am' }
                     </button>
@@ -282,9 +280,9 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                       onClick={e => downloadSectionPdf(e, mod.slug, mod.label)}
                       disabled={isBusy}
                       style={{
-                        fontSize:'11px', fontWeight:600, padding:'4px 10px', borderRadius:'7px',
-                        border:`1px solid ${tint(r, .35)}`, background: tint(r, .06),
-                        color: legibil(firma.culoare), cursor: isBusy ? 'wait' : 'pointer',
+                        fontSize:'12.5px', fontWeight:600, padding:'4px 10px', borderRadius:'7px',
+                        border:'1px solid var(--border-strong)', background: 'var(--surface-secondary)',
+                        color: 'var(--text-secondary)', cursor: isBusy ? 'wait' : 'pointer',
                         opacity: isBusy ? .6 : 1,
                       }}
                     >
@@ -293,7 +291,8 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                     <Link
                       href={href}
                       onClick={e => e.stopPropagation()}
-                      style={{ fontSize:'11px', fontWeight:600, color:legibil(firma.culoare), whiteSpace:'nowrap' }}
+                      className="link-accent"
+                      style={{ fontSize:'12.5px', fontWeight:600, color:'var(--accent)', whiteSpace:'nowrap' }}
                     >
                       Deschide →
                     </Link>
