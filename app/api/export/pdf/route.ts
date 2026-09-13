@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS, MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
+import { generateNotePdfBytes } from '@/lib/notePdf'
 
 export const maxDuration = 120
 
@@ -135,7 +136,7 @@ async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: 
 }
 
 export async function POST(req: NextRequest) {
-  const { lunaId, title, scope, firmaSlug, itemIds = [] } = await req.json()
+  const { lunaId, title, scope, firmaSlug, firmaNume, lunaLabel, itemIds = [] } = await req.json()
   if (!lunaId) return NextResponse.json({ error: 'Luna contabilă lipsește' }, { status: 400 })
   const sb = getServiceSupabase()
 
@@ -221,6 +222,15 @@ export async function POST(req: NextRequest) {
         if (!data) continue
         await embedDoc(merged, Buffer.from(await data.arrayBuffer()), entry.type, entry.name)
       }
+      // Notele de pe tranzacții (tab-ul Note din Extras) - o pagină separată, imediat după extras,
+      // ca să ajungă și ea la contabilitate o dată cu restul documentelor, nu doar vizibilă în aplicație.
+      if (section === 'extras' && firmaNume && lunaLabel) {
+        const noteBytes = await generateNotePdfBytes(lunaId, firmaNume, lunaLabel)
+        if (noteBytes) {
+          addSectionCover(merged, coverFont, 'Note tranzacții')
+          await embedDoc(merged, Buffer.from(noteBytes), 'application/pdf', 'note_tranzactii.pdf')
+        }
+      }
     }
   } else {
     // PDF per-secțiune (sau fără firmaSlug): pagină cu numele categoriei, apoi extras + documente secțiunii
@@ -242,6 +252,13 @@ export async function POST(req: NextRequest) {
       const { data } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!data) continue
       await embedDoc(merged, Buffer.from(await data.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)
+    }
+    if (isExtras && firmaNume && lunaLabel) {
+      const noteBytes = await generateNotePdfBytes(lunaId, firmaNume, lunaLabel)
+      if (noteBytes) {
+        addSectionCover(merged, coverFont, 'Note tranzacții')
+        await embedDoc(merged, Buffer.from(noteBytes), 'application/pdf', 'note_tranzactii.pdf')
+      }
     }
   }
 

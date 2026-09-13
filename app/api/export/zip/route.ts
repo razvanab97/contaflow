@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS, MODULE_DEFS } from '@/lib/firma-config'
+import { generateNotePdfBytes } from '@/lib/notePdf'
 import JSZip from 'jszip'
 
 export const maxDuration = 120
@@ -159,6 +160,13 @@ export async function POST(req: NextRequest) {
         const fileName = entries.length > 1 ? `${String(i + 1).padStart(pad, '0')} - ${entry.name}` : entry.name
         folder.file(fileName, entry.data!)
       })
+
+      // Notele de pe tranzacții (tab-ul Note din Extras) - dosar propriu, imediat după Extras de cont,
+      // ca să ajungă și ele la contabilitate o dată cu restul documentelor.
+      if (section === 'extras' && firmaNume && luna) {
+        const noteBytes = await generateNotePdfBytes(lunaId, firmaNume, luna)
+        if (noteBytes) root.folder('Note tranzacții')!.file('note_tranzactii.pdf', noteBytes)
+      }
     }
 
     const buf = await zip.generateAsync({ type: 'arraybuffer' })

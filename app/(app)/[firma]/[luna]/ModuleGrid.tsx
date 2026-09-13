@@ -102,7 +102,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
       const res = await fetch('/api/export/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lunaId, title: modLabel, scope: { section: modSlug } }),
+        body: JSON.stringify({ lunaId, title: modLabel, scope: { section: modSlug }, firmaNume: firma.nume, lunaLabel: luna }),
       })
       if (res.ok) {
         const b = await res.blob()
