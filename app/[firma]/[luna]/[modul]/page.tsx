@@ -1,21 +1,26 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import nextDynamic from 'next/dynamic'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getActiveFirme, getLuniContabile } from '@/lib/queries'
 import { getFirmaConfig, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
-import EmagModule from '../modules/EmagModule'
-import TrendyolModule from '../modules/TrendyolModule'
-import BookingModule from '../modules/BookingModule'
-import AirbnbModule from '../modules/AirbnbModule'
-import StarsdeskModule from '../modules/StarsdeskModule'
-import AngajatiModule from '../modules/AngajatiModule'
-import ActeModule from '../modules/ActeModule'
-import DispozitieModule from '../modules/DispozitieModule'
-import FacturiModule from '../modules/FacturiModule'
-import ExtrasModule from '../modules/ExtrasModule'
-import RaportLunarModule from '../modules/RaportLunarModule'
-import ImpoziteModule from '../modules/ImpoziteModule'
-import RaportLunarProiectModule from '../modules/RaportLunarProiectModule'
+
+// Fiecare modul e incarcat lazy (chunk separat) - pagina afiseaza mereu un singur modul, dar
+// fara asta toate cele 13 componente (unele mari, ex. EmagModule ~600 linii) ajungeau in bundle-ul
+// oricarei pagini de modul, indiferent care e cea reala afisata.
+const EmagModule = nextDynamic(() => import('../modules/EmagModule'))
+const TrendyolModule = nextDynamic(() => import('../modules/TrendyolModule'))
+const BookingModule = nextDynamic(() => import('../modules/BookingModule'))
+const AirbnbModule = nextDynamic(() => import('../modules/AirbnbModule'))
+const StarsdeskModule = nextDynamic(() => import('../modules/StarsdeskModule'))
+const AngajatiModule = nextDynamic(() => import('../modules/AngajatiModule'))
+const ActeModule = nextDynamic(() => import('../modules/ActeModule'))
+const DispozitieModule = nextDynamic(() => import('../modules/DispozitieModule'))
+const FacturiModule = nextDynamic(() => import('../modules/FacturiModule'))
+const ExtrasModule = nextDynamic(() => import('../modules/ExtrasModule'))
+const RaportLunarModule = nextDynamic(() => import('../modules/RaportLunarModule'))
+const ImpoziteModule = nextDynamic(() => import('../modules/ImpoziteModule'))
+const RaportLunarProiectModule = nextDynamic(() => import('../modules/RaportLunarProiectModule'))
 
 export const dynamic = 'force-dynamic'
 
