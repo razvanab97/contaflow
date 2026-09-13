@@ -6,6 +6,7 @@ export type ModuleSlug =
   | 'airbnb-facturi' | 'airbnb-borderou'
   | '5stardesk'
   | 'impozite'
+  | 'raport-lunar-proiect'
 
 export interface TaskDef {
   key: string
@@ -182,6 +183,14 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
       { key: '5stardesk.factura_incarcata', label: 'Factură 5StarDesk încărcată' },
     ],
   },
+  'raport-lunar-proiect': {
+    slug: 'raport-lunar-proiect',
+    label: 'Raport lunar',
+    description: 'Documentul Word de raportare lunară pentru proiectul european — un singur fișier, actualizat în fiecare lună (nu se acumulează versiuni vechi)',
+    tasks: [
+      { key: 'raport_lunar_proiect.actualizat', label: 'Raport lunar actualizat' },
+    ],
+  },
 }
 
 export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
@@ -221,6 +230,19 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
       adresa: 'Sat Erbiceni Com. Erbiceni, Vol. 7, Poz. 051',
       judet: 'IS',
       tara: 'RO',
+    },
+  },
+  'proiect-ab-textile': {
+    slug: 'proiect-ab-textile',
+    // Nu e o firmă reală (fără CUI/ONRC) - e un proiect european derulat de AB Textile SRL,
+    // cu propriile documente lunare de raportat, distincte de contabilitatea firmei.
+    module: ['raport-lunar-proiect'],
+    legal: {
+      nrRegCom: '',
+      cif: '',
+      adresa: '',
+      judet: '',
+      tara: '',
     },
   },
 }

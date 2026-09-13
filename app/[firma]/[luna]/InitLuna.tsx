@@ -18,7 +18,7 @@ export default function InitLuna({ firma, luna }: { firma: {id:string;nume:strin
   }
 
   return (
-    <div style={{ minHeight:'100vh', background:'var(--c-0a0a0a)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ minHeight:'70vh', width:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
       <div style={{ textAlign:'center', maxWidth:'340px' }}>
         <div style={{ width:'48px', height:'48px', borderRadius:'14px', margin:'0 auto 20px', background:tint(r,.15), display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div style={{ width:'14px', height:'14px', borderRadius:'50%', background:firma.culoare }}/>

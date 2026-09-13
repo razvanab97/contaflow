@@ -8,9 +8,10 @@ import { legibil } from '@/lib/colors'
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string; tasks: TaskItem[]; checklistItems: ChecklistItem[] }
 interface Nefacturata { id:string; codRezervare:string; numeOaspete:string; suma:number|null; platforma:string }
+interface FacturaOrfana { id:string; numarFactura:string; numeClient:string; suma:number|null; idRezervare:string }
 interface VerificareResult {
   totalRezervari:number; totalFacturiClient:number; totalFacturiComision:number
-  faraFacturaClient:Nefacturata[]; faraComisionAirbnb:Nefacturata[]
+  faraFacturaClient:Nefacturata[]; facturiFaraRezervare:FacturaOrfana[]; faraComisionAirbnb:Nefacturata[]
   comisionBookingLipsa:boolean; totalRezervariBooking:number
 }
 
@@ -46,6 +47,23 @@ function ListaLipsa({ items, tip, onResolved }: { items: Nefacturata[]; tip:'cli
           >
             {resolving === n.id ? '...' : '✓ Am facturat'}
           </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ListaOrfane({ items }: { items: FacturaOrfana[] }) {
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
+      {items.map(f => (
+        <div key={f.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
+          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background:'light-dark(rgba(180,83,9,.25), rgba(245,201,106,.1))', color:'#F5C96A', flexShrink:0 }}>
+            {f.numarFactura || '—'}
+          </span>
+          <span style={{ flex:1, fontSize:'12px', color:'var(--c-dddddd)' }}>{f.numeClient || '—'}</span>
+          {f.idRezervare && <span style={{ fontSize:'12px', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace' }}>{f.idRezervare}</span>}
+          <span style={{ fontSize:'11px', color:'var(--c-888888)', flexShrink:0 }}>{money(f.suma)} RON</span>
         </div>
       ))}
     </div>
@@ -116,6 +134,16 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
           {result && (result.faraFacturaClient.length === 0
             ? <p style={{ fontSize:'12px', color:'var(--accent-mint)' }}>✓ Toate rezervările au factură client asociată.</p>
             : <ListaLipsa items={result.faraFacturaClient} tip="client" onResolved={id=>eliminaDinLista(id,'faraFacturaClient')}/>)}
+        </div>
+
+        <div>
+          <div style={{ marginBottom:'8px' }}>
+            <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>Facturi 5StarDesk fără rezervare în borderou</span>
+          </div>
+          <p style={{ fontSize:'11px', color:'var(--c-666666)', marginTop:'-4px', marginBottom:'8px' }}>Verificare inversă — factura există, dar rezervarea ei nu a fost găsită în borderoul lunii (posibil lipsă din borderou, cod citit greșit, sau lună diferită).</p>
+          {result && (result.facturiFaraRezervare.length === 0
+            ? <p style={{ fontSize:'12px', color:'var(--accent-mint)' }}>✓ Toate facturile 5StarDesk au rezervare asociată în borderou.</p>
+            : <ListaOrfane items={result.facturiFaraRezervare}/>)}
         </div>
 
         <div>

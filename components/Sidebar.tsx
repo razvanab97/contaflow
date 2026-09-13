@@ -19,15 +19,19 @@ interface Props {
   lunaCurenta: string
   lunaLabel: string
   firmaAtiva?: string
-  modulActiv?: string
   moduleFirma?: ModuleDef[]
   restanteCount?: number
 }
 
-export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, modulActiv, moduleFirma, restanteCount }: Props) {
+export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, moduleFirma, restanteCount }: Props) {
   const pathname = usePathname()
   const isDashboard = pathname === '/dashboard'
   const [open, setOpen] = useState(false)
+
+  // Derivat din URL (nu primit ca prop) ca sidebar-ul sa poata fi randat dintr-un layout
+  // comun [firma]/[luna]/layout.tsx, care nu are acces la segmentul [modul] al paginii copil.
+  const pathParts = pathname.split('/').filter(Boolean)
+  const modulActiv = firmaAtiva && pathParts[0] === firmaAtiva && pathParts[1] === lunaCurenta ? pathParts[2] : undefined
 
   return (
     <>

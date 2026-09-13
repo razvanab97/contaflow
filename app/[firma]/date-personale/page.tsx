@@ -31,7 +31,10 @@ export default async function DatePersonalePage({ params }: { params: Promise<{f
   if (!firma) notFound()
 
   const luna = getCurrentLuna()
-  const allTaskStari = await dbSelect('task_stari', { select: 'luna_id,completat' })
+  const [allTaskStari, restanteCount] = await Promise.all([
+    dbSelect('task_stari', { select: 'luna_id,completat' }),
+    getRestanteCount(firma.id),
+  ])
 
   const luniMap: Record<string, any> = {}
   for (const l of luni) luniMap[`${l.firma_id}_${l.luna?.slice(0,7)}`] = l
@@ -50,7 +53,6 @@ export default async function DatePersonalePage({ params }: { params: Promise<{f
   })
 
   const modules = getFirmaModules(slug)
-  const restanteCount = await getRestanteCount(firma.id)
 
   return (
     <div style={{ display:'flex', minHeight:'100vh', background:'var(--c-0a0a0a)' }}>
@@ -59,7 +61,6 @@ export default async function DatePersonalePage({ params }: { params: Promise<{f
         lunaCurenta={luna}
         lunaLabel={lunaLabel(luna)}
         firmaAtiva={slug}
-        modulActiv={undefined}
         moduleFirma={modules}
         restanteCount={restanteCount}
       />

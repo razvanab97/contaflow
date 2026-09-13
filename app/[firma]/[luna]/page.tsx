@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import Sidebar from '@/components/Sidebar'
 import InitLuna from './InitLuna'
 import ModuleGrid from './ModuleGrid'
-import { dbSelect, getRestanteCount } from '@/lib/db'
-import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
+import { dbSelect } from '@/lib/db'
+import { getFirmaBySlug, getLuniContabile, getRestanteCount } from '@/lib/queries'
+import { getFirmaModules } from '@/lib/firma-config'
 import LunaSummary from './LunaSummary'
 import ExportButtons from './ExportButtons'
 
@@ -18,21 +18,19 @@ function nextLuna(luna: string) { const d = new Date(luna+'-01'); d.setMonth(d.g
 export default async function HubPage({ params }: { params: Promise<{firma:string;luna:string}> }) {
   const { firma: slug, luna } = await params
 
-  const [firmeRaw, toateFirmele, luni] = await Promise.all([
-    dbSelect('firme', { eq: { slug } }),
-    dbSelect('firme', { eq: { activa: true }, order: 'created_at' }),
-    dbSelect('luni_contabile', { select: '*' }),
+  const [firma, luni] = await Promise.all([
+    getFirmaBySlug(slug),
+    getLuniContabile(),
   ])
-
-  const firma = firmeRaw[0]
   if (!firma) notFound()
 
   const lunaData = luni.find((l: any) => l.firma_id === firma.id && l.luna?.startsWith(luna))
-  if (!lunaData) return <InitLuna firma={firma} luna={luna} />
+  if (!lunaData) return <main style={{ flex: 1, padding: '44px 52px', display: 'flex' }}><InitLuna firma={firma} luna={luna} /></main>
 
-  const [taskStariRaw, moduleStariRaw] = await Promise.all([
+  const [taskStariRaw, moduleStariRaw, restanteCount] = await Promise.all([
     dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
     dbSelect('module_stari', { eq: { luna_id: lunaData.id }, select: 'modul_slug,dezactivat' }),
+    getRestanteCount(firma.id),
   ])
 
   const taskMap: Record<string, boolean> = {}
@@ -40,25 +38,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
 
   const dezactivate = moduleStariRaw.filter((m: any) => m.dezactivat).map((m: any) => m.modul_slug)
 
-  const luniMap: Record<string, any> = {}
-  for (const l of luni) luniMap[`${l.firma_id}_${l.luna?.slice(0,7)}`] = l
-
-  const taskCount: Record<string, { done: number }> = {}
-  const allTaskStari = await dbSelect('task_stari', { select: 'luna_id,completat' })
-  for (const ts of allTaskStari) {
-    if (!taskCount[ts.luna_id]) taskCount[ts.luna_id] = { done: 0 }
-    if (ts.completat) taskCount[ts.luna_id].done++
-  }
-
-  const firmeNav = toateFirmele.map((f: any) => {
-    const ld = luniMap[`${f.id}_${luna}`]
-    const total = getFirmaTotalTasks(f.slug)
-    const done = ld ? (taskCount[ld.id]?.done || 0) : 0
-    return { id: f.id, slug: f.slug, nume: f.nume, culoare: f.culoare, pct: total > 0 ? Math.round((done/total)*100) : 0 }
-  })
-
   const modules = getFirmaModules(slug)
-  const restanteCount = await getRestanteCount(firma.id)
   const activeModules = modules.filter(m => !dezactivate.includes(m.slug))
   const total = activeModules.reduce((sum, m) => sum + m.tasks.length, 0)
   const done = activeModules.reduce((sum, m) => sum + m.tasks.filter(t => taskMap[t.key]).length, 0)
@@ -66,71 +46,60 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
   const ll = lunaLabel(luna)
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--c-0a0a0a)' }}>
-      <Sidebar
-        firme={firmeNav}
-        lunaCurenta={luna}
-        lunaLabel={ll}
-        firmaAtiva={slug}
-        moduleFirma={modules}
+    <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1000px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '36px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: firma.culoare }}/>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--c-ffffff)', letterSpacing: '-0.4px' }}>
+              {firma.nume}
+            </h1>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '20px' }}>
+            <Link href={`/${slug}/${prevLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--c-888888)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+            </Link>
+            <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--c-aaaaaa)' }}>{ll}</span>
+            <Link href={`/${slug}/${nextLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--c-888888)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+            </Link>
+          </div>
+        </div>
+
+        <LunaSummary lunaId={lunaData.id} culoare={firma.culoare} />
+
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '32px', fontWeight: 700, letterSpacing: '-1px', color: pct === 100 ? 'var(--accent-mint)' : firma.culoare, lineHeight: 1 }}>
+            {pct}%
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--c-888888)', marginTop: '4px' }}>
+            {done}/{total} task-uri
+          </div>
+        </div>
+      </div>
+
+      {/* Total progress bar */}
+      <div style={{ height: '2px', background: 'var(--c-1a1a1a)', borderRadius: '2px', marginBottom: '36px' }}>
+        <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? 'var(--accent-mint)' : firma.culoare, width: `${pct}%` }}/>
+      </div>
+
+      {/* Export buttons */}
+      <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'24px', marginTop:'-12px' }}>
+        <ExportButtons firmaId={firma.id} firmaNume={firma.nume} firmaSlug={firma.slug} lunaId={lunaData.id} lunaLabel={ll} culoare={firma.culoare}/>
+      </div>
+
+      {/* Module cards grid — cu reordonare */}
+      <ModuleGrid
+        modules={modules}
+        firma={{ id: firma.id, slug: firma.slug, nume: firma.nume, culoare: firma.culoare }}
+        luna={luna}
+        slug={slug}
+        lunaId={lunaData.id}
+        taskMap={taskMap}
         restanteCount={restanteCount}
+        dezactivate={dezactivate}
       />
-
-      <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1000px' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '36px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: firma.culoare }}/>
-              <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--c-ffffff)', letterSpacing: '-0.4px' }}>
-                {firma.nume}
-              </h1>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '20px' }}>
-              <Link href={`/${slug}/${prevLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--c-888888)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-              </Link>
-              <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--c-aaaaaa)' }}>{ll}</span>
-              <Link href={`/${slug}/${nextLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--c-888888)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-              </Link>
-            </div>
-          </div>
-
-          <LunaSummary lunaId={lunaData.id} culoare={firma.culoare} />
-
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '32px', fontWeight: 700, letterSpacing: '-1px', color: pct === 100 ? 'var(--accent-mint)' : firma.culoare, lineHeight: 1 }}>
-              {pct}%
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--c-888888)', marginTop: '4px' }}>
-              {done}/{total} task-uri
-            </div>
-          </div>
-        </div>
-
-        {/* Total progress bar */}
-        <div style={{ height: '2px', background: 'var(--c-1a1a1a)', borderRadius: '2px', marginBottom: '36px' }}>
-          <div style={{ height: '2px', borderRadius: '2px', background: pct === 100 ? 'var(--accent-mint)' : firma.culoare, width: `${pct}%` }}/>
-        </div>
-
-        {/* Export buttons */}
-        <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'24px', marginTop:'-12px' }}>
-          <ExportButtons firmaId={firma.id} firmaNume={firma.nume} firmaSlug={firma.slug} lunaId={lunaData.id} lunaLabel={ll} culoare={firma.culoare}/>
-        </div>
-
-        {/* Module cards grid — cu reordonare */}
-        <ModuleGrid
-          modules={modules}
-          firma={{ id: firma.id, slug: firma.slug, nume: firma.nume, culoare: firma.culoare }}
-          luna={luna}
-          slug={slug}
-          lunaId={lunaData.id}
-          taskMap={taskMap}
-          restanteCount={restanteCount}
-          dezactivate={dezactivate}
-        />
-      </main>
-    </div>
+    </main>
   )
 }

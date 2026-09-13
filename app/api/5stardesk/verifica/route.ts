@@ -16,7 +16,8 @@ async function extractBorderou(bytes: Buffer, platforma: 'airbnb' | 'booking'): 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const instructions = platforma === 'airbnb'
     ? `Acesta e un borderou/raport de câștiguri Airbnb. Contine linii de tip "Payout", "Rezervare" si uneori "Ajustare de definitivare".
-Extrage DOAR liniile de tip "Rezervare" (ignora liniile "Payout" si "Ajustare de definitivare" - nu sunt rezervari individuale de facturat).
+Extrage DOAR liniile de tip "Rezervare" (ignora liniile "Payout" si "Ajustare de definitivare" - nu sunt rezervari individuale de facturat, chiar daca mentioneaza acelasi Cod de confirmare ca o rezervare deja extrasa).
+Fiecare Cod de confirmare trebuie sa apara O SINGURA DATA in rezultat. Daca acelasi cod pare sa apara pe mai multe linii din document, e semn ca una dintre ele e o ajustare sau o corectie a celeilalte, nu o rezervare noua - pastreaz-o doar pe cea care e clar o linie de tip "Rezervare" si ignor-o pe cealalta.
 Pentru fiecare linie de Rezervare: codRezervare = "Cod de confirmare" (ex: "HM49J4C2DW"), numeOaspete = coloana "Oaspete", suma = coloana "Suma" (numar, fara simbol monetar).`
     : `Acesta e un borderou/sumar de plati Booking.com. Contine linii de tip "Rezervare".
 Pentru fiecare linie: codRezervare = "Număr rezervare" (numeric, ex: "6721732753"), numeOaspete = "Nume oaspete", suma = coloana "Sumă" (numar, fara simbol monetar).`
@@ -93,6 +94,19 @@ function codesMatch(codeA: string, codeB: string) {
   return a.length >= 6 && b.length >= 6 && (a.includes(b) || b.includes(a))
 }
 
+// Plasă de siguranță împotriva extragerilor AI care duplică din greșeală același cod de rezervare
+// (ex: o linie de "Ajustare de definitivare" citită greșit ca rezervare separată) - păstrează prima apariție.
+function dedupeByCode(rows: RezervareRow[]): RezervareRow[] {
+  const seen = new Set<string>()
+  const out: RezervareRow[] = []
+  for (const r of rows) {
+    const key = normalizeCode(r.codRezervare || '')
+    if (key) { if (seen.has(key)) continue; seen.add(key) }
+    out.push(r)
+  }
+  return out
+}
+
 function isStardeskMatch(rez: { cod_rezervare:string; nume_oaspete:string|null; suma:number|null }, factura: { id_rezervare:string|null; nume_client:string|null; suma:number|null }) {
   if (codesMatch(rez.cod_rezervare, factura.id_rezervare || '')) return true
   const rezName = normalizeName(rez.nume_oaspete || '')
@@ -113,6 +127,10 @@ async function computeVerification(sb: ReturnType<typeof getServiceSupabase>, lu
 
   const faraFacturaClient = rezervari.filter(rez => !rez.rezolvat_client && !stardeskFacturi.some(f => isStardeskMatch(rez, f)))
 
+  // Verificare inversă: facturi 5StarDesk care nu se potrivesc cu nicio rezervare din borderoul lunii
+  // (rezervare lipsă din borderou, cod citit greșit, sau lună diferită)
+  const facturiFaraRezervare = stardeskFacturi.filter(f => !rezervari.some(rez => isStardeskMatch(rez, f)))
+
   const rezervariAirbnb = rezervari.filter(r => r.platforma === 'airbnb')
   const comisionAirbnb = comisionFacturi.filter(f => f.platforma === 'airbnb')
   const faraComisionAirbnb = rezervariAirbnb.filter(rez => !rez.rezolvat_comision && !comisionAirbnb.some(f => codesMatch(rez.cod_rezervare, f.cod_rezervare || '')))
@@ -125,6 +143,7 @@ async function computeVerification(sb: ReturnType<typeof getServiceSupabase>, lu
     totalFacturiClient: stardeskFacturi.length,
     totalFacturiComision: comisionFacturi.length,
     faraFacturaClient: faraFacturaClient.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
+    facturiFaraRezervare: facturiFaraRezervare.map(f => ({ id: f.id, numarFactura: f.numar_factura, numeClient: f.nume_client, suma: f.suma, idRezervare: f.id_rezervare })),
     faraComisionAirbnb: faraComisionAirbnb.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
     comisionBookingLipsa: rezervariBooking.length > 0 && !comisionBookingExista,
     totalRezervariBooking: rezervariBooking.length,
@@ -149,6 +168,7 @@ async function extrageBorderouriLipsa(sb: ReturnType<typeof getServiceSupabase>,
     const bytes = Buffer.from(await file.arrayBuffer())
     let rezervari: RezervareRow[] = []
     try { rezervari = await extractBorderou(bytes, platforma) } catch {}
+    rezervari = dedupeByCode(rezervari)
     if (rezervari.length) {
       await sb.from('borderou_rezervari').insert(rezervari.map(r => ({
         luna_id: lunaId, firma_id: firmaId, document_id: doc.id, platforma,
@@ -225,7 +245,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const lunaId = req.nextUrl.searchParams.get('lunaId')
-  if (!lunaId) return NextResponse.json({ totalRezervari: 0, totalFacturiClient: 0, totalFacturiComision: 0, faraFacturaClient: [], faraComisionAirbnb: [], comisionBookingLipsa: false, totalRezervariBooking: 0 })
+  if (!lunaId) return NextResponse.json({ totalRezervari: 0, totalFacturiClient: 0, totalFacturiComision: 0, faraFacturaClient: [], facturiFaraRezervare: [], faraComisionAirbnb: [], comisionBookingLipsa: false, totalRezervariBooking: 0 })
   const sb = getServiceSupabase()
   return NextResponse.json(await computeVerification(sb, lunaId))
 }

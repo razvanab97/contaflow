@@ -124,14 +124,17 @@ export default async function Dashboard() {
                   ))}
                 </div>
 
-                <FirmaQuickInfo
-                  cui={f.cui}
-                  nrRegCom={f.nr_reg_com}
-                  adresa={f.adresa}
-                  judet={f.judet}
-                  tara={f.tara}
-                  proprietari={proprietariMap[f.id] || []}
-                />
+                {/* Proiectele (fără CUI - nu sunt firme reale) nu au date de firmă de arătat */}
+                {f.cui && (
+                  <FirmaQuickInfo
+                    cui={f.cui}
+                    nrRegCom={f.nr_reg_com}
+                    adresa={f.adresa}
+                    judet={f.judet}
+                    tara={f.tara}
+                    proprietari={proprietariMap[f.id] || []}
+                  />
+                )}
 
                 <div style={{ marginTop: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '12px', color: 'var(--c-999999)' }}>
