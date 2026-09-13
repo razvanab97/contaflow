@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 54, text: 'Raport lunar (proiect): redesign complet — workspace cu previzualizare + editor pe secțiuni (nu textarea-uri), liste editabile individual, dată-interval, autosave, tab-uri (Editare/Previzualizare/Istoric/Fișier); arhitectură generică, reutilizabilă pentru viitoare tipuri de documente' },
   { v: 53, text: 'Raport lunar (proiect): buton de ștergere pentru câmpurile personalizate (textul revine fix, cu valoarea curentă) + indicii vizuale mai clare pentru selecție și generare' },
   { v: 52, text: 'Raport lunar (proiect): poți selecta orice text din previzualizare și să-l faci "câmp editabil" cu propria etichetă, pe lângă cele 4 fixe' },
   { v: 51, text: 'Raport lunar (proiect): antetul/subsolul cu sigle apar acum la dimensiunea corectă din Word, aliniate pe orizontală, nu uriașe/stivuite' },

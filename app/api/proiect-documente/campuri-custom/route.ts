@@ -72,14 +72,21 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Actualizeaza valoarea unui camp personalizat si regenereaza documentul
+// Actualizeaza valoarea si/sau eticheta unui camp personalizat. Regenereaza documentul doar
+// daca s-a schimbat valoarea (eticheta e doar un nume afisat in formular, nu apare in document).
 export async function PATCH(req: NextRequest) {
-  const { firmaId, id, valoare } = await req.json().catch(() => ({})) as { firmaId?: string; id?: string; valoare?: string }
-  if (!firmaId || !id || valoare == null) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
+  const { firmaId, id, valoare, eticheta } = await req.json().catch(() => ({})) as { firmaId?: string; id?: string; valoare?: string; eticheta?: string }
+  if (!firmaId || !id || (valoare == null && !eticheta?.trim())) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
 
   const sb = getServiceSupabase()
-  const { error } = await sb.from('proiect_raport_campuri_custom').update({ valoare }).eq('id', id).eq('firma_id', firmaId)
+  const patch: Record<string, string> = {}
+  if (valoare != null) patch.valoare = valoare
+  if (eticheta?.trim()) patch.eticheta = eticheta.trim()
+
+  const { error } = await sb.from('proiect_raport_campuri_custom').update(patch).eq('id', id).eq('firma_id', firmaId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (valoare == null) return NextResponse.json({ ok: true })
 
   try {
     const doc = await regenerateRaportLunar(sb, firmaId)

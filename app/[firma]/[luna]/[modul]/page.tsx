@@ -124,15 +124,17 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'impozite':
         return <ImpoziteModule firma={firmaForModule} lunaId={lunaData.id} tasks={modulDef.tasks} stari={impoziteStari}/>
       case 'raport-lunar-proiect':
-        return <RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks}/>
+        return <RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/>
       default:
         notFound()
     }
   }
 
   return (
-    <main style={{ flex:1, padding:'44px 52px', maxWidth:'900px' }}>
-      {/* Header */}
+    <main style={{ flex:1, padding:'44px 52px', maxWidth: modulSlug === 'raport-lunar-proiect' ? '1200px' : '900px' }}>
+      {/* Header - ReportWorkspace isi construieste propriul header (breadcrumb + titlu + schimbator
+          de luna), ca sa nu aparem cu doua titluri suprapuse pentru documentul-workspace */}
+      {modulSlug !== 'raport-lunar-proiect' && (
       <div style={{ marginBottom:'32px' }}>
         <Link href={`/${slug}/${luna}`} style={{ display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'var(--c-888888)', marginBottom:'16px' }}>
           <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
@@ -148,6 +150,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
           {modulDef.description}
         </p>
       </div>
+      )}
 
       {/* Module content */}
       {renderModule()}
