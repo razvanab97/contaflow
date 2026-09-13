@@ -198,3 +198,13 @@ export function insertCustomMarker(documentXml: string, selectedText: string, ke
   if (at === -1) throw new Error('Paragraful nu a putut fi localizat pentru înlocuire')
   return documentXml.slice(0, at) + newPara + documentXml.slice(at + target.length)
 }
+
+/**
+ * Inversul lui insertCustomMarker: cand un camp personalizat e sters, marcajul lui redevine
+ * text static fix (valoarea curenta a campului, inghetata) - nu ramane un marcaj gol nefolosit.
+ */
+export function revertCustomMarker(documentXml: string, key: string, staticValue: string): string {
+  const marker = customMarker(key)
+  if (!documentXml.includes(marker)) throw new Error('Marcajul nu a fost găsit în șablon')
+  return documentXml.split(marker).join(xmlEscape(staticValue))
+}

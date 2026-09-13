@@ -44,6 +44,14 @@ function RaportCampuriForm({ firma, onGenerated, refreshToken }: { firma: Firma;
     if (res.ok) onGenerated()
   }
 
+  async function stergeCustom(id: string, eticheta: string) {
+    if (!confirm(`Ștergi câmpul "${eticheta}"? Textul rămâne fix, cu valoarea de acum — nu va mai fi editabil aici.`)) return
+    setCustom(prev => prev.filter(c => c.id !== id))
+    const res = await fetch('/api/proiect-documente/campuri-custom', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId: firma.id, id }) })
+    if (res.ok) onGenerated()
+    else load()
+  }
+
   async function configureaza() {
     setConfiguring(true); setError('')
     const res = await fetch('/api/proiect-documente/configureaza-sablon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId: firma.id }) })
@@ -82,7 +90,8 @@ function RaportCampuriForm({ firma, onGenerated, refreshToken }: { firma: Firma;
       ) : (
         <>
           <p style={{ fontSize: '12px', color: 'var(--c-666666)', marginBottom: '14px' }}>
-            Completează pentru luna curentă și generează — documentul de mai sus se actualizează automat, cu formatarea originală păstrată.
+            Completează pentru luna curentă și apasă <strong style={{ color: 'var(--c-999999)' }}>Generează raportul</strong> — documentul de mai sus se actualizează automat, cu formatarea originală păstrată.
+            {' '}Mai ai nevoie de un câmp? Selectează orice text în previzualizarea de mai sus și apasă <strong style={{ color: 'var(--c-999999)' }}>+ Fă câmp editabil</strong>.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '14px' }}>
             <div>
@@ -110,7 +119,15 @@ function RaportCampuriForm({ firma, onGenerated, refreshToken }: { firma: Firma;
                 </div>
                 {custom.map(c => (
                   <div key={c.id}>
-                    <label style={LABEL_STYLE}>{c.eticheta}</label>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <label style={{ ...LABEL_STYLE, marginBottom: 0 }}>{c.eticheta}</label>
+                      <button
+                        onClick={() => stergeCustom(c.id, c.eticheta)} title="Șterge câmpul (textul rămâne fix, la valoarea curentă)"
+                        style={{ fontSize: '10px', fontWeight: 600, color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+                      >
+                        ✕ Șterge
+                      </button>
+                    </div>
                     <input
                       value={c.valoare}
                       onChange={e => setCustom(prev => prev.map(x => x.id === c.id ? { ...x, valoare: e.target.value } : x))}
@@ -335,7 +352,12 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
               ) : previewIsPdf ? (
                 <iframe src={`/api/proiect-documente/download?id=${doc.id}&preview=1`} style={{ width: '100%', height: '75vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', background: 'var(--c-ffffff)' }}/>
               ) : previewHtml != null ? (
-                <SelectableDocxPreview firmaId={firma.id} html={previewHtml} culoare={firma.culoare} onFieldCreated={handleFieldCreated}/>
+                <>
+                  <p style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '8px', marginBottom: '4px' }}>
+                    💡 Selectează orice text din document ca să-l adaugi ca și câmp editabil în formularul de mai jos.
+                  </p>
+                  <SelectableDocxPreview firmaId={firma.id} html={previewHtml} culoare={firma.culoare} onFieldCreated={handleFieldCreated}/>
+                </>
               ) : null
             )}
           </div>
