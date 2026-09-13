@@ -7,32 +7,42 @@ interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string; tasks: TaskItem[] }
 interface ProiectDoc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; updated_at: string }
 interface Campuri { perioada: string; autorizatii: string; obiective: string; activitati: string }
+interface CampCustom { id: string; cheie: string; eticheta: string; valoare: string }
 
 const SECTIUNE = 'raport_lunar'
 
 const TEXTAREA_STYLE: React.CSSProperties = { width: '100%', minHeight: '64px', fontSize: '13px', color: 'var(--c-dddddd)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '8px 10px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }
 const LABEL_STYLE: React.CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--c-999999)', marginBottom: '5px', display: 'block' }
 
-function RaportCampuriForm({ firma, onGenerated }: { firma: Firma; onGenerated: () => void }) {
+function RaportCampuriForm({ firma, onGenerated, refreshToken }: { firma: Firma; onGenerated: () => void; refreshToken: number }) {
   const [loading, setLoading] = useState(true)
   const [sablonConfigurat, setSablonConfigurat] = useState(false)
   const [campuri, setCampuri] = useState<Campuri>({ perioada: '', autorizatii: '', obiective: '', activitati: '' })
+  const [custom, setCustom] = useState<CampCustom[]>([])
   const [configuring, setConfiguring] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
   function load() {
-    fetch(`/api/proiect-documente/campuri?firmaId=${encodeURIComponent(firma.id)}`)
-      .then(res => res.json())
-      .then(data => {
-        setSablonConfigurat(!!data.sablonConfigurat)
-        if (data.campuri) setCampuri({ perioada: data.campuri.perioada, autorizatii: data.campuri.autorizatii, obiective: data.campuri.obiective, activitati: data.campuri.activitati })
-        setLoading(false)
-      }).catch(() => setLoading(false))
+    Promise.all([
+      fetch(`/api/proiect-documente/campuri?firmaId=${encodeURIComponent(firma.id)}`).then(r => r.json()),
+      fetch(`/api/proiect-documente/campuri-custom?firmaId=${encodeURIComponent(firma.id)}`).then(r => r.json()),
+    ]).then(([campuriData, customData]) => {
+      setSablonConfigurat(!!campuriData.sablonConfigurat)
+      if (campuriData.campuri) setCampuri({ perioada: campuriData.campuri.perioada, autorizatii: campuriData.campuri.autorizatii, obiective: campuriData.campuri.obiective, activitati: campuriData.campuri.activitati })
+      setCustom(customData.campuri || [])
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [firma.id])
+  useEffect(() => { load() }, [firma.id, refreshToken])
+
+  async function salveazaCustom(id: string, valoare: string) {
+    setCustom(prev => prev.map(c => c.id === id ? { ...c, valoare } : c))
+    const res = await fetch('/api/proiect-documente/campuri-custom', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId: firma.id, id, valoare }) })
+    if (res.ok) onGenerated()
+  }
 
   async function configureaza() {
     setConfiguring(true); setError('')
@@ -91,6 +101,26 @@ function RaportCampuriForm({ firma, onGenerated }: { firma: Firma; onGenerated: 
               <label style={LABEL_STYLE}>Activități derulate în lună (o linie per activitate)</label>
               <textarea value={campuri.activitati} onChange={e => setCampuri(c => ({ ...c, activitati: e.target.value }))} style={TEXTAREA_STYLE}/>
             </div>
+
+            {custom.length > 0 && (
+              <>
+                <div style={{ height: '1px', background: 'var(--c-1e1e1e)', margin: '4px 0' }}/>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                  Câmpuri adăugate din previzualizare
+                </div>
+                {custom.map(c => (
+                  <div key={c.id}>
+                    <label style={LABEL_STYLE}>{c.eticheta}</label>
+                    <input
+                      value={c.valoare}
+                      onChange={e => setCustom(prev => prev.map(x => x.id === c.id ? { ...x, valoare: e.target.value } : x))}
+                      onBlur={e => salveazaCustom(c.id, e.target.value)}
+                      style={{ ...TEXTAREA_STYLE, minHeight: 'auto' }}
+                    />
+                  </div>
+                ))}
+              </>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button onClick={genereaza} disabled={generating} style={{ fontSize: '12px', fontWeight: 600, padding: '8px 16px', borderRadius: '8px', border: 'none', background: firma.culoare, color: 'var(--c-ffffff)', cursor: 'pointer', opacity: generating ? .6 : 1 }}>
@@ -101,6 +131,79 @@ function RaportCampuriForm({ firma, onGenerated }: { firma: Firma; onGenerated: 
         </>
       )}
       {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '10px' }}>{error}</p>}
+    </div>
+  )
+}
+
+// Previzualizare cu selectie de text: selectezi o bucata din document, apare un buton mic
+// "Fa camp editabil" langa selectie - ii dai o eticheta si acea portiune (doar ea, restul
+// paragrafului ramane neschimbat) devine un camp nou in formularul de mai jos, in plus fata
+// de cele 4 fixe.
+function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated }: { firmaId: string; html: string; culoare: string; onFieldCreated: () => void }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [sel, setSel] = useState<{ text: string; x: number; y: number } | null>(null)
+  const [labeling, setLabeling] = useState(false)
+  const [label, setLabel] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  function handleMouseUp() {
+    const selection = window.getSelection()
+    const container = containerRef.current
+    if (!selection || selection.isCollapsed || !container) return
+    const text = selection.toString().trim()
+    const anchorNode = selection.anchorNode
+    if (!text || !anchorNode || !container.contains(anchorNode)) return
+    const rect = selection.getRangeAt(0).getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+    setSel({ text, x: rect.left - containerRect.left + rect.width / 2, y: rect.top - containerRect.top })
+    setLabeling(false); setError('')
+  }
+
+  async function salveaza() {
+    if (!sel || !label.trim()) return
+    setSaving(true); setError('')
+    const res = await fetch('/api/proiect-documente/campuri-custom', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firmaId, selectedText: sel.text, eticheta: label.trim() }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setError(data.error || 'Nu am putut crea câmpul'); setSaving(false); return }
+    window.getSelection()?.removeAllRanges()
+    setSel(null); setLabeling(false); setLabel(''); setSaving(false)
+    onFieldCreated()
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={containerRef}
+        className="docx-preview"
+        onMouseUp={handleMouseUp}
+        style={{ background: 'var(--c-ffffff)', color: '#1a1a1a', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', padding: '32px 40px', maxHeight: '75vh', overflowY: 'auto', fontSize: '14px', lineHeight: 1.6, userSelect: 'text' }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+      {sel && (
+        <div style={{ position: 'absolute', left: sel.x, top: Math.max(0, sel.y - 38), transform: 'translateX(-50%)', zIndex: 20 }}>
+          {!labeling ? (
+            <button onClick={() => setLabeling(true)} style={{ fontSize: '11px', fontWeight: 600, padding: '6px 10px', borderRadius: '7px', border: 'none', background: culoare, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,.35)' }}>
+              + Fă câmp editabil
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '6px', background: 'var(--c-161616)', padding: '6px', borderRadius: '8px', border: '1px solid var(--c-2a2a2a)', boxShadow: '0 4px 12px rgba(0,0,0,.4)' }}>
+              <input
+                autoFocus value={label} onChange={e => setLabel(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') salveaza(); if (e.key === 'Escape') { setSel(null); setLabeling(false) } }}
+                placeholder="Etichetă (ex: Perioadă)" style={{ fontSize: '12px', width: '160px', color: 'var(--c-dddddd)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '5px 8px', outline: 'none' }}
+              />
+              <button onClick={salveaza} disabled={saving || !label.trim()} style={{ fontSize: '11px', fontWeight: 600, padding: '5px 10px', borderRadius: '6px', border: 'none', background: culoare, color: '#fff', cursor: 'pointer', opacity: saving ? .6 : 1, whiteSpace: 'nowrap' }}>
+                {saving ? '...' : 'Salvează'}
+              </button>
+            </div>
+          )}
+          {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '4px', background: 'var(--c-161616)', padding: '4px 8px', borderRadius: '6px' }}>{error}</p>}
+        </div>
+      )}
     </div>
   )
 }
@@ -127,21 +230,39 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewIsPdf, setPreviewIsPdf] = useState(false)
   const [previewError, setPreviewError] = useState('')
+  const [campuriRefresh, setCampuriRefresh] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
 
   function load() {
-    fetch(`/api/proiect-documente?firmaId=${encodeURIComponent(firma.id)}&sectiune=${SECTIUNE}`)
+    return fetch(`/api/proiect-documente?firmaId=${encodeURIComponent(firma.id)}&sectiune=${SECTIUNE}`)
       .then(res => res.json())
-      .then(data => { setDoc(data.doc || null); setLoading(false) })
-      .catch(() => { setError('Eroare la încărcare'); setLoading(false) })
+      .then(data => { setDoc(data.doc || null); setLoading(false); return data.doc as ProiectDoc | null })
+      .catch(() => { setError('Eroare la încărcare'); setLoading(false); return null })
   }
 
   useEffect(() => { load() }, [firma.id])
 
-  function handleGenerated() {
-    load()
-    setPreviewOpen(false); setPreviewHtml(null); setPreviewIsPdf(false)
+  async function loadPreview(docId: string) {
+    setPreviewLoading(true); setPreviewError('')
+    const res = await fetch(`/api/proiect-documente/preview?id=${docId}`)
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setPreviewError(data.error || 'Previzualizarea a eșuat')
+    else if (data.pdf) { setPreviewIsPdf(true); setPreviewHtml(null) }
+    else { setPreviewHtml(data.html || ''); setPreviewIsPdf(false) }
+    setPreviewLoading(false)
+  }
+
+  // Dupa regenerare (formular sau camp nou din selectie), reincarcam documentul si, daca
+  // previzualizarea era deschisa, o reimprospatam pe loc - fara sa o inchidem brusc.
+  async function handleGenerated() {
+    const newDoc = await load()
+    if (previewOpen && newDoc) { setPreviewHtml(null); setPreviewIsPdf(false); loadPreview(newDoc.id) }
+  }
+
+  async function handleFieldCreated() {
+    await handleGenerated()
+    setCampuriRefresh(v => v + 1)
   }
 
   async function togglePreview() {
@@ -149,13 +270,7 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
     if (!doc) return
     setPreviewOpen(true)
     if (previewHtml || previewIsPdf) return
-    setPreviewLoading(true); setPreviewError('')
-    const res = await fetch(`/api/proiect-documente/preview?id=${doc.id}`)
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) setPreviewError(data.error || 'Previzualizarea a eșuat')
-    else if (data.pdf) setPreviewIsPdf(true)
-    else setPreviewHtml(data.html || '')
-    setPreviewLoading(false)
+    loadPreview(doc.id)
   }
 
   async function upload(file: File) {
@@ -220,11 +335,7 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
               ) : previewIsPdf ? (
                 <iframe src={`/api/proiect-documente/download?id=${doc.id}&preview=1`} style={{ width: '100%', height: '75vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', background: 'var(--c-ffffff)' }}/>
               ) : previewHtml != null ? (
-                <div
-                  className="docx-preview"
-                  style={{ background: 'var(--c-ffffff)', color: '#1a1a1a', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', padding: '32px 40px', maxHeight: '75vh', overflowY: 'auto', fontSize: '14px', lineHeight: 1.6 }}
-                  dangerouslySetInnerHTML={{ __html: previewHtml }}
-                />
+                <SelectableDocxPreview firmaId={firma.id} html={previewHtml} culoare={firma.culoare} onFieldCreated={handleFieldCreated}/>
               ) : null
             )}
           </div>
@@ -246,7 +357,7 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
         {error && doc && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{error}</p>}
       </div>
 
-      {doc && <RaportCampuriForm firma={firma} onGenerated={handleGenerated}/>}
+      {doc && <RaportCampuriForm firma={firma} onGenerated={handleGenerated} refreshToken={campuriRefresh}/>}
     </div>
   )
 }

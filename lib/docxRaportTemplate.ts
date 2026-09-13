@@ -133,6 +133,7 @@ export interface RaportFieldValues {
   autorizatii: string[]
   obiective: string[]
   activitati: string[]
+  custom?: Record<string, string>
 }
 
 /** Genereaza document.xml final dintr-un sablon (produs de buildTemplate) + valorile curente. */
@@ -149,5 +150,51 @@ export function generateFromTemplate(templateXml: string, values: RaportFieldVal
   xml = expandMarker(xml, MARKERS.autorizatii, values.autorizatii)
   xml = expandMarker(xml, MARKERS.obiective, values.obiective)
   xml = expandMarker(xml, MARKERS.activitati, values.activitati)
+
+  for (const [key, value] of Object.entries(values.custom || {})) {
+    xml = xml.split(customMarker(key)).join(xmlEscape(value))
+  }
   return xml
+}
+
+export function customMarker(key: string): string {
+  return `%%CUSTOM_${key}%%`
+}
+
+function normalize(s: string): string {
+  return s.replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Gaseste paragraful care contine `selectedText` (selectat de utilizator direct din
+ * previzualizare) si inlocuieste DOAR acea portiune cu un marcaj, pastrand restul
+ * paragrafului neatins (spre deosebire de buildTemplate, care inlocuieste tot paragraful -
+ * aici selectia poate fi doar o bucata dintr-o propozitie mai lunga).
+ */
+export function insertCustomMarker(documentXml: string, selectedText: string, key: string): string {
+  const needle = normalize(selectedText)
+  if (!needle) throw new Error('Selecție goală')
+
+  const paras = getParagraphs(documentXml)
+  const matches = paras.filter(p => normalize(paraText(p)).includes(needle))
+  if (!matches.length) throw new Error('Nu am găsit exact acest text în document — selectează din nou, fără să treci peste mai multe paragrafe')
+  if (matches.length > 1) throw new Error('Acest text apare de mai multe ori în document — selectează o porțiune mai lungă/specifică, ca să fie unică')
+
+  const target = matches[0]
+  const fullText = paraText(target)
+  const idx = normalize(fullText).indexOf(needle)
+  // idx e calculat pe textul normalizat (spatii comprimate) - il aplicam pe fullText original
+  // presupunand ca nu difera semnificativ (spatii multiple sunt rare in interiorul unei fraze)
+  const before = fullText.slice(0, idx)
+  const after = fullText.slice(idx + selectedText.trim().length)
+
+  const rPr = getFirstRunPr(target)
+  const openTag = getParaOpenTag(target)
+  const pPr = getParaPr(target)
+  const runFor = (t: string) => t ? `<w:r>${rPr}<w:t xml:space="preserve">${xmlEscape(t)}</w:t></w:r>` : ''
+  const newPara = `${openTag}${pPr}${runFor(before)}<w:r>${rPr}<w:t xml:space="preserve">${customMarker(key)}</w:t></w:r>${runFor(after)}</w:p>`
+
+  const at = documentXml.indexOf(target)
+  if (at === -1) throw new Error('Paragraful nu a putut fi localizat pentru înlocuire')
+  return documentXml.slice(0, at) + newPara + documentXml.slice(at + target.length)
 }

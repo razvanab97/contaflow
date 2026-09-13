@@ -15,6 +15,16 @@ export async function POST(req: NextRequest) {
   if (!firmaId) return NextResponse.json({ error: 'firmaId lipsește' }, { status: 400 })
 
   const sb = getServiceSupabase()
+
+  // Deja configurat - nu il reconstruim din documentul curent (l-ar sterge/rescrie), ca sa nu
+  // pierdem campurile personalizate adaugate ulterior prin selectie direct din previzualizare.
+  const { data: already } = await sb.from('proiect_documente').select('id').eq('firma_id', firmaId).eq('sectiune', SECTIUNE_SABLON).maybeSingle()
+  if (already) {
+    const { data: campuri, error: campuriErr } = await sb.from('proiect_raport_campuri').select().eq('firma_id', firmaId).eq('sectiune', SECTIUNE).maybeSingle()
+    if (campuriErr) return NextResponse.json({ error: campuriErr.message }, { status: 500 })
+    return NextResponse.json({ campuri })
+  }
+
   const { data: doc } = await sb.from('proiect_documente').select('*').eq('firma_id', firmaId).eq('sectiune', SECTIUNE).maybeSingle()
   if (!doc) return NextResponse.json({ error: 'Nu există niciun document încărcat încă' }, { status: 400 })
   if (!doc.fisier_tip?.includes('wordprocessingml') && !doc.fisier_path.toLowerCase().endsWith('.docx')) {
@@ -35,22 +45,18 @@ export async function POST(req: NextRequest) {
     zip.file('word/document.xml', templateXml)
     const templateBuffer = await zip.generateAsync({ type: 'nodebuffer' })
 
-    const { data: existingSablon } = await sb.from('proiect_documente').select('fisier_path').eq('firma_id', firmaId).eq('sectiune', SECTIUNE_SABLON).maybeSingle()
-
     const path = `${firmaId}/proiect-documente/${SECTIUNE_SABLON}/${Date.now()}_${doc.fisier_nume}`
     const { error: upErr } = await sb.storage.from('documente').upload(path, templateBuffer, { contentType: doc.fisier_tip })
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
-    const { error: sablonErr } = await sb.from('proiect_documente').upsert({
+    const { error: sablonErr } = await sb.from('proiect_documente').insert({
       firma_id: firmaId, sectiune: SECTIUNE_SABLON, fisier_nume: doc.fisier_nume, fisier_path: path,
       fisier_tip: doc.fisier_tip, fisier_marime: templateBuffer.length, updated_at: new Date().toISOString(),
-    }, { onConflict: 'firma_id,sectiune' })
+    })
     if (sablonErr) {
       await sb.storage.from('documente').remove([path])
       return NextResponse.json({ error: sablonErr.message }, { status: 500 })
     }
-
-    if (existingSablon?.fisier_path) await sb.storage.from('documente').remove([existingSablon.fisier_path])
 
     const { data: campuri, error: campuriErr } = await sb.from('proiect_raport_campuri').upsert({
       firma_id: firmaId, sectiune: SECTIUNE,
