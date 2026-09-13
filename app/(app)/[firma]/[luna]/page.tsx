@@ -7,6 +7,7 @@ import { getFirmaBySlug, getLuniContabile, getRestanteCount } from '@/lib/querie
 import { getFirmaModules } from '@/lib/firma-config'
 import LunaSummary from './LunaSummary'
 import ExportButtons from './ExportButtons'
+import RecomandariLuna from '@/components/RecomandariLuna'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,6 +100,14 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
         taskMap={taskMap}
         restanteCount={restanteCount}
         dezactivate={dezactivate}
+      />
+
+      <RecomandariLuna
+        lunaId={lunaData.id}
+        firmaId={firma.id}
+        firmaSlug={firma.slug}
+        firmaNume={firma.nume}
+        lunaLabel={ll}
       />
     </main>
   )

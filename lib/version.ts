@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 63, text: 'Nou: „Recomandări pentru sistem" la finalul hub-ului lunar — la cerere, AI analizează task-uri, module dezactivate, tranzacții nedocumentate și restanțe reale ale lunii și propune 3-5 îmbunătățiri concrete pentru mai puțină muncă manuală pe viitor (necesită rularea migrării SQL recomandari_luna)' },
   { v: 62, text: 'Rafinare vizuală completă: font Inter peste tot, paletă nouă pe toate cele 3 teme (Light alb pe gri, Night grafit nu negru pur), culoare cu sens (albastru=acțiune, verde=gata, amber=în lucru, roșu=restanțe) în loc de culoarea firmei peste tot, task-uri ca bifă+text în loc de pastile, Glass revenit la doar sidebar/header/dropdown-uri' },
   { v: 61, text: 'Glass rescris alb/translucent (nu întunecat) și extins pe carduri, rânduri de modul și tab-uri, nu doar sidebar/header. Conținutul paginilor folosește acum mult mai mult din lățimea ecranului (820-1000px → 1200-1500px)' },
   { v: 60, text: 'Sistem global de aparență: Sistem/Deschis/Întunecat/Glass, selector în sidebar (vizibil pe orice pagină), persistat, fără clipire la încărcare. Glass e translucent+blur doar pe sidebar/header/dropdown-uri — tabelele și formularele rămân opace pentru lizibilitate' },
