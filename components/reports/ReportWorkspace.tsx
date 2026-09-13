@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import TaskSection, { TaskItem } from '../../app/[firma]/[luna]/modules/TaskSection'
+import TaskSection, { TaskItem } from '../../app/(app)/[firma]/[luna]/modules/TaskSection'
 import type { DocumentTemplate, ListItem } from '@/lib/documentWorkspace/types'
 import { parseMultilineToItems, itemsToMultiline } from '@/lib/documentWorkspace/types'
 import ReportHeader from './ReportHeader'

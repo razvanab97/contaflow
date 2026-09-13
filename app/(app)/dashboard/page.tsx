@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import Sidebar from '@/components/Sidebar'
 import DocumenteGenerale from '@/components/DocumenteGenerale'
 import FirmaQuickInfo from '@/components/FirmaQuickInfo'
 import { dbSelect } from '@/lib/db'
@@ -36,19 +35,10 @@ export default async function Dashboard() {
     proprietariMap[p.firma_id].push(p)
   }
 
-  const firmeNav = firme.map((f: any) => {
-    const lunaData = luniMap[`${f.id}_${LUNA}`]
-    const total = getFirmaTotalTasks(f.slug)
-    const done = lunaData ? (taskCount[lunaData.id]?.done || 0) : 0
-    return { id: f.id, slug: f.slug, nume: f.nume, culoare: f.culoare, pct: total > 0 ? Math.round((done / total) * 100) : 0 }
-  })
-
   const ll = lunaLabel(LUNA)
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--c-0a0a0a)' }}>
-      <Sidebar firme={firmeNav} lunaCurenta={LUNA} lunaLabel={ll} />
-
+    <>
       <main className="pt-20 px-4 pb-10 md:pt-12 md:px-[52px] md:pb-12" style={{ flex: 1, width: '100%' }}>
         <div style={{ marginBottom: '40px' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-666666)', letterSpacing: '.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
@@ -159,6 +149,6 @@ export default async function Dashboard() {
           <DocumenteGenerale />
         </div>
       </main>
-    </div>
+    </>
   )
 }

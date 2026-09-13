@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 55, text: 'Shell persistent pe toată aplicația: sidebar-ul nu se mai reconstruiește nici la Dashboard/Furnizori/Date personale/Model documente/Facturi de asociat (nu doar în interiorul unei firme+luni) + comutator rapid de firmă în capul paginii, cu prefetch' },
   { v: 54, text: 'Raport lunar (proiect): redesign complet — workspace cu previzualizare + editor pe secțiuni (nu textarea-uri), liste editabile individual, dată-interval, autosave, tab-uri (Editare/Previzualizare/Istoric/Fișier); arhitectură generică, reutilizabilă pentru viitoare tipuri de documente' },
   { v: 53, text: 'Raport lunar (proiect): buton de ștergere pentru câmpurile personalizate (textul revine fix, cu valoarea curentă) + indicii vizuale mai clare pentru selecție și generare' },
   { v: 52, text: 'Raport lunar (proiect): poți selecta orice text din previzualizare și să-l faci "câmp editabil" cu propria etichetă, pe lângă cele 4 fixe' },
