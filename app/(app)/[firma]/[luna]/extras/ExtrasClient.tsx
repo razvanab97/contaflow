@@ -276,7 +276,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           <p style={{ fontSize:'13px', color:'var(--c-888888)', marginLeft:'17px' }}>{firma.nume} · {lunaLabel}</p>
         </div>
 
-        <div style={{ display:'flex', background:'var(--c-161616)', border:'1px solid var(--c-242424)', padding:'3px', borderRadius:'10px', gap:'3px', marginBottom:'24px', width:'fit-content' }}>
+        <div className="glass-surface" style={{ display:'flex', padding:'3px', borderRadius:'10px', gap:'3px', marginBottom:'24px', width:'fit-content' }}>
           <button onClick={()=>setPageTab('extras')} style={{ padding:'7px 16px', borderRadius:'7px', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, background:pageTab==='extras'?c:'transparent', color:pageTab==='extras'?'var(--c-ffffff)':'var(--c-888888)' }}>Extras de cont</button>
           <button onClick={()=>setPageTab('facturi')} style={{ padding:'7px 16px', borderRadius:'7px', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, background:pageTab==='facturi'?c:'transparent', color:pageTab==='facturi'?'var(--c-ffffff)':'var(--c-888888)' }}>Facturi + chitanță</button>
           <button onClick={()=>setPageTab('note')} style={{ padding:'7px 16px', borderRadius:'7px', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, background:pageTab==='note'?c:'transparent', color:pageTab==='note'?'var(--c-ffffff)':'var(--c-888888)' }}>Note</button>
@@ -383,7 +383,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
               <div style={{ display:'flex', gap:'10px', alignItems:'flex-end', flexDirection:'column' }}>
                 {/* View Mode Toggle */}
                 <div style={{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
-                  <div style={{ display:'flex', background:'var(--c-161616)', border:'1px solid var(--c-242424)', padding:'3px', borderRadius:'10px' }}>
+                  <div className="glass-surface" style={{ display:'flex', padding:'3px', borderRadius:'10px' }}>
                     <button onClick={()=>setViewMode('workspace')} style={{ fontSize:'12px', fontWeight:600, padding:'6px 14px', borderRadius:'7px', border:'none', background:viewMode==='workspace'?c:'transparent', color:viewMode==='workspace'?'var(--c-ffffff)':'var(--c-888888)', cursor:'pointer' }}>
                       Workspace App
                     </button>

@@ -46,7 +46,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
   const ll = lunaLabel(luna)
 
   return (
-    <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1000px' }}>
+    <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1400px' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px', marginBottom: '36px' }}>
         <div>

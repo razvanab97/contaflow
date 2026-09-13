@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <main style={{ flex:1, padding:'44px 52px', maxWidth:'900px' }}>
+    <main style={{ flex:1, padding:'44px 52px', maxWidth:'1300px' }}>
       <div style={{ marginBottom:'32px' }}>
         <div style={{ width:'160px', height:'12px', borderRadius:'4px', background:'var(--c-161616)', marginBottom:'16px' }}/>
         <div style={{ width:'240px', height:'24px', borderRadius:'6px', background:'var(--c-161616)', marginBottom:'10px' }}/>

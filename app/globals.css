@@ -108,7 +108,7 @@
   color-scheme: dark;
 }
 
-:root[data-theme="light"] {
+:root[data-theme="light"], :root[data-theme="glass"] {
   --c-0a0a0a: #F5F5F5;
   --c-0d0d0d: #F2F2F2;
   --c-0f0f0f: #F0F0F0;
@@ -165,21 +165,22 @@
   color-scheme: light;
 }
 
-/* Liquid Glass: doar suprafetele "plutitoare" (sidebar, header, dropdown-uri) devin
-   translucide+blur - tabelele, formularele si editorul de documente raman opace
-   (folosesc in continuare --surface/--c-*, neschimbate), pentru lizibilitate. */
+/* Liquid Glass: alb/deschis la culoare (aceleasi valori --c-* ca Light, de mai sus),
+   cu majoritatea suprafetelor (carduri, randuri de modul, tab-uri, dropdown-uri, sidebar,
+   header) translucide+blur pe unul din cele 3 niveluri de elevatie. Raman opace doar
+   editorul de documente si formularele cu input-uri, pentru lizibilitate. */
 :root[data-theme="glass"] {
-  --glass-surface-bg: rgba(14,14,16,.5);   --glass-surface-blur: blur(16px);  --glass-surface-border: rgba(255,255,255,.08);
-  --glass-elevated-bg: rgba(26,26,29,.62); --glass-elevated-blur: blur(20px); --glass-elevated-border: rgba(255,255,255,.10);
-  --glass-floating-bg: rgba(34,34,38,.72); --glass-floating-blur: blur(26px); --glass-floating-border: rgba(255,255,255,.14);
+  --glass-surface-bg: rgba(255,255,255,.55);   --glass-surface-blur: blur(18px);  --glass-surface-border: rgba(255,255,255,.6);
+  --glass-elevated-bg: rgba(255,255,255,.68);  --glass-elevated-blur: blur(22px); --glass-elevated-border: rgba(255,255,255,.7);
+  --glass-floating-bg: rgba(255,255,255,.78);  --glass-floating-blur: blur(28px); --glass-floating-border: rgba(255,255,255,.8);
 
-  /* Fara ceva texturat in spate, blur-ul de pe sidebar/header n-are ce sa estompeze si
-     pare plat. Un fundal foarte discret ii da glass-ului adancime reala. */
+  /* Fara ceva texturat in spate, blur-ul n-are ce sa estompeze si pare plat pe un fundal
+     alb uniform. Un fundal pastelat foarte discret ii da adancime reala. */
   --app-bg-image:
-    radial-gradient(1000px 700px at 8% 0%, rgba(96,165,250,.16), transparent 55%),
-    radial-gradient(900px 700px at 100% 15%, rgba(110,231,176,.13), transparent 50%);
+    radial-gradient(1100px 720px at 10% -5%, rgba(37,99,235,.10), transparent 55%),
+    radial-gradient(950px 720px at 100% 10%, rgba(5,150,105,.09), transparent 52%);
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -215,11 +216,37 @@ select, input, textarea {
 }
 
 .module-row {
+  background: var(--glass-surface-bg);
+  border: 1px solid var(--glass-surface-border);
+  backdrop-filter: var(--glass-surface-blur);
+  -webkit-backdrop-filter: var(--glass-surface-blur);
   transition: background-color .15s ease, border-color .15s ease;
 }
 .module-row:hover {
-  background: var(--c-141414);
-  border-color: var(--c-282828);
+  background: var(--glass-elevated-bg);
+  border-color: var(--glass-elevated-border);
+}
+
+/* Utilitare Glass reutilizabile - 3 niveluri de elevatie. Opace (fara blur) implicit
+   pe Light/Dark, translucide+blur doar sub [data-theme="glass"]. Aplicabile pe orice
+   card/rand/tab prin className, fara sa fie nevoie de stiluri separate per tema. */
+.glass-surface {
+  background: var(--glass-surface-bg);
+  border: 1px solid var(--glass-surface-border);
+  backdrop-filter: var(--glass-surface-blur);
+  -webkit-backdrop-filter: var(--glass-surface-blur);
+}
+.glass-elevated {
+  background: var(--glass-elevated-bg);
+  border: 1px solid var(--glass-elevated-border);
+  backdrop-filter: var(--glass-elevated-blur);
+  -webkit-backdrop-filter: var(--glass-elevated-blur);
+}
+.glass-floating {
+  background: var(--glass-floating-bg);
+  border: 1px solid var(--glass-floating-border);
+  backdrop-filter: var(--glass-floating-blur);
+  -webkit-backdrop-filter: var(--glass-floating-blur);
 }
 
 select:focus, input:focus { border-color: var(--c-444444); }

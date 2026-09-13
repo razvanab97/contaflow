@@ -156,6 +156,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
             return (
               <div
                 key={mod.slug}
+                className={isOver ? '' : 'module-row'}
                 draggable
                 onDragStart={() => onDragStart(idx)}
                 onDragOver={e => onDragOver(e, idx)}
@@ -164,8 +165,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                 style={{
                   display:'flex', alignItems:'center', gap:'12px',
                   padding:'12px 16px',
-                  background: isOver ? tint(r, .08) : 'var(--c-111111)',
-                  border: isOver ? `1px solid ${tint(r, .4)}` : '1px solid var(--c-1e1e1e)',
+                  ...(isOver ? { background: tint(r, .08), border: `1px solid ${tint(r, .4)}` } : {}),
                   borderRadius:'10px',
                   cursor:'grab',
                   transition:'background .1s, border-color .1s',
@@ -225,7 +225,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
                 className="module-row"
                 onClick={() => router.push(href)}
                 style={{
-                  background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'12px',
+                  borderRadius:'12px',
                   padding:'12px 16px', cursor:'pointer',
                   display:'flex', flexDirection:'column', gap:'8px',
                   opacity: isDeactivated ? .5 : 1,

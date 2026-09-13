@@ -24,7 +24,7 @@ export default async function FurnizoriPage({ params }: { params: Promise<{ firm
   const luna = getCurrentLuna()
 
   return (
-    <main style={{ flex: 1, padding: '44px 52px', maxWidth: '960px' }}>
+    <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1400px' }}>
       <div style={{ marginBottom: '32px' }}>
         <Link href={`/${slug}/${luna}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--c-888888)', marginBottom: '16px' }}>
           <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>

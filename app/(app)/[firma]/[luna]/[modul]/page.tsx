@@ -131,7 +131,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   }
 
   return (
-    <main style={{ flex:1, padding:'44px 52px', maxWidth: modulSlug === 'raport-lunar-proiect' ? '1200px' : '900px' }}>
+    <main style={{ flex:1, padding:'44px 52px', maxWidth: modulSlug === 'raport-lunar-proiect' ? '1500px' : '1300px' }}>
       {/* Header - ReportWorkspace isi construieste propriul header (breadcrumb + titlu + schimbator
           de luna), ca sa nu aparem cu doua titluri suprapuse pentru documentul-workspace */}
       {modulSlug !== 'raport-lunar-proiect' && (

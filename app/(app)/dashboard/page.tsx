@@ -83,7 +83,7 @@ export default async function Dashboard() {
             const restante = restanteMap[f.id] || 0
 
             return (
-              <div key={f.id} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '16px', padding: '24px 28px' }}>
+              <div key={f.id} className="glass-elevated" style={{ borderRadius: '16px', padding: '24px 28px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '18px' }}>
                   <div style={{
                     width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0,

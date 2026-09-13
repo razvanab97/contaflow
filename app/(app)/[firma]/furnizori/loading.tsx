@@ -1,2 +1,2 @@
 import AppSkeleton from '@/components/AppSkeleton'
-export default function Loading() { return <AppSkeleton maxWidth="960px" /> }
+export default function Loading() { return <AppSkeleton maxWidth="1400px" /> }
