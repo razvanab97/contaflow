@@ -4,6 +4,15 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 }
 
+/* Randare documente Word (mammoth) - reset-ul global elimina bulinele/indentarea listelor,
+   le restauram doar aici ca previzualizarea sa arate ca documentul original. */
+.docx-preview ul { list-style: disc; padding-left: 22px; margin: 6px 0; }
+.docx-preview ol { list-style: decimal; padding-left: 22px; margin: 6px 0; }
+.docx-preview li { margin: 2px 0; }
+.docx-preview p { margin: 8px 0; }
+.docx-preview table { border-collapse: collapse; width: 100%; }
+.docx-preview td, .docx-preview th { border: 1px solid #ddd; padding: 6px 10px; vertical-align: top; }
+
 /* Temă — variabile neutre (fundaluri/borduri/text), derivate direct din nuanțele
    folosite deja în aplicație. Implicit (fără atribut) = tema întunecată curentă,
    neschimbată vizual. [data-theme="light"] o suprascrie pentru tema deschisă. */

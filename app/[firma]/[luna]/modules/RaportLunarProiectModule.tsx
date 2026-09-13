@@ -26,6 +26,11 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [drag, setDrag] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [previewIsPdf, setPreviewIsPdf] = useState(false)
+  const [previewError, setPreviewError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
 
@@ -38,6 +43,20 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
 
   useEffect(() => { load() }, [firma.id])
 
+  async function togglePreview() {
+    if (previewOpen) { setPreviewOpen(false); return }
+    if (!doc) return
+    setPreviewOpen(true)
+    if (previewHtml || previewIsPdf) return
+    setPreviewLoading(true); setPreviewError('')
+    const res = await fetch(`/api/proiect-documente/preview?id=${doc.id}`)
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setPreviewError(data.error || 'Previzualizarea a eșuat')
+    else if (data.pdf) setPreviewIsPdf(true)
+    else setPreviewHtml(data.html || '')
+    setPreviewLoading(false)
+  }
+
   async function upload(file: File) {
     setUploading(true); setError('')
     const fd = new FormData()
@@ -47,13 +66,14 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
     const res = await fetch('/api/proiect-documente', { method: 'POST', body: fd })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setError(data.error || 'Eroare upload')
-    else setDoc(data.doc)
+    else { setDoc(data.doc); setPreviewOpen(false); setPreviewHtml(null); setPreviewIsPdf(false) }
     setUploading(false)
   }
 
   async function removeDoc() {
     if (!doc || !confirm('Ștergi documentul curent? Va trebui reîncărcat de la zero.')) return
     setDoc(null)
+    setPreviewOpen(false); setPreviewHtml(null); setPreviewIsPdf(false)
     await fetch(`/api/proiect-documente?firmaId=${encodeURIComponent(firma.id)}&sectiune=${SECTIUNE}`, { method: 'DELETE' })
   }
 
@@ -74,17 +94,38 @@ export default function RaportLunarProiectModule({ firma, lunaId, tasks }: Props
         ) : error && !doc ? (
           <p style={{ fontSize: '12px', color: 'var(--accent-red)' }}>{error}</p>
         ) : doc ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: firma.culoare, flexShrink: 0 }}/>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '13px', color: 'var(--c-dddddd)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</div>
-              <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px' }}>{fmtSize(doc.fisier_marime)} · actualizat {fmtData(doc.updated_at)}</div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '8px', flexWrap: 'wrap' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: firma.culoare, flexShrink: 0 }}/>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', color: 'var(--c-dddddd)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</div>
+                <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px' }}>{fmtSize(doc.fisier_marime)} · actualizat {fmtData(doc.updated_at)}</div>
+              </div>
+              <button onClick={togglePreview} style={{ fontSize: '12px', fontWeight: 600, color: previewOpen ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                {previewOpen ? 'Ascunde' : 'Previzualizează'}
+              </button>
+              <a href={`/api/proiect-documente/download?id=${doc.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none', flexShrink: 0 }}>Descarcă</a>
+              <button onClick={() => inputRef.current?.click()} disabled={uploading} style={{ fontSize: '12px', fontWeight: 600, padding: '6px 12px', borderRadius: '7px', border: `1px solid ${firma.culoare}`, background: 'transparent', color: legibil(firma.culoare), cursor: 'pointer', flexShrink: 0, opacity: uploading ? .6 : 1 }}>
+                {uploading ? 'Se încarcă...' : 'Încarcă versiune nouă'}
+              </button>
+              <button onClick={removeDoc} title="Șterge" style={{ width: '26px', height: '26px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '13px', lineHeight: 1 }}>×</button>
             </div>
-            <a href={`/api/proiect-documente/download?id=${doc.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none', flexShrink: 0 }}>Descarcă</a>
-            <button onClick={() => inputRef.current?.click()} disabled={uploading} style={{ fontSize: '12px', fontWeight: 600, padding: '6px 12px', borderRadius: '7px', border: `1px solid ${firma.culoare}`, background: 'transparent', color: legibil(firma.culoare), cursor: 'pointer', flexShrink: 0, opacity: uploading ? .6 : 1 }}>
-              {uploading ? 'Se încarcă...' : 'Încarcă versiune nouă'}
-            </button>
-            <button onClick={removeDoc} title="Șterge" style={{ width: '26px', height: '26px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '13px', lineHeight: 1 }}>×</button>
+
+            {previewOpen && (
+              previewLoading ? (
+                <p style={{ fontSize: '12px', color: 'var(--c-666666)', marginTop: '8px' }}>Se randează previzualizarea...</p>
+              ) : previewError ? (
+                <p style={{ fontSize: '12px', color: 'var(--accent-red)', marginTop: '8px' }}>{previewError}</p>
+              ) : previewIsPdf ? (
+                <iframe src={`/api/proiect-documente/download?id=${doc.id}&preview=1`} style={{ width: '100%', height: '75vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', background: 'var(--c-ffffff)' }}/>
+              ) : previewHtml != null ? (
+                <div
+                  className="docx-preview"
+                  style={{ background: 'var(--c-ffffff)', color: '#1a1a1a', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', padding: '32px 40px', maxHeight: '75vh', overflowY: 'auto', fontSize: '14px', lineHeight: 1.6 }}
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              ) : null
+            )}
           </div>
         ) : (
           <div
