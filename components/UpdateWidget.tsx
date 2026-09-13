@@ -10,8 +10,9 @@ export default function UpdateWidget() {
       {open && (
         <div style={{
           position: 'absolute', bottom: '22px', left: 0, width: '320px', maxHeight: '360px', overflowY: 'auto',
-          background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: '10px', padding: '12px 14px',
-          boxShadow: '0 8px 24px rgba(0,0,0,.5)',
+          background: 'var(--glass-elevated-bg)', border: '1px solid var(--glass-elevated-border)', borderRadius: '10px', padding: '12px 14px',
+          backdropFilter: 'var(--glass-elevated-blur)', WebkitBackdropFilter: 'var(--glass-elevated-blur)',
+          boxShadow: 'var(--shadow-md)',
         }}>
           <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '8px' }}>
             Ce s-a schimbat

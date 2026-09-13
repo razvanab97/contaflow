@@ -53,7 +53,7 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
   const modules = firmaSlug ? getFirmaModules(firmaSlug) : undefined
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--c-0a0a0a)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--app-bg-image, none), var(--c-0a0a0a)', backgroundAttachment: 'fixed' }}>
       <Sidebar
         firme={firmeNav}
         lunaCurenta={lunaEfectiva}

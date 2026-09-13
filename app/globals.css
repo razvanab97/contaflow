@@ -70,6 +70,41 @@
   --danger-bg: #1A1010;
   --danger-border: #5B3030;
 
+  /* Token-uri semantice - alias-uri peste rampa --c-* de mai sus. Cum --c-* insusi
+     comuta pe [data-theme], aceste alias-uri raman corecte pe orice tema fara sa mai
+     fie redefinite explicit sub [data-theme="light"]/[data-theme="glass"] mai jos. */
+  --app-bg: var(--c-0a0a0a);
+  --surface: var(--c-111111);
+  --surface-secondary: var(--c-0d0d0d);
+  --surface-elevated: var(--c-161616);
+
+  --text-primary: var(--c-eeeeee);
+  --text-secondary: var(--c-999999);
+  --text-muted: var(--c-666666);
+
+  --border: var(--c-2a2a2a);
+  --border-subtle: var(--c-1e1e1e);
+
+  --hover: var(--overlay-hover);
+  --selected: rgba(255,255,255,.06);
+
+  --accent: var(--accent-blue);
+  --success: var(--accent-green);
+  --warning: #F5C96A;
+  --danger: var(--accent-red);
+
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.25);
+  --shadow-md: 0 8px 24px rgba(0,0,0,.4);
+  --shadow-floating: 0 12px 32px rgba(0,0,0,.5);
+
+  /* Glass: opac implicit pe Light/Night (fara blur) - componentele "glass-eligible"
+     (Sidebar, header, dropdown-uri) folosesc mereu aceste variabile necondiționat, pe unul
+     din cele 3 niveluri de elevatie; doar [data-theme="glass"] le face translucide+blur.
+     Asa nu exista cod separat per tema in componente. */
+  --glass-surface-bg: var(--c-0d0d0d);   --glass-surface-blur: none; --glass-surface-border: var(--c-1e1e1e);
+  --glass-elevated-bg: var(--c-161616);  --glass-elevated-blur: none; --glass-elevated-border: var(--c-2a2a2a);
+  --glass-floating-bg: var(--c-171717);  --glass-floating-blur: none; --glass-floating-border: var(--c-2a2a2a);
+
   color-scheme: dark;
 }
 
@@ -122,6 +157,7 @@
   --overlay-hover: rgba(0,0,0,.05);
   --overlay-hover-soft: rgba(0,0,0,.04);
   --text-strong: rgba(0,0,0,.85);
+  --selected: rgba(0,0,0,.06);
 
   --danger-bg: #FEF2F2;
   --danger-border: #FCA5A5;
@@ -129,8 +165,30 @@
   color-scheme: light;
 }
 
+/* Liquid Glass: doar suprafetele "plutitoare" (sidebar, header, dropdown-uri) devin
+   translucide+blur - tabelele, formularele si editorul de documente raman opace
+   (folosesc in continuare --surface/--c-*, neschimbate), pentru lizibilitate. */
+:root[data-theme="glass"] {
+  --glass-surface-bg: rgba(14,14,16,.5);   --glass-surface-blur: blur(16px);  --glass-surface-border: rgba(255,255,255,.08);
+  --glass-elevated-bg: rgba(26,26,29,.62); --glass-elevated-blur: blur(20px); --glass-elevated-border: rgba(255,255,255,.10);
+  --glass-floating-bg: rgba(34,34,38,.72); --glass-floating-blur: blur(26px); --glass-floating-border: rgba(255,255,255,.14);
+
+  /* Fara ceva texturat in spate, blur-ul de pe sidebar/header n-are ce sa estompeze si
+     pare plat. Un fundal foarte discret ii da glass-ului adancime reala. */
+  --app-bg-image:
+    radial-gradient(1000px 700px at 8% 0%, rgba(96,165,250,.16), transparent 55%),
+    radial-gradient(900px 700px at 100% 15%, rgba(110,231,176,.13), transparent 50%);
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html, body, .module-row, * { transition: none !important; }
+}
+
 html, body {
-  background: var(--c-0a0a0a) !important;
+  background: var(--app-bg-image, none), var(--c-0a0a0a) !important;
+  background-attachment: fixed;
   color: var(--c-d8d8d8);
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;

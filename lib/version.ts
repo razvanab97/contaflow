@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 60, text: 'Sistem global de aparență: Sistem/Deschis/Întunecat/Glass, selector în sidebar (vizibil pe orice pagină), persistat, fără clipire la încărcare. Glass e translucent+blur doar pe sidebar/header/dropdown-uri — tabelele și formularele rămân opace pentru lizibilitate' },
   { v: 59, text: 'Hub-ul lunar: module lunare din carduri mari (230px+) în rânduri compacte (~70-100px) — toate modulele unei firme încap acum pe un singur ecran, fără scroll; corectat și overflow orizontal pe mobil în antetul hub-ului' },
   { v: 58, text: 'Extras de cont: eliminat mini-sidebar-ul propriu (logo + căutare duplicate) rămas dintr-o versiune veche, dinainte de shell-ul persistent — bara de progres și butonul de finalizare extras au fost mutate în conținutul principal' },
   { v: 57, text: 'Dashboard: facturi restante vizibile direct pe fiecare card de firmă + total pe prima linie, fără să intri în firmă' },

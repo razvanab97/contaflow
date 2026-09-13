@@ -74,7 +74,7 @@ export default function DocumentSearch({ firmaId, culoare = 'var(--c-888888)' }:
         style={{ width: '100%', fontSize: '12px', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--c-242424)', background: 'var(--c-111111)', color: 'var(--c-dddddd)', outline: 'none' }}
       />
       {open && (
-        <div style={{ position: 'absolute', top: '100%', left: '18px', right: '18px', marginTop: '6px', maxHeight: '360px', overflowY: 'auto', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 200 }}>
+        <div style={{ position: 'absolute', top: '100%', left: '18px', right: '18px', marginTop: '6px', maxHeight: '360px', overflowY: 'auto', background: 'var(--glass-elevated-bg)', border: '1px solid var(--glass-elevated-border)', borderRadius: '10px', backdropFilter: 'var(--glass-elevated-blur)', WebkitBackdropFilter: 'var(--glass-elevated-blur)', boxShadow: 'var(--shadow-md)', zIndex: 200 }}>
           {loading ? (
             <div style={{ padding: '14px', fontSize: '12px', color: 'var(--c-666666)', textAlign: 'center' }}>Se caută...</div>
           ) : results.length === 0 ? (

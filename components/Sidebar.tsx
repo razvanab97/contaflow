@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
 import { rgb, legibil, tint } from '@/lib/colors'
 import DocumentSearch from './DocumentSearch'
+import ThemeSelector from './shell/ThemeSelector'
 
 export interface FirmaNav {
   id: string
@@ -36,7 +37,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
   return (
     <>
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3" style={{ height: '56px', padding: '0 16px', background: 'var(--c-0d0d0d)', borderBottom: '1px solid var(--c-1a1a1a)' }}>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3" style={{ height: '56px', padding: '0 16px', background: 'var(--glass-surface-bg)', backdropFilter: 'var(--glass-surface-blur)', WebkitBackdropFilter: 'var(--glass-surface-blur)', borderBottom: '1px solid var(--glass-surface-border)' }}>
         <button
           onClick={() => setOpen(true)}
           aria-label="Deschide meniul"
@@ -65,8 +66,10 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
         className={`fixed md:sticky top-0 left-0 h-screen z-50 transition-transform duration-200 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
         style={{
           width: '240px', flexShrink: 0,
-          background: 'var(--c-0d0d0d)',
-          borderRight: '1px solid var(--c-1a1a1a)',
+          background: 'var(--glass-surface-bg)',
+          backdropFilter: 'var(--glass-surface-blur)',
+          WebkitBackdropFilter: 'var(--glass-surface-blur)',
+          borderRight: '1px solid var(--glass-surface-border)',
           display: 'flex', flexDirection: 'column',
           overflowY: 'auto',
         }}
@@ -93,6 +96,8 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
             </svg>
           </button>
         </div>
+
+        <ThemeSelector />
 
       {/* Back to hub (when in module page) */}
       {firmaAtiva && modulActiv && (

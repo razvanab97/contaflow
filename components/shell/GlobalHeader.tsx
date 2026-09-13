@@ -21,7 +21,9 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath }: Pr
   return (
     <header style={{
       height: '52px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '14px',
-      padding: '0 28px', borderBottom: '1px solid var(--c-1a1a1a)',
+      padding: '0 28px', borderBottom: '1px solid var(--glass-surface-border)',
+      background: 'var(--glass-surface-bg)',
+      backdropFilter: 'var(--glass-surface-blur)', WebkitBackdropFilter: 'var(--glass-surface-blur)',
     }}>
       <div style={{ position: 'relative' }}>
         <button
@@ -44,8 +46,9 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath }: Pr
             <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
             <div style={{
               position: 'absolute', top: '38px', left: 0, zIndex: 61, minWidth: '210px',
-              background: 'var(--c-141414)', border: '1px solid var(--c-262626)', borderRadius: '10px',
-              padding: '6px', boxShadow: '0 12px 28px rgba(0,0,0,.45)',
+              background: 'var(--glass-elevated-bg)', border: '1px solid var(--glass-elevated-border)', borderRadius: '10px',
+              backdropFilter: 'var(--glass-elevated-blur)', WebkitBackdropFilter: 'var(--glass-elevated-blur)',
+              padding: '6px', boxShadow: 'var(--shadow-md)',
             }}>
               {firme.map(f => (
                 <Link
