@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 70, text: 'Publicare: update-ul pentru importul AI de extrase pe monede separate a fost împins la deploy și apare în istoricul din stânga jos' },
   { v: 69, text: 'Extras de cont: fallback suplimentar la citirea AI - dacă AI întoarce o singură listă mixtă de tranzacții, sistemul o separă local pe valute înainte de salvare (RON/EUR etc.)' },
   { v: 68, text: 'Extras de cont: butonul „Citire extras cu AI” împarte automat un PDF cu mai multe conturi/monede în extrase separate, de exemplu RON și EUR, fiecare cu tranzacțiile proprii' },
   { v: 67, text: 'Extras de cont: importul PDF acceptă acum și răspunsul AI cu structură pe conturi (`conturi: [...]`), iar dacă un PDF EUR/HUF/RON este pus pe cardul greșit apare mesaj clar cu moneda detectată' },
