@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { importInboxDocument } from '@/lib/inbox-facturi'
 
@@ -47,6 +48,14 @@ type GmailAttachment = {
   data?: string
   size?: number
   error?: { message?: string }
+}
+
+type SyncJob = {
+  id: string
+  source_id: string
+  firma_id: string
+  luna_id: string
+  luna: string
 }
 
 function decodeBase64Url(data: string) {
@@ -119,33 +128,28 @@ async function gmailJson<T>(url: string, accessToken: string): Promise<T> {
   return json as T
 }
 
-export async function POST(req: NextRequest) {
-  const { sourceId, firmaId, lunaId, luna, max = 10 } = await req.json().catch(() => ({}))
-  const cleanSourceId = String(sourceId || '')
-  const cleanFirmaId = String(firmaId || '')
-  const cleanLunaId = String(lunaId || '')
-  const cleanLuna = String(luna || '')
-  const maxMessages = Math.min(Math.max(Number(max) || 10, 1), 25)
-  if (!cleanSourceId || !cleanFirmaId || !cleanLunaId || !cleanLuna) {
-    return NextResponse.json({ error: 'sourceId/firmaId/lunaId/luna lipsesc' }, { status: 400 })
-  }
-
+async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
   const sb = getServiceSupabase()
-  const { data: source, error: sourceError } = await sb
-    .from('inbox_surse_email')
-    .select('id,firma_id,provider,eticheta,email,access_token,refresh_token,token_expires_at')
-    .eq('id', cleanSourceId)
-    .eq('firma_id', cleanFirmaId)
-    .eq('provider', 'gmail')
-    .single()
-
-  if (sourceError || !source) return NextResponse.json({ error: sourceError?.message || 'Sursa Gmail nu există' }, { status: 404 })
+  await sb.from('inbox_sync_jobs').update({
+    status: 'running',
+    started_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq('id', job.id)
 
   try {
+    const { data: source, error: sourceError } = await sb
+      .from('inbox_surse_email')
+      .select('id,firma_id,provider,eticheta,email,access_token,refresh_token,token_expires_at')
+      .eq('id', job.source_id)
+      .eq('firma_id', job.firma_id)
+      .eq('provider', 'gmail')
+      .single()
+    if (sourceError || !source) throw new Error(sourceError?.message || 'Sursa Gmail nu există')
+
     const accessToken = await refreshAccessToken(source as InboxSource)
     if (!accessToken) throw new Error('Conexiunea Gmail nu are access token. Reconectează contul Google.')
 
-    const since = previousMonthStartForGmail(cleanLuna)
+    const since = previousMonthStartForGmail(job.luna)
     const query = encodeURIComponent(`has:attachment filename:pdf after:${since.gmail}`)
     const list = await gmailJson<GmailListResponse>(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=${maxMessages}`,
@@ -178,9 +182,9 @@ export async function POST(req: NextRequest) {
           bytes,
           mediaType: 'application/pdf',
           originalName: fileName,
-          firmaId: cleanFirmaId,
-          lunaId: cleanLunaId,
-          luna: cleanLuna,
+          firmaId: job.firma_id,
+          lunaId: job.luna_id,
+          luna: job.luna,
           sourceLabel: `${source.eticheta}${source.email ? ` (${source.email})` : ''}`,
           requireDetectedFirm: true,
         }))
@@ -192,21 +196,98 @@ export async function POST(req: NextRequest) {
       connection_error: null,
       last_sync_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    }).eq('id', cleanSourceId)
+    }).eq('id', job.source_id)
 
-    return NextResponse.json({
+    const result = {
       messagesChecked: list.messages?.length || 0,
       pdfsFound,
       since: since.iso,
       imported,
-    })
+    }
+    const skipped = imported.filter(item => item.skipped).length
+    const duplicates = imported.filter(item => item.duplicate).length
+    const saved = imported.filter(item => !item.duplicate && !item.skipped).length
+    await sb.from('inbox_sync_jobs').update({
+      status: 'done',
+      messages_checked: result.messagesChecked,
+      pdfs_found: pdfsFound,
+      imported_count: saved,
+      duplicate_count: duplicates,
+      skipped_count: skipped,
+      since_date: since.iso,
+      result,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', job.id)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Sincronizarea Gmail a eșuat'
     await sb.from('inbox_surse_email').update({
       status: 'eroare',
       connection_error: message,
       updated_at: new Date().toISOString(),
-    }).eq('id', cleanSourceId)
-    return NextResponse.json({ error: message }, { status: 500 })
+    }).eq('id', job.source_id)
+    await sb.from('inbox_sync_jobs').update({
+      status: 'error',
+      error_message: message,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', job.id)
   }
+}
+
+export async function GET(req: NextRequest) {
+  const firmaId = req.nextUrl.searchParams.get('firmaId')
+  const sourceId = req.nextUrl.searchParams.get('sourceId')
+  if (!firmaId) return NextResponse.json({ error: 'firmaId lipsește' }, { status: 400 })
+
+  const sb = getServiceSupabase()
+  let query = sb
+    .from('inbox_sync_jobs')
+    .select('id,source_id,firma_id,luna_id,luna,status,messages_checked,pdfs_found,imported_count,duplicate_count,skipped_count,since_date,error_message,result,started_at,completed_at,created_at,updated_at')
+    .eq('firma_id', firmaId)
+    .order('created_at', { ascending: false })
+    .limit(12)
+  if (sourceId) query = query.eq('source_id', sourceId)
+  const { data, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ jobs: data || [] })
+}
+
+export async function POST(req: NextRequest) {
+  const { sourceId, firmaId, lunaId, luna, max = 10 } = await req.json().catch(() => ({}))
+  const cleanSourceId = String(sourceId || '')
+  const cleanFirmaId = String(firmaId || '')
+  const cleanLunaId = String(lunaId || '')
+  const cleanLuna = String(luna || '')
+  const maxMessages = Math.min(Math.max(Number(max) || 10, 1), 25)
+  if (!cleanSourceId || !cleanFirmaId || !cleanLunaId || !cleanLuna) {
+    return NextResponse.json({ error: 'sourceId/firmaId/lunaId/luna lipsesc' }, { status: 400 })
+  }
+
+  const sb = getServiceSupabase()
+  const { data: running } = await sb
+    .from('inbox_sync_jobs')
+    .select('id,status,created_at')
+    .eq('source_id', cleanSourceId)
+    .eq('firma_id', cleanFirmaId)
+    .in('status', ['queued', 'running'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+  if (running?.[0]) return NextResponse.json({ job: running[0], alreadyRunning: true })
+
+  const { data: job, error } = await sb.from('inbox_sync_jobs').insert({
+    source_id: cleanSourceId,
+    firma_id: cleanFirmaId,
+    luna_id: cleanLunaId,
+    luna: cleanLuna,
+    status: 'queued',
+    updated_at: new Date().toISOString(),
+  }).select('id,source_id,firma_id,luna_id,luna,status,created_at,updated_at').single()
+  if (error || !job) return NextResponse.json({ error: error?.message || 'Jobul nu a putut fi creat' }, { status: 500 })
+
+  after(async () => {
+    await runGmailSyncJob(job as SyncJob, maxMessages)
+  })
+
+  return NextResponse.json({ job })
 }

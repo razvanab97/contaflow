@@ -37,6 +37,21 @@ interface InboxSource {
   status: 'neconectat' | 'activ' | 'eroare' | 'pauzat'
   last_sync_at?: string | null
 }
+interface SyncJob {
+  id: string
+  source_id: string
+  status: 'queued' | 'running' | 'done' | 'error'
+  messages_checked?: number | null
+  pdfs_found?: number | null
+  imported_count?: number | null
+  duplicate_count?: number | null
+  skipped_count?: number | null
+  since_date?: string | null
+  error_message?: string | null
+  result?: { imported?: ImportResult[] } | null
+  created_at?: string | null
+  updated_at?: string | null
+}
 
 const SOURCES: { key:string; title:string; provider: InboxSource['provider']; desc:string; hint:string; placeholder:string }[] = [
   {
@@ -102,6 +117,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const [sourceError, setSourceError] = useState('')
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null)
   const [syncMessage, setSyncMessage] = useState('')
+  const [syncJobs, setSyncJobs] = useState<SyncJob[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
 
@@ -122,6 +138,30 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   }, [firma.id])
 
   useEffect(() => { loadSources() }, [loadSources])
+
+  const loadSyncJobs = useCallback(async () => {
+    const res = await fetch(`/api/inbox-facturi/gmail/sync?firmaId=${encodeURIComponent(firma.id)}`)
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return
+    const jobs: SyncJob[] = data.jobs || []
+    setSyncJobs(jobs)
+    const latestDone = jobs.find(job => job.status === 'done' && job.result?.imported)
+    if (latestDone?.result?.imported) {
+      setResults(latestDone.result.imported)
+      const since = latestDone.since_date ? ` din ${new Date(latestDone.since_date).toLocaleDateString('ro-RO')}` : ''
+      setSyncMessage(`Ultimul Gmail: ${latestDone.messages_checked || 0} emailuri verificate${since} până azi, ${latestDone.pdfs_found || 0} PDF-uri găsite, ${latestDone.imported_count || 0} importate, ${latestDone.duplicate_count || 0} duplicate, ${latestDone.skipped_count || 0} fără legătură cu firmele.`)
+      await load()
+      await loadSources()
+    }
+  }, [firma.id, load, loadSources])
+
+  useEffect(() => { loadSyncJobs() }, [loadSyncJobs])
+
+  useEffect(() => {
+    if (!syncJobs.some(job => job.status === 'queued' || job.status === 'running')) return
+    const id = window.setInterval(() => { loadSyncJobs() }, 5000)
+    return () => window.clearInterval(id)
+  }, [loadSyncJobs, syncJobs])
 
   async function upload(files: FileList) {
     if (!files.length) return
@@ -206,7 +246,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   async function syncGmail(source: InboxSource) {
     setSyncingSourceId(source.id)
     setError('')
-    setSyncMessage('')
+    setSyncMessage('Sincronizarea Gmail a pornit în fundal. Poți pleca de pe pagină; când revii, statusul se actualizează de aici.')
     setResults([])
     const res = await fetch('/api/inbox-facturi/gmail/sync', {
       method:'POST',
@@ -217,17 +257,24 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     if (!res.ok) {
       setError(data.error || 'Sincronizarea Gmail a eșuat')
     } else {
-      const imported: ImportResult[] = data.imported || []
-      setResults(imported)
-      const skipped = imported.filter(item => item.skipped).length
-      const noi = imported.filter(item => !item.duplicate && !item.skipped).length
-      const duplicate = imported.filter(item => item.duplicate).length
-      const since = data.since ? ` din ${new Date(data.since).toLocaleDateString('ro-RO')}` : ''
-      setSyncMessage(`Gmail: ${data.messagesChecked || 0} emailuri verificate${since} până azi, ${data.pdfsFound || 0} PDF-uri găsite, ${noi} importate, ${duplicate} duplicate, ${skipped} fără legătură cu firmele.`)
-      await load()
-      await loadSources()
+      setSyncMessage(data.alreadyRunning ? 'Sincronizarea Gmail rulează deja în fundal.' : 'Sincronizarea Gmail rulează în fundal. Poți pleca de pe pagină.')
+      await loadSyncJobs()
     }
     setSyncingSourceId(null)
+  }
+
+  function latestJobFor(sourceId: string | undefined) {
+    if (!sourceId) return null
+    return syncJobs.find(job => job.source_id === sourceId) || null
+  }
+
+  function jobText(job: SyncJob | null) {
+    if (!job) return ''
+    if (job.status === 'queued') return 'În coadă pentru sincronizare'
+    if (job.status === 'running') return 'Sincronizare în fundal...'
+    if (job.status === 'error') return `Eroare sync: ${job.error_message || 'verifică reconectarea'}`
+    const since = job.since_date ? ` din ${new Date(job.since_date).toLocaleDateString('ro-RO')}` : ''
+    return `Ultimul sync${since}: ${job.imported_count || 0} noi, ${job.duplicate_count || 0} duplicate, ${job.skipped_count || 0} sărite`
   }
 
   return (
@@ -239,6 +286,8 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
           const source = sourceFor(sourceDef.title)
           const active = source?.status === 'activ'
           const editing = editingSource === sourceDef.title
+          const job = latestJobFor(source?.id)
+          const jobRunning = job?.status === 'queued' || job?.status === 'running'
           return (
           <div key={sourceDef.key} style={{ background:'var(--c-111111)', border:`1px solid ${active ? 'rgba(74,222,128,.25)' : 'var(--c-222222)'}`, borderRadius:'12px', padding:'14px 16px' }}>
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
@@ -253,6 +302,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
             {source?.email && <div style={{ marginTop:'9px', fontSize:'11px', color:'var(--c-aaaaaa)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{source.email}</div>}
             <div style={{ marginTop:'9px', fontSize:'10px', color:'var(--c-666666)', lineHeight:1.45 }}>{sourceDef.hint}</div>
             {source?.last_sync_at && <div style={{ marginTop:'5px', fontSize:'10px', color:'var(--c-666666)' }}>Ultima conectare: {new Date(source.last_sync_at).toLocaleString('ro-RO')}</div>}
+            {job && <div style={{ marginTop:'5px', fontSize:'10px', color:job.status === 'error' ? 'var(--accent-red)' : jobRunning ? legibil(firma.culoare) : 'var(--c-666666)' }}>{jobText(job)}</div>}
             {editing ? (
               <div style={{ marginTop:'10px', display:'flex', flexDirection:'column', gap:'8px' }}>
                 <input value={sourceEmail} onChange={e => setSourceEmail(e.target.value)} placeholder={sourceDef.placeholder} style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
@@ -270,8 +320,8 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
                   </button>
                 )}
                 {sourceDef.provider === 'gmail' && source?.id && active && (
-                  <button onClick={() => syncGmail(source)} disabled={syncingSourceId === source.id} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid rgba(74,222,128,.35)', background:'rgba(74,222,128,.08)', color:'var(--accent-green)', cursor:'pointer', opacity:syncingSourceId === source.id ? .65 : 1 }}>
-                    {syncingSourceId === source.id ? 'Sincronizează...' : 'Sincronizează'}
+                  <button onClick={() => syncGmail(source)} disabled={syncingSourceId === source.id || jobRunning} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid rgba(74,222,128,.35)', background:'rgba(74,222,128,.08)', color:'var(--accent-green)', cursor:'pointer', opacity:(syncingSourceId === source.id || jobRunning) ? .65 : 1 }}>
+                    {jobRunning ? 'Rulează...' : syncingSourceId === source.id ? 'Pornește...' : 'Sincronizează'}
                   </button>
                 )}
                 <button onClick={() => startEditSource(sourceDef.title)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:`1px solid ${active ? 'rgba(74,222,128,.35)' : firma.culoare}`, background:'transparent', color:active?'var(--accent-green)':legibil(firma.culoare), cursor:'pointer' }}>
