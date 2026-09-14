@@ -16,6 +16,7 @@ interface Doc {
 interface ImportResult {
   duplicate: boolean
   targetFirma: string | null
+  source?: string | null
   doc?: { id:string; fisier_nume:string }
   extracted?: {
     incredereFirma?: string
@@ -97,6 +98,8 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const [sourceEmail, setSourceEmail] = useState('')
   const [sourceBusy, setSourceBusy] = useState(false)
   const [sourceError, setSourceError] = useState('')
+  const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null)
+  const [syncMessage, setSyncMessage] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
 
@@ -198,6 +201,31 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     window.location.href = `/api/inbox-facturi/gmail/start?${params.toString()}`
   }
 
+  async function syncGmail(source: InboxSource) {
+    setSyncingSourceId(source.id)
+    setError('')
+    setSyncMessage('')
+    setResults([])
+    const res = await fetch('/api/inbox-facturi/gmail/sync', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ sourceId: source.id, firmaId: firma.id, lunaId, luna }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setError(data.error || 'Sincronizarea Gmail a eșuat')
+    } else {
+      const imported: ImportResult[] = data.imported || []
+      setResults(imported)
+      const noi = imported.filter(item => !item.duplicate).length
+      const duplicate = imported.filter(item => item.duplicate).length
+      setSyncMessage(`Gmail: ${data.messagesChecked || 0} emailuri verificate, ${data.pdfsFound || 0} PDF-uri găsite, ${noi} importate, ${duplicate} duplicate.`)
+      await load()
+      await loadSources()
+    }
+    setSyncingSourceId(null)
+  }
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
@@ -235,6 +263,11 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
                 {sourceDef.provider === 'gmail' && (
                   <button onClick={() => connectGmail(sourceDef)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', cursor:'pointer' }}>
                     {active ? 'Reconectează Google' : 'Conectează Google'}
+                  </button>
+                )}
+                {sourceDef.provider === 'gmail' && source?.id && active && (
+                  <button onClick={() => syncGmail(source)} disabled={syncingSourceId === source.id} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid rgba(74,222,128,.35)', background:'rgba(74,222,128,.08)', color:'var(--accent-green)', cursor:'pointer', opacity:syncingSourceId === source.id ? .65 : 1 }}>
+                    {syncingSourceId === source.id ? 'Sincronizează...' : 'Sincronizează'}
                   </button>
                 )}
                 <button onClick={() => startEditSource(sourceDef.title)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:`1px solid ${active ? 'rgba(74,222,128,.35)' : firma.culoare}`, background:'transparent', color:active?'var(--accent-green)':legibil(firma.culoare), cursor:'pointer' }}>
@@ -306,13 +339,15 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
 
           {results.length > 0 && (
             <div style={{ marginTop:'14px', display:'flex', flexDirection:'column', gap:'6px' }}>
+              {syncMessage && <div style={{ padding:'9px 11px', borderRadius:'8px', background:'rgba(59,130,246,.08)', border:'1px solid rgba(59,130,246,.2)', fontSize:'11px', color:'var(--c-aaaaaa)' }}>{syncMessage}</div>}
               {results.map((res, idx) => (
                 <div key={idx} style={{ padding:'9px 11px', borderRadius:'8px', background:res.duplicate?'rgba(251,146,60,.08)':'rgba(74,222,128,.08)', border:`1px solid ${res.duplicate?'rgba(251,146,60,.25)':'rgba(74,222,128,.2)'}`, fontSize:'11px', color:'var(--c-aaaaaa)' }}>
-                  {res.duplicate ? 'Duplicat detectat' : 'Importat'} · {res.targetFirma || 'firmă necunoscută'} · {res.extracted?.incredereFirma || 'verifică'}{res.extracted?.furnizor ? ` · ${res.extracted.furnizor}` : ''}
+                  {res.duplicate ? 'Duplicat detectat' : 'Importat'} · {res.targetFirma || 'firmă necunoscută'} · {res.extracted?.incredereFirma || 'verifică'}{res.extracted?.furnizor ? ` · ${res.extracted.furnizor}` : ''}{res.source ? ` · ${res.source}` : ''}
                 </div>
               ))}
             </div>
           )}
+          {syncMessage && results.length === 0 && <div style={{ marginTop:'14px', padding:'9px 11px', borderRadius:'8px', background:'rgba(59,130,246,.08)', border:'1px solid rgba(59,130,246,.2)', fontSize:'11px', color:'var(--c-aaaaaa)' }}>{syncMessage}</div>}
           {error && <p style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'10px' }}>{error}</p>}
         </div>
       </div>
