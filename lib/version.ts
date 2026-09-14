@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 86, text: 'Inbox Facturi: sincronizarea Gmail scanează până la 100 de emailuri cu PDF, paginat, ca să prindă facturile din august precum ISO/Verk/Skoutz chiar dacă sunt mai jos în inbox' },
   { v: 85, text: 'Inbox Facturi: sincronizarea Gmail pornește ca job în fundal; poți pleca de pe pagină, iar statusul și rezultatele se recuperează când revii' },
   { v: 84, text: 'Inbox Facturi: sincronizarea Gmail nu mai importă PDF-uri fără legătură cu firmele; furnizorii externi rămân acceptați dacă firma apare ca beneficiar/cumpărător' },
   { v: 83, text: 'Inbox Facturi: sincronizarea Gmail caută mereu facturi din 01 ale lunii contabile precedente până în prezent, în funcție de luna de lucru deschisă' },

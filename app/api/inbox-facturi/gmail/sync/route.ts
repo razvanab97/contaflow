@@ -27,6 +27,7 @@ type TokenResponse = {
 
 type GmailListResponse = {
   messages?: { id: string; threadId?: string }[]
+  nextPageToken?: string
   error?: { message?: string }
 }
 
@@ -128,6 +129,22 @@ async function gmailJson<T>(url: string, accessToken: string): Promise<T> {
   return json as T
 }
 
+async function listGmailMessages(accessToken: string, query: string, maxMessages: number) {
+  const messages: { id: string; threadId?: string }[] = []
+  let pageToken = ''
+  while (messages.length < maxMessages) {
+    const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages')
+    url.searchParams.set('q', query)
+    url.searchParams.set('maxResults', String(Math.min(50, maxMessages - messages.length)))
+    if (pageToken) url.searchParams.set('pageToken', pageToken)
+    const page = await gmailJson<GmailListResponse>(url.toString(), accessToken)
+    messages.push(...(page.messages || []))
+    if (!page.nextPageToken) break
+    pageToken = page.nextPageToken
+  }
+  return messages
+}
+
 async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
   const sb = getServiceSupabase()
   await sb.from('inbox_sync_jobs').update({
@@ -150,15 +167,12 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
     if (!accessToken) throw new Error('Conexiunea Gmail nu are access token. Reconectează contul Google.')
 
     const since = previousMonthStartForGmail(job.luna)
-    const query = encodeURIComponent(`has:attachment filename:pdf after:${since.gmail}`)
-    const list = await gmailJson<GmailListResponse>(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=${maxMessages}`,
-      accessToken
-    )
+    const query = `has:attachment filename:pdf after:${since.gmail}`
+    const messages = await listGmailMessages(accessToken, query, maxMessages)
 
     const imported = []
     let pdfsFound = 0
-    for (const messageRef of list.messages || []) {
+    for (const messageRef of messages) {
       const msg = await gmailJson<GmailMessage>(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageRef.id)}?format=full`,
         accessToken
@@ -199,7 +213,7 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
     }).eq('id', job.source_id)
 
     const result = {
-      messagesChecked: list.messages?.length || 0,
+      messagesChecked: messages.length,
       pdfsFound,
       since: since.iso,
       imported,
@@ -254,12 +268,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { sourceId, firmaId, lunaId, luna, max = 10 } = await req.json().catch(() => ({}))
+  const { sourceId, firmaId, lunaId, luna, max = 100 } = await req.json().catch(() => ({}))
   const cleanSourceId = String(sourceId || '')
   const cleanFirmaId = String(firmaId || '')
   const cleanLunaId = String(lunaId || '')
   const cleanLuna = String(luna || '')
-  const maxMessages = Math.min(Math.max(Number(max) || 10, 1), 25)
+  const maxMessages = Math.min(Math.max(Number(max) || 100, 1), 100)
   if (!cleanSourceId || !cleanFirmaId || !cleanLunaId || !cleanLuna) {
     return NextResponse.json({ error: 'sourceId/firmaId/lunaId/luna lipsesc' }, { status: 400 })
   }
