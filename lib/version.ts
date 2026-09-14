@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 80, text: 'Inbox Facturi: cardurile Gmail 1, Gmail 2, iCloud și Oblio au acum buton Conectează/Configurează și salvează sursa pe firmă în inbox_surse_email' },
   { v: 79, text: 'Inbox Facturi: cardul Oblio apare lângă Gmail 1, Gmail 2 și iCloud, pregătit pentru conectare prin API token și preluare facturi/e-Factura' },
   { v: 78, text: 'Luna de lucru este afișată separat de perioada contabilă: pentru luna de lucru Septembrie apare „Contabilitate 1-31 August 2026 (lucrat în Septembrie 2026)”, iar luna următoare va afișa perioada contabilă următoare' },
   { v: 77, text: 'Facturi restante: lista afișează număr factură, furnizor, dată și sumă; când o factură este asociată în Extras de cont, factura restantă potrivită se marchează automat ca achitată' },

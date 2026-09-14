@@ -26,6 +26,49 @@ interface ImportResult {
     dataDocument?: string | null
   } | null
 }
+interface InboxSource {
+  id: string
+  provider: 'gmail' | 'icloud_imap' | 'oblio'
+  eticheta: string
+  email: string | null
+  status: 'neconectat' | 'activ' | 'eroare' | 'pauzat'
+  last_sync_at?: string | null
+}
+
+const SOURCES: { key:string; title:string; provider: InboxSource['provider']; desc:string; hint:string; placeholder:string }[] = [
+  {
+    key: 'gmail-1',
+    title: 'Gmail 1',
+    provider: 'gmail',
+    desc: 'OAuth citire facturi și atașamente',
+    hint: 'Salvăm contul aici; următorul pas tehnic este OAuth Google pentru citire automată.',
+    placeholder: 'email@gmail.com',
+  },
+  {
+    key: 'gmail-2',
+    title: 'Gmail 2',
+    provider: 'gmail',
+    desc: 'Al doilea cont, separat pe aceleași reguli',
+    hint: 'Se configurează separat, ca să putem ști din ce cont a venit factura.',
+    placeholder: 'al-doilea-cont@gmail.com',
+  },
+  {
+    key: 'icloud',
+    title: 'iCloud Mail',
+    provider: 'icloud_imap',
+    desc: 'IMAP cu parolă de aplicație Apple',
+    hint: 'În aplicație salvăm contul; parola de aplicație se pune server-side, nu se afișează în browser.',
+    placeholder: 'nume@icloud.com',
+  },
+  {
+    key: 'oblio',
+    title: 'Oblio',
+    provider: 'oblio',
+    desc: 'API token pentru facturi și documente e-Factura disponibile în Oblio',
+    hint: 'În aplicație salvăm contul Oblio; token-ul API se ține server-side.',
+    placeholder: 'cont@oblio.eu',
+  },
+]
 
 function isPreviewable(tip: string | null | undefined, nume: string) {
   if (tip === 'application/pdf' || nume.toLowerCase().endsWith('.pdf')) return 'pdf'
@@ -48,6 +91,12 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const [error, setError] = useState('')
   const [results, setResults] = useState<ImportResult[]>([])
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
+  const [sources, setSources] = useState<InboxSource[]>([])
+  const [sourcesLoaded, setSourcesLoaded] = useState(false)
+  const [editingSource, setEditingSource] = useState<string | null>(null)
+  const [sourceEmail, setSourceEmail] = useState('')
+  const [sourceBusy, setSourceBusy] = useState(false)
+  const [sourceError, setSourceError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
 
@@ -59,6 +108,15 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   }, [firma.id, lunaId])
 
   useEffect(() => { load() }, [load])
+
+  const loadSources = useCallback(async () => {
+    const res = await fetch(`/api/inbox-facturi/surse?firmaId=${encodeURIComponent(firma.id)}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) setSources(data.sources || [])
+    setSourcesLoaded(true)
+  }, [firma.id])
+
+  useEffect(() => { loadSources() }, [loadSources])
 
   async function upload(files: FileList) {
     if (!files.length) return
@@ -92,25 +150,83 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }
 
+  function sourceFor(title: string) {
+    return sources.find(source => source.eticheta === title)
+  }
+
+  function startEditSource(title: string) {
+    const current = sourceFor(title)
+    setEditingSource(title)
+    setSourceEmail(current?.email || '')
+    setSourceError('')
+  }
+
+  async function saveSource(sourceDef: typeof SOURCES[number]) {
+    setSourceBusy(true)
+    setSourceError('')
+    const res = await fetch('/api/inbox-facturi/surse', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        firmaId: firma.id,
+        provider: sourceDef.provider,
+        eticheta: sourceDef.title,
+        email: sourceEmail,
+        status: sourceEmail.trim() ? 'activ' : 'neconectat',
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setSourceBusy(false)
+    if (!res.ok) {
+      setSourceError(data.error || 'Sursa nu a putut fi salvată')
+      return
+    }
+    setSources(prev => {
+      const next = prev.filter(source => source.id !== data.source.id && source.eticheta !== data.source.eticheta)
+      return [...next, data.source]
+    })
+    setEditingSource(null)
+    setSourceEmail('')
+  }
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:'10px' }}>
-        {[
-          ['Gmail 1', 'OAuth citire facturi și atașamente'],
-          ['Gmail 2', 'Al doilea cont, separat pe aceleași reguli'],
-          ['iCloud Mail', 'IMAP cu parolă de aplicație Apple'],
-          ['Oblio', 'API token pentru facturi și documente e-Factura disponibile în Oblio'],
-        ].map(([title, desc]) => (
-          <div key={title} style={{ background:'var(--c-111111)', border:'1px solid var(--c-222222)', borderRadius:'12px', padding:'14px 16px' }}>
-            <div style={{ fontSize:'13px', fontWeight:700, color:'var(--c-eeeeee)', marginBottom:'4px' }}>{title}</div>
-            <div style={{ fontSize:'11px', color:'var(--c-888888)', lineHeight:1.45 }}>{desc}</div>
-            <div style={{ marginTop:'10px', display:'inline-flex', padding:'4px 8px', borderRadius:'999px', background:'var(--c-171717)', color:'var(--c-777777)', fontSize:'10px', fontWeight:700 }}>
-              pregătit pentru conectare
+        {SOURCES.map(sourceDef => {
+          const source = sourceFor(sourceDef.title)
+          const active = source?.status === 'activ'
+          const editing = editingSource === sourceDef.title
+          return (
+          <div key={sourceDef.key} style={{ background:'var(--c-111111)', border:`1px solid ${active ? 'rgba(74,222,128,.25)' : 'var(--c-222222)'}`, borderRadius:'12px', padding:'14px 16px' }}>
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
+              <div>
+                <div style={{ fontSize:'13px', fontWeight:700, color:'var(--c-eeeeee)', marginBottom:'4px' }}>{sourceDef.title}</div>
+                <div style={{ fontSize:'11px', color:'var(--c-888888)', lineHeight:1.45 }}>{sourceDef.desc}</div>
+              </div>
+              <div style={{ flexShrink:0, display:'inline-flex', padding:'4px 8px', borderRadius:'999px', background:active?'rgba(74,222,128,.12)':'var(--c-171717)', color:active?'var(--accent-green)':'var(--c-777777)', fontSize:'10px', fontWeight:700 }}>
+                {!sourcesLoaded ? '...' : active ? 'configurat' : 'neconectat'}
+              </div>
             </div>
+            {source?.email && <div style={{ marginTop:'9px', fontSize:'11px', color:'var(--c-aaaaaa)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{source.email}</div>}
+            <div style={{ marginTop:'9px', fontSize:'10px', color:'var(--c-666666)', lineHeight:1.45 }}>{sourceDef.hint}</div>
+            {editing ? (
+              <div style={{ marginTop:'10px', display:'flex', flexDirection:'column', gap:'8px' }}>
+                <input value={sourceEmail} onChange={e => setSourceEmail(e.target.value)} placeholder={sourceDef.placeholder} style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
+                <div style={{ display:'flex', gap:'7px' }}>
+                  <button onClick={() => saveSource(sourceDef)} disabled={sourceBusy} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', cursor:'pointer', opacity:sourceBusy?.6:1 }}>Salvează</button>
+                  <button onClick={() => setEditingSource(null)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-888888)', cursor:'pointer' }}>Anulează</button>
+                </div>
+                {sourceError && <div style={{ fontSize:'10px', color:'var(--accent-red)' }}>{sourceError}</div>}
+              </div>
+            ) : (
+              <button onClick={() => startEditSource(sourceDef.title)} style={{ marginTop:'10px', fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:`1px solid ${active ? 'rgba(74,222,128,.35)' : firma.culoare}`, background:'transparent', color:active?'var(--accent-green)':legibil(firma.culoare), cursor:'pointer' }}>
+                {active ? 'Configurează' : 'Conectează'}
+              </button>
+            )}
           </div>
-        ))}
+        )})}
       </div>
 
       <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'14px', overflow:'hidden' }}>
