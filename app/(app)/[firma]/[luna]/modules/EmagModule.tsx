@@ -443,6 +443,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
   const [summary, setSummary] = useState<EmagSummary|null>(null)
   const [docs, setDocs] = useState<EmagDoc[]>([])
   const [avizData, setAvizData] = useState<Record<string, AvizData>>({})
+  const [moduleTasks, setModuleTasks] = useState<TaskItem[]>(tasks)
   const [file, setFile] = useState<File|null>(null)
   const [drag, setDrag] = useState(false)
   const [amount, setAmount] = useState('')
@@ -453,8 +454,14 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
   const [pdfBusy, setPdfBusy] = useState(false)
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
+  const taskStatusRef = useRef<Record<string, boolean>>({})
   const r = rgb(firma.culoare)
   const INP: React.CSSProperties = { fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'9px 12px', color:'var(--c-bbbbbb)', outline:'none', width:'100%' }
+
+  useEffect(() => { setModuleTasks(tasks) }, [tasks])
+  useEffect(() => {
+    taskStatusRef.current = Object.fromEntries(moduleTasks.map(t => [t.key, t.completat]))
+  }, [moduleTasks])
 
   function togglePreview(id: string) {
     setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
@@ -466,11 +473,51 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
     if (res.ok) { setDocs(data.documents || []); setSummary(data.summary || null) }
   }, [lunaId])
 
+  const setTaskCompleted = useCallback((taskKey: string, completat: boolean) => {
+    if (!tasks.some(t => t.key === taskKey)) return
+    if (taskStatusRef.current[taskKey] === completat) return
+
+    taskStatusRef.current = { ...taskStatusRef.current, [taskKey]: completat }
+    setModuleTasks(prev => prev.map(t => t.key === taskKey ? { ...t, completat } : t))
+
+    fetch('/api/tasks/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lunaId, taskKey, completat }),
+    }).then(res => {
+      if (res.ok) return
+      taskStatusRef.current = { ...taskStatusRef.current, [taskKey]: !completat }
+      setModuleTasks(prev => prev.map(t => t.key === taskKey ? { ...t, completat: !completat } : t))
+    }).catch(() => {
+      taskStatusRef.current = { ...taskStatusRef.current, [taskKey]: !completat }
+      setModuleTasks(prev => prev.map(t => t.key === taskKey ? { ...t, completat: !completat } : t))
+    })
+  }, [lunaId, tasks])
+
+  const syncEmagTasks = useCallback((data: Record<string, AvizData>) => {
+    for (const task of tasks) {
+      if (task.key.startsWith('emag.aviz_')) setTaskCompleted(task.key, !!data[task.key])
+    }
+
+    for (const market of ['ro', 'bg', 'hu']) {
+      const avize = Object.entries(data)
+        .filter(([key]) => key.startsWith(`emag.aviz_${market}_`))
+        .map(([, value]) => value)
+      const invoices = avize.flatMap(aviz => aviz.invoices || [])
+      const hasInvoices = invoices.length > 0
+      const allInvoicesAttached = hasInvoices && invoices.every(inv => !!inv.factura_document_id)
+      setTaskCompleted(`emag.facturi_${market}`, allInvoicesAttached)
+    }
+  }, [setTaskCompleted, tasks])
+
   const loadAvize = useCallback(async () => {
     const res = await fetch(`/api/emag/aviz?lunaId=${encodeURIComponent(lunaId)}`)
     const data = await res.json().catch(() => ({}))
-    if (res.ok) setAvizData(data)
-  }, [lunaId])
+    if (res.ok) {
+      setAvizData(data)
+      syncEmagTasks(data)
+    }
+  }, [lunaId, syncEmagTasks])
 
   useEffect(() => { load(); loadAvize() }, [load, loadAvize])
 
@@ -513,14 +560,11 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
   }
 
   const sortedItems = [...checklistItems].sort((a, b) => (a.checklist_templates?.ordine||0) - (b.checklist_templates?.ordine||0))
-  const done = tasks.filter(t => t.completat).length
-  const total = tasks.length
-
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'20px' }}>
 
       {/* Task-uri bifabile */}
-      <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
+      <TaskSection tasks={moduleTasks} lunaId={lunaId} culoare={firma.culoare}/>
 
       {/* Avize de plată — încarcă PDF-ul, AI-ul extrage facturile de căutat + copy */}
       <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
@@ -532,7 +576,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
             {pdfBusy ? 'Se generează...' : 'Descarcă tot'}
           </button>
         </div>
-        {tasks.filter(t => t.key.startsWith('emag.aviz_')).map(t => (
+        {moduleTasks.filter(t => t.key.startsWith('emag.aviz_')).map(t => (
           <AvizUploadRow key={t.key} taskKey={t.key} label={t.label} descriere={t.descriere} data={avizData[t.key]} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} onChange={loadAvize}/>
         ))}
       </div>
