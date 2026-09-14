@@ -94,12 +94,12 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
       if (!res.ok) { setError(`Server error ${res.status}`); if (!silent) setLoading(false); return }
       const data = await res.json()
       if (!Array.isArray(data)) { setError('Format invalid'); if (!silent) setLoading(false); return }
-      // Sort unresolved first
+      // Pastreaza ordinea extrasului. Daca mutam tranzactiile rezolvate la final,
+      // workspace-ul "sare" dupa upload pentru ca lista se reordoneaza sub indexul curent.
       data.sort((a: Tx, b: Tx) => {
-        const aR = !!a.document_id || a.note === 'na'
-        const bR = !!b.document_id || b.note === 'na'
-        if (aR === bR) return new Date(a.data_tranzactie).getTime() - new Date(b.data_tranzactie).getTime()
-        return aR ? 1 : -1
+        const byDate = new Date(a.data_tranzactie).getTime() - new Date(b.data_tranzactie).getTime()
+        if (byDate !== 0) return byDate
+        return a.id.localeCompare(b.id)
       })
       setTxs(data)
       if (restoredActiveId.current) {

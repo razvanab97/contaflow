@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 75, text: 'Extras de cont: tranzacțiile rămân în ordinea extrasului după atașarea documentelor; lista nu mai mută automat rezolvatele la final, deci workspace-ul nu mai sare între poziții' },
   { v: 74, text: 'Extras de cont: poți selecta și încărca mai multe facturi pe aceeași tranzacție/comandă; documentele rămân grupate pe tranzacția bancară și sunt afișate cu referința comenzii' },
   { v: 73, text: 'Extras de cont: ce scrii în tab-ul Note rămâne păstrat local când schimbi tab-ul și revii, dar se resetează normal la refresh de pagină' },
   { v: 72, text: 'Extras de cont: după atașarea unui document, workspace-ul trece la tranzacția imediat următoare după ID-ul tranzacției curente, fără salturi peste 2-3 poziții când lista se reordonează' },
