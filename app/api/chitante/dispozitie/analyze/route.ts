@@ -1,11 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createHash } from 'node:crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
 function safePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || fallback
+}
+
+function normalize(value: unknown) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function money(value: unknown) {
+  const n = Number(value)
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null
+}
+
+function normalizeInvoiceDate(value: unknown) {
+  const raw = String(value || '').trim()
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (iso) return raw
+  const ro = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/)
+  if (!ro) return null
+  return `${ro[3]}-${ro[2].padStart(2, '0')}-${ro[1].padStart(2, '0')}`
+}
+
+function readStoredHash(value: unknown) {
+  return String(value || '').match(/\bHASH:([a-f0-9]{64})\b/i)?.[1]?.toLowerCase() || ''
 }
 
 function dispositionPurpose(extracted: { category?:string; supplier?:string; series?:string; invoiceNumber?:string; apartment?:string; invoiceDate?:string; representingPeriod?:string }) {
@@ -34,6 +62,47 @@ function dispositionUtility(extracted: { category?:string; supplier?:string }) {
   return ''
 }
 
+type ExistingInvoice = {
+  fisier_nume:string
+  furnizor:string|null
+  numar_document:string|null
+  suma:number|null
+  locatie:string|null
+  utilitate:string|null
+  data_document:string|null
+  fisier_marime:number|null
+  created_at:string|null
+}
+
+function duplicateReason(existing: ExistingInvoice, current: {
+  hash:string
+  size:number
+  invoiceNumber?:string
+  amount:number|null
+  utility:string
+  apartment?:string
+  invoiceDate:string|null
+  period?:string
+}) {
+  if (current.hash && current.size === Number(existing.fisier_marime) && readStoredHash(existing.furnizor) === current.hash)
+    return 'fisier_identic' as const
+
+  const sameInvoiceNumber = current.invoiceNumber && existing.numar_document && normalize(existing.numar_document) === normalize(current.invoiceNumber)
+  const sameAmount = current.amount != null && existing.suma != null && Math.abs(Number(existing.suma) - current.amount) < 0.01
+  const sameUtility = current.utility && existing.utilitate && normalize(existing.utilitate) === normalize(current.utility)
+  const sameApartment = current.apartment && existing.locatie && normalize(existing.locatie) === normalize(current.apartment)
+  const sameDate = current.invoiceDate && existing.data_document === current.invoiceDate
+  const samePeriod = current.period && normalize(existing.furnizor).includes(normalize(current.period))
+
+  if (sameInvoiceNumber && (sameUtility || sameAmount || sameApartment || sameDate))
+    return 'numar_factura' as const
+  if (sameAmount && sameUtility && (sameApartment || sameDate || samePeriod))
+    return 'detalii_factura' as const
+  if (sameAmount && sameApartment && samePeriod)
+    return 'suma_apartament_perioada' as const
+  return null
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!req.headers.get('content-type')?.includes('multipart/form-data'))
@@ -47,6 +116,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error:'Fișier sau date lipsă' }, { status:400 })
 
     const bytes = Buffer.from(await file.arrayBuffer())
+    const documentHash = createHash('sha256').update(bytes).digest('hex')
     const client = new Anthropic({ apiKey:process.env.ANTHROPIC_API_KEY })
     const source = file.type === 'application/pdf'
       ? { type:'document' as const, source:{ type:'base64' as const, media_type:'application/pdf' as const, data:bytes.toString('base64') } }
@@ -65,22 +135,37 @@ export async function POST(req: NextRequest) {
     try { extracted = match ? JSON.parse(match[0]) : {} } catch {}
     const purpose = dispositionPurpose(extracted)
     const sb = getServiceSupabase()
+    const utilitate = dispositionUtility(extracted)
+    const invoiceDate = normalizeInvoiceDate(extracted.invoiceDate)
 
-    // Verificare duplicat: aceeasi factura (dupa numar) sau aceeasi suma deja atasata la o dispozitie in aceasta luna
-    let duplicateWarning: { fisierNume:string; motiv:'numar_factura'|'suma' } | null = null
-    if (extracted.invoiceNumber || extracted.amount) {
+    let duplicateWarning: { fisierNume:string; motiv:'fisier_identic'|'numar_factura'|'detalii_factura'|'suma_apartament_perioada'; createdAt:string|null } | null = null
+    if (documentHash || extracted.invoiceNumber || extracted.amount) {
       const { data: existing } = await sb.from('documente')
-        .select('fisier_nume,numar_document,suma')
-        .eq('firma_id', firmaId).eq('luna_id', lunaId).eq('tip_document', 'factura')
+        .select('fisier_nume,furnizor,numar_document,suma,locatie,utilitate,data_document,fisier_marime,created_at')
+        .eq('firma_id', firmaId)
+        .eq('tip_document', 'factura')
         .like('fisier_path', '%/dispozitii-plata/atasamente/%')
-      const numarMatch = extracted.invoiceNumber
-        ? (existing || []).find(e => e.numar_document && String(e.numar_document) === String(extracted.invoiceNumber))
-        : undefined
-      const sumaMatch = !numarMatch && extracted.amount
-        ? (existing || []).find(e => e.suma != null && Math.abs(Number(e.suma) - Number(extracted.amount)) < 0.01)
-        : undefined
-      const match = numarMatch || sumaMatch
-      if (match) duplicateWarning = { fisierNume: match.fisier_nume, motiv: numarMatch ? 'numar_factura' : 'suma' }
+        .order('created_at', { ascending:false })
+        .limit(500)
+      const current = {
+        hash: documentHash,
+        size: bytes.length,
+        invoiceNumber: extracted.invoiceNumber,
+        amount: money(extracted.amount),
+        utility: utilitate,
+        apartment: extracted.apartment,
+        invoiceDate,
+        period: extracted.representingPeriod,
+      }
+      const duplicate = (existing || []).map(invoice => ({
+        invoice,
+        motiv: duplicateReason(invoice as ExistingInvoice, current),
+      })).find(match => match.motiv)
+      if (duplicate?.motiv) duplicateWarning = {
+        fisierNume: duplicate.invoice.fisier_nume,
+        motiv: duplicate.motiv,
+        createdAt: duplicate.invoice.created_at || null,
+      }
     }
 
     const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
@@ -88,14 +173,13 @@ export async function POST(req: NextRequest) {
     const path = `${firmaId}/${lunaId}/dispozitii-plata/atasamente/${safePart(number, 'draft')}/${fileName}`
     const { error:storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType:file.type })
     if (storageError) return NextResponse.json({ error:storageError.message }, { status:500 })
-    const utilitate = dispositionUtility(extracted)
     const { data:document, error } = await sb.from('documente').insert({
       firma_id:firmaId, luna_id:lunaId, modul:'acte_contabile', tip_document:'factura',
-      furnizor:`Atașament dispoziție ${number} | ${purpose}`,
+      furnizor:`Atașament dispoziție ${number} | ${purpose} | HASH:${documentHash}`,
       numar_document:String(extracted.invoiceNumber || ''), fisier_path:path, fisier_nume:fileName,
       fisier_tip:file.type, fisier_marime:bytes.length, in_zip:false,
-      suma: extracted.amount || null, locatie: extracted.apartment || null, utilitate: utilitate || null,
-    }).select('id,fisier_nume').single()
+      suma: extracted.amount || null, locatie: extracted.apartment || null, utilitate: utilitate || null, data_document: invoiceDate,
+    }).select('id,fisier_nume,furnizor,data_document,created_at,locatie,utilitate,suma').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error:error.message }, { status:500 }) }
     return NextResponse.json({ document, purpose, amount:extracted.amount || null, locatie:extracted.apartment || null, utilitate: utilitate || null, duplicateWarning })
   } catch (error) {

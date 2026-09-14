@@ -10,6 +10,13 @@ interface ExtractedInvoice {
   valoare?: number
 }
 
+function currencyForTaskKey(taskKey?: string | null) {
+  const key = String(taskKey || '').toLowerCase()
+  if (key.includes('_bg')) return 'EUR'
+  if (key.includes('_hu')) return 'HUF'
+  return 'RON'
+}
+
 function safePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || fallback
 }
@@ -57,7 +64,11 @@ export async function GET(req: NextRequest) {
     ? await sb.from('documente').select('id,fisier_nume').in('id', facturaDocIds)
     : { data: [] }
   const facturaDocById = new Map((facturaDocs || []).map(d => [d.id, d.fisier_nume]))
-  const facturiEnriched = (facturi || []).map(f => ({ ...f, factura_fisier_nume: f.factura_document_id ? facturaDocById.get(f.factura_document_id) || null : null }))
+  const facturiEnriched = (facturi || []).map(f => ({
+    ...f,
+    valuta: currencyForTaskKey(f.task_key),
+    factura_fisier_nume: f.factura_document_id ? facturaDocById.get(f.factura_document_id) || null : null,
+  }))
 
   const result: Record<string, { documentId:string; avizNumber:string; fisierNume:string; invoices:typeof facturiEnriched }> = {}
   for (const a of avize || []) {
@@ -115,6 +126,7 @@ export async function POST(req: NextRequest) {
     }
 
     const invoices = extracted.facturi || []
+    const valuta = currencyForTaskKey(taskKey)
     let inserted: unknown[] = []
     if (invoices.length) {
       const rows = invoices.map(inv => ({
@@ -130,7 +142,7 @@ export async function POST(req: NextRequest) {
       }))
       const { data: insertedRows, error: insError } = await sb.from('emag_avize_facturi').insert(rows).select('*')
       if (insError) return NextResponse.json({ error: insError.message }, { status: 500 })
-      inserted = insertedRows || []
+      inserted = (insertedRows || []).map(row => ({ ...row, valuta }))
     }
 
     return NextResponse.json({ ok: true, documentId: doc.id, avizNumber, fisierNume: fileName, invoices: inserted })

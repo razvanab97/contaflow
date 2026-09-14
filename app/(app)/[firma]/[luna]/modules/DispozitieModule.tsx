@@ -7,12 +7,55 @@ import { legibil, rgb, tint } from '@/lib/colors'
 interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:string; cui?:string|null; nrRegCom?:string|null; adresa?:string|null; judet?:string|null; tara?:string|null }
 interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[]; proprietari?: Proprietar[] }
 
-type DispDoc = { id:string; fisier_nume:string; numar_document:string; furnizor:string; suma?:number|null; locatie?:string|null; utilitate?:string|null; data?:Record<string,string|number>; attachments?:{id:string;fisier_nume:string}[] }
+type AttachmentDoc = { id:string; fisier_nume:string; furnizor?:string|null; data_document?:string|null; created_at?:string|null; locatie?:string|null; utilitate?:string|null; suma?:number|null }
+type DispDoc = { id:string; fisier_nume:string; numar_document:string; furnizor:string; suma?:number|null; locatie?:string|null; utilitate?:string|null; data?:Record<string,string|number>; attachments?:AttachmentDoc[] }
 type BuletinResult = { prenume:string; nume:string; serieCi:string; numarCi:string }
+type DuplicateWarning = {
+  fisierNume:string
+  motiv:'fisier_identic'|'numar_factura'|'detalii_factura'|'suma_apartament_perioada'
+  createdAt?:string|null
+}
 
 function dpLabel(doc: DispDoc): string {
-  const parts = [doc.utilitate, doc.locatie ? `ap. ${doc.locatie}` : null, doc.suma != null ? `${Number(doc.suma).toFixed(2)} RON` : null].filter(Boolean)
+  const parts = [doc.utilitate, doc.locatie ? `ap. ${doc.locatie}` : null, invoicePeriodLabel(doc), doc.suma != null ? `${Number(doc.suma).toFixed(2)} RON` : null].filter(Boolean)
   return parts.length ? parts.join(' · ') : String(doc.data?.purpose || doc.furnizor || doc.fisier_nume)
+}
+
+function roDate(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('ro-RO')
+}
+
+function periodFromFurnizor(value?: string | null) {
+  const text = String(value || '')
+  const match = text.match(/\bluna\s+([^|]+?)(?:\s+\|\s+HASH:|$)/i)
+  return match?.[1]?.replace(/\s+-\s*$/, '').trim() || ''
+}
+
+function invoicePeriodLabel(doc: DispDoc) {
+  const labels = new Set<string>()
+  for (const attachment of doc.attachments || []) {
+    const period = periodFromFurnizor(attachment.furnizor)
+    if (period) labels.add(`luna ${period}`)
+    else if (attachment.data_document) labels.add(`fact. ${roDate(attachment.data_document)}`)
+  }
+  return [...labels].slice(0, 2).join(' / ')
+}
+
+function duplicateReasonLabel(warning: DuplicateWarning) {
+  if (warning.motiv === 'fisier_identic') return 'fișier identic'
+  if (warning.motiv === 'numar_factura') return 'același număr de factură'
+  if (warning.motiv === 'detalii_factura') return 'aceeași sumă + utilitate + apartament/perioadă'
+  return 'aceeași sumă + apartament + perioadă'
+}
+
+function duplicateDateLabel(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return `, încărcată pe ${date.toLocaleDateString('ro-RO')}`
 }
 
 export default function DispozitieModule({ firma, firmeDisponibile, lunaId, tasks, proprietari = [] }: Props) {
@@ -33,7 +76,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
   const [identityNumber, setIdentityNumber] = useState('')
   const [preset, setPreset] = useState('')
   const [editId, setEditId] = useState('')
-  const [attachedInvoices, setAttachedInvoices] = useState<{id:string;fisier_nume:string}[]>([])
+  const [attachedInvoices, setAttachedInvoices] = useState<AttachmentDoc[]>([])
   const [invoiceBusy, setInvoiceBusy] = useState(false)
   const [duplicateWarnings, setDuplicateWarnings] = useState<string[]>([])
   const [deletingId, setDeletingId] = useState('')
@@ -55,6 +98,9 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
     try { setLocalProprietari(JSON.parse(localStorage.getItem(lsKey) || '[]')) } catch {}
   }, [lsKey])
   const INP: React.CSSProperties = { fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'9px 12px', color:'var(--c-bbbbbb)', outline:'none', width:'100%' }
+  const BLOCK: React.CSSProperties = { padding:'14px', border:'1px solid var(--c-1e1e1e)', borderRadius:'12px', background:'var(--c-101010)', marginTop:'12px' }
+  const BLOCK_TITLE: React.CSSProperties = { fontSize:'11px', fontWeight:800, letterSpacing:'.06em', textTransform:'uppercase', color:'var(--c-888888)', marginBottom:'10px' }
+  const SUBTLE: React.CSSProperties = { fontSize:'11px', color:'var(--c-666666)', marginTop:'2px' }
 
   const loadNumber = useCallback(async () => {
     const res = await fetch(`/api/chitante/dispozitie?lunaId=${encodeURIComponent(selectedLunaId)}`)
@@ -169,8 +215,8 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
       if (data.purpose) setPurpose(prev=>prev ? `${prev}; ${data.purpose}` : data.purpose)
       if (data.amount) setAmount(prev => String(Math.round(((Number(prev) || 0) + data.amount) * 100) / 100))
       if (data.duplicateWarning) {
-        const motiv = data.duplicateWarning.motiv === 'numar_factura' ? 'același număr de factură' : 'aceeași sumă'
-        newWarnings.push(`„${data.document?.fisier_nume || file.name}" pare identică cu „${data.duplicateWarning.fisierNume}" (${motiv}) — verifică să nu fie dublură.`)
+        const warning = data.duplicateWarning as DuplicateWarning
+        newWarnings.push(`„${data.document?.fisier_nume || file.name}" pare duplicat cu „${warning.fisierNume}" (${duplicateReasonLabel(warning)}${duplicateDateLabel(warning.createdAt)}) — verifică să nu fie factura de luna trecută sau deja salvată.`)
       }
     }
     if (newWarnings.length) setDuplicateWarnings(newWarnings)
@@ -204,34 +250,48 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
         </div>
 
         <div style={{ padding:'18px 22px' }}>
-          {documents.map(doc => (
-            <div key={doc.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'var(--c-161616)', borderRadius:'8px' }}>
-              <span style={{ flex:1, fontSize:'11px', color:'var(--c-cccccc)' }}>DP nr. {doc.numar_document} · {dpLabel(doc)}{doc.attachments?.length?` · ${doc.attachments.length} anexe`:''}</span>
-              <a href={`/api/chitante/dispozitie?download=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare) }}>↓</a>
-              <button onClick={()=>editDisposition(doc)} style={{ fontSize:'10px', color:'#8DB8FF', background:'transparent', border:'none', cursor:'pointer' }}>Modifică</button>
-              <button onClick={()=>deleteDisposition(doc)} disabled={deletingId===doc.id} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>{deletingId===doc.id?'...':'✕'}</button>
-            </div>
-          ))}
+          <div style={{ ...BLOCK, marginTop:0 }}>
+            <div style={BLOCK_TITLE}>Dispoziții emise</div>
+            {documents.length === 0 && <div style={{ fontSize:'12px', color:'var(--c-777777)' }}>Nu există încă dispoziții generate pentru luna selectată.</div>}
+            {documents.map(doc => (
+              <div key={doc.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', alignItems:'center', gap:'8px', padding:'9px 10px', marginBottom:'6px', background:'var(--c-161616)', borderRadius:'8px' }}>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:'11px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>DP nr. {doc.numar_document} · {dpLabel(doc)}</div>
+                  <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'2px' }}>{doc.attachments?.length?`${doc.attachments.length} anexe`: 'fără anexe'}</div>
+                </div>
+                <a href={`/api/chitante/dispozitie?download=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare), textDecoration:'none' }}>↓</a>
+                <button onClick={()=>editDisposition(doc)} style={{ fontSize:'10px', color:'#8DB8FF', background:'transparent', border:'none', cursor:'pointer' }}>Modifică</button>
+                <button onClick={()=>deleteDisposition(doc)} disabled={deletingId===doc.id} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>{deletingId===doc.id?'...':'✕'}</button>
+              </div>
+            ))}
+          </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px', marginTop:'12px' }}>
+          <div style={BLOCK}>
+            <div style={BLOCK_TITLE}>1. Firmă, număr și dată dispoziție</div>
+            <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'8px' }}>
             <select value={firmaId} onChange={e=>setFirmaId(e.target.value)} style={INP}>{firmeDisponibile.map(f=><option key={f.id} value={f.id}>{f.nume}</option>)}</select>
             <input readOnly value={number} placeholder="Număr automat" style={{ ...INP, color:legibil(firma.culoare), fontWeight:700 }}/>
             <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={INP}/>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr 70px 70px', gap:'8px', marginTop:'8px' }}>
+            </div>
+            <div style={SUBTLE}>Numărul se calculează automat pe luna selectată. Data poate fi schimbată pentru dispoziții emise retroactiv.</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr 70px 70px', gap:'8px', marginTop:'8px' }}>
             <input readOnly value={legal?.nrRegCom||''} placeholder="Reg. com." style={{ ...INP, color:'var(--c-888888)' }}/>
             <input readOnly value={legal?.cif||''} placeholder="CIF" style={{ ...INP, color:'var(--c-888888)' }}/>
             <input readOnly value={legal?.adresa||''} placeholder="Adresa" style={{ ...INP, color:'var(--c-888888)' }}/>
             <input readOnly value={legal?.judet||''} style={{ ...INP, color:'var(--c-888888)' }}/>
             <input readOnly value={legal?.tara||''} style={{ ...INP, color:'var(--c-888888)' }}/>
+            </div>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:'8px', marginTop:'8px' }}>
+
+          <div style={BLOCK}>
+            <div style={BLOCK_TITLE}>2. Beneficiar / proprietar</div>
+            <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:'8px' }}>
             <input value={owner} onChange={e=>setOwner(e.target.value)} placeholder="Proprietar / beneficiar implicit" style={INP}/>
             <input value={beneficiaryFunction} onChange={e=>setBeneficiaryFunction(e.target.value)} placeholder="Calitate / funcție" style={INP}/>
             <input value={identitySeries} onChange={e=>setIdentitySeries(e.target.value)} placeholder="Serie CI" style={INP}/>
             <input value={identityNumber} onChange={e=>setIdentityNumber(e.target.value)} placeholder="Număr CI" style={INP}/>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'2fr auto auto', gap:'8px', marginTop:'8px' }}>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'2fr auto', gap:'8px', marginTop:'8px' }}>
             <select value={preset} onChange={e=>applyPreset(e.target.value)} style={INP}>
               <option value="">{allProprietari.length ? 'Selectează proprietar...' : 'Niciun proprietar configurat'}</option>
               {allProprietari.map(p=>(
@@ -239,54 +299,68 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
               ))}
             </select>
             <button onClick={()=>buletinRef.current?.click()} disabled={buletinBusy} style={{ border:`1px solid ${firma.culoare}`, borderRadius:'8px', background:'transparent', color:legibil(firma.culoare), padding:'9px 14px', cursor:'pointer', fontSize:'12px', fontWeight:600, whiteSpace:'nowrap' }}>{buletinBusy?'AI citește...':'+ Buletin'}</button>
-            <button onClick={()=>invoiceRef.current?.click()} disabled={invoiceBusy} style={{ border:'1px solid var(--c-333333)', borderRadius:'8px', background:'var(--c-1a1a1a)', color:'var(--c-cccccc)', padding:'9px 14px', cursor:'pointer', fontSize:'12px', whiteSpace:'nowrap' }}>{invoiceBusy?'AI analizează...':'+ Facturi AI'}</button>
             <input ref={buletinRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files?.[0]&&analyzeBuletin(e.target.files[0])}/>
-            <input ref={invoiceRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files&&analyzeInvoices(e.target.files)}/>
+            </div>
+
+            {/* Proprietari locali salvați */}
+            {localProprietari.length>0 && (
+              <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>
+                {localProprietari.map(p=>(
+                  <span key={p.nume} style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:tint(rgb(firma.culoare),.12), color:legibil(firma.culoare) }}>
+                    {p.nume} · {p.serieCi} {p.numarCi}
+                    <button onClick={()=>deleteLocalProprietar(p.nume)} style={{ background:'none', border:'none', color:legibil(firma.culoare), cursor:'pointer', padding:'0 2px', fontSize:'10px', lineHeight:1 }}>✕</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Panou confirmare buletin */}
+            {buletinResult && (
+              <div style={{ marginTop:'10px', padding:'14px 16px', background:'var(--c-111111)', border:`1px solid ${firma.culoare}44`, borderRadius:'10px' }}>
+                <div style={{ fontSize:'11px', fontWeight:700, color:legibil(firma.culoare), marginBottom:'10px' }}>Proprietar extras din buletin — confirmă și salvează</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 80px 80px', gap:'8px', marginBottom:'10px' }}>
+                  <input value={bPrenume} onChange={e=>setBPrenume(e.target.value)} placeholder="Prenume" style={INP}/>
+                  <input value={bNume} onChange={e=>setBNume(e.target.value)} placeholder="Nume familie" style={INP}/>
+                  <input value={bSerie} onChange={e=>setBSerie(e.target.value.toUpperCase())} placeholder="Serie CI" style={INP}/>
+                  <input value={bNumar} onChange={e=>setBNumar(e.target.value)} placeholder="Nr. CI" style={INP}/>
+                </div>
+                <div style={{ display:'flex', gap:'8px' }}>
+                  <button onClick={saveProprietar} disabled={!bPrenume&&!bNume} style={{ border:'none', borderRadius:'8px', background:firma.culoare, color:'var(--c-ffffff)', padding:'8px 16px', cursor:'pointer', fontSize:'12px', fontWeight:700 }}>Salvează preset</button>
+                  <button onClick={()=>setBuletinResult(null)} style={{ border:'1px solid var(--c-333333)', borderRadius:'8px', background:'transparent', color:'var(--c-888888)', padding:'8px 12px', cursor:'pointer', fontSize:'12px' }}>Anulează</button>
+                </div>
+              </div>
+            )}
           </div>
-          {attachedInvoices.length>0 && <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>{attachedInvoices.map(i=><span key={i.id} style={{ fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:'var(--c-1a1a1a)', color:'var(--c-888888)' }}>{i.fisier_nume}</span>)}</div>}
-          {duplicateWarnings.length>0 && (
-            <div style={{ marginTop:'8px', padding:'8px 12px', borderRadius:'8px', background:'light-dark(rgba(220,38,38,.2), rgba(248,113,113,.08))', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))', display:'flex', flexDirection:'column', gap:'4px' }}>
-              {duplicateWarnings.map((w,i)=>(
-                <span key={i} style={{ fontSize:'11px', color:'var(--accent-red)' }}>⚠ {w}</span>
-              ))}
-            </div>
-          )}
 
-          {/* Proprietari locali salvați */}
-          {localProprietari.length>0 && (
-            <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>
-              {localProprietari.map(p=>(
-                <span key={p.nume} style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:tint(rgb(firma.culoare),.12), color:legibil(firma.culoare) }}>
-                  {p.nume} · {p.serieCi} {p.numarCi}
-                  <button onClick={()=>deleteLocalProprietar(p.nume)} style={{ background:'none', border:'none', color:legibil(firma.culoare), cursor:'pointer', padding:'0 2px', fontSize:'10px', lineHeight:1 }}>✕</button>
-                </span>
-              ))}
+          <div style={BLOCK}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', marginBottom:'10px' }}>
+              <div>
+                <div style={BLOCK_TITLE}>3. Facturi atașate și verificare AI</div>
+                <div style={SUBTLE}>AI citește suma, apartamentul, utilitatea și luna/data facturii, apoi verifică duplicatele inclusiv din lunile trecute.</div>
+              </div>
+              <button onClick={()=>invoiceRef.current?.click()} disabled={invoiceBusy} style={{ border:'1px solid var(--c-333333)', borderRadius:'8px', background:'var(--c-1a1a1a)', color:'var(--c-cccccc)', padding:'9px 14px', cursor:'pointer', fontSize:'12px', whiteSpace:'nowrap' }}>{invoiceBusy?'AI analizează...':'+ Facturi AI'}</button>
+              <input ref={invoiceRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files&&analyzeInvoices(e.target.files)}/>
             </div>
-          )}
+            {attachedInvoices.length>0 ? <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>{attachedInvoices.map(i=><span key={i.id} style={{ fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:'var(--c-1a1a1a)', color:'var(--c-888888)' }}>{i.fisier_nume}{periodFromFurnizor(i.furnizor) ? ` · luna ${periodFromFurnizor(i.furnizor)}` : i.data_document ? ` · fact. ${roDate(i.data_document)}` : ''}</span>)}</div> : <div style={{ fontSize:'12px', color:'var(--c-777777)' }}>Nu sunt facturi atașate încă.</div>}
+            {duplicateWarnings.length>0 && (
+              <div style={{ marginTop:'8px', padding:'8px 12px', borderRadius:'8px', background:'light-dark(rgba(220,38,38,.2), rgba(248,113,113,.08))', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))', display:'flex', flexDirection:'column', gap:'4px' }}>
+                {duplicateWarnings.map((w,i)=>(
+                  <span key={i} style={{ fontSize:'11px', color:'var(--accent-red)' }}>⚠ {w}</span>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {/* Panou confirmare buletin */}
-          {buletinResult && (
-            <div style={{ marginTop:'10px', padding:'14px 16px', background:'var(--c-111111)', border:`1px solid ${firma.culoare}44`, borderRadius:'10px' }}>
-              <div style={{ fontSize:'11px', fontWeight:700, color:legibil(firma.culoare), marginBottom:'10px' }}>Proprietar extras din buletin — confirmă și salvează</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 80px 80px', gap:'8px', marginBottom:'10px' }}>
-                <input value={bPrenume} onChange={e=>setBPrenume(e.target.value)} placeholder="Prenume" style={INP}/>
-                <input value={bNume} onChange={e=>setBNume(e.target.value)} placeholder="Nume familie" style={INP}/>
-                <input value={bSerie} onChange={e=>setBSerie(e.target.value.toUpperCase())} placeholder="Serie CI" style={INP}/>
-                <input value={bNumar} onChange={e=>setBNumar(e.target.value)} placeholder="Nr. CI" style={INP}/>
-              </div>
-              <div style={{ display:'flex', gap:'8px' }}>
-                <button onClick={saveProprietar} disabled={!bPrenume&&!bNume} style={{ border:'none', borderRadius:'8px', background:firma.culoare, color:'var(--c-ffffff)', padding:'8px 16px', cursor:'pointer', fontSize:'12px', fontWeight:700 }}>Salvează preset</button>
-                <button onClick={()=>setBuletinResult(null)} style={{ border:'1px solid var(--c-333333)', borderRadius:'8px', background:'transparent', color:'var(--c-888888)', padding:'8px 12px', cursor:'pointer', fontSize:'12px' }}>Anulează</button>
-              </div>
-            </div>
-          )}
-          <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 2fr auto', gap:'8px', marginTop:'8px' }}>
+          <div style={BLOCK}>
+            <div style={BLOCK_TITLE}>4. Date finale și generare</div>
+            <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 2fr auto', gap:'8px' }}>
             <input value={beneficiary} onChange={e=>setBeneficiary(e.target.value)} placeholder="Beneficiar" style={INP}/>
             <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Suma RON" style={INP}/>
             <input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="Scopul plății" style={INP}/>
             <div style={{ display:'flex', gap:'6px' }}>
               {editId && <button onClick={()=>{setEditId('');setAttachedInvoices([]);setPreset('');loadNumber()}} style={{ border:'1px solid var(--c-333333)', borderRadius:'8px', background:'transparent', color:'var(--c-888888)', padding:'9px 12px', cursor:'pointer', fontSize:'12px' }}>Anulează</button>}
               <button onClick={generate} disabled={!(beneficiary||owner)||!amount||!purpose} style={{ border:'none', borderRadius:'8px', background:firma.culoare, color:'var(--c-ffffff)', padding:'9px 14px', cursor:'pointer', fontSize:'12px', fontWeight:600, opacity:!(beneficiary||owner)||!amount||!purpose?.5:1 }}>{editId?'Salvează':'Generează PDF'}</button>
+            </div>
             </div>
           </div>
           {error && <p style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'8px' }}>{error}</p>}

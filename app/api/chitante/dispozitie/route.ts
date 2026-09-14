@@ -37,6 +37,10 @@ function safe(value: unknown, fallback = '') {
   return String(value || fallback).replace(/[^\x20-\x7E]/g, '')
 }
 
+function readStoredHash(value: unknown) {
+  return String(value || '').match(/\bHASH:([a-f0-9]{64})\b/i)?.[1] || ''
+}
+
 async function getNextNumber(lunaId: string) {
   const sb = getServiceSupabase()
   const { data, error } = await sb
@@ -126,7 +130,7 @@ export async function GET(req: NextRequest) {
     const { data:attachmentDocuments, error:attachmentError } = documents?.length
       ? await sb
           .from('documente')
-          .select('id,fisier_nume,numar_document,furnizor')
+          .select('id,fisier_nume,numar_document,furnizor,data_document,created_at,locatie,utilitate,suma')
           .eq('luna_id', lunaId)
           .eq('modul', 'acte_contabile')
           .eq('tip_document', 'factura')
@@ -372,7 +376,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: databaseError.message }, { status: 500 })
     }
     if (attachmentIds.length) {
-      await sb.from('documente').update({ furnizor:`Atașament DP ${disposition.id} nr. ${dispositionNumber} | ${safe(body.purpose)}`, numar_document:dispositionNumber, in_zip:true }).in('id', attachmentIds).eq('firma_id', firmaId).eq('luna_id', lunaId)
+      const { data: attHashes } = await sb.from('documente').select('id,furnizor').in('id', attachmentIds).eq('firma_id', firmaId).eq('luna_id', lunaId)
+      for (const att of attHashes || []) {
+        const hash = readStoredHash(att.furnizor)
+        await sb.from('documente')
+          .update({ furnizor:`Atașament DP ${disposition.id} nr. ${dispositionNumber} | ${safe(body.purpose)}${hash ? ` | HASH:${hash}` : ''}`, numar_document:dispositionNumber, in_zip:true })
+          .eq('id', att.id)
+          .eq('firma_id', firmaId)
+          .eq('luna_id', lunaId)
+      }
       const { data: attDocs } = await sb.from('documente').select('fisier_path,fisier_nume').in('id', attachmentIds).eq('firma_id', firmaId)
       const zip = new JSZip()
       zip.file(fileName, bytes)

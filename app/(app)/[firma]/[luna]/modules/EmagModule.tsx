@@ -9,7 +9,7 @@ interface ChecklistItem { id:string; completat:boolean; checklist_templates?:{ t
 interface EmagDoc { id:string; fisier_nume:string; category:string; effect:'cheltuiala'|'reducere'; amount:number; invoiceNumber:string; date:string; notes:string }
 interface EmagSummary { bankReceipts:number; bankPayments:number; bankCashflow:number; emagExpenses:number; emagReductions:number; emagNetCost:number }
 interface OldDoc { id:string; fisier_nume:string; tip_document?:string }
-interface AvizFactura { id:string; categorie:string; id_document:string; serie_document:string; numar_cautare:string; data_document:string; valoare:number; copiat:boolean; factura_document_id:string|null; factura_fisier_nume:string|null }
+interface AvizFactura { id:string; categorie:string; id_document:string; serie_document:string; numar_cautare:string; data_document:string; valoare:number; valuta?:string; copiat:boolean; factura_document_id:string|null; factura_fisier_nume:string|null }
 interface AvizData { documentId:string; avizNumber:string; fisierNume:string; invoices:AvizFactura[] }
 
 interface Props {
@@ -20,6 +20,19 @@ interface Props {
 }
 
 function money(v: number) { return new Intl.NumberFormat('ro-RO', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(v||0) }
+function avizCurrency(taskKey?: string) {
+  const key = String(taskKey || '').toLowerCase()
+  if (key.includes('_bg')) return 'EUR'
+  if (key.includes('_hu')) return 'HUF'
+  return 'RON'
+}
+function moneyCurrency(v: number, currency: string) {
+  const isHuf = currency === 'HUF'
+  return `${new Intl.NumberFormat('ro-RO', {
+    minimumFractionDigits: isHuf ? 0 : 2,
+    maximumFractionDigits: isHuf ? 0 : 2,
+  }).format(v || 0)} ${currency}`
+}
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 // Tipul nu e mereu disponibil in listele mai vechi — deducem si dupa extensia din nume
 function isPreviewable(tip: string | undefined, nume: string): 'pdf' | 'image' | null {
@@ -153,8 +166,8 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
   )
 }
 
-function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
-  inv: AvizFactura; firmaId:string; lunaId:string; culoare:string; onChange:()=>void
+function FacturaRow({ inv, firmaId, lunaId, culoare, currency, onChange }: {
+  inv: AvizFactura; firmaId:string; lunaId:string; culoare:string; currency:string; onChange:()=>void
 }) {
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
@@ -202,7 +215,7 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, onChange }: {
   return (
     <div>
       <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px', flexWrap:'wrap' }}>
-        <span style={{ flex:1, minWidth:'140px', fontSize:'12px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {money(inv.valoare)} RON</span>
+        <span style={{ flex:1, minWidth:'140px', fontSize:'12px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {moneyCurrency(inv.valoare, inv.valuta || currency)}</span>
         <input
           defaultValue={inv.numar_cautare}
           onBlur={e => renameNumarCautare(e.target.value.trim())}
@@ -318,6 +331,8 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
   const [preview, setPreview] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
+  const currency = avizCurrency(taskKey)
+  const avizTotal = data?.invoices.reduce((sum, inv) => sum + (Number(inv.valoare) || 0), 0) || 0
 
   async function upload(file: File) {
     setUploading(true); setError('')
@@ -358,7 +373,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
           <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>{label}</div>
           {descriere && <div style={{ fontSize:'11px', color:'var(--c-777777)', marginTop:'2px' }}>{descriere}</div>}
         </div>
-        {data && <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', flexShrink:0 }}>{data.invoices.length} factur{data.invoices.length===1?'ă':'i'}</span>}
+        {data && <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', flexShrink:0 }}>{data.invoices.length} factur{data.invoices.length===1?'ă':'i'} · {moneyCurrency(avizTotal, currency)}</span>}
         <svg width="14" height="14" fill="none" stroke="var(--c-555555)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0, transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s' }}>
           <path d="M6 9l6 6 6-6"/>
         </svg>
@@ -395,7 +410,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
                   {data.invoices.map(inv => (
-                    <FacturaRow key={inv.id} inv={inv} firmaId={firmaId} lunaId={lunaId} culoare={culoare} onChange={onChange}/>
+                    <FacturaRow key={inv.id} inv={inv} firmaId={firmaId} lunaId={lunaId} culoare={culoare} currency={currency} onChange={onChange}/>
                   ))}
                 </div>
               )}
