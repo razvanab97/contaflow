@@ -1,12 +1,14 @@
 'use client'
 import { useState, useRef } from 'react'
 import { legibil, tint } from '@/lib/colors'
+import CopyButton from '@/components/CopyButton'
 
 interface Extras { id: string; nr_tranzactii: number; nr_documentate: number; procesat_ai?: boolean; sold_final?: number; valuta?: string; pdf_path?: string | null; pdf_nume?: string | null }
 
-export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras, culoare, onDone }: {
+export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras, culoare, onDone, unlockCode }: {
   valuta: string; extrasId?: string; firmaId: string; lunaId: string
   extras: Extras | null; culoare: string; onDone: () => void
+  unlockCode?: string
 }) {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -80,6 +82,16 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
         <p style={{ margin: '0 0 14px', fontSize: '11px', lineHeight: 1.5, color: 'var(--c-777777)' }}>
           Încarcă extrasul PDF, iar AI identifică automat moneda și tranzacțiile.
         </p>
+      )}
+
+      {unlockCode && (
+        <div style={{ display:'flex', alignItems:'center', gap:'8px', margin:'0 0 14px', padding:'9px 11px', border:'1px solid var(--c-2a2a2a)', borderRadius:'9px', background:'var(--c-111111)' }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:'10px', fontWeight:700, color:'var(--c-666666)', textTransform:'uppercase', letterSpacing:'.08em' }}>Cod deblocare PDF</div>
+            <div style={{ fontSize:'13px', fontWeight:700, color:'var(--c-ffffff)', fontFamily:'monospace', marginTop:'2px' }}>{unlockCode}</div>
+          </div>
+          <CopyButton value={unlockCode} />
+        </div>
       )}
 
       {extras?.nr_tranzactii ? (

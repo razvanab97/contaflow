@@ -65,6 +65,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const restored = useRef(false)
   const positionRestored = useRef(false)
   const c = firma.culoare || '#F27A1A'
+  const extrasUnlockCode = firma.slug === 'ab-homes-invest' ? '48867823' : undefined
   const workspaceKey = `contaflow:extras-workspace:${lunaId}`
 
   const load = useCallback(async (silent = false) => {
@@ -313,25 +314,25 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           {/* Conturi existente din BD */}
           {extrase.map(e => (
             <UploadExtras key={e.id} extrasId={e.id} valuta={e.valuta||'RON'} firmaId={firma.id} lunaId={lunaId}
-              extras={e} culoare={c} onDone={load}/>
+              extras={e} culoare={c} onDone={load} unlockCode={extrasUnlockCode}/>
           ))}
           {/* Slot gol RON dacă nu există */}
           {!extrase.some(e => e.valuta==='RON') && (
-            <UploadExtras key="ron-empty" valuta="RON" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load}/>
+            <UploadExtras key="ron-empty" valuta="RON" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load} unlockCode={extrasUnlockCode}/>
           )}
           {/* Slot gol EUR dacă nu există */}
           {!extrase.some(e => e.valuta==='EUR') && (
-            <UploadExtras key="eur-empty" valuta="EUR" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load}/>
+            <UploadExtras key="eur-empty" valuta="EUR" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load} unlockCode={extrasUnlockCode}/>
           )}
           {/* Sloturi noi pentru conturi adiționale */}
           {Array.from({length:newSlots}).map((_,i) => (
             <UploadExtras key={`new-${i}`} valuta="AUTO" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c}
-              onDone={()=>{setNewSlots(s=>Math.max(0,s-1));load()}}/>
+              onDone={()=>{setNewSlots(s=>Math.max(0,s-1));load()}} unlockCode={extrasUnlockCode}/>
           ))}
         </div>
         <div style={{ display:'flex', gap:'12px', marginBottom:'40px', alignItems:'stretch' }}>
           <div style={{ flex:1 }}>
-            <UploadExtras valuta="AUTO" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load}/>
+            <UploadExtras valuta="AUTO" firmaId={firma.id} lunaId={lunaId} extras={null} culoare={c} onDone={load} unlockCode={extrasUnlockCode}/>
           </div>
           <button
             onClick={()=>setNewSlots(s=>s+1)}
