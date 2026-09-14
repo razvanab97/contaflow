@@ -3,6 +3,10 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 74, text: 'Extras de cont: poți selecta și încărca mai multe facturi pe aceeași tranzacție/comandă; documentele rămân grupate pe tranzacția bancară și sunt afișate cu referința comenzii' },
+  { v: 73, text: 'Extras de cont: ce scrii în tab-ul Note rămâne păstrat local când schimbi tab-ul și revii, dar se resetează normal la refresh de pagină' },
+  { v: 72, text: 'Extras de cont: după atașarea unui document, workspace-ul trece la tranzacția imediat următoare după ID-ul tranzacției curente, fără salturi peste 2-3 poziții când lista se reordonează' },
+  { v: 71, text: 'Extras de cont: referința internă afișată și copiată în workspace-ul tranzacției este scurtată la numărul util introdus manual, de exemplu 435138 în loc de 435138;261' },
   { v: 70, text: 'Publicare: update-ul pentru importul AI de extrase pe monede separate a fost împins la deploy și apare în istoricul din stânga jos' },
   { v: 69, text: 'Extras de cont: fallback suplimentar la citirea AI - dacă AI întoarce o singură listă mixtă de tranzacții, sistemul o separă local pe valute înainte de salvare (RON/EUR etc.)' },
   { v: 68, text: 'Extras de cont: butonul „Citire extras cu AI” împarte automat un PDF cu mai multe conturi/monede în extrase separate, de exemplu RON și EUR, fiecare cu tranzacțiile proprii' },

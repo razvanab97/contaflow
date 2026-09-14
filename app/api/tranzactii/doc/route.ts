@@ -46,10 +46,16 @@ function filenamePart(value: string, fallback = '') {
   return normalized || fallback
 }
 
+function shortReference(value?: string | null) {
+  const firstPart = String(value || '').split(';')[0]?.trim() || ''
+  const numeric = firstPart.match(/\d+/)?.[0]
+  return numeric || firstPart
+}
+
 export async function POST(req: NextRequest) {
   try {
     const fd = await req.formData()
-    const file = fd.get('file') as File
+    const files = fd.getAll('file').filter((item): item is File => item instanceof File && item.size > 0)
     const txId = fd.get('txId') as string
     const firmaId = fd.get('firmaId') as string
     const lunaId = fd.get('lunaId') as string
@@ -58,13 +64,13 @@ export async function POST(req: NextRequest) {
     const numDoc = (fd.get('numDoc') as string) || ''
     const mode = (fd.get('mode') as string) || 'replace'
 
-    if (!file || !txId || !firmaId || !lunaId)
+    if (!files.length || !txId || !firmaId || !lunaId)
       return NextResponse.json({ error: 'Date lipsă pentru asocierea documentului' }, { status: 400 })
-    if (!ALLOWED_TYPES.has(file.type))
+    if (files.some(file => !ALLOWED_TYPES.has(file.type)))
       return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG și PNG' }, { status: 400 })
 
     const txRes = await fetch(
-      `${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}&firma_id=eq.${encodeURIComponent(firmaId)}&select=id,extras_id,document_id,data_tranzactie,descriere_curatata,descriere,suma`,
+      `${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}&firma_id=eq.${encodeURIComponent(firmaId)}&select=id,extras_id,document_id,data_tranzactie,descriere_curatata,descriere,suma,valuta,referinta`,
       { headers: H }
     )
     const txs = txRes.ok ? await txRes.json() : []
@@ -72,53 +78,65 @@ export async function POST(req: NextRequest) {
     if (!tx?.id)
       return NextResponse.json({ error: 'Tranzacția nu a fost găsită pentru firma selectată' }, { status: 404 })
 
-    let buf: Buffer = Buffer.from(await file.arrayBuffer())
-    if (file.type === 'application/pdf') buf = await stampPdfWithDate(buf, tx.data_tranzactie)
-    const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
-    const details = furnizor || tx.descriere_curatata || tx.descriere || 'document'
-    const renamedFile = [
-      filenamePart(tx.data_tranzactie, 'fara_data'),
-      filenamePart(Number(tx.suma).toFixed(2), 'fara_suma'),
-      filenamePart(details, 'document'),
-      numDoc ? filenamePart(numDoc) : '',
-    ].filter(Boolean).join('_') + `.${extension}`
-    const path = `${firmaId}/${lunaId}/tx/${txId}_${Date.now()}_${renamedFile}`
+    const orderRef = shortReference(tx.referinta)
+    const documents: { docId: string; filename: string }[] = []
+    let primaryDocId = tx.document_id as string | null
 
-    const upRes = await fetch(`${SB}/storage/v1/object/documente/${path}`, {
-      method: 'POST',
-      headers: { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': file.type, 'x-upsert': 'true' },
-      body: new Uint8Array(buf)
-    })
-    if (!upRes.ok) return NextResponse.json({ error: 'Storage: ' + await upRes.text() }, { status: 500 })
+    for (const [idx, file] of files.entries()) {
+      let buf: Buffer = Buffer.from(await file.arrayBuffer())
+      if (file.type === 'application/pdf') buf = await stampPdfWithDate(buf, tx.data_tranzactie)
+      const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
+      const details = furnizor || tx.descriere_curatata || tx.descriere || 'document'
+      const renamedFile = [
+        filenamePart(tx.data_tranzactie, 'fara_data'),
+        filenamePart(Number(tx.suma).toFixed(2), 'fara_suma'),
+        filenamePart(tx.valuta || '', ''),
+        orderRef ? filenamePart(`comanda_${orderRef}`) : '',
+        filenamePart(details, 'document'),
+        numDoc ? filenamePart(numDoc) : '',
+        files.length > 1 ? `anexa_${idx + 1}` : '',
+      ].filter(Boolean).join('_') + `.${extension}`
+      const path = `${firmaId}/${lunaId}/tx/${txId}_${Date.now()}_${idx}_${renamedFile}`
 
-    const documentBody = {
-      firma_id: firmaId, luna_id: lunaId, tranzactie_id: txId,
-      modul: 'extras', tip_document: tip, furnizor, numar_document: numDoc,
-      fisier_path: path, fisier_nume: renamedFile, fisier_tip: file.type,
-      fisier_marime: buf.length, in_zip: true
-    }
-    // mode='add': tranzactia poate avea mai multe facturi - nu suprascrie documentul existent, adauga unul nou
-    const shouldReplace = mode === 'replace' && tx.document_id
-    const docRes = await fetch(
-      shouldReplace
-        ? `${SB}/rest/v1/documente?id=eq.${encodeURIComponent(tx.document_id)}`
-        : `${SB}/rest/v1/documente`,
-      {
-        method: shouldReplace ? 'PATCH' : 'POST',
-        headers: { ...H, 'Prefer': 'return=representation' },
-        body: JSON.stringify(documentBody)
+      const upRes = await fetch(`${SB}/storage/v1/object/documente/${path}`, {
+        method: 'POST',
+        headers: { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': file.type, 'x-upsert': 'true' },
+        body: new Uint8Array(buf)
+      })
+      if (!upRes.ok) return NextResponse.json({ error: 'Storage: ' + await upRes.text() }, { status: 500 })
+
+      const documentBody = {
+        firma_id: firmaId, luna_id: lunaId, tranzactie_id: txId,
+        modul: 'extras', tip_document: tip, furnizor, numar_document: numDoc || orderRef,
+        fisier_path: path, fisier_nume: renamedFile, fisier_tip: file.type,
+        fisier_marime: buf.length, in_zip: true
       }
-    )
-    const docs = await docRes.json()
-    const doc = Array.isArray(docs) ? docs[0] : docs
-    if (!docRes.ok || !doc?.id) return NextResponse.json({ error: 'DB doc: ' + JSON.stringify(doc) }, { status: 500 })
+      // mode='add': tranzactia poate avea mai multe facturi - nu suprascrie documentul existent, adauga unul nou.
+      // La incarcare multipla initiala, primul document devine principal, restul raman atasate aceleiasi tranzactii/comenzi.
+      const shouldReplace = mode === 'replace' && !!tx.document_id && idx === 0
+      const docRes = await fetch(
+        shouldReplace
+          ? `${SB}/rest/v1/documente?id=eq.${encodeURIComponent(tx.document_id)}`
+          : `${SB}/rest/v1/documente`,
+        {
+          method: shouldReplace ? 'PATCH' : 'POST',
+          headers: { ...H, 'Prefer': 'return=representation' },
+          body: JSON.stringify(documentBody)
+        }
+      )
+      const docs = await docRes.json()
+      const doc = Array.isArray(docs) ? docs[0] : docs
+      if (!docRes.ok || !doc?.id) return NextResponse.json({ error: 'DB doc: ' + JSON.stringify(doc) }, { status: 500 })
+      if (!primaryDocId) primaryDocId = doc.id
+      documents.push({ docId: doc.id, filename: renamedFile })
+    }
 
-    // La adaugare suplimentara, document_id (documentul "principal") se seteaza doar daca tranzactia nu avea deja unul
-    if (mode !== 'add' || !tx.document_id) {
+    // La adaugare suplimentara, document_id (documentul "principal") se seteaza doar daca tranzactia nu avea deja unul.
+    if (primaryDocId && (mode !== 'add' || !tx.document_id)) {
       const updateRes = await fetch(`${SB}/rest/v1/tranzactii?id=eq.${encodeURIComponent(txId)}`, {
         method: 'PATCH',
         headers: { ...H, 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ document_id: doc.id, note: null, status_note: null })
+        body: JSON.stringify({ document_id: primaryDocId, note: null, status_note: null })
       })
       if (!updateRes.ok)
         return NextResponse.json({ error: 'Tranzacția nu a putut fi actualizată' }, { status: 500 })
@@ -137,7 +155,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ ok: true, docId: doc.id, filename: renamedFile })
+    return NextResponse.json({ ok: true, docId: documents[0]?.docId, filename: documents[0]?.filename, documents, count: documents.length })
   } catch (error) {
     const message = String(error)
     const status = message.includes('Content-Type') ? 400 : 500

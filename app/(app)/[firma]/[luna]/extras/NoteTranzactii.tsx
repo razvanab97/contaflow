@@ -10,15 +10,21 @@ interface Tx {
 
 const QUICK_NOTES = ['Aștept factura', 'Nu am primit factura', 'Am trimis email furnizor', 'De verificat cu clientul']
 
-export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culoare, onSetStatusNote }: {
+export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culoare, onSetStatusNote, draft, onDraftChange }: {
   txs: Tx[]; firmaNume: string; lunaId: string; lunaLabel: string; culoare: string
   onSetStatusNote: (id: string, statusNote: string|null) => void
+  draft?: { search: string; pickedId: string|null; customText: string }
+  onDraftChange?: (draft: { search: string; pickedId: string|null; customText: string }) => void
 }) {
-  const [search, setSearch] = useState('')
-  const [pickedId, setPickedId] = useState<string|null>(null)
-  const [customText, setCustomText] = useState('')
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState('')
+  const search = draft?.search ?? ''
+  const pickedId = draft?.pickedId ?? null
+  const customText = draft?.customText ?? ''
+
+  function setDraft(patch: Partial<{ search: string; pickedId: string|null; customText: string }>) {
+    onDraftChange?.({ search, pickedId, customText, ...patch })
+  }
 
   const noted = txs.filter(t => t.status_note)
     .sort((a, b) => new Date(a.data_tranzactie).getTime() - new Date(b.data_tranzactie).getTime())
@@ -33,9 +39,7 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
 
   function saveNote(id: string, note: string) {
     onSetStatusNote(id, note)
-    setPickedId(null)
-    setCustomText('')
-    setSearch('')
+    setDraft({ pickedId: null, customText: '', search: '' })
   }
 
   async function downloadPdf() {
@@ -72,14 +76,14 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
       <div style={{ marginBottom: '24px', position: 'relative' }}>
         <input
           value={search}
-          onChange={e => { setSearch(e.target.value); setPickedId(null) }}
+          onChange={e => setDraft({ search: e.target.value, pickedId: null })}
           placeholder="Caută tranzacție după descriere sau sumă..."
           style={{ width: '100%', maxWidth: '460px', padding: '10px 14px', borderRadius: '9px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-eeeeee)', fontSize: '13px', outline: 'none' }}
         />
         {results.length > 0 && !pickedId && (
           <div style={{ marginTop: '8px', maxWidth: '460px', border: '1px solid var(--c-242424)', borderRadius: '9px', overflow: 'hidden' }}>
             {results.map(t => (
-              <button key={t.id} onClick={() => { setPickedId(t.id); setSearch('') }} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', width: '100%', padding: '9px 12px', border: 'none', borderBottom: '1px solid var(--c-1e1e1e)', background: 'var(--c-141414)', color: 'var(--c-dddddd)', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}>
+              <button key={t.id} onClick={() => setDraft({ pickedId: t.id, search: '' })} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', width: '100%', padding: '9px 12px', border: 'none', borderBottom: '1px solid var(--c-1e1e1e)', background: 'var(--c-141414)', color: 'var(--c-dddddd)', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.data_tranzactie} · {t.descriere_curatata || t.descriere}</span>
                 <span style={{ fontWeight: 700, flexShrink: 0, color: t.tip === 'credit' ? 'var(--accent-green)' : 'var(--accent-red)' }}>{t.tip === 'credit' ? '+' : '-'}{Number(t.suma).toFixed(2)} {t.valuta}</span>
               </button>
@@ -95,7 +99,7 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
               <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-ffffff)' }}>{picked.descriere_curatata || picked.descriere}</p>
               <p style={{ fontSize: '11px', color: 'var(--c-888888)', marginTop: '2px' }}>{picked.data_tranzactie} · {picked.tip === 'credit' ? '+' : '-'}{Number(picked.suma).toFixed(2)} {picked.valuta}</p>
             </div>
-            <button onClick={() => setPickedId(null)} style={{ border: 'none', background: 'transparent', color: 'var(--c-666666)', cursor: 'pointer', fontSize: '13px' }}>✕</button>
+            <button onClick={() => setDraft({ pickedId: null })} style={{ border: 'none', background: 'transparent', color: 'var(--c-666666)', cursor: 'pointer', fontSize: '13px' }}>✕</button>
           </div>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
             {QUICK_NOTES.map(n => (
@@ -105,7 +109,7 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
           <div style={{ display: 'flex', gap: '8px' }}>
             <input
               value={customText}
-              onChange={e => setCustomText(e.target.value)}
+              onChange={e => setDraft({ customText: e.target.value })}
               placeholder="Sau text personalizat..."
               onKeyDown={e => { if (e.key === 'Enter' && customText.trim()) saveNote(picked.id, customText.trim()) }}
               style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-111111)', color: 'var(--c-eeeeee)', fontSize: '12px', outline: 'none' }}

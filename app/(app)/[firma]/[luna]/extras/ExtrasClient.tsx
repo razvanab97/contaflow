@@ -31,6 +31,12 @@ function isPreviewable(nume: string): 'pdf' | 'image' | null {
   return null
 }
 
+function shortReference(value: string | null) {
+  const firstPart = String(value || '').split(';')[0]?.trim() || ''
+  const numeric = firstPart.match(/\d+/)?.[0]
+  return numeric || firstPart
+}
+
 interface Tx {
   id: string; extras_id: string; data_tranzactie: string
   descriere: string; descriere_curatata: string
@@ -63,6 +69,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const [activeTxIndex, setActiveTxIndex] = useState(0)
   const [exportingDocs, setExportingDocs] = useState(false)
   const [exportError, setExportError] = useState('')
+  const [noteDraft, setNoteDraft] = useState({ search: '', pickedId: null as string|null, customText: '' })
   const restoredActiveId = useRef<string|null>(null)
   const pendingFocusId = useRef<string|null>(null)
   const restoredScrollY = useRef(0)
@@ -257,10 +264,12 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   }
 
   const onUploadSuccess = useCallback((uploadedTxId: string) => {
-    // Mergi pur si simplu la urmatoarea tranzactie in ordine, nu la urmatoarea "nerezolvata"
-    const nextIdx = activeTxIndex + 1
-    if (nextIdx < filtered.length && filtered[nextIdx].id !== uploadedTxId) {
-      pendingFocusId.current = filtered[nextIdx].id
+    const uploadedIndex = filtered.findIndex(tx => tx.id === uploadedTxId)
+    const nextIdx = uploadedIndex >= 0 ? uploadedIndex + 1 : activeTxIndex + 1
+    const nextTx = filtered[nextIdx]
+    if (nextTx && nextTx.id !== uploadedTxId) {
+      setActiveTxIndex(nextIdx)
+      pendingFocusId.current = nextTx.id
     }
     load(true)
   }, [activeTxIndex, filtered, load])
@@ -290,7 +299,16 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         {pageTab === 'facturi' ? (
           <FacturiModule firma={firma} lunaId={lunaId} tasks={facturiTasks} section="facturi-chitanta"/>
         ) : pageTab === 'note' ? (
-          <NoteTranzactii txs={txs} firmaNume={firma.nume} lunaId={lunaId} lunaLabel={lunaLabel} culoare={c} onSetStatusNote={updateStatusNote}/>
+          <NoteTranzactii
+            txs={txs}
+            firmaNume={firma.nume}
+            lunaId={lunaId}
+            lunaLabel={lunaLabel}
+            culoare={c}
+            onSetStatusNote={updateStatusNote}
+            draft={noteDraft}
+            onDraftChange={setNoteDraft}
+          />
         ) : (
         <>
         {scopedTxs.length > 0 && (
@@ -484,13 +502,16 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
   const cat = tx.categorie ? CAT[tx.categorie]||CAT.altele : CAT.altele
   const data = new Date(tx.data_tranzactie).toLocaleDateString('ro-RO',{day:'2-digit',month:'short',year:'2-digit'})
   const r = `${parseInt(culoare.slice(1,3),16)},${parseInt(culoare.slice(3,5),16)},${parseInt(culoare.slice(5,7),16)}`
+  const docsForTx = tx.documenteToate?.length ? tx.documenteToate : tx.documente ? [tx.documente] : []
+  const orderRef = shortReference(tx.referinta)
 
   async function upload(files: FileList) {
     if (!files.length) return
     setUploading(true)
     setUploadError('')
     const fd = new FormData()
-    fd.append('file', files[0]); fd.append('txId', tx.id)
+    Array.from(files).forEach(file => fd.append('file', file))
+    fd.append('txId', tx.id)
     fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
     fd.append('tip', tip); fd.append('furnizor', furnizor); fd.append('numDoc', numDoc)
     const res = await fetch('/api/tranzactii/doc', { method:'POST', body:fd })
@@ -542,7 +563,7 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
             </button>
             <button onClick={onNA} style={{ fontSize:'11px', fontWeight:600, padding:'5px 9px', borderRadius:'7px', border:'1px solid var(--c-2a2a2a)', background:'var(--c-1a1a1a)', color:'var(--c-888888)', cursor:'pointer' }}>N/A</button>
           </>}
-          {isDone&&<span style={{ fontSize:'11px', fontWeight:600, padding:'5px 12px', borderRadius:'7px', background:'rgba(74,222,128,.15)', color:'var(--accent-green)' }}>{tx.documente?.tip_document||'doc'} ✓</span>}
+          {isDone&&<span style={{ fontSize:'11px', fontWeight:600, padding:'5px 12px', borderRadius:'7px', background:'rgba(74,222,128,.15)', color:'var(--accent-green)' }}>{docsForTx.length > 1 ? `${docsForTx.length} doc` : tx.documente?.tip_document||'doc'} ✓</span>}
           {isNA&&<button onClick={onClearNA} style={{ fontSize:'11px', fontWeight:600, padding:'5px 9px', borderRadius:'7px', border:'1px solid var(--c-2a2a2a)', background:'var(--c-1a1a1a)', color:'var(--c-666666)', cursor:'pointer' }}>Anulează N/A</button>}
         </div>
       </div>
@@ -575,7 +596,7 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
             style={{ border:`1.5px dashed ${drag?culoare:'var(--c-2a2a2a)'}`, borderRadius:'10px', padding:'18px', textAlign:'center', cursor:'pointer', background:drag?`${tint(r,.06)}`:'var(--c-0d0d0d)' }}>
             {uploading?<p style={{fontSize:'12px',color:'var(--c-777777)'}}>Se încarcă...</p>:<p style={{fontSize:'12px',fontWeight:600,color:'var(--c-888888)'}}>drag & drop sau click · PDF / JPG / PNG</p>}
           </div>
-          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files&&upload(e.target.files)}/>
+          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files&&upload(e.target.files)}/>
           {uploadError && <p style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'8px' }}>{uploadError}</p>}
         </div>
       )}
@@ -583,11 +604,13 @@ function TxCard({ tx, firmaId, lunaId, culoare, onNA, onClearNA, onDone }: {
       {isDone&&tx.documente&&(
         <div style={{ padding:'7px 16px 9px', borderTop:'1px solid rgba(74,222,128,.1)', background:'rgba(74,222,128,.03)', display:'flex', alignItems:'center', gap:'8px' }}>
           <svg width="13" height="13" fill="none" stroke="var(--accent-green)" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
-          {tx.documente.furnizor
-            ? <span style={{fontSize:'13px',fontWeight:600,color:'var(--accent-green)'}}>{tx.documente.furnizor}</span>
-            : <span style={{fontSize:'12px',fontWeight:500,color:'var(--accent-green)'}}>{tx.documente.fisier_nume}</span>
+          {docsForTx.length > 1
+            ? <span style={{fontSize:'13px',fontWeight:600,color:'var(--accent-green)'}}>{docsForTx.length} documente{orderRef ? ` · comanda/ref. ${orderRef}` : ''}</span>
+            : tx.documente.furnizor
+              ? <span style={{fontSize:'13px',fontWeight:600,color:'var(--accent-green)'}}>{tx.documente.furnizor}</span>
+              : <span style={{fontSize:'12px',fontWeight:500,color:'var(--accent-green)'}}>{tx.documente.fisier_nume}</span>
           }
-          {tx.documente.furnizor&&<span style={{fontSize:'11px',color:'var(--c-777777)'}}>· {tx.documente.fisier_nume}</span>}
+          {docsForTx.length <= 1 && tx.documente.furnizor&&<span style={{fontSize:'11px',color:'var(--c-777777)'}}>· {tx.documente.fisier_nume}</span>}
           {tx.documente.numar_document&&<span style={{fontSize:'11px',color:'var(--c-888888)', fontWeight:600}}>· {tx.documente.numar_document}</span>}
           <a href={`/api/tranzactii/document?id=${encodeURIComponent(tx.documente.id)}`} style={{ marginLeft:'auto', fontSize:'11px', fontWeight:700, color:'var(--accent-green)', textDecoration:'none' }}>Descarcă ↓</a>
         </div>
@@ -784,6 +807,8 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   const cat = tx.categorie ? CAT[tx.categorie]||CAT.altele : CAT.altele
   const data = new Date(tx.data_tranzactie).toLocaleDateString('ro-RO',{day:'2-digit',month:'long',year:'numeric'})
   const r = `${parseInt(culoare.slice(1,3),16)},${parseInt(culoare.slice(3,5),16)},${parseInt(culoare.slice(5,7),16)}`
+  const docsForTx = tx.documenteToate?.length ? tx.documenteToate : tx.documente ? [tx.documente] : []
+  const orderRef = shortReference(tx.referinta)
 
   // Reset fields when active transaction changes
   useEffect(() => {
@@ -813,7 +838,8 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     if (!files.length) return
     setAddBusy(true); setAddError('')
     const fd = new FormData()
-    fd.append('file', files[0]); fd.append('txId', tx.id)
+    Array.from(files).forEach(file => fd.append('file', file))
+    fd.append('txId', tx.id)
     fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
     fd.append('tip', 'factura'); fd.append('mode', 'add')
     const res = await fetch('/api/tranzactii/doc', { method:'POST', body:fd })
@@ -827,7 +853,8 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     setUploading(true)
     setUploadError('')
     const fd = new FormData()
-    fd.append('file', files[0]); fd.append('txId', tx.id)
+    Array.from(files).forEach(file => fd.append('file', file))
+    fd.append('txId', tx.id)
     fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
     fd.append('tip', tip); fd.append('furnizor', furnizor); fd.append('numDoc', numDoc)
     const res = await fetch('/api/tranzactii/doc', { method:'POST', body:fd })
@@ -907,8 +934,8 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
               <div>
                 <div style={{ fontSize:'10px', fontWeight:600, color:'var(--c-777777)', textTransform:'uppercase', marginBottom:'3px' }}>Referință internă</div>
                 <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                  <div style={{ fontSize:'15px', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace', wordBreak:'break-all' }}>{tx.referinta}</div>
-                  <CopyButton value={tx.referinta} />
+                  <div style={{ fontSize:'15px', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace', wordBreak:'break-all' }}>{shortReference(tx.referinta)}</div>
+                  <CopyButton value={shortReference(tx.referinta)} />
                 </div>
               </div>
             )}
@@ -956,11 +983,15 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
               <svg width="22" height="22" fill="none" stroke="var(--accent-green)" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
             </div>
             <h3 style={{ fontSize:'16px', fontWeight:700, color:'var(--c-ffffff)', marginBottom:'8px' }}>Tranzacție Rezolvată</h3>
-            <p style={{ fontSize:'13px', color:'var(--c-888888)', marginBottom:'20px' }}>Documentul a fost asociat cu succes în arhivă.</p>
+            <p style={{ fontSize:'13px', color:'var(--c-888888)', marginBottom:'10px' }}>Documentul a fost asociat cu succes în arhivă.</p>
+            <div style={{ display:'inline-flex', alignItems:'center', gap:'8px', padding:'6px 10px', borderRadius:'999px', background:'var(--c-101010)', border:'1px solid var(--c-202020)', color:'var(--c-aaaaaa)', fontSize:'11px', fontWeight:700, marginBottom:'18px' }}>
+              {orderRef ? `Comanda/ref. ${orderRef}` : 'Aceeași tranzacție'}
+              <span style={{ color:'var(--accent-green)' }}>· {docsForTx.length || 1} document{(docsForTx.length || 1) === 1 ? '' : 'e'}</span>
+            </div>
             
             {/* Associated Doc(s) Details — o tranzactie poate avea mai multe facturi atasate */}
             <div style={{ display:'flex', flexDirection:'column', gap:'6px', textAlign:'left', marginBottom:'16px' }}>
-              {(tx.documenteToate?.length ? tx.documenteToate : tx.documente ? [tx.documente] : []).map(doc => {
+              {docsForTx.map((doc, docIndex) => {
                 const kind = isPreviewable(doc.fisier_nume)
                 const open = previewDocIds.has(doc.id)
                 return (
@@ -968,6 +999,9 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                     <div style={{ background:'var(--c-0d0d0d)', border:'1px solid var(--c-1a1a1a)', borderRadius:'10px', padding:'10px 14px', display:'flex', alignItems:'center', gap:'10px' }}>
                       <svg width="14" height="14" fill="none" stroke="var(--accent-green)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
                       <div style={{ flex:1, minWidth:0 }}>
+                        {docsForTx.length > 1 && (
+                          <div style={{ fontSize:'10px', color:'var(--c-777777)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'3px' }}>Factura {docIndex + 1} din {docsForTx.length}</div>
+                        )}
                         <input
                           defaultValue={doc.fisier_nume}
                           onBlur={e => {
@@ -1006,7 +1040,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
 
             {showAddMore && (
               <div style={{ textAlign:'left', padding:'14px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-1e1e1e)', borderRadius:'10px' }}>
-                <div style={{ fontSize:'11px', color:'var(--c-666666)', marginBottom:'9px' }}>Adaugă încă o factură pentru această plată — link sau fișier. Poți repeta pentru fiecare factură.</div>
+                <div style={{ fontSize:'11px', color:'var(--c-666666)', marginBottom:'9px' }}>Adaugă una sau mai multe facturi pentru aceeași plată/comandă — link sau fișiere selectate împreună.</div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginBottom:'10px' }}>
                   <input value={addUrl} onChange={e=>setAddUrl(e.target.value)} placeholder="Lipește linkul facturii PDF" style={INP}/>
                   <button onClick={addMoreUrl} disabled={addBusy||!addUrl} style={{ ...BTN, background:culoare, color:'var(--c-ffffff)', opacity:(addBusy||!addUrl)?.5:1 }}>
@@ -1020,9 +1054,9 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                   onDrop={e=>{e.preventDefault();setAddDrag(false);e.dataTransfer.files.length&&addMoreFile(e.dataTransfer.files)}}
                   style={{ border:`1.5px dashed ${addDrag?culoare:'var(--c-2a2a2a)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background:addDrag?`${tint(r,.06)}`:'var(--c-0d0d0d)' }}
                 >
-                  <p style={{ fontSize:'12px', color: addBusy ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>{addBusy ? 'Se adaugă...' : 'sau adaugă fișier'}</p>
+                  <p style={{ fontSize:'12px', color: addBusy ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>{addBusy ? 'Se adaugă...' : 'sau adaugă fișiere'}</p>
                 </div>
-                <input ref={addFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>{ if (e.target.files?.length) addMoreFile(e.target.files); e.target.value='' }}/>
+                <input ref={addFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>{ if (e.target.files?.length) addMoreFile(e.target.files); e.target.value='' }}/>
                 {addError && <p style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'8px' }}>{addError}</p>}
               </div>
             )}
@@ -1122,12 +1156,12 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
               ) : (
                 <div>
                   <svg width="20" height="20" fill="none" stroke={culoare} strokeWidth="2.5" viewBox="0 0 24 24" style={{ margin:'0 auto 8px' }}><path d="M12 4v16m8-8H4"/></svg>
-                  <p style={{fontSize:'12px',fontWeight:600,color:'var(--c-888888)',marginBottom:'4px'}}>Adaugă fișier (PDF / JPG / PNG)</p>
-                  <p style={{fontSize:'10px',color:'var(--c-555555)'}}>drag & drop sau click pentru navigare</p>
+                  <p style={{fontSize:'12px',fontWeight:600,color:'var(--c-888888)',marginBottom:'4px'}}>Adaugă fișier(e) (PDF / JPG / PNG)</p>
+                  <p style={{fontSize:'10px',color:'var(--c-555555)'}}>poți selecta mai multe facturi pentru aceeași comandă</p>
                 </div>
               )}
             </div>
-            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files&&upload(e.target.files)}/>
+            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files&&upload(e.target.files)}/>
             {uploadError && <p style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'8px' }}>{uploadError}</p>}
           </div>
         )}
