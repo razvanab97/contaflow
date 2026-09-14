@@ -63,6 +63,20 @@ function collectPdfParts(part: GmailPart | undefined, out: GmailPart[] = []) {
   return out
 }
 
+function previousMonthStartForGmail(workMonth: string) {
+  const match = workMonth.match(/^(\d{4})-(\d{2})/)
+  const base = match
+    ? new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1))
+    : new Date()
+  const previous = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() - 1, 1))
+  const year = previous.getUTCFullYear()
+  const month = String(previous.getUTCMonth() + 1).padStart(2, '0')
+  return {
+    iso: `${year}-${month}-01`,
+    gmail: `${year}/${month}/01`,
+  }
+}
+
 async function refreshAccessToken(source: InboxSource) {
   if (!source.refresh_token) return source.access_token
   const expiresAt = source.token_expires_at ? new Date(source.token_expires_at).getTime() : 0
@@ -131,7 +145,8 @@ export async function POST(req: NextRequest) {
     const accessToken = await refreshAccessToken(source as InboxSource)
     if (!accessToken) throw new Error('Conexiunea Gmail nu are access token. Reconectează contul Google.')
 
-    const query = encodeURIComponent('has:attachment filename:pdf newer_than:180d')
+    const since = previousMonthStartForGmail(cleanLuna)
+    const query = encodeURIComponent(`has:attachment filename:pdf after:${since.gmail}`)
     const list = await gmailJson<GmailListResponse>(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=${maxMessages}`,
       accessToken
@@ -181,6 +196,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       messagesChecked: list.messages?.length || 0,
       pdfsFound,
+      since: since.iso,
       imported,
     })
   } catch (err) {

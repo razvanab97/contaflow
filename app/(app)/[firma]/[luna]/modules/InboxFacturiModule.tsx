@@ -219,7 +219,8 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
       setResults(imported)
       const noi = imported.filter(item => !item.duplicate).length
       const duplicate = imported.filter(item => item.duplicate).length
-      setSyncMessage(`Gmail: ${data.messagesChecked || 0} emailuri verificate, ${data.pdfsFound || 0} PDF-uri găsite, ${noi} importate, ${duplicate} duplicate.`)
+      const since = data.since ? ` din ${new Date(data.since).toLocaleDateString('ro-RO')}` : ''
+      setSyncMessage(`Gmail: ${data.messagesChecked || 0} emailuri verificate${since} până azi, ${data.pdfsFound || 0} PDF-uri găsite, ${noi} importate, ${duplicate} duplicate.`)
       await load()
       await loadSources()
     }
