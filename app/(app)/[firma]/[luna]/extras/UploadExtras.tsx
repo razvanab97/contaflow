@@ -40,7 +40,13 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
     if (extrasId) fd.append('extrasId', extrasId)
     const res = await fetch('/api/extras/upload', { method: 'POST', body: fd })
     const d = await res.json()
-    if (res.ok && d.ok) { setStatus(`✓ ${d.count} tranzacții · ${d.valuta || valuta}`); onDone() }
+    if (res.ok && d.ok) {
+      const details = Array.isArray(d.results) && d.results.length > 1
+        ? d.results.map((result: { count:number; valuta:string }) => `${result.count} ${result.valuta}`).join(' + ')
+        : `${d.count} tranzacții · ${d.valuta || valuta}`
+      setStatus(`✓ ${details}`)
+      onDone()
+    }
     else setErr(d.error || 'Eroare')
     setLoading(false)
   }

@@ -19,6 +19,10 @@ const CAT: Record<string, { bg: string; c: string }> = {
 }
 
 const PER = 10
+const EXTRAS_UNLOCK_CODES: Record<string, string> = {
+  'ab-homes-invest': '48867823',
+  abxhomes: '51569342',
+}
 
 function isPreviewable(nume: string): 'pdf' | 'image' | null {
   const lower = nume.toLowerCase()
@@ -65,7 +69,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const restored = useRef(false)
   const positionRestored = useRef(false)
   const c = firma.culoare || '#F27A1A'
-  const extrasUnlockCode = firma.slug === 'ab-homes-invest' ? '48867823' : undefined
+  const extrasUnlockCode = EXTRAS_UNLOCK_CODES[firma.slug]
   const workspaceKey = `contaflow:extras-workspace:${lunaId}`
 
   const load = useCallback(async (silent = false) => {

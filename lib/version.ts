@@ -3,6 +3,11 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 69, text: 'Extras de cont: fallback suplimentar la citirea AI - dacă AI întoarce o singură listă mixtă de tranzacții, sistemul o separă local pe valute înainte de salvare (RON/EUR etc.)' },
+  { v: 68, text: 'Extras de cont: butonul „Citire extras cu AI” împarte automat un PDF cu mai multe conturi/monede în extrase separate, de exemplu RON și EUR, fiecare cu tranzacțiile proprii' },
+  { v: 67, text: 'Extras de cont: importul PDF acceptă acum și răspunsul AI cu structură pe conturi (`conturi: [...]`), iar dacă un PDF EUR/HUF/RON este pus pe cardul greșit apare mesaj clar cu moneda detectată' },
+  { v: 66, text: 'Extras de cont: ABXHOMES SRL are acum cod de deblocare PDF 51569342 cu buton Copy, lângă codul deja adăugat pentru AB HOMES INVEST' },
+  { v: 65, text: 'eMAG: avizele BG se calculează/afișează în EUR, HU în HUF, RO în RON; task-urile și contorul modulului se actualizează singure după încărcarea facturilor. Extras AB HOMES INVEST are cod de deblocare PDF cu Copy, iar Dispozițiile de plată au verificare duplicate și afișează luna/data facturii' },
   { v: 64, text: 'Fix: pagina de Note pe tranzacții (din Extras de cont) e acum inclusă și în „PDF toate"/„ZIP categorii" — nu mai rămâne doar în aplicație, ajunge și la contabilitate o dată cu restul documentelor. Verificate toate cele 49 de pagini de modul din toate firmele, fără erori' },
   { v: 63, text: 'Nou: „Recomandări pentru sistem" la finalul hub-ului lunar — la cerere, AI analizează task-uri, module dezactivate, tranzacții nedocumentate și restanțe reale ale lunii și propune 3-5 îmbunătățiri concrete pentru mai puțină muncă manuală pe viitor (necesită rularea migrării SQL recomandari_luna)' },
   { v: 62, text: 'Rafinare vizuală completă: font Inter peste tot, paletă nouă pe toate cele 3 teme (Light alb pe gri, Night grafit nu negru pur), culoare cu sens (albastru=acțiune, verde=gata, amber=în lucru, roșu=restanțe) în loc de culoarea firmei peste tot, task-uri ca bifă+text în loc de pastile, Glass revenit la doar sidebar/header/dropdown-uri' },
