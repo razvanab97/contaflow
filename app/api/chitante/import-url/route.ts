@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
 const ACCOUNTING_SECTIONS = new Set([
-  'facturi-chitanta', 'facturi-restante',
+  'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
   'booking-facturi', 'booking-borderou',
   'airbnb-facturi', 'airbnb-borderou',
   '5stardesk', 'trendyol', 'acte-contabile', 'angajati',

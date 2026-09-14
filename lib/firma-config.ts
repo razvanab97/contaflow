@@ -1,6 +1,6 @@
 export type ModuleSlug =
   | 'extras' | 'angajati' | 'acte-contabile' | 'dispozitie-plata'
-  | 'facturi-chitanta' | 'facturi-restante' | 'raport-lunar'
+  | 'facturi-chitanta' | 'facturi-restante' | 'inbox-facturi' | 'raport-lunar'
   | 'emag' | 'trendyol'
   | 'booking-facturi' | 'booking-borderou'
   | 'airbnb-facturi' | 'airbnb-borderou'
@@ -45,7 +45,7 @@ export interface FirmaConfigDef {
 
 const COMUNE: ModuleSlug[] = [
   'extras', 'angajati', 'acte-contabile', 'dispozitie-plata',
-  'facturi-chitanta', 'facturi-restante', 'raport-lunar', 'impozite',
+  'facturi-chitanta', 'facturi-restante', 'inbox-facturi', 'raport-lunar', 'impozite',
 ]
 
 export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
@@ -99,6 +99,14 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     description: 'Facturi neachitate din luna curentă',
     tasks: [
       { key: 'facturi_restante.verificate', label: 'Facturi restante verificate' },
+    ],
+  },
+  'inbox-facturi': {
+    slug: 'inbox-facturi',
+    label: 'Inbox Facturi',
+    description: 'Facturi preluate din email/Oblio și repartizate automat pe firmă',
+    tasks: [
+      { key: 'inbox_facturi.verificate', label: 'Facturi din inbox verificate' },
     ],
   },
   'raport-lunar': {

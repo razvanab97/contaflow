@@ -17,6 +17,7 @@ const AngajatiModule = nextDynamic(() => import('../modules/AngajatiModule'))
 const ActeModule = nextDynamic(() => import('../modules/ActeModule'))
 const DispozitieModule = nextDynamic(() => import('../modules/DispozitieModule'))
 const FacturiModule = nextDynamic(() => import('../modules/FacturiModule'))
+const InboxFacturiModule = nextDynamic(() => import('../modules/InboxFacturiModule'))
 const ExtrasModule = nextDynamic(() => import('../modules/ExtrasModule'))
 const RaportLunarModule = nextDynamic(() => import('../modules/RaportLunarModule'))
 const ImpoziteModule = nextDynamic(() => import('../modules/ImpoziteModule'))
@@ -119,6 +120,8 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
         return <FacturiModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="facturi-chitanta"/>
       case 'facturi-restante':
         return <FacturiModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="facturi-restante"/>
+      case 'inbox-facturi':
+        return <InboxFacturiModule firma={firmaForModule} lunaId={lunaData.id} luna={luna} tasks={tasks}/>
       case 'raport-lunar':
         return <RaportLunarModule firma={firmaForModule} lunaId={lunaData.id}/>
       case 'impozite':

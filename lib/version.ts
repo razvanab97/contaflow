@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 76, text: 'Nou: modul Inbox Facturi pe fiecare firmă reală — documentele primite din email/Oblio pot fi încărcate în lot, AI detectează firma după CIF/nume, verifică duplicatele și le salvează la firma/luna potrivită' },
   { v: 75, text: 'Extras de cont: tranzacțiile rămân în ordinea extrasului după atașarea documentelor; lista nu mai mută automat rezolvatele la final, deci workspace-ul nu mai sare între poziții' },
   { v: 74, text: 'Extras de cont: poți selecta și încărca mai multe facturi pe aceeași tranzacție/comandă; documentele rămân grupate pe tranzacția bancară și sunt afișate cu referința comenzii' },
   { v: 73, text: 'Extras de cont: ce scrii în tab-ul Note rămâne păstrat local când schimbi tab-ul și revii, dar se resetează normal la refresh de pagină' },

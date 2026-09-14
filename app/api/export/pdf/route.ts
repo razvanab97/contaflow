@@ -40,6 +40,7 @@ function pathToSection(path: string): string {
   if (p.includes('/dispozitii-plata/')) return 'dispozitie-plata'
   if (p.includes('/facturi-chitanta/')) return 'facturi-chitanta'
   if (p.includes('/facturi-restante/')) return 'facturi-restante'
+  if (p.includes('/inbox-facturi/')) return 'inbox-facturi'
   if (p.includes('/booking-facturi/')) return 'booking-facturi'
   if (p.includes('/booking-borderou/')) return 'booking-borderou'
   if (p.includes('/airbnb-facturi/')) return 'airbnb-facturi'

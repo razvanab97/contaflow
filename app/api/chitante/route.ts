@@ -7,7 +7,7 @@ const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 const ALLOWED_CATEGORIES = new Set(['utilitati', 'chirie', 'altul'])
 const ALLOWED_DOCUMENT_TYPES = new Set(['factura', 'chitanta', 'borderou', 'raport_csv', 'contract', 'altul'])
 const ALLOWED_SECTIONS = new Set([
-  'facturi-chitanta', 'facturi-restante',
+  'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
   'booking-facturi', 'booking-borderou',
   'airbnb-facturi', 'airbnb-borderou',
   '5stardesk', 'trendyol', 'acte-contabile', 'angajati',

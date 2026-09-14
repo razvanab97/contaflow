@@ -4,7 +4,7 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 // Secțiunile gestionate prin UploadPanel — singurele din care acest endpoint generic
 // are voie să șteargă (documentele din emag-avize/dispozitii-plata/etc. au rutele lor proprii)
 const DELETABLE_SECTIONS = [
-  'facturi-chitanta', 'facturi-restante',
+  'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
   'booking-facturi', 'booking-borderou',
   'airbnb-facturi', 'airbnb-borderou',
   '5stardesk', 'trendyol', 'acte-contabile', 'angajati',
