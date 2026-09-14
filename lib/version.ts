@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 81, text: 'Inbox Facturi: Gmail 1 și Gmail 2 pot porni conectarea reală prin Google OAuth; callback-ul salvează token-ul securizat pe firmă și pe sursa selectată' },
   { v: 80, text: 'Inbox Facturi: cardurile Gmail 1, Gmail 2, iCloud și Oblio au acum buton Conectează/Configurează și salvează sursa pe firmă în inbox_surse_email' },
   { v: 79, text: 'Inbox Facturi: cardul Oblio apare lângă Gmail 1, Gmail 2 și iCloud, pregătit pentru conectare prin API token și preluare facturi/e-Factura' },
   { v: 78, text: 'Luna de lucru este afișată separat de perioada contabilă: pentru luna de lucru Septembrie apare „Contabilitate 1-31 August 2026 (lucrat în Septembrie 2026)”, iar luna următoare va afișa perioada contabilă următoare' },

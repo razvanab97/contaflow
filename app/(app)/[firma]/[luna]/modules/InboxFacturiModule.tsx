@@ -189,6 +189,15 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     setSourceEmail('')
   }
 
+  function connectGmail(sourceDef: typeof SOURCES[number]) {
+    const params = new URLSearchParams({
+      firmaId: firma.id,
+      eticheta: sourceDef.title,
+      returnTo: window.location.pathname,
+    })
+    window.location.href = `/api/inbox-facturi/gmail/start?${params.toString()}`
+  }
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
@@ -211,6 +220,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
             </div>
             {source?.email && <div style={{ marginTop:'9px', fontSize:'11px', color:'var(--c-aaaaaa)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{source.email}</div>}
             <div style={{ marginTop:'9px', fontSize:'10px', color:'var(--c-666666)', lineHeight:1.45 }}>{sourceDef.hint}</div>
+            {source?.last_sync_at && <div style={{ marginTop:'5px', fontSize:'10px', color:'var(--c-666666)' }}>Ultima conectare: {new Date(source.last_sync_at).toLocaleString('ro-RO')}</div>}
             {editing ? (
               <div style={{ marginTop:'10px', display:'flex', flexDirection:'column', gap:'8px' }}>
                 <input value={sourceEmail} onChange={e => setSourceEmail(e.target.value)} placeholder={sourceDef.placeholder} style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
@@ -221,9 +231,16 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
                 {sourceError && <div style={{ fontSize:'10px', color:'var(--accent-red)' }}>{sourceError}</div>}
               </div>
             ) : (
-              <button onClick={() => startEditSource(sourceDef.title)} style={{ marginTop:'10px', fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:`1px solid ${active ? 'rgba(74,222,128,.35)' : firma.culoare}`, background:'transparent', color:active?'var(--accent-green)':legibil(firma.culoare), cursor:'pointer' }}>
-                {active ? 'Configurează' : 'Conectează'}
-              </button>
+              <div style={{ marginTop:'10px', display:'flex', flexWrap:'wrap', gap:'7px' }}>
+                {sourceDef.provider === 'gmail' && (
+                  <button onClick={() => connectGmail(sourceDef)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', cursor:'pointer' }}>
+                    {active ? 'Reconectează Google' : 'Conectează Google'}
+                  </button>
+                )}
+                <button onClick={() => startEditSource(sourceDef.title)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:`1px solid ${active ? 'rgba(74,222,128,.35)' : firma.culoare}`, background:'transparent', color:active?'var(--accent-green)':legibil(firma.culoare), cursor:'pointer' }}>
+                  {active ? 'Configurează' : sourceDef.provider === 'gmail' ? 'Email manual' : 'Conectează'}
+                </button>
+              </div>
             )}
           </div>
         )})}
