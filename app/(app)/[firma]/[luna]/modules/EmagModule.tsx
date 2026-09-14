@@ -167,7 +167,7 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
 }
 
 function FacturaRow({ inv, firmaId, lunaId, culoare, currency, onChange }: {
-  inv: AvizFactura; firmaId:string; lunaId:string; culoare:string; currency:string; onChange:()=>void
+  inv: AvizFactura; firmaId:string; lunaId:string; culoare:string; currency:string; onChange:()=>void|Promise<void>
 }) {
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
@@ -177,21 +177,21 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, currency, onChange }: {
   async function markCopied() {
     if (inv.copiat) return
     await fetch('/api/emag/aviz/factura', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:inv.id, copiat:true }) })
-    onChange()
+    await onChange()
   }
   async function unmarkCopied() {
     await fetch('/api/emag/aviz/factura', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:inv.id, copiat:false }) })
-    onChange()
+    await onChange()
   }
   async function renameNumarCautare(numar_cautare: string) {
     if (!numar_cautare.trim() || numar_cautare === inv.numar_cautare) return
     await fetch('/api/emag/aviz/factura', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:inv.id, numar_cautare }) })
-    onChange()
+    await onChange()
   }
   async function renameFacturaFisier(fisier_nume: string) {
     if (!inv.factura_document_id || !fisier_nume.trim() || fisier_nume === inv.factura_fisier_nume) return
     await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:inv.factura_document_id, fisier_nume }) })
-    onChange()
+    await onChange()
   }
   async function uploadFactura(file: File) {
     setUploading(true)
@@ -201,13 +201,13 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, currency, onChange }: {
     fd.append('firmaId', firmaId)
     fd.append('lunaId', lunaId)
     await fetch('/api/emag/aviz/factura', { method:'POST', body:fd })
-    onChange()
+    await onChange()
     setUploading(false)
   }
   async function removeFactura() {
     if (!confirm('Ștergi factura încărcată?')) return
     await fetch(`/api/emag/aviz/factura?facturaId=${encodeURIComponent(inv.id)}`, { method:'DELETE' })
-    onChange()
+    await onChange()
   }
 
   const kind = inv.factura_document_id ? isPreviewable(undefined, inv.factura_fisier_nume || '') : null
@@ -263,7 +263,7 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, currency, onChange }: {
 }
 
 function BulkUploadZone({ documentId, firmaId, lunaId, culoare, onChange }: {
-  documentId:string; firmaId:string; lunaId:string; culoare:string; onChange:()=>void
+  documentId:string; firmaId:string; lunaId:string; culoare:string; onChange:()=>void|Promise<void>
 }) {
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
@@ -281,7 +281,7 @@ function BulkUploadZone({ documentId, firmaId, lunaId, culoare, onChange }: {
     const res = await fetch('/api/emag/aviz/factura/bulk', { method:'POST', body:fd })
     const d = await res.json().catch(() => ({ matched:[], unmatched:[] }))
     setResult(d)
-    onChange()
+    await onChange()
     setUploading(false)
   }
 
@@ -322,7 +322,7 @@ function BulkUploadZone({ documentId, firmaId, lunaId, culoare, onChange }: {
 
 function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoare, onChange }: {
   taskKey:string; label:string; descriere?:string; data?:AvizData; firmaId:string; lunaId:string; culoare:string
-  onChange:()=>void
+  onChange:()=>void|Promise<void>
 }) {
   const [open, setOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -344,25 +344,25 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
     const res = await fetch('/api/emag/aviz', { method:'POST', body:fd })
     const d = await res.json().catch(() => ({}))
     if (!res.ok) setError(d.error || 'Eroare la procesarea avizului')
-    else onChange()
+    else await onChange()
     setUploading(false)
   }
 
   async function removeAviz() {
     if (!data || !confirm('Ștergi avizul și facturile extrase din el?')) return
     const res = await fetch(`/api/emag/aviz?id=${encodeURIComponent(data.documentId)}`, { method:'DELETE' })
-    if (res.ok) onChange()
+    if (res.ok) await onChange()
   }
 
   async function renameAvizNumber(numar_document: string) {
     if (!data || !numar_document.trim() || numar_document === data.avizNumber) return
     await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:data.documentId, numar_document }) })
-    onChange()
+    await onChange()
   }
   async function renameAvizFisier(fisier_nume: string) {
     if (!data || !fisier_nume.trim() || fisier_nume === data.fisierNume) return
     await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:data.documentId, fisier_nume }) })
-    onChange()
+    await onChange()
   }
 
   return (
@@ -564,7 +564,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
     <div style={{ display:'flex', flexDirection:'column', gap:'20px' }}>
 
       {/* Task-uri bifabile */}
-      <TaskSection tasks={moduleTasks} lunaId={lunaId} culoare={firma.culoare}/>
+      <TaskSection tasks={moduleTasks} lunaId={lunaId} culoare={firma.culoare} onItemsChange={setModuleTasks}/>
 
       {/* Avize de plată — încarcă PDF-ul, AI-ul extrage facturile de căutat + copy */}
       <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>

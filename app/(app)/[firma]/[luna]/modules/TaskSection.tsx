@@ -14,28 +14,37 @@ interface Props {
   tasks: TaskItem[]
   lunaId: string
   culoare: string
+  onItemsChange?: (items: TaskItem[]) => void
 }
 
-export default function TaskSection({ tasks, lunaId, culoare }: Props) {
+export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: Props) {
   const router = useRouter()
   const [items, setItems] = useState(tasks)
   const [loading, setLoading] = useState<string | null>(null)
 
   useEffect(() => { setItems(tasks) }, [tasks])
 
+  function updateItems(updater: (items: TaskItem[]) => TaskItem[]) {
+    setItems(prev => {
+      const next = updater(prev)
+      onItemsChange?.(next)
+      return next
+    })
+  }
+
   async function toggle(key: string) {
     const current = items.find(t => t.key === key)
     if (!current || loading) return
     const next = !current.completat
     setLoading(key)
-    setItems(prev => prev.map(t => t.key === key ? { ...t, completat: next } : t))
+    updateItems(prev => prev.map(t => t.key === key ? { ...t, completat: next } : t))
     const res = await fetch('/api/tasks/toggle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lunaId, taskKey: key, completat: next }),
     })
     if (!res.ok) {
-      setItems(prev => prev.map(t => t.key === key ? { ...t, completat: !next } : t))
+      updateItems(prev => prev.map(t => t.key === key ? { ...t, completat: !next } : t))
     } else {
       router.refresh()
     }
