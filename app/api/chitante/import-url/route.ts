@@ -38,6 +38,38 @@ function downloadHeaders(source: URL) {
   return headers
 }
 
+function sameDocNumber(a?: string | null, b?: string | null) {
+  const ca = String(a || '').toLowerCase().replace(/\s+/g, '')
+  const cb = String(b || '').toLowerCase().replace(/\s+/g, '')
+  return !!ca && !!cb && ca === cb
+}
+
+function supplierMatch(a?: string | null, b?: string | null) {
+  const ca = String(a || '').split('|')[0]?.toLowerCase().trim() || ''
+  const cb = String(b || '').toLowerCase().trim()
+  return ca.length >= 4 && cb.length >= 4 && (ca.includes(cb) || cb.includes(ca))
+}
+
+async function markMatchingRestantePaid(sb: ReturnType<typeof getServiceSupabase>, firmaId: string, transaction: { data_tranzactie:string; descriere_curatata:string|null; descriere:string|null; suma:number }, supplier?: string, reference?: string) {
+  const { data: rest } = await sb
+    .from('documente')
+    .select('id,numar_document,furnizor,suma')
+    .eq('firma_id', firmaId)
+    .eq('platit', false)
+    .like('fisier_path', '%/facturi-restante/%')
+  const txSuma = Math.abs(Number(transaction.suma))
+  const ids = (rest || [])
+    .filter(doc => sameDocNumber(doc.numar_document, reference) || (
+      supplierMatch(doc.furnizor, supplier || transaction.descriere_curatata || transaction.descriere) &&
+      doc.suma != null &&
+      Math.abs(Math.abs(Number(doc.suma)) - txSuma) <= 0.01
+    ))
+    .map(doc => doc.id)
+  if (ids.length) {
+    await sb.from('documente').update({ platit:true, data_platii:transaction.data_tranzactie }).in('id', ids)
+  }
+}
+
 export async function POST(req: NextRequest) {
   const {
     url, firmaId, lunaId, section, supplier, description, reference, transactionId,
@@ -99,6 +131,9 @@ export async function POST(req: NextRequest) {
     ...(transactionId ? { modul:'extras' } : isAccountingSection ? { modul:'acte_contabile' } : {}),
     tip_document:documentType,
     furnizor:[supplier, description && `Descriere: ${description}`, reference && `Referinta: ${reference}`, `Sursa: ${sourceName}`].filter(Boolean).join(' | '),
+    numar_document: reference || null,
+    suma: transaction ? Math.abs(Number(transaction.suma)) : null,
+    data_document: transaction?.data_tranzactie || null,
     fisier_path:path,
     fisier_nume:fileName,
     fisier_tip:'application/pdf',
@@ -128,6 +163,7 @@ export async function POST(req: NextRequest) {
     if (count !== null) await sb.from('extrase').update({ nr_documentate:count }).eq('id', transaction.extras_id)
     const oldPath = oldDocument?.data?.fisier_path
     if (oldPath && oldPath !== path) await sb.storage.from('documente').remove([oldPath])
+    await markMatchingRestantePaid(sb, firmaId, transaction, supplier, reference)
   }
   return NextResponse.json({ doc:data })
 }

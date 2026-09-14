@@ -5,12 +5,11 @@ import { dbSelect } from '@/lib/db'
 import { getRestanteCount } from '@/lib/queries'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 import { rgb, legibil, tint } from '@/lib/colors'
+import { accountingFullLabel, currentWorkMonthKey } from '@/lib/accounting-period'
 
 export const dynamic = 'force-dynamic'
 
-const LUNA = new Date().toISOString().slice(0, 7)
-const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
-function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
+const LUNA = currentWorkMonthKey()
 function ini(n: string) { return n.split(' ').filter((w:string) => /^[A-ZĂÎȘȚ]/.test(w)).slice(0,2).map((w:string)=>w[0]).join('') }
 
 export default async function Dashboard() {
@@ -43,7 +42,7 @@ export default async function Dashboard() {
   const totalRestante = restanteCounts.reduce((sum, n) => sum + n, 0)
   const firmeCuRestante = restanteCounts.filter(n => n > 0).length
 
-  const ll = lunaLabel(LUNA)
+  const ll = accountingFullLabel(LUNA)
 
   return (
     <>

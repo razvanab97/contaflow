@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
   let query = sb
     .from('documente')
-    .select('id,fisier_nume,fisier_tip,tip_document,furnizor,modul,created_at,platit,data_platii')
+    .select('id,fisier_nume,fisier_tip,tip_document,furnizor,modul,numar_document,suma,data_document,created_at,platit,data_platii')
     .not('fisier_path', 'like', '%/tx/%')
     .not('fisier_path', 'like', '%/checklist/%')
     .like('fisier_path', `%/${section}/%`)

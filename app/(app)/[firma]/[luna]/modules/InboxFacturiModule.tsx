@@ -101,6 +101,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
           ['Gmail 1', 'OAuth citire facturi și atașamente'],
           ['Gmail 2', 'Al doilea cont, separat pe aceleași reguli'],
           ['iCloud Mail', 'IMAP cu parolă de aplicație Apple'],
+          ['Oblio', 'API token pentru facturi și documente e-Factura disponibile în Oblio'],
         ].map(([title, desc]) => (
           <div key={title} style={{ background:'var(--c-111111)', border:'1px solid var(--c-222222)', borderRadius:'12px', padding:'14px 16px' }}>
             <div style={{ fontSize:'13px', fontWeight:700, color:'var(--c-eeeeee)', marginBottom:'4px' }}>{title}</div>

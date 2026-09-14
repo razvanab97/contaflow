@@ -4,6 +4,7 @@ import nextDynamic from 'next/dynamic'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getActiveFirme, getLuniContabile } from '@/lib/queries'
 import { getFirmaConfig, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
+import { accountingFullLabel, accountingPeriodLabel, accountingWorkLabel } from '@/lib/accounting-period'
 
 // Fiecare modul e incarcat lazy (chunk separat) - pagina afiseaza mereu un singur modul, dar
 // fara asta toate cele 13 componente (unele mari, ex. EmagModule ~600 linii) ajungeau in bundle-ul
@@ -24,9 +25,6 @@ const ImpoziteModule = nextDynamic(() => import('../modules/ImpoziteModule'))
 const RaportLunarProiectModule = nextDynamic(() => import('../modules/RaportLunarProiectModule'))
 
 export const dynamic = 'force-dynamic'
-
-const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
-function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
 
 export default async function ModulPage({ params }: { params: Promise<{firma:string;luna:string;modul:string}> }) {
   const { firma: slug, luna, modul: modulSlug } = await params
@@ -62,7 +60,9 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
 
   const tasks = modulDef.tasks.map(t => ({ ...t, completat: taskMap[t.key] ?? false }))
 
-  const ll = lunaLabel(luna)
+  const ll = accountingFullLabel(luna)
+  const periodLabel = accountingPeriodLabel(luna)
+  const workLabel = accountingWorkLabel(luna)
 
   const firmaForModule = {
     id: firma.id, slug: firma.slug, nume: firma.nume, culoare: firma.culoare,
@@ -141,7 +141,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       <div style={{ marginBottom:'32px' }}>
         <Link href={`/${slug}/${luna}`} style={{ display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'var(--c-888888)', marginBottom:'16px' }}>
           <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          {firma.nume.replace(' SRL','')} · {ll}
+          {firma.nume.replace(' SRL','')} · Contabilitate {periodLabel} ({workLabel})
         </Link>
         <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
           <div style={{ width:'10px', height:'10px', borderRadius:'50%', background:firma.culoare, flexShrink:0 }}/>

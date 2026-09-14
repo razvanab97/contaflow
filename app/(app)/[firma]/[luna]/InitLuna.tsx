@@ -2,13 +2,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { rgb, tint } from '@/lib/colors'
+import { accountingPeriodLabel, accountingWorkLabel } from '@/lib/accounting-period'
 
 export default function InitLuna({ firma, luna }: { firma: {id:string;nume:string;culoare:string}; luna: string }) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const [y,m] = luna.split('-')
-  const luni = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
-  const ll = `${luni[+m]} ${y}`
+  const periodLabel = accountingPeriodLabel(luna)
+  const workLabel = accountingWorkLabel(luna)
   const r = rgb(firma.culoare)
 
   async function init() {
@@ -24,9 +24,9 @@ export default function InitLuna({ firma, luna }: { firma: {id:string;nume:strin
           <div style={{ width:'14px', height:'14px', borderRadius:'50%', background:firma.culoare }}/>
         </div>
         <h1 style={{ fontSize:'18px', fontWeight:600, color:'var(--c-ffffff)', marginBottom:'6px' }}>{firma.nume}</h1>
-        <p style={{ fontSize:'13px', color:'var(--c-777777)', marginBottom:'28px' }}>{ll} — lună neîncepută</p>
+        <p style={{ fontSize:'13px', color:'var(--c-777777)', marginBottom:'28px' }}>Contabilitate {periodLabel}<br/><span style={{ fontSize:'12px' }}>({workLabel}) — lună neîncepută</span></p>
         <button onClick={init} disabled={loading} style={{ padding:'10px 24px', borderRadius:'9px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', fontSize:'13px', fontWeight:600, cursor:'pointer', opacity:loading?.6:1 }}>
-          {loading ? 'Se inițializează...' : `Începe ${ll}`}
+          {loading ? 'Se inițializează...' : `Începe contabilitatea ${periodLabel}`}
         </button>
         <p style={{ fontSize:'11px', color:'var(--c-444444)', marginTop:'12px' }}>Se creează automat toate task-urile</p>
       </div>

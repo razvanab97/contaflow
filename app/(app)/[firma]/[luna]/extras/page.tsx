@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import ExtrasClient from './ExtrasClient'
 import { MODULE_DEFS } from '@/lib/firma-config'
+import { accountingShortLabel } from '@/lib/accounting-period'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,9 +34,7 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
   const facturiTasks = MODULE_DEFS['facturi-chitanta'].tasks.map(t => ({ ...t, completat: taskMap[t.key] ?? false }))
   const extrasFinalizat = taskMap['extras.tranzactii_documentate'] ?? false
 
-  const [y, m] = luna.split('-')
-  const LUNI = ['','Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec']
-  const ll = `${LUNI[+m]} ${y}`
+  const ll = accountingShortLabel(luna)
 
   return (
     <ExtrasClient

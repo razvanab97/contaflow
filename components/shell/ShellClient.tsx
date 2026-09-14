@@ -4,9 +4,7 @@ import { usePathname } from 'next/navigation'
 import Sidebar, { FirmaNav } from '@/components/Sidebar'
 import GlobalHeader from './GlobalHeader'
 import { getFirmaModules } from '@/lib/firma-config'
-
-const LUNI_FULL = ['', 'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie', 'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie']
-function lunaLabel(s: string) { const [y, m] = s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
+import { accountingShortLabel } from '@/lib/accounting-period'
 
 interface Props {
   initialFirmeNav: FirmaNav[]
@@ -57,7 +55,7 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
       <Sidebar
         firme={firmeNav}
         lunaCurenta={lunaEfectiva}
-        lunaLabel={lunaLabel(lunaEfectiva)}
+        lunaLabel={accountingShortLabel(lunaEfectiva)}
         firmaAtiva={firmaSlug}
         moduleFirma={modules}
         restanteCount={restanteCount}

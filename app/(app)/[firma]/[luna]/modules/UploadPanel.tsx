@@ -8,6 +8,9 @@ interface Doc {
   fisier_tip?: string | null
   tip_document?: string
   furnizor?: string
+  numar_document?: string | null
+  suma?: number | null
+  data_document?: string | null
   platit?: boolean
   data_platii?: string|null
 }
@@ -33,6 +36,30 @@ interface Props {
 }
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
+
+function cleanSupplier(value?: string | null) {
+  return String(value || '').split('|')[0]?.trim() || ''
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('ro-RO', { day:'2-digit', month:'2-digit', year:'numeric' })
+}
+
+function formatMoney(value?: number | null) {
+  return typeof value === 'number' ? `${value.toFixed(2)} RON` : ''
+}
+
+function docLabel(doc: Doc) {
+  const parts = [
+    doc.numar_document ? `Factura ${doc.numar_document}` : '',
+    cleanSupplier(doc.furnizor),
+    formatDate(doc.data_document),
+    formatMoney(doc.suma),
+  ].filter(Boolean)
+  return parts.length ? parts.join(' - ') : doc.fisier_nume
+}
 
 export default function UploadPanel({
   firmaId, lunaId, section, culoare, title, description,
@@ -156,11 +183,14 @@ export default function UploadPanel({
                 <div key={doc.id}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: isPaid ? 'var(--c-141414)' : 'var(--c-161616)', border: `1px solid ${isPaid ? 'var(--c-1e1e1e)' : 'var(--c-222222)'}`, borderRadius: '8px' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? 'var(--c-333333)' : culoare, flexShrink: 0 }}/>
-                    <input
-                      defaultValue={doc.fisier_nume}
-                      onBlur={e => renameDoc(doc, e.target.value.trim())}
-                      style={{ flex: 1, minWidth: 0, fontSize: '12px', color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
-                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {docLabel(doc)}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--c-666666)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {doc.fisier_nume}
+                      </div>
+                    </div>
                     {doc.tip_document && <span style={{ fontSize: '10px', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
                     {showPaidToggle && (
                       <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>

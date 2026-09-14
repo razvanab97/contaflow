@@ -52,6 +52,42 @@ function shortReference(value?: string | null) {
   return numeric || firstPart
 }
 
+function sameDocNumber(a?: string | null, b?: string | null) {
+  const ca = String(a || '').toLowerCase().replace(/\s+/g, '')
+  const cb = String(b || '').toLowerCase().replace(/\s+/g, '')
+  return !!ca && !!cb && ca === cb
+}
+
+function supplierMatch(a?: string | null, b?: string | null) {
+  const ca = String(a || '').split('|')[0]?.toLowerCase().trim() || ''
+  const cb = String(b || '').toLowerCase().trim()
+  return ca.length >= 4 && cb.length >= 4 && (ca.includes(cb) || cb.includes(ca))
+}
+
+async function markMatchingRestantePaid(firmaId: string, tx: any, furnizor: string, numDoc: string) {
+  const restRes = await fetch(
+    `${SB}/rest/v1/documente?firma_id=eq.${encodeURIComponent(firmaId)}&platit=eq.false&fisier_path=like.*%2Ffacturi-restante%2F*&select=id,numar_document,furnizor,suma`,
+    { headers: H }
+  )
+  if (!restRes.ok) return
+  const rest = await restRes.json()
+  if (!Array.isArray(rest) || !rest.length) return
+  const txSuma = Math.abs(Number(tx.suma))
+  const ids = rest
+    .filter((doc: any) => sameDocNumber(doc.numar_document, numDoc) || (
+      supplierMatch(doc.furnizor, furnizor || tx.descriere_curatata || tx.descriere) &&
+      doc.suma != null &&
+      Math.abs(Math.abs(Number(doc.suma)) - txSuma) <= 0.01
+    ))
+    .map((doc: any) => doc.id)
+  if (!ids.length) return
+  await fetch(`${SB}/rest/v1/documente?id=in.(${ids.join(',')})`, {
+    method: 'PATCH',
+    headers: { ...H, 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ platit: true, data_platii: tx.data_tranzactie })
+  })
+}
+
 export async function POST(req: NextRequest) {
   try {
     const fd = await req.formData()
@@ -108,6 +144,8 @@ export async function POST(req: NextRequest) {
       const documentBody = {
         firma_id: firmaId, luna_id: lunaId, tranzactie_id: txId,
         modul: 'extras', tip_document: tip, furnizor, numar_document: numDoc || orderRef,
+        suma: Math.abs(Number(tx.suma)),
+        data_document: tx.data_tranzactie,
         fisier_path: path, fisier_nume: renamedFile, fisier_tip: file.type,
         fisier_marime: buf.length, in_zip: true
       }
@@ -154,6 +192,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({ nr_documentate: documented })
       })
     }
+    await markMatchingRestantePaid(firmaId, tx, furnizor, numDoc || orderRef)
 
     return NextResponse.json({ ok: true, docId: documents[0]?.docId, filename: documents[0]?.filename, documents, count: documents.length })
   } catch (error) {

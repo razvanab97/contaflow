@@ -8,11 +8,10 @@ import { getFirmaModules } from '@/lib/firma-config'
 import LunaSummary from './LunaSummary'
 import ExportButtons from './ExportButtons'
 import RecomandariLuna from '@/components/RecomandariLuna'
+import { accountingFullLabel, accountingPeriodLabel, accountingWorkLabel } from '@/lib/accounting-period'
 
 export const dynamic = 'force-dynamic'
 
-const LUNI_FULL = ['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
-function lunaLabel(s: string) { const [y,m]=s.split('-'); return `${LUNI_FULL[+m]} ${y}` }
 function prevLuna(luna: string) { const d = new Date(luna+'-01'); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,7) }
 function nextLuna(luna: string) { const d = new Date(luna+'-01'); d.setMonth(d.getMonth()+1); return d.toISOString().slice(0,7) }
 
@@ -44,7 +43,9 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
   const total = activeModules.reduce((sum, m) => sum + m.tasks.length, 0)
   const done = activeModules.reduce((sum, m) => sum + m.tasks.filter(t => taskMap[t.key]).length, 0)
   const pct = total > 0 ? Math.round((done/total)*100) : 0
-  const ll = lunaLabel(luna)
+  const ll = accountingFullLabel(luna)
+  const periodLabel = accountingPeriodLabel(luna)
+  const workLabel = accountingWorkLabel(luna)
 
   return (
     <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1400px' }}>
@@ -61,7 +62,10 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
             <Link href={`/${slug}/${prevLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
             </Link>
-            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>{ll}</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.25 }}>
+              Contabilitate {periodLabel}
+              <span style={{ display: 'block', fontSize: '11px', fontWeight: 450, color: 'var(--text-muted)' }}>({workLabel})</span>
+            </span>
             <Link href={`/${slug}/${nextLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
             </Link>
