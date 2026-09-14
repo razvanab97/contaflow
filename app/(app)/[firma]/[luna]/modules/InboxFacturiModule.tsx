@@ -113,6 +113,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const [sourcesLoaded, setSourcesLoaded] = useState(false)
   const [editingSource, setEditingSource] = useState<string | null>(null)
   const [sourceEmail, setSourceEmail] = useState('')
+  const [sourceSecret, setSourceSecret] = useState('')
   const [sourceBusy, setSourceBusy] = useState(false)
   const [sourceError, setSourceError] = useState('')
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null)
@@ -202,7 +203,8 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   function startEditSource(title: string) {
     const current = sourceFor(title)
     setEditingSource(title)
-    setSourceEmail(current?.email || '')
+    setSourceEmail(current?.email || (title === 'Oblio' ? 'abhomesinvest@gmail.com' : ''))
+    setSourceSecret('')
     setSourceError('')
   }
 
@@ -232,6 +234,35 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     })
     setEditingSource(null)
     setSourceEmail('')
+    setSourceSecret('')
+  }
+
+  async function connectOblio() {
+    setSourceBusy(true)
+    setSourceError('')
+    const res = await fetch('/api/inbox-facturi/oblio/connect', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        firmaId: firma.id,
+        email: sourceEmail,
+        clientSecret: sourceSecret,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setSourceBusy(false)
+    if (!res.ok) {
+      setSourceError(data.error || 'Oblio nu a putut fi conectat')
+      return
+    }
+    setSources(prev => {
+      const next = prev.filter(source => source.id !== data.source.id && source.eticheta !== data.source.eticheta)
+      return [...next, data.source]
+    })
+    setEditingSource(null)
+    setSourceEmail('')
+    setSourceSecret('')
+    setSyncMessage(`Oblio conectat. Firme găsite în cont: ${(data.companies || []).map((c: { company?: string; cif?: string }) => c.company || c.cif).filter(Boolean).join(', ') || 'niciuna listată'}.`)
   }
 
   function connectGmail(sourceDef: typeof SOURCES[number]) {
@@ -306,9 +337,10 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
             {editing ? (
               <div style={{ marginTop:'10px', display:'flex', flexDirection:'column', gap:'8px' }}>
                 <input value={sourceEmail} onChange={e => setSourceEmail(e.target.value)} placeholder={sourceDef.placeholder} style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
+                {sourceDef.provider === 'oblio' && <input type="password" value={sourceSecret} onChange={e => setSourceSecret(e.target.value)} placeholder="Token API din Oblio → Setări → Date Cont" style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>}
                 <div style={{ display:'flex', gap:'7px' }}>
-                  <button onClick={() => saveSource(sourceDef)} disabled={sourceBusy} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', cursor:'pointer', opacity:sourceBusy?.6:1 }}>Salvează</button>
-                  <button onClick={() => setEditingSource(null)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-888888)', cursor:'pointer' }}>Anulează</button>
+                  <button onClick={() => sourceDef.provider === 'oblio' ? connectOblio() : saveSource(sourceDef)} disabled={sourceBusy} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', cursor:'pointer', opacity:sourceBusy?.6:1 }}>{sourceDef.provider === 'oblio' ? 'Testează și salvează' : 'Salvează'}</button>
+                  <button onClick={() => { setEditingSource(null); setSourceSecret('') }} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-888888)', cursor:'pointer' }}>Anulează</button>
                 </div>
                 {sourceError && <div style={{ fontSize:'10px', color:'var(--accent-red)' }}>{sourceError}</div>}
               </div>
