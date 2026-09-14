@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 84, text: 'Inbox Facturi: sincronizarea Gmail nu mai importă PDF-uri fără legătură cu firmele; furnizorii externi rămân acceptați dacă firma apare ca beneficiar/cumpărător' },
   { v: 83, text: 'Inbox Facturi: sincronizarea Gmail caută mereu facturi din 01 ale lunii contabile precedente până în prezent, în funcție de luna de lucru deschisă' },
   { v: 82, text: 'Inbox Facturi: Gmail conectat poate fi sincronizat manual; aplicația citește emailuri recente cu atașamente PDF, importă facturile prin AI, detectează firma și marchează duplicatele' },
   { v: 81, text: 'Inbox Facturi: Gmail 1 și Gmail 2 pot porni conectarea reală prin Google OAuth; callback-ul salvează token-ul securizat pe firmă și pe sursa selectată' },

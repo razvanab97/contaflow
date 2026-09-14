@@ -29,6 +29,8 @@ type ExtractieInbox = {
 
 export type InboxImportResult = {
   duplicate: boolean
+  skipped?: boolean
+  skipReason?: string
   targetFirma: string | null
   source?: string | null
   doc?: {
@@ -89,7 +91,8 @@ async function analyzeInvoice(bytes: Uint8Array, mediaType: string, candidates: 
         { type: 'text', text: `Acesta este un document contabil primit in inbox (factura, chitanta, invoice, e-Factura sau document similar). Identifica pentru care dintre firmele noastre este documentul, folosind mai ales CUI/CIF/cod fiscal si apoi numele firmei. Firme disponibile: ${JSON.stringify(firme)}.
 Raspunde DOAR cu JSON:
 {"firmaSlug":"slug-ul firmei sau null","firmaCui":"CUI/CIF gasit pe document pentru firma noastra sau null","incredereFirma":"sigur|posibil|necunoscut","furnizor":"emitent/furnizor sau null","numarDocument":"seria si numarul facturii/documentului sau null","suma":123.45,"moneda":"RON|EUR|HUF|BGN sau null","dataDocument":"AAAA-LL-ZZ sau null","tipDocument":"factura|chitanta|invoice|altul","motiv":"pe scurt de ce ai ales firma"}.
-Nu inventa valori. Daca documentul contine mai multe firme, firma noastra este beneficiarul/cumparatorul, nu furnizorul.` },
+Nu inventa valori. Daca documentul contine mai multe firme, firma noastra este beneficiarul/cumparatorul, nu furnizorul.
+Accepta furnizori externi/straini (de exemplu ISO/Maxy/Verk/Jumbo/Anthropic/OpenAI), dar numai daca documentul indica una dintre firmele noastre ca beneficiar/cumparator, prin CUI/CIF, nume firma sau adresa. Daca documentul pare personal sau pentru alta entitate, seteaza firmaSlug si firmaCui null, incredereFirma necunoscut.` },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -122,6 +125,7 @@ export async function importInboxDocument({
   lunaId,
   luna,
   sourceLabel,
+  requireDetectedFirm = false,
 }: {
   sb: SupabaseService
   bytes: Uint8Array
@@ -131,6 +135,7 @@ export async function importInboxDocument({
   lunaId: string
   luna: string
   sourceLabel?: string | null
+  requireDetectedFirm?: boolean
 }): Promise<InboxImportResult> {
   const hash = crypto.createHash('sha256').update(bytes).digest('hex')
   const [{ data: firme }, { data: luni }] = await Promise.all([
@@ -156,6 +161,16 @@ export async function importInboxDocument({
   const byCui = candidates.find(f => norm(f.cui) && norm(f.cui) === norm(extracted?.firmaCui))
   const bySlug = candidates.find(f => f.slug === extracted?.firmaSlug)
   const detected = extracted?.incredereFirma === 'sigur' ? (byCui || bySlug) : byCui || null
+  if (requireDetectedFirm && !detected) {
+    return {
+      duplicate: false,
+      skipped: true,
+      skipReason: 'Firma nu a fost identificată sigur ca beneficiar/cumpărător',
+      targetFirma: null,
+      source: sourceLabel || null,
+      extracted,
+    }
+  }
   const target = detected || candidates.find(f => f.id === firmaId) || candidates[0]
   const docMonth = monthFromIso(extracted?.dataDocument) || luna
   const targetLunaId = luniRows.find(l => l.firma_id === target?.id && l.luna?.startsWith(docMonth))?.id || target?.luna_id || lunaId

@@ -15,6 +15,8 @@ interface Doc {
 }
 interface ImportResult {
   duplicate: boolean
+  skipped?: boolean
+  skipReason?: string
   targetFirma: string | null
   source?: string | null
   doc?: { id:string; fisier_nume:string }
@@ -217,10 +219,11 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     } else {
       const imported: ImportResult[] = data.imported || []
       setResults(imported)
-      const noi = imported.filter(item => !item.duplicate).length
+      const skipped = imported.filter(item => item.skipped).length
+      const noi = imported.filter(item => !item.duplicate && !item.skipped).length
       const duplicate = imported.filter(item => item.duplicate).length
       const since = data.since ? ` din ${new Date(data.since).toLocaleDateString('ro-RO')}` : ''
-      setSyncMessage(`Gmail: ${data.messagesChecked || 0} emailuri verificate${since} până azi, ${data.pdfsFound || 0} PDF-uri găsite, ${noi} importate, ${duplicate} duplicate.`)
+      setSyncMessage(`Gmail: ${data.messagesChecked || 0} emailuri verificate${since} până azi, ${data.pdfsFound || 0} PDF-uri găsite, ${noi} importate, ${duplicate} duplicate, ${skipped} fără legătură cu firmele.`)
       await load()
       await loadSources()
     }
@@ -342,8 +345,8 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
             <div style={{ marginTop:'14px', display:'flex', flexDirection:'column', gap:'6px' }}>
               {syncMessage && <div style={{ padding:'9px 11px', borderRadius:'8px', background:'rgba(59,130,246,.08)', border:'1px solid rgba(59,130,246,.2)', fontSize:'11px', color:'var(--c-aaaaaa)' }}>{syncMessage}</div>}
               {results.map((res, idx) => (
-                <div key={idx} style={{ padding:'9px 11px', borderRadius:'8px', background:res.duplicate?'rgba(251,146,60,.08)':'rgba(74,222,128,.08)', border:`1px solid ${res.duplicate?'rgba(251,146,60,.25)':'rgba(74,222,128,.2)'}`, fontSize:'11px', color:'var(--c-aaaaaa)' }}>
-                  {res.duplicate ? 'Duplicat detectat' : 'Importat'} · {res.targetFirma || 'firmă necunoscută'} · {res.extracted?.incredereFirma || 'verifică'}{res.extracted?.furnizor ? ` · ${res.extracted.furnizor}` : ''}{res.source ? ` · ${res.source}` : ''}
+                <div key={idx} style={{ padding:'9px 11px', borderRadius:'8px', background:res.skipped?'rgba(148,163,184,.08)':res.duplicate?'rgba(251,146,60,.08)':'rgba(74,222,128,.08)', border:`1px solid ${res.skipped?'rgba(148,163,184,.22)':res.duplicate?'rgba(251,146,60,.25)':'rgba(74,222,128,.2)'}`, fontSize:'11px', color:'var(--c-aaaaaa)' }}>
+                  {res.skipped ? 'Sărit' : res.duplicate ? 'Duplicat detectat' : 'Importat'} · {res.targetFirma || 'firmă necunoscută'} · {res.extracted?.incredereFirma || 'verifică'}{res.extracted?.furnizor ? ` · ${res.extracted.furnizor}` : ''}{res.skipReason ? ` · ${res.skipReason}` : ''}{res.source ? ` · ${res.source}` : ''}
                 </div>
               ))}
             </div>

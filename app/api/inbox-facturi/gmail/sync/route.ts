@@ -182,6 +182,7 @@ export async function POST(req: NextRequest) {
           lunaId: cleanLunaId,
           luna: cleanLuna,
           sourceLabel: `${source.eticheta}${source.email ? ` (${source.email})` : ''}`,
+          requireDetectedFirm: true,
         }))
       }
     }
