@@ -186,3 +186,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error:String(error) }, { status:500 })
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error:'id lipsește' }, { status:400 })
+  const sb = getServiceSupabase()
+  const { data: document, error } = await sb.from('documente')
+    .select('id,fisier_path')
+    .eq('id', id)
+    .eq('tip_document', 'factura')
+    .like('fisier_path', '%/dispozitii-plata/atasamente/%')
+    .single()
+  if (error || !document) return NextResponse.json({ error:'Factura nu a fost găsită' }, { status:404 })
+  const { error: storageError } = await sb.storage.from('documente').remove([document.fisier_path])
+  if (storageError) return NextResponse.json({ error: storageError.message }, { status:500 })
+  const { error: deleteError } = await sb.from('documente').delete().eq('id', id)
+  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status:500 })
+  return NextResponse.json({ ok:true })
+}

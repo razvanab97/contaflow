@@ -59,6 +59,20 @@ function duplicateDateLabel(value?: string | null) {
   return `, încărcată pe ${date.toLocaleDateString('ro-RO')}`
 }
 
+// Extrage numărul de apartament dintr-o etichetă de proprietate (ex. "... apartament 83" -> "83"),
+// ca să poată fi comparat cu apartamentul citit de AI de pe factură. Ignoră alte numere din
+// adresă (nr. stradă etc.) căutând explicit cuvântul "apartament".
+function apartmentNumberFromEticheta(eticheta: string): string {
+  const match = eticheta.match(/apartament\w*\.?\s*(?:nr\.?)?\s*(\d+)/i)
+  return match ? match[1].replace(/^0+(?=\d)/, '') : ''
+}
+
+function findLocatieMatch(locatii: ProprietarLocatie[], apartmentRaw?: string | null) {
+  const apartment = String(apartmentRaw || '').replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+  if (!apartment) return undefined
+  return locatii.find(l => apartmentNumberFromEticheta(l.eticheta) === apartment)
+}
+
 export default function DispozitieModule({ firma, firmeDisponibile, lunaId, tasks, proprietari = [] }: Props) {
   const [firmaId, setFirmaId] = useState(firma.id)
   const selectedFirma = firmeDisponibile.find(f => f.id === firmaId) || firma
@@ -79,7 +93,8 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
   const [editId, setEditId] = useState('')
   const [attachedInvoices, setAttachedInvoices] = useState<AttachmentDoc[]>([])
   const [invoiceBusy, setInvoiceBusy] = useState(false)
-  const [duplicateWarnings, setDuplicateWarnings] = useState<string[]>([])
+  const [duplicateWarnings, setDuplicateWarnings] = useState<{ docId:string; text:string }[]>([])
+  const [removingInvoiceId, setRemovingInvoiceId] = useState('')
   const [deletingId, setDeletingId] = useState('')
   const [templateBusy, setTemplateBusy] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
@@ -252,7 +267,8 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
 
   async function analyzeInvoices(files: FileList) {
     setInvoiceBusy(true); setError(''); setDuplicateWarnings([])
-    const newWarnings: string[] = []
+    const newWarnings: { docId:string; text:string }[] = []
+    let locatieAlreadyChosen = !!selectedLocatieId
     for (const file of Array.from(files)) {
       const fd = new FormData()
       fd.append('file', file); fd.append('firmaId', selectedFirma.id); fd.append('lunaId', selectedLunaId); fd.append('number', number)
@@ -264,11 +280,33 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
       if (data.amount) setAmount(prev => String(Math.round(((Number(prev) || 0) + data.amount) * 100) / 100))
       if (data.duplicateWarning) {
         const warning = data.duplicateWarning as DuplicateWarning
-        newWarnings.push(`„${data.document?.fisier_nume || file.name}" pare duplicat cu „${warning.fisierNume}" (${duplicateReasonLabel(warning)}${duplicateDateLabel(warning.createdAt)}) — verifică să nu fie factura de luna trecută sau deja salvată.`)
+        newWarnings.push({
+          docId: data.document?.id,
+          text: `„${data.document?.fisier_nume || file.name}" pare duplicat cu „${warning.fisierNume}" (${duplicateReasonLabel(warning)}${duplicateDateLabel(warning.createdAt)}) — verifică să nu fie factura de luna trecută sau deja salvată.`,
+        })
+      }
+      // Dacă factura are un apartament recunoscut și nicio proprietate nu a fost aleasă încă
+      // (nici manual, nici de o factură anterioară din același lot), recomandăm automat proprietarul.
+      if (!locatieAlreadyChosen && data.locatie) {
+        const match = findLocatieMatch(locatii, data.locatie)
+        if (match) { applyLocatie(match.id); locatieAlreadyChosen = true }
       }
     }
     if (newWarnings.length) setDuplicateWarnings(newWarnings)
     setInvoiceBusy(false)
+  }
+
+  async function removeAttachedInvoice(doc: AttachmentDoc) {
+    if (!confirm(`Ștergi definitiv factura „${doc.fisier_nume}"? Nu va mai putea fi recuperată.`)) return
+    setRemovingInvoiceId(doc.id)
+    const res = await fetch(`/api/chitante/dispozitie/analyze?id=${encodeURIComponent(doc.id)}`, { method:'DELETE' })
+    const data = await res.json().catch(()=>({}))
+    if (!res.ok) setError(data.error || 'Nu am putut șterge factura')
+    else {
+      setAttachedInvoices(prev => prev.filter(i => i.id !== doc.id))
+      setDuplicateWarnings(prev => prev.filter(w => w.docId !== doc.id))
+    }
+    setRemovingInvoiceId('')
   }
 
   function editDisposition(doc: DispDoc) {
@@ -423,11 +461,24 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
               <button onClick={()=>invoiceRef.current?.click()} disabled={invoiceBusy} style={{ border:'1px solid var(--c-333333)', borderRadius:'8px', background:'var(--c-1a1a1a)', color:'var(--c-cccccc)', padding:'9px 14px', cursor:'pointer', fontSize:'12px', whiteSpace:'nowrap' }}>{invoiceBusy?'AI analizează...':'+ Facturi AI'}</button>
               <input ref={invoiceRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e=>e.target.files&&analyzeInvoices(e.target.files)}/>
             </div>
-            {attachedInvoices.length>0 ? <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>{attachedInvoices.map(i=><span key={i.id} style={{ fontSize:'10px', padding:'3px 7px', borderRadius:'5px', background:'var(--c-1a1a1a)', color:'var(--c-888888)' }}>{i.fisier_nume}{periodFromFurnizor(i.furnizor) ? ` · luna ${periodFromFurnizor(i.furnizor)}` : i.data_document ? ` · fact. ${roDate(i.data_document)}` : ''}</span>)}</div> : <div style={{ fontSize:'12px', color:'var(--c-777777)' }}>Nu sunt facturi atașate încă.</div>}
+            {attachedInvoices.length>0 ? <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>{attachedInvoices.map(i=>{
+              const isDuplicate = duplicateWarnings.some(w=>w.docId===i.id)
+              return (
+                <span key={i.id} style={{
+                  display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'10px', padding:'3px 4px 3px 7px', borderRadius:'5px',
+                  background: isDuplicate ? 'light-dark(rgba(220,38,38,.14), rgba(248,113,113,.1))' : 'var(--c-1a1a1a)',
+                  border: isDuplicate ? '1px solid light-dark(rgba(220,38,38,.5), rgba(248,113,113,.4))' : '1px solid transparent',
+                  color: isDuplicate ? 'var(--accent-red)' : 'var(--c-888888)',
+                }}>
+                  {isDuplicate && '⚠ '}{i.fisier_nume}{periodFromFurnizor(i.furnizor) ? ` · luna ${periodFromFurnizor(i.furnizor)}` : i.data_document ? ` · fact. ${roDate(i.data_document)}` : ''}
+                  <button onClick={()=>removeAttachedInvoice(i)} disabled={removingInvoiceId===i.id} title="Șterge definitiv factura" style={{ border:'none', background:'transparent', color:'inherit', opacity:.7, cursor:'pointer', fontSize:'10px', padding:'0 2px', lineHeight:1 }}>{removingInvoiceId===i.id?'...':'✕'}</button>
+                </span>
+              )
+            })}</div> : <div style={{ fontSize:'12px', color:'var(--c-777777)' }}>Nu sunt facturi atașate încă.</div>}
             {duplicateWarnings.length>0 && (
               <div style={{ marginTop:'8px', padding:'8px 12px', borderRadius:'8px', background:'light-dark(rgba(220,38,38,.2), rgba(248,113,113,.08))', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))', display:'flex', flexDirection:'column', gap:'4px' }}>
-                {duplicateWarnings.map((w,i)=>(
-                  <span key={i} style={{ fontSize:'11px', color:'var(--accent-red)' }}>⚠ {w}</span>
+                {duplicateWarnings.map(w=>(
+                  <span key={w.docId} style={{ fontSize:'11px', color:'var(--accent-red)' }}>⚠ {w.text}</span>
                 ))}
               </div>
             )}
