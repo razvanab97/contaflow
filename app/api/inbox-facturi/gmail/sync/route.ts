@@ -176,7 +176,10 @@ async function refreshAccessToken(source: InboxSource) {
 }
 
 async function gmailJson<T>(url: string, accessToken: string): Promise<T> {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(30_000),
+  })
   const json = await res.json().catch(() => ({})) as T & { error?: { message?: string } }
   if (!res.ok) throw new Error(json.error?.message || 'Gmail API a întors eroare')
   return json as T
@@ -221,6 +224,11 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
     started_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).eq('id', job.id)
+  await updateJobProgress(sb, job, { messagesChecked: 0, pdfsFound: 0 }, {
+    status: 'info',
+    text: 'Job pornit pe server',
+    detail: 'Pregătesc citirea Gmail',
+  })
 
   try {
     const { data: source, error: sourceError } = await sb
@@ -231,9 +239,24 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
       .eq('provider', 'gmail')
       .single()
     if (sourceError || !source) throw new Error(sourceError?.message || 'Sursa Gmail nu există')
+    await updateJobProgress(sb, job, {}, {
+      status: 'info',
+      text: `Sursa Gmail găsită: ${source.eticheta}`,
+      detail: source.email || null,
+    })
 
+    await updateJobProgress(sb, job, {}, {
+      status: 'info',
+      text: 'Verific tokenul Google',
+      detail: 'Dacă se oprește aici, contul trebuie reconectat',
+    })
     const accessToken = await refreshAccessToken(source as InboxSource)
     if (!accessToken) throw new Error('Conexiunea Gmail nu are access token. Reconectează contul Google.')
+    await updateJobProgress(sb, job, {}, {
+      status: 'info',
+      text: 'Token Google valid',
+      detail: 'Încep căutarea emailurilor',
+    })
 
     const { query, since: sinceDate, until: untilDate } = gmailQuery(job.luna, job.result?.sinceDate, job.result?.untilDate)
     await updateJobProgress(sb, job, { since: sinceDate, until: untilDate, messagesChecked: 0, pdfsFound: 0, imported: [] }, {
@@ -334,6 +357,11 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
     }).eq('id', job.id)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Sincronizarea Gmail a eșuat'
+    await updateJobProgress(sb, job, {}, {
+      status: 'eroare',
+      text: 'Sincronizarea s-a oprit',
+      detail: message,
+    })
     await sb.from('inbox_surse_email').update({
       status: 'eroare',
       connection_error: message,
@@ -440,15 +468,57 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const staleCutoff = new Date(Date.now() - 3 * 60_000).toISOString()
   const { data: running } = await sb
     .from('inbox_sync_jobs')
-    .select('id,status,created_at')
+    .select('id,status,created_at,updated_at,result')
     .eq('source_id', cleanSourceId)
     .eq('firma_id', cleanFirmaId)
     .in('status', ['queued', 'running'])
     .order('created_at', { ascending: false })
     .limit(1)
-  if (running?.[0]) return NextResponse.json({ job: running[0], alreadyRunning: true })
+  const runningJob = running?.[0] as (SyncJob & { updated_at?: string | null }) | undefined
+  if (runningJob && (!runningJob.updated_at || runningJob.updated_at >= staleCutoff)) {
+    return NextResponse.json({ job: runningJob, alreadyRunning: true })
+  }
+  if (runningJob) {
+    const staleResult = {
+      ...(runningJob.result || {}),
+      activity: [
+        ...((runningJob.result as SyncResult | null)?.activity || []),
+        {
+          time: new Date().toISOString(),
+          status: 'eroare' as const,
+          text: 'Job marcat blocat',
+          detail: 'Nu a mai actualizat progresul de peste 3 minute; poți reporni sincronizarea.',
+        },
+      ].slice(-80),
+    }
+    await sb.from('inbox_sync_jobs').update({
+      status: 'error',
+      error_message: 'Job blocat fără progres peste 3 minute',
+      result: staleResult,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', runningJob.id)
+  }
+
+  const range = gmailQuery(cleanLuna, cleanSinceDate, cleanUntilDate)
+  const initialResult: SyncResult = {
+    sinceDate: cleanSinceDate,
+    untilDate: cleanUntilDate,
+    since: range.since,
+    until: range.until,
+    messagesChecked: 0,
+    pdfsFound: 0,
+    imported: [],
+    activity: [{
+      time: new Date().toISOString(),
+      status: 'info',
+      text: 'Sincronizare trimisă la server',
+      detail: `${range.since}${range.until ? ` → ${range.until}` : ' → azi'}`,
+    }],
+  }
 
   const { data: job, error } = await sb.from('inbox_sync_jobs').insert({
     source_id: cleanSourceId,
@@ -456,7 +526,7 @@ export async function POST(req: NextRequest) {
     luna_id: cleanLunaId,
     luna: cleanLuna,
     status: 'queued',
-    result: { sinceDate: cleanSinceDate, untilDate: cleanUntilDate },
+    result: initialResult,
     updated_at: new Date().toISOString(),
   }).select('id,source_id,firma_id,luna_id,luna,status,result,created_at,updated_at').single()
   if (error || !job) return NextResponse.json({ error: error?.message || 'Jobul nu a putut fi creat' }, { status: 500 })

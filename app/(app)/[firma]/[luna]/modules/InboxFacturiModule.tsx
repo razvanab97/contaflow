@@ -128,6 +128,12 @@ function todayIso() {
   return date.toISOString().slice(0, 10)
 }
 
+function isJobStale(job: SyncJob | null | undefined) {
+  if (!job || (job.status !== 'queued' && job.status !== 'running')) return false
+  const updated = job.updated_at ? new Date(job.updated_at).getTime() : 0
+  return !updated || Date.now() - updated > 3 * 60_000
+}
+
 export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   firma: Firma
   lunaId: string
@@ -395,10 +401,10 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     return `Ultimul sync${since}${until}: ${job.imported_count || 0} noi, ${job.duplicate_count || 0} duplicate, ${job.skipped_count || 0} sărite`
   }
 
-  const liveJob = syncJobs.find(job => job.status === 'running' || job.status === 'queued') || syncJobs[0] || null
+  const liveJob = syncJobs.find(job => (job.status === 'running' || job.status === 'queued') && !isJobStale(job)) || syncJobs[0] || null
   const liveSource = liveJob ? sources.find(source => source.id === liveJob.source_id) : null
   const liveActivity = liveJob?.result?.activity || []
-  const liveRunning = liveJob?.status === 'queued' || liveJob?.status === 'running'
+  const liveRunning = (liveJob?.status === 'queued' || liveJob?.status === 'running') && !isJobStale(liveJob)
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
@@ -410,7 +416,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
           const active = source?.status === 'activ'
           const editing = editingSource === sourceDef.title
           const job = latestJobFor(source?.id)
-          const jobRunning = job?.status === 'queued' || job?.status === 'running'
+          const jobRunning = (job?.status === 'queued' || job?.status === 'running') && !isJobStale(job)
           return (
           <div key={sourceDef.key} style={{ background:'var(--c-111111)', border:`1px solid ${active ? 'rgba(74,222,128,.25)' : 'var(--c-222222)'}`, borderRadius:'12px', padding:'14px 16px' }}>
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
