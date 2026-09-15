@@ -15,6 +15,7 @@ type DuplicateWarning = {
   fisierNume:string
   motiv:'fisier_identic'|'numar_factura'|'detalii_factura'|'suma_apartament_perioada'
   createdAt?:string|null
+  existingDocumentId?:string|null
 }
 
 function dpLabel(doc: DispDoc): string {
@@ -59,18 +60,47 @@ function duplicateDateLabel(value?: string | null) {
   return `, încărcată pe ${date.toLocaleDateString('ro-RO')}`
 }
 
-// Extrage numărul de apartament dintr-o etichetă de proprietate (ex. "... apartament 83" -> "83"),
-// ca să poată fi comparat cu apartamentul citit de AI de pe factură. Ignoră alte numere din
-// adresă (nr. stradă etc.) căutând explicit cuvântul "apartament".
+// Extrage numărul de apartament dintr-un text (etichetă de proprietate sau adresa citită de AI
+// de pe factură): "... apartament 83" / "... ap. 83" -> "83", iar un text care e doar un număr
+// ("83") e luat ca atare. Ignoră celelalte numere din adresă (nr. stradă, bloc etc.).
 function apartmentNumberFromEticheta(eticheta: string): string {
-  const match = eticheta.match(/apartament\w*\.?\s*(?:nr\.?)?\s*(\d+)/i)
-  return match ? match[1].replace(/^0+(?=\d)/, '') : ''
+  const match = String(eticheta || '').match(/\bap(?:artament(?:ul)?)?\.?\s*(?:nr\.?)?\s*(\d+)/i)
+  if (match) return match[1].replace(/^0+(?=\d)/, '')
+  const bare = String(eticheta || '').trim().match(/^(\d+)$/)
+  return bare ? bare[1].replace(/^0+(?=\d)/, '') : ''
+}
+
+const STOPWORDS = new Set(['strada','stradă','str','numarul','numărul','nr','bloc','bl','ap','apartament','apartamentul','villa','vila'])
+
+// Cuvinte "semnificative" (nume de stradă/loc) și numere dintr-un text, pentru potrivire
+// când adresa nu are un apartament explicit (case, vile) - facturile de utilități (curent,
+// gaz) au adesea doar adresa de livrare, nu un identificator de apartament din lista noastră.
+function wordsAndNumbers(text: string): { words:string[]; numbers:string[] } {
+  const clean = String(text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const tokens = clean.split(/\s+/).filter(Boolean)
+  const words = tokens.filter(t => /[a-z]/.test(t) && t.length >= 4 && !STOPWORDS.has(t))
+  const numbers = tokens.filter(t => /^\d+$/.test(t)).map(n => n.replace(/^0+(?=\d)/, ''))
+  return { words, numbers }
 }
 
 function findLocatieMatch(locatii: ProprietarLocatie[], apartmentRaw?: string | null) {
-  const apartment = String(apartmentRaw || '').replace(/\D/g, '').replace(/^0+(?=\d)/, '')
-  if (!apartment) return undefined
-  return locatii.find(l => apartmentNumberFromEticheta(l.eticheta) === apartment)
+  const raw = String(apartmentRaw || '').trim()
+  if (!raw) return undefined
+  const apartment = apartmentNumberFromEticheta(raw)
+  if (apartment) {
+    const byApartment = locatii.find(l => apartmentNumberFromEticheta(l.eticheta) === apartment)
+    if (byApartment) return byApartment
+  }
+  // Proprietăți fără "apartament" în etichetă (case/vile identificate prin stradă + număr):
+  // cerem și un cuvânt comun (numele străzii), nu doar un număr, ca să evităm potriviri
+  // întâmplătoare pe un simplu "nr. 7" care ar putea apărea pe orice altă adresă.
+  const invoice = wordsAndNumbers(raw)
+  if (!invoice.words.length) return undefined
+  return locatii.find(l => {
+    if (apartmentNumberFromEticheta(l.eticheta)) return false
+    const et = wordsAndNumbers(l.eticheta)
+    return et.words.some(w => invoice.words.includes(w)) && et.numbers.some(n => invoice.numbers.includes(n))
+  })
 }
 
 export default function DispozitieModule({ firma, firmeDisponibile, lunaId, tasks, proprietari = [] }: Props) {
@@ -93,7 +123,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
   const [editId, setEditId] = useState('')
   const [attachedInvoices, setAttachedInvoices] = useState<AttachmentDoc[]>([])
   const [invoiceBusy, setInvoiceBusy] = useState(false)
-  const [duplicateWarnings, setDuplicateWarnings] = useState<{ docId:string; text:string }[]>([])
+  const [duplicateWarnings, setDuplicateWarnings] = useState<{ docId:string; text:string; existingDocumentId?:string|null }[]>([])
   const [removingInvoiceId, setRemovingInvoiceId] = useState('')
   const [deletingId, setDeletingId] = useState('')
   const [templateBusy, setTemplateBusy] = useState(false)
@@ -267,15 +297,18 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
 
   async function analyzeInvoices(files: FileList) {
     setInvoiceBusy(true); setError(''); setDuplicateWarnings([])
-    const newWarnings: { docId:string; text:string }[] = []
+    const newWarnings: { docId:string; text:string; existingDocumentId?:string|null }[] = []
     let locatieAlreadyChosen = !!selectedLocatieId
+    const attachedIdsSoFar = attachedInvoices.map(i => i.id)
     for (const file of Array.from(files)) {
       const fd = new FormData()
       fd.append('file', file); fd.append('firmaId', selectedFirma.id); fd.append('lunaId', selectedLunaId); fd.append('number', number)
+      fd.append('existingAttachmentIds', attachedIdsSoFar.join(','))
       const res = await fetch('/api/chitante/dispozitie/analyze', { method:'POST', body:fd })
       const data = await res.json().catch(()=>({}))
       if (!res.ok) { setError(data.error||'Analiza nu a reușit'); break }
       setAttachedInvoices(prev=>[...prev, data.document])
+      if (data.document?.id) attachedIdsSoFar.push(data.document.id)
       if (data.purpose) setPurpose(prev=>prev ? `${prev}; ${data.purpose}` : data.purpose)
       if (data.amount) setAmount(prev => String(Math.round(((Number(prev) || 0) + data.amount) * 100) / 100))
       if (data.duplicateWarning) {
@@ -283,6 +316,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
         newWarnings.push({
           docId: data.document?.id,
           text: `„${data.document?.fisier_nume || file.name}" pare duplicat cu „${warning.fisierNume}" (${duplicateReasonLabel(warning)}${duplicateDateLabel(warning.createdAt)}) — verifică să nu fie factura de luna trecută sau deja salvată.`,
+          existingDocumentId: warning.existingDocumentId,
         })
       }
       // Dacă factura are un apartament recunoscut și nicio proprietate nu a fost aleasă încă
@@ -478,7 +512,12 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
             {duplicateWarnings.length>0 && (
               <div style={{ marginTop:'8px', padding:'8px 12px', borderRadius:'8px', background:'light-dark(rgba(220,38,38,.2), rgba(248,113,113,.08))', border:'1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))', display:'flex', flexDirection:'column', gap:'4px' }}>
                 {duplicateWarnings.map(w=>(
-                  <span key={w.docId} style={{ fontSize:'11px', color:'var(--accent-red)' }}>⚠ {w.text}</span>
+                  <div key={w.docId} style={{ display:'flex', alignItems:'baseline', gap:'8px', flexWrap:'wrap' }}>
+                    <span style={{ fontSize:'11px', color:'var(--accent-red)' }}>⚠ {w.text}</span>
+                    {w.existingDocumentId && (
+                      <a href={`/api/chitante/document?id=${encodeURIComponent(w.existingDocumentId)}&preview=1`} target="_blank" rel="noopener noreferrer" style={{ fontSize:'11px', color:'#8DB8FF', whiteSpace:'nowrap' }}>Vezi factura originală ↗</a>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

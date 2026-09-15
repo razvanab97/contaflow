@@ -63,6 +63,7 @@ function dispositionUtility(extracted: { category?:string; supplier?:string }) {
 }
 
 type ExistingInvoice = {
+  id:string
   fisier_nume:string
   furnizor:string|null
   numar_document:string|null
@@ -112,6 +113,7 @@ export async function POST(req: NextRequest) {
     const firmaId = String(fd.get('firmaId') || '')
     const lunaId = String(fd.get('lunaId') || '')
     const number = String(fd.get('number') || 'draft')
+    const existingAttachmentIds = String(fd.get('existingAttachmentIds') || '').split(',').map(s => s.trim()).filter(Boolean)
     if (!file || !firmaId || !lunaId || !ALLOWED_TYPES.has(file.type))
       return NextResponse.json({ error:'Fișier sau date lipsă' }, { status:400 })
 
@@ -138,15 +140,21 @@ export async function POST(req: NextRequest) {
     const utilitate = dispositionUtility(extracted)
     const invoiceDate = normalizeInvoiceDate(extracted.invoiceDate)
 
-    let duplicateWarning: { fisierNume:string; motiv:'fisier_identic'|'numar_factura'|'detalii_factura'|'suma_apartament_perioada'; createdAt:string|null } | null = null
+    let duplicateWarning: { fisierNume:string; motiv:'fisier_identic'|'numar_factura'|'detalii_factura'|'suma_apartament_perioada'; createdAt:string|null; existingDocumentId:string } | null = null
     if (documentHash || extracted.invoiceNumber || extracted.amount) {
-      const { data: existing } = await sb.from('documente')
-        .select('fisier_nume,furnizor,numar_document,suma,locatie,utilitate,data_document,fisier_marime,created_at')
+      const { data: existingRaw } = await sb.from('documente')
+        .select('id,fisier_nume,furnizor,numar_document,suma,locatie,utilitate,data_document,fisier_marime,created_at')
         .eq('firma_id', firmaId)
         .eq('tip_document', 'factura')
         .like('fisier_path', '%/dispozitii-plata/atasamente/%')
         .order('created_at', { ascending:false })
         .limit(500)
+      // O ciornă de dispoziție părăsită (atașată, dar dispoziția n-a fost niciodată generată/salvată)
+      // nu mai trebuie să conteze ca "deja existentă" - altfel orice reîncercare a aceluiași lot de
+      // facturi iese mereu ca duplicat fals. Contează doar facturile deja incluse într-o dispoziție
+      // salvată ("Atașament DP ...") sau cele atașate chiar acum, în lotul curent, nesalvat încă.
+      const existingIds = new Set(existingAttachmentIds)
+      const existing = (existingRaw || []).filter(inv => String(inv.furnizor || '').startsWith('Atașament DP ') || existingIds.has(inv.id))
       const current = {
         hash: documentHash,
         size: bytes.length,
@@ -157,7 +165,7 @@ export async function POST(req: NextRequest) {
         invoiceDate,
         period: extracted.representingPeriod,
       }
-      const duplicate = (existing || []).map(invoice => ({
+      const duplicate = existing.map(invoice => ({
         invoice,
         motiv: duplicateReason(invoice as ExistingInvoice, current),
       })).find(match => match.motiv)
@@ -165,6 +173,7 @@ export async function POST(req: NextRequest) {
         fisierNume: duplicate.invoice.fisier_nume,
         motiv: duplicate.motiv,
         createdAt: duplicate.invoice.created_at || null,
+        existingDocumentId: duplicate.invoice.id,
       }
     }
 

@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 97, text: 'Dispoziții de plată: o factură atașată și neșters nu mai apare ca "duplicat" data viitoare dacă dispoziția n-a fost niciodată salvată — contează doar facturile deja incluse într-o dispoziție generată sau atașate chiar acum. Avertismentul de duplicat are buton "Vezi factura originală" ca să compari direct cele două fișiere. Potrivirea automată a proprietarului acoperă acum și adrese fără "apartament" (case/vile, ex. "Munteni nr 7"), nu doar apartamente numerotate' },
   { v: 96, text: 'Dispoziții de plată: la atașarea unei facturi AI, dacă apartamentul citit se potrivește cu o proprietate configurată, proprietarul se recomandă automat, fără să mai alegi din listă. Factura suspectată de duplicat apare evidențiată cu roșu direct în lista de atașamente, iar fiecare factură atașată are acum un buton de ștergere definitivă (din bază + fișier), pentru cazul în care e greșită sau duplicat' },
   { v: 95, text: 'Dispoziții de plată: alegi proprietatea dintr-un dropdown (gestionabil, adaugi/ștergi din pagină) și proprietarul se precompletează automat cu nume și serie/număr CI, fără căutare manuală. Fix: numele cu diacritice nu mai apar trunchiate în PDF (ex. "Bordeanu Dănuț" nu mai ieșea ca "Bordeanu Dnu")' },
   { v: 94, text: 'Airbnb Facturi: importul din link citește PDF-ul facturii, salvează datele extrase și îl asociază automat cu rezervarea din borderou când găsește codul sau suma' },
