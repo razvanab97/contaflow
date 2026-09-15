@@ -6,7 +6,29 @@ import { isEonInvoice, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
-type ExtractedInvoice = { category?:string; amount?:number; supplier?:string; series?:string; invoiceNumber?:string; apartment?:string; invoiceDate?:string; representingPeriod?:string }
+type ExtractedInvoice = { category?:string; amount?:number; supplier?:string; series?:string; invoiceNumber?:string; apartment?:string; invoiceDate?:string; representingPeriod?:string; receiptFrom?:string }
+
+// Instrucțiuni generale + o regulă specifică pentru chitanțele (scrise de mână) ale ASOCIAȚIEI
+// DE LOCATARI BL. CFR PT. GARA 2 (CIF 5552650) - regula se activează doar dacă AI-ul recunoaște
+// efectiv acest emitent pe document, deci nu afectează facturile/chitanțele altor furnizori.
+const INVOICE_EXTRACTION_PROMPT = `Extrage datele facturii sau chitanței pentru o dispoziție de plată. Documentul poate fi o factură tipărită SAU o chitanță fotografiată/scanată, cu câmpuri completate de mână și posibil hârtie îndoită, umbre, ștampilă peste text sau semnătură - analizează vizual imaginea (nu te baza doar pe OCR) și citește cu atenție atât textul tipărit, cât și scrisul de mână. Nu interpreta ștampila sau semnătura ca text de câmp.
+
+Returnează DOAR JSON, fără text suplimentar:
+{"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria documentului","invoiceNumber":"numarul documentului","apartment":"numarul apartamentului sau adresa scurta (bloc/apartament)","invoiceDate":"ZZ.LL.AAAA","representingPeriod":"copiaza exact textul din campul reprezentand/pentru luna — poate fi o luna (ex: Mai 2026) sau doua luni (ex: Mai si Iunie 2026) — lasa null daca nu exista acest camp","receiptFrom":"numele persoanei de la campul \\"Am primit de la\\" (doar pentru chitante), sau null"}
+
+Reguli generale:
+- Nu scrie descrieri lungi, nu inventa date. Dacă un câmp este parțial ilizibil, lasă-l null - mai bine null decât o valoare inventată.
+- Pentru "amount": suma NUMERICĂ (câmpul "Suma de") are prioritate față de suma scrisă în litere; normalizează formatul românesc la cel intern (1.000,00 -> 1000, 443,52 -> 443.52). Dacă după virgulă e scrisă o SINGURĂ cifră (ex: "1000,0"), aceasta înseamnă zecimi, deci completează cu un zero la final (1000,0 -> 1000.00) - nu adăuga altă cifră.
+- Cifrele scrise de mână pot fi ambigue (mai ales în cifre grăbite/cursive): "5" poate semăna cu "2", "3" cu "9" sau "8", "1" cu "7". Când citești un număr scris de mână (număr de chitanță, dată), analizează FIECARE cifră separat după forma buclelor/liniilor ei, nu citi numărul "din prima impresie" - o cifră confundată schimbă tot numărul.
+
+Regulă specifică pentru chitanțele emise de ASOCIAȚIA DE LOCATARI BL. CFR PT. GARA 2 (CIF/CUI 5552650, Iași, Str. Silvestru Străpungere nr. 7) - se aplică NUMAI dacă acest emitent apare tipărit pe document:
+- "supplier" = numele asociației, tipărit în partea superioară a chitanței (nu confunda cu numele proprietarului de mai jos).
+- "invoiceNumber" = numărul SCRIS DE MÂNĂ de lângă "CHITANȚA Nr." - NU numărul tipărit de lângă "Seria B / Nr." din dreapta sus; sunt două câmpuri diferite ale formularului și au aproape mereu valori diferite (numărul tipărit e al formularului pre-tipărit din carnet, cel scris de mână e numărul real, secvențial, al chitanței - acesta din urmă contează). Citește cu foarte mare atenție fiecare cifră scrisă de mână, cifră cu cifră.
+- "series" = litera tipărită de lângă "Seria" (de obicei "B").
+- "apartment" = numărul blocului SCRIS DE MÂNĂ la câmpul "Adresa" (NU adresa tipărită "Sediul: ... Bl. I5, Sc. A, Et. 1" din antet, care e sediul asociației, alt câmp, nu adresa proprietarului), plus apartamentul, format "Bloc <cifra scrisă de mână>, ap. 8" (ex: "Bloc 4, ap. 8"). Abrevierea scrisă de mână "c. 8" sau cifra simplă "8" lângă bloc înseamnă tot apartamentul - normalizează mereu la "ap. 8" în răspuns, dar numărul blocului citește-l exact cum e scris de mână, nu-l inventa. Dacă la câmpul "Am primit de la" apare "Grumăzescu", "GRUMAZESCU" sau o variantă foarte apropiată, apartamentul este ÎNTOTDEAUNA 8, indiferent cum arată cifra scrisă de mână lângă "c." sau "ap." la acel câmp.
+- "receiptFrom" = numele scris de mână la "Am primit de la". Pentru chitanțele acestei asociații, chiriașul/proprietarul e aproape întotdeauna Grumăzescu Angela - dacă scrisul de mână e neclar dar SEAMĂNĂ cu acest nume (chiar și parțial, ex. conține "GR", "MAZESCU", "ANGELA" sau variante cu litere confundate), returnează "Grumăzescu Angela"; folosește null doar dacă numele pare clar diferit sau complet ilizibil.
+- "representingPeriod" = copiază textul scris de mână la câmpul "reprezentând" (poate fi "întreținere", o lună/perioadă, sau altă explicație) dacă poate fi citit cu suficientă încredere, chiar dacă nu e strict un nume de lună; altfel null.
+- "category" = "asociatie".`
 
 async function extractInvoiceData(client: Anthropic, bytes: Buffer, mimeType: string): Promise<ExtractedInvoice> {
   const source = mimeType === 'application/pdf'
@@ -17,7 +39,7 @@ async function extractInvoiceData(client: Anthropic, bytes: Buffer, mimeType: st
     max_tokens:500,
     messages:[{ role:'user', content:[
       source,
-      { type:'text', text:'Extrage datele facturii sau chitantei pentru o dispozitie de plata. Citeste cu atentie textul scris de mana. Returneaza doar JSON: {"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria documentului","invoiceNumber":"numarul documentului","apartment":"numarul apartamentului","invoiceDate":"ZZ.LL.AAAA","representingPeriod":"copiaza exact textul din campul reprezentand/pentru luna — poate fi o luna (ex: Mai 2026) sau doua luni (ex: Mai si Iunie 2026) — lasa null daca nu exista acest camp"}. Nu scrie descrieri lungi, nu inventa date.' },
+      { type:'text', text:INVOICE_EXTRACTION_PROMPT },
     ] }],
   })
   const raw = response.content.filter(block=>block.type==='text').map(block=>(block as {text:string}).text).join('')
@@ -219,7 +241,7 @@ export async function POST(req: NextRequest) {
       suma: extracted.amount || null, locatie: extracted.apartment || null, utilitate: utilitate || null, data_document: invoiceDate,
     }).select('id,fisier_nume,furnizor,data_document,created_at,locatie,utilitate,suma').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error:error.message }, { status:500 }) }
-    return NextResponse.json({ document, purpose, amount:extracted.amount || null, locatie:extracted.apartment || null, utilitate: utilitate || null, duplicateWarning })
+    return NextResponse.json({ document, purpose, amount:extracted.amount || null, locatie:extracted.apartment || null, utilitate: utilitate || null, receiptFrom: extracted.receiptFrom || null, duplicateWarning })
   } catch (error) {
     return NextResponse.json({ error:String(error) }, { status:500 })
   }
