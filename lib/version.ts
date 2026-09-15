@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 93, text: 'Airbnb: borderoul acceptă CSV, generează automat lista de facturi așteptate pentru rezervări, iar PDF-urile încărcate în Airbnb Facturi se asociază singure după cod/sumă' },
   { v: 92, text: 'Inbox Facturi: jurnalul live Gmail pornește imediat la apăsarea sincronizării, are timeout pe apelurile Google și deblochează automat job-urile rămase fără progres' },
   { v: 91, text: 'Inbox Facturi: sincronizarea Gmail afișează jurnal live cu emailurile și PDF-urile citite, plus rezultat pe fiecare PDF: importat, duplicat sau sărit' },
   { v: 90, text: 'Inbox Facturi: Gmail are buton Preview înainte de sincronizare; vezi emailurile, expeditorii și PDF-urile găsite în intervalul ales fără să imporți nimic' },

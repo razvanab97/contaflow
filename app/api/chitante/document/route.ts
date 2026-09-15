@@ -54,6 +54,13 @@ export async function DELETE(req: NextRequest) {
   const { error: unlinkError } = await sb.from('tranzactii').update({ document_id: null }).eq('document_id', id)
   if (unlinkError) return NextResponse.json({ error: unlinkError.message }, { status: 500 })
 
+  if (path.includes('/airbnb-facturi/')) {
+    await sb
+      .from('airbnb_facturi_asteptate')
+      .update({ factura_document_id: null, status: 'de_atasat', updated_at: new Date().toISOString() })
+      .eq('factura_document_id', id)
+  }
+
   const { error: deleteError } = await sb.from('documente').delete().eq('id', id)
   if (deleteError) {
     if (doc.tranzactie_id) await sb.from('tranzactii').update({ document_id: id }).eq('id', doc.tranzactie_id)

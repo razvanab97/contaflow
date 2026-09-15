@@ -21,7 +21,7 @@ const CONFIG = {
   },
   'airbnb-borderou': {
     title: 'Airbnb · Borderou lunar',
-    description: 'Centralizator lunar descărcat din Airbnb (raport de rezervări)',
+    description: 'Centralizator lunar descărcat din Airbnb (PDF sau CSV; CSV-ul generează facturile de atașat)',
     linkPlaceholder: 'Link PDF borderou Airbnb',
     docTypes: [{ value: 'borderou', label: 'Borderou' }, { value: 'raport_csv', label: 'Raport CSV' }],
   },

@@ -15,6 +15,21 @@ interface Doc {
   data_platii?: string|null
 }
 
+interface AirbnbExpectedInvoice {
+  id: string
+  cod_confirmare: string
+  oaspete?: string | null
+  anunt?: string | null
+  data_start?: string | null
+  data_sfarsit?: string | null
+  data_tranzactie?: string | null
+  moneda?: string | null
+  suma?: number | null
+  status?: string | null
+  factura_document_id?: string | null
+  documente?: { fisier_nume?: string | null } | null
+}
+
 function isPreviewable(tip: string | null | undefined, nume: string) {
   if (tip === 'application/pdf' || nume.toLowerCase().endsWith('.pdf')) return 'pdf'
   if (tip?.startsWith('image/')) return 'image'
@@ -51,6 +66,11 @@ function formatMoney(value?: number | null) {
   return typeof value === 'number' ? `${value.toFixed(2)} RON` : ''
 }
 
+function formatCurrency(value?: number | null, currency?: string | null) {
+  if (typeof value !== 'number') return ''
+  return `${value.toFixed(2)} ${currency || 'RON'}`
+}
+
 function docLabel(doc: Doc) {
   const parts = [
     doc.numar_document ? `Factura ${doc.numar_document}` : '',
@@ -66,6 +86,8 @@ export default function UploadPanel({
   showLinkImport = false, linkPlaceholder, documentTypeOptions, showPaidToggle = false, onChange,
 }: Props) {
   const [docs, setDocs] = useState<Doc[]>([])
+  const [airbnbExpected, setAirbnbExpected] = useState<AirbnbExpectedInvoice[]>([])
+  const [airbnbExpectedError, setAirbnbExpectedError] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
@@ -78,6 +100,9 @@ export default function UploadPanel({
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
   const INP: React.CSSProperties = { fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-bbbbbb)', outline: 'none', width: '100%' }
+  const acceptsCsv = section === 'airbnb-borderou'
+  const fileAccept = acceptsCsv ? '.pdf,.jpg,.jpeg,.png,.csv,text/csv' : '.pdf,.jpg,.jpeg,.png'
+  const acceptLabel = acceptsCsv ? 'PDF, JPG, PNG, CSV' : 'PDF, JPG, PNG'
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/chitante?lunaId=${encodeURIComponent(lunaId)}&firmaId=${encodeURIComponent(firmaId)}&section=${section}`)
@@ -86,7 +111,20 @@ export default function UploadPanel({
     setLoaded(true)
   }, [lunaId, firmaId, section])
 
-  useEffect(() => { load() }, [load])
+  const loadAirbnbExpected = useCallback(async () => {
+    if (section !== 'airbnb-facturi') return
+    const res = await fetch(`/api/airbnb/facturi-asteptate?lunaId=${encodeURIComponent(lunaId)}&firmaId=${encodeURIComponent(firmaId)}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setAirbnbExpected(data.items || [])
+      setAirbnbExpectedError('')
+    } else {
+      setAirbnbExpected([])
+      setAirbnbExpectedError(data.error || 'Nu pot citi facturile așteptate din borderou')
+    }
+  }, [lunaId, firmaId, section])
+
+  useEffect(() => { load(); loadAirbnbExpected() }, [load, loadAirbnbExpected])
 
   async function upload(files: FileList) {
     setBusy(true); setError('')
@@ -105,6 +143,7 @@ export default function UploadPanel({
       if (!res.ok) { const d = await res.json().catch(()=>({})); setError(d.error || 'Eroare upload'); break }
     }
     await load()
+    await loadAirbnbExpected()
     setBusy(false)
     onChange?.()
   }
@@ -119,7 +158,7 @@ export default function UploadPanel({
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setError(data.error || 'Importul nu a reușit')
-    else { setLink(''); await load() }
+    else { setLink(''); await load(); await loadAirbnbExpected() }
     setBusy(false)
   }
 
@@ -136,7 +175,7 @@ export default function UploadPanel({
   async function deleteDoc(doc: Doc) {
     if (!confirm(`Ștergi „${doc.fisier_nume}"?`)) return
     const res = await fetch(`/api/chitante/document?id=${encodeURIComponent(doc.id)}`, { method: 'DELETE' })
-    if (res.ok) { setDocs(prev => prev.filter(d => d.id !== doc.id)); onChange?.() }
+    if (res.ok) { setDocs(prev => prev.filter(d => d.id !== doc.id)); await loadAirbnbExpected(); onChange?.() }
     else { const d = await res.json().catch(() => ({})); setError(d.error || 'Documentul nu a putut fi șters') }
   }
 
@@ -172,6 +211,50 @@ export default function UploadPanel({
       </div>
 
       <div style={{ padding: '18px 22px' }}>
+        {section === 'airbnb-facturi' && (
+          <div style={{ marginBottom: '16px', padding: '12px', border: '1px solid var(--c-1f1f1f)', borderRadius: '10px', background: 'var(--c-0d0d0d)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', marginBottom:'8px' }}>
+              <div>
+                <div style={{ fontSize:'12px', fontWeight:700, color:'var(--c-dddddd)' }}>Facturi cerute de borderoul Airbnb</div>
+                <div style={{ fontSize:'10px', color:'var(--c-777777)' }}>Se generează automat când încarci CSV-ul în Airbnb · Borderou. PDF-urile puse aici se asociază după cod rezervare sau sumă.</div>
+              </div>
+              {airbnbExpected.length > 0 && (
+                <span style={{ fontSize:'10px', fontWeight:700, color:legibil(culoare), background:tint(r, .1), border:`1px solid ${tint(r, .35)}`, borderRadius:'999px', padding:'4px 8px', flexShrink:0 }}>
+                  {airbnbExpected.filter(i => i.factura_document_id).length}/{airbnbExpected.length} atașate
+                </span>
+              )}
+            </div>
+            {airbnbExpectedError && <div style={{ fontSize:'11px', color:'var(--accent-red)' }}>{airbnbExpectedError}</div>}
+            {!airbnbExpectedError && airbnbExpected.length === 0 && (
+              <div style={{ fontSize:'11px', color:'var(--c-777777)' }}>Nu există încă facturi așteptate. Încarcă borderoul CSV Airbnb în modulul „Airbnb · Borderou”.</div>
+            )}
+            {airbnbExpected.length > 0 && (
+              <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+                {airbnbExpected.map(item => {
+                  const attached = !!item.factura_document_id
+                  const dates = [formatDate(item.data_start), formatDate(item.data_sfarsit)].filter(Boolean).join(' - ')
+                  return (
+                    <div key={item.id} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'10px', alignItems:'center', padding:'8px 10px', border:'1px solid var(--c-222222)', borderRadius:'8px', background:attached ? 'light-dark(rgba(5,150,105,.12), rgba(110,231,176,.06))' : 'var(--c-141414)' }}>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ fontSize:'12px', fontWeight:700, color:attached ? 'var(--accent-mint)' : 'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {item.cod_confirmare} · {item.oaspete || 'oaspete necitit'} · {formatCurrency(item.suma, item.moneda)}
+                        </div>
+                        <div style={{ fontSize:'10px', color:'var(--c-666666)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:'2px' }}>
+                          {dates || formatDate(item.data_tranzactie)} {item.anunt ? `· ${item.anunt}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                        <span style={{ fontSize:'10px', fontWeight:700, color:attached ? 'var(--accent-mint)' : 'var(--c-888888)' }}>{attached ? 'atașată' : 'de atașat'}</span>
+                        {attached && <a href={`/api/chitante/document?id=${encodeURIComponent(item.factura_document_id!)}`} style={{ fontSize:'10px', color:legibil(culoare), textDecoration:'none' }}>↓</a>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Document list */}
         {loaded && docs.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
@@ -255,9 +338,9 @@ export default function UploadPanel({
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-666666)', marginBottom: '3px' }}>
             {busy ? 'Se încarcă...' : 'Adaugă fișiere'}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--c-888888)' }}>PDF, JPG, PNG · drag & drop sau click</div>
+          <div style={{ fontSize: '12px', color: 'var(--c-888888)' }}>{acceptLabel} · drag & drop sau click</div>
         </div>
-        <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>
+        <input ref={fileRef} type="file" multiple accept={fileAccept} style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>
 
         {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{error}</p>}
       </div>

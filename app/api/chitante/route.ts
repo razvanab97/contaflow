@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
+const ALLOWED_CSV_TYPES = new Set(['text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain', ''])
 const ALLOWED_CATEGORIES = new Set(['utilitati', 'chirie', 'altul'])
 const ALLOWED_DOCUMENT_TYPES = new Set(['factura', 'chitanta', 'borderou', 'raport_csv', 'contract', 'altul'])
 const ALLOWED_SECTIONS = new Set([
@@ -69,6 +70,20 @@ async function analyzeAngajatiDoc(bytes: Uint8Array, mediaType: string): Promise
 }
 
 type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null }
+type AirbnbBorderouRow = {
+  uniqueKey: string
+  codConfirmare: string
+  oaspete: string | null
+  anunt: string | null
+  dataRezervarii: string | null
+  dataStart: string | null
+  dataSfarsit: string | null
+  dataTranzactie: string | null
+  moneda: string | null
+  suma: number | null
+  taxaServicii: number | null
+  castiguriBrute: number | null
+}
 
 // Citeste orice factura/document (facturi restante, facturi+chitanta, booking, airbnb, trendyol,
 // acte contabile) cu AI, ca titlul fisierului sa reflecte continutul real, nu doar tipul ales manual.
@@ -124,6 +139,157 @@ function safeFilePart(value: string, fallback: string) {
     .slice(0, 70) || fallback
 }
 
+function isCsvFile(file: File) {
+  const name = file.name.toLowerCase()
+  return name.endsWith('.csv') || ALLOWED_CSV_TYPES.has(file.type)
+}
+
+function parseCsv(text: string) {
+  const rows: string[][] = []
+  let row: string[] = []
+  let cell = ''
+  let quoted = false
+  const input = text.replace(/^\uFEFF/, '')
+
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i]
+    const next = input[i + 1]
+    if (quoted) {
+      if (ch === '"' && next === '"') { cell += '"'; i += 1 }
+      else if (ch === '"') quoted = false
+      else cell += ch
+      continue
+    }
+    if (ch === '"') quoted = true
+    else if (ch === ',') { row.push(cell); cell = '' }
+    else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = '' }
+    else if (ch !== '\r') cell += ch
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row) }
+  return rows.filter(r => r.some(c => c.trim()))
+}
+
+function parseCsvNumber(value?: string | null) {
+  const cleaned = String(value || '').trim().replace(/\s/g, '').replace(',', '.').replace(/[^\d.-]/g, '')
+  if (!cleaned) return null
+  const n = Number(cleaned)
+  return Number.isFinite(n) ? n : null
+}
+
+function parseAirbnbDate(value?: string | null) {
+  const raw = String(value || '').trim()
+  const mdY = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (mdY) return `${mdY[3]}-${mdY[1].padStart(2, '0')}-${mdY[2].padStart(2, '0')}`
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : null
+}
+
+function parseAirbnbBorderouCsv(text: string): AirbnbBorderouRow[] {
+  const rows = parseCsv(text)
+  if (rows.length < 2) return []
+  const headers = rows[0].map(h => h.trim().toLowerCase())
+  const idx = (name: string) => headers.indexOf(name.toLowerCase())
+  const at = (row: string[], name: string) => {
+    const i = idx(name)
+    return i >= 0 ? String(row[i] || '').trim() : ''
+  }
+
+  return rows.slice(1)
+    .filter(row => at(row, 'Tip').toLowerCase() === 'rezervare')
+    .map(row => {
+      const codConfirmare = at(row, 'Cod de confirmare')
+      const dataTranzactie = parseAirbnbDate(at(row, 'Data'))
+      const suma = parseCsvNumber(at(row, 'Suma'))
+      return {
+        uniqueKey: [codConfirmare, dataTranzactie || '', suma ?? ''].join('|'),
+        codConfirmare,
+        oaspete: at(row, 'Oaspete') || null,
+        anunt: at(row, 'Anunț') || null,
+        dataRezervarii: parseAirbnbDate(at(row, 'Data rezervării')),
+        dataStart: parseAirbnbDate(at(row, 'Data de început')),
+        dataSfarsit: parseAirbnbDate(at(row, 'Data de sfârșit')),
+        dataTranzactie,
+        moneda: at(row, 'Moneda') || null,
+        suma,
+        taxaServicii: parseCsvNumber(at(row, 'Taxa de servicii')),
+        castiguriBrute: parseCsvNumber(at(row, 'Câștiguri brute')),
+      }
+    })
+    .filter(row => row.codConfirmare)
+}
+
+function normalizedText(...values: Array<string | null | undefined>) {
+  return values.join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+async function saveAirbnbBorderouRows(sb: ReturnType<typeof getServiceSupabase>, params: {
+  firmaId: string
+  lunaId: string
+  documentId: string
+  text: string
+}) {
+  const rows = parseAirbnbBorderouCsv(params.text)
+  if (!rows.length) return 0
+
+  const payload = rows.map(row => ({
+    firma_id: params.firmaId,
+    luna_id: params.lunaId,
+    borderou_document_id: params.documentId,
+    unique_key: row.uniqueKey,
+    cod_confirmare: row.codConfirmare,
+    oaspete: row.oaspete,
+    anunt: row.anunt,
+    data_rezervarii: row.dataRezervarii,
+    data_start: row.dataStart,
+    data_sfarsit: row.dataSfarsit,
+    data_tranzactie: row.dataTranzactie,
+    moneda: row.moneda,
+    suma: row.suma,
+    taxa_servicii: row.taxaServicii,
+    castiguri_brute: row.castiguriBrute,
+    updated_at: new Date().toISOString(),
+  }))
+
+  const { error } = await sb
+    .from('airbnb_facturi_asteptate')
+    .upsert(payload, { onConflict: 'firma_id,luna_id,unique_key' })
+  if (error) throw error
+  return rows.length
+}
+
+async function linkAirbnbInvoiceIfPossible(sb: ReturnType<typeof getServiceSupabase>, params: {
+  firmaId: string
+  lunaId: string
+  documentId: string
+  fileName: string
+  extractie: GenericExtractie | null
+}) {
+  const { data: expected } = await sb
+    .from('airbnb_facturi_asteptate')
+    .select('id,cod_confirmare,suma')
+    .eq('firma_id', params.firmaId)
+    .eq('luna_id', params.lunaId)
+    .is('factura_document_id', null)
+
+  if (!expected?.length) return null
+  const haystack = normalizedText(params.fileName, params.extractie?.numarDocument, params.extractie?.furnizor)
+  const amount = typeof params.extractie?.suma === 'number' ? params.extractie.suma : null
+
+  const match = expected.find(row => {
+    const code = normalizedText(row.cod_confirmare)
+    if (code && haystack.includes(code)) return true
+    const expectedAmount = typeof row.suma === 'number' ? row.suma : Number(row.suma)
+    return amount != null && Number.isFinite(expectedAmount) && Math.abs(expectedAmount - amount) < 0.01
+  })
+  if (!match) return null
+
+  await sb
+    .from('airbnb_facturi_asteptate')
+    .update({ factura_document_id: params.documentId, status: 'atasata', updated_at: new Date().toISOString() })
+    .eq('id', match.id)
+  return match.id
+}
+
 export async function GET(req: NextRequest) {
   const lunaId = req.nextUrl.searchParams.get('lunaId')
   const firmaId = req.nextUrl.searchParams.get('firmaId')
@@ -175,10 +341,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Date lipsă sau invalide' }, { status: 400 })
   if (!simpleSection && (!ALLOWED_CATEGORIES.has(effectiveCategory) || !ALLOWED_DOCUMENT_TYPES.has(effectiveType)))
     return NextResponse.json({ error: 'Date lipsă sau invalide' }, { status: 400 })
-  if (!ALLOWED_TYPES.has(file.type))
-    return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG și PNG' }, { status: 400 })
+  const isAirbnbCsv = section === 'airbnb-borderou' && isCsvFile(file)
+  if (!ALLOWED_TYPES.has(file.type) && !isAirbnbCsv)
+    return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG, PNG și CSV pentru borderoul Airbnb' }, { status: 400 })
 
-  const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
+  const extension = isAirbnbCsv ? 'csv' : file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
   const sb = getServiceSupabase()
 
   let uploadBytes: Uint8Array = new Uint8Array(await file.arrayBuffer())
@@ -199,7 +366,7 @@ export async function POST(req: NextRequest) {
       effectiveDocumentType = angajatiExtractie.tipDocument
       effectiveDocumentTypeLabel = ANGAJATI_TYPE_LABELS[angajatiExtractie.tipDocument] || effectiveDocumentTypeLabel
     }
-  } else {
+  } else if (!isAirbnbCsv) {
     genericExtractie = await analyzeGenericDoc(uploadBytes, file.type)
   }
 
@@ -211,7 +378,7 @@ export async function POST(req: NextRequest) {
   const path = `${firmaId}/${lunaId}/${section}/${fileName}`
 
   const { error: storageError } = await sb.storage.from('documente').upload(path, uploadBytes, {
-    contentType: file.type,
+    contentType: isAirbnbCsv ? 'text/csv' : file.type,
     upsert: false,
   })
   if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
@@ -230,7 +397,7 @@ export async function POST(req: NextRequest) {
       data_document: genericExtractie?.dataDocument || null,
       fisier_path: path,
       fisier_nume: fileName,
-      fisier_tip: file.type,
+      fisier_tip: isAirbnbCsv ? 'text/csv' : file.type,
       fisier_marime: uploadBytes.length,
       in_zip: true,
     })
@@ -242,6 +409,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   if (transactionId) await sb.from('tranzactii').update({ document_id: doc.id, note: null }).eq('id', transactionId)
+
+  let airbnbRows = 0
+  if (isAirbnbCsv) {
+    try {
+      airbnbRows = await saveAirbnbBorderouRows(sb, {
+        firmaId,
+        lunaId,
+        documentId: doc.id,
+        text: new TextDecoder('utf-8').decode(uploadBytes),
+      })
+    } catch (csvError) {
+      await sb.from('documente').delete().eq('id', doc.id)
+      await sb.storage.from('documente').remove([path])
+      return NextResponse.json({ error: `CSV Airbnb invalid sau tabela lipsește: ${String((csvError as Error)?.message || csvError)}` }, { status: 500 })
+    }
+  }
+
+  let airbnbLinkedId: string | null = null
+  if (section === 'airbnb-facturi') {
+    airbnbLinkedId = await linkAirbnbInvoiceIfPossible(sb, {
+      firmaId,
+      lunaId,
+      documentId: doc.id,
+      fileName,
+      extractie: genericExtractie,
+    })
+  }
 
   if (angajatiExtractie && (angajatiExtractie.angajati.length || angajatiExtractie.cas != null || angajatiExtractie.cass != null || angajatiExtractie.impozit != null || angajatiExtractie.totalPlata != null)) {
     await sb.from('angajati_extractii').insert({
@@ -257,5 +451,5 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  return NextResponse.json({ doc })
+  return NextResponse.json({ doc, airbnbRows, airbnbLinkedId })
 }
