@@ -211,6 +211,12 @@ export async function POST(req: NextRequest) {
     for (const mod of moduleOrder) {
       if (sectionMap.has(mod)) ordered.push(mod)
     }
+    // Booking · Borderou nu mai e o pagină/modul propriu-zis (a fost unit cu Booking · Facturi),
+    // deci nu mai apare în lista de module a firmei — îl punem totuși lângă facturile lui, nu la coadă.
+    if (sectionMap.has('booking-borderou') && !ordered.includes('booking-borderou')) {
+      const i = ordered.indexOf('booking-facturi')
+      ordered.splice(i >= 0 ? i + 1 : ordered.length, 0, 'booking-borderou')
+    }
     for (const sec of sectionMap.keys()) {
       if (!ordered.includes(sec)) ordered.push(sec)
     }
