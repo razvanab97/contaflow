@@ -33,8 +33,15 @@ function amountInWords(amount: number) {
   return `${leiWords} lei si ${underHundred(bani)} bani`
 }
 
+// Fontul standard PDF (Helvetica) nu are diacritice, iar eliminarea lor brută trunchia
+// cuvinte întregi (ex. "Bordeanu Dănuț" -> "Bordeanu Dnu"); le transliterăm în loc să le ștergem.
+const DIACRITICS: Record<string, string> = {
+  ă:'a', â:'a', î:'i', ș:'s', ş:'s', ț:'t', ţ:'t',
+  Ă:'A', Â:'A', Î:'I', Ș:'S', Ş:'S', Ț:'T', Ţ:'T',
+}
 function safe(value: unknown, fallback = '') {
-  return String(value || fallback).replace(/[^\x20-\x7E]/g, '')
+  const str = String(value || fallback).replace(/[ăâîșşțţĂÂÎȘŞȚŢ]/g, ch => DIACRITICS[ch])
+  return str.replace(/[^\x20-\x7E]/g, '')
 }
 
 function readStoredHash(value: unknown) {
@@ -349,6 +356,13 @@ export async function POST(req: NextRequest) {
       const utilitati = [...new Set((attMeta || []).map(a => a.utilitate).filter(Boolean))]
       locatieAgregata = locatii.length ? locatii.join(', ') : null
       utilitateAgregata = utilitati.length ? utilitati.join(', ') : null
+    }
+    // Proprietatea aleasă explicit din dropdown (legată de proprietar) are prioritate față de
+    // cea dedusă din facturile atașate — e mereu corectă, chiar dacă DP nu are nicio factură.
+    const locatieEticheta = String(body.locatieEticheta || '').trim()
+    if (locatieEticheta) {
+      const restul = (locatieAgregata || '').split(', ').filter(l => l && l !== locatieEticheta)
+      locatieAgregata = [locatieEticheta, ...restul].join(', ')
     }
 
     const dispositionData = JSON.stringify({ purpose:body.purpose, beneficiary:body.beneficiary, function:body.function, amount, date:body.date, identitySeries:body.identitySeries, identityNumber:body.identityNumber })

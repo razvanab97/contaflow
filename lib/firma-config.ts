@@ -31,6 +31,7 @@ export interface FirmaLegal {
 }
 
 export interface Proprietar {
+  id?: string
   nume: string
   serieCi: string
   numarCi: string

@@ -10,6 +10,7 @@ interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks
 type AttachmentDoc = { id:string; fisier_nume:string; furnizor?:string|null; data_document?:string|null; created_at?:string|null; locatie?:string|null; utilitate?:string|null; suma?:number|null }
 type DispDoc = { id:string; fisier_nume:string; numar_document:string; furnizor:string; suma?:number|null; locatie?:string|null; utilitate?:string|null; data?:Record<string,string|number>; attachments?:AttachmentDoc[] }
 type BuletinResult = { prenume:string; nume:string; serieCi:string; numarCi:string }
+type ProprietarLocatie = { id:string; eticheta:string; proprietar_id:string; proprietari?: { nume:string; serie_ci:string|null; numar_ci:string|null } | null }
 type DuplicateWarning = {
   fisierNume:string
   motiv:'fisier_identic'|'numar_factura'|'detalii_factura'|'suma_apartament_perioada'
@@ -94,6 +95,23 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
   const [bPrenume, setBPrenume] = useState(''); const [bNume, setBNume] = useState('')
   const [bSerie, setBSerie] = useState(''); const [bNumar, setBNumar] = useState('')
 
+  // Proprietăți (adrese) legate de proprietari, ca la selectarea uneia să se precompleteze
+  // automat proprietarul, fără să mai cauți numele lui manual.
+  const [locatii, setLocatii] = useState<ProprietarLocatie[]>([])
+  const [selectedLocatieId, setSelectedLocatieId] = useState('')
+  const [showLocatieForm, setShowLocatieForm] = useState(false)
+  const [newLocatieEticheta, setNewLocatieEticheta] = useState('')
+  const [newLocatieProprietarId, setNewLocatieProprietarId] = useState('')
+  const [locatieBusy, setLocatieBusy] = useState(false)
+
+  const loadLocatii = useCallback(async () => {
+    const res = await fetch(`/api/proprietari/locatii?firmaId=${encodeURIComponent(selectedFirma.id)}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) setLocatii(data.locatii || [])
+  }, [selectedFirma.id])
+
+  useEffect(() => { loadLocatii() }, [loadLocatii])
+
   useEffect(() => {
     try { setLocalProprietari(JSON.parse(localStorage.getItem(lsKey) || '[]')) } catch {}
   }, [lsKey])
@@ -154,10 +172,11 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
       firmaId:selectedFirma.id, lunaId:selectedLunaId, firmaNume:selectedFirma.nume,
       cif:legal?.cif, nrRegCom:legal?.nrRegCom, adresa:legal?.adresa, judet:legal?.judet, tara:legal?.tara,
       editId, date, beneficiary:beneficiary||owner, function:beneficiaryFunction, amount, purpose, identitySeries, identityNumber, attachmentIds:attachedInvoices.map(i=>i.id),
+      locatieEticheta: locatii.find(l=>l.id===selectedLocatieId)?.eticheta || null,
     }) })
     if (!res.ok) { setError((await res.json().catch(()=>({}))).error||'Generarea nu a reușit'); return }
     const assigned=res.headers.get('X-Disposition-Number')||number; const isZip=(res.headers.get('Content-Type')||'').includes('zip'); const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dispozitie_plata_${assigned}.${isZip?'zip':'pdf'}`; a.click(); URL.revokeObjectURL(url)
-    setEditId(''); setAttachedInvoices([]); setPreset(''); setBeneficiary(''); setAmount(''); setPurpose(''); await loadNumber()
+    setEditId(''); setAttachedInvoices([]); setPreset(''); setSelectedLocatieId(''); setBeneficiary(''); setAmount(''); setPurpose(''); await loadNumber()
   }
 
   const allProprietari = [...proprietari, ...localProprietari.filter(l => !proprietari.some(s => s.nume === l.nume))]
@@ -168,6 +187,35 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
     if (!p) return
     setBeneficiary(p.nume); setOwner(p.nume); setBeneficiaryFunction('Proprietar')
     setIdentitySeries(p.serieCi); setIdentityNumber(p.numarCi)
+  }
+
+  function applyLocatie(id: string) {
+    setSelectedLocatieId(id)
+    const loc = locatii.find(l => l.id === id)
+    if (!loc?.proprietari) return
+    setPreset('')
+    setBeneficiary(loc.proprietari.nume); setOwner(loc.proprietari.nume); setBeneficiaryFunction('Proprietar')
+    setIdentitySeries(loc.proprietari.serie_ci || ''); setIdentityNumber(loc.proprietari.numar_ci || '')
+  }
+
+  async function addLocatie() {
+    if (!newLocatieEticheta.trim() || !newLocatieProprietarId) return
+    setLocatieBusy(true); setError('')
+    const res = await fetch('/api/proprietari/locatii', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firmaId: selectedFirma.id, proprietarId: newLocatieProprietarId, eticheta: newLocatieEticheta.trim() }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setError(data.error || 'Nu am putut adăuga proprietatea')
+    else { setNewLocatieEticheta(''); setNewLocatieProprietarId(''); await loadLocatii() }
+    setLocatieBusy(false)
+  }
+
+  async function removeLocatie(loc: ProprietarLocatie) {
+    if (!confirm(`Ștergi legătura „${loc.eticheta}" → ${loc.proprietari?.nume || '?'}?`)) return
+    const res = await fetch(`/api/proprietari/locatii?id=${encodeURIComponent(loc.id)}`, { method: 'DELETE' })
+    if (res.ok) { setLocatii(prev => prev.filter(l => l.id !== loc.id)); if (selectedLocatieId === loc.id) setSelectedLocatieId('') }
+    else { const d = await res.json().catch(() => ({})); setError(d.error || 'Nu am putut șterge proprietatea') }
   }
 
   async function analyzeBuletin(file: File) {
@@ -285,6 +333,40 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
 
           <div style={BLOCK}>
             <div style={BLOCK_TITLE}>2. Beneficiar / proprietar</div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'2fr auto', gap:'8px', marginBottom:'8px' }}>
+              <select value={selectedLocatieId} onChange={e=>applyLocatie(e.target.value)} style={INP}>
+                <option value="">{locatii.length ? 'Selectează proprietatea (precompletează proprietarul)...' : 'Nicio proprietate configurată încă'}</option>
+                {locatii.map(l => <option key={l.id} value={l.id}>{l.eticheta} → {l.proprietari?.nume || '?'}</option>)}
+              </select>
+              <button onClick={()=>setShowLocatieForm(v=>!v)} style={{ border:'1px solid var(--c-333333)', borderRadius:'8px', background:'transparent', color:'var(--c-888888)', padding:'9px 12px', cursor:'pointer', fontSize:'12px', whiteSpace:'nowrap' }}>
+                {showLocatieForm ? 'Ascunde' : 'Gestionează proprietăți'}
+              </button>
+            </div>
+
+            {showLocatieForm && (
+              <div style={{ marginBottom:'10px', padding:'10px 12px', background:'var(--c-0d0d0d)', border:'1px solid var(--c-1e1e1e)', borderRadius:'8px' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'2fr 1.5fr auto', gap:'8px', marginBottom: locatii.length ? '10px' : 0 }}>
+                  <input value={newLocatieEticheta} onChange={e=>setNewLocatieEticheta(e.target.value)} placeholder="Denumire proprietate (ex. Villa MV07 - Munteni nr 07)" style={INP}/>
+                  <select value={newLocatieProprietarId} onChange={e=>setNewLocatieProprietarId(e.target.value)} style={INP}>
+                    <option value="">Alege proprietar...</option>
+                    {proprietari.filter(p => p.id).map(p => <option key={p.id} value={p.id}>{p.nume}</option>)}
+                  </select>
+                  <button onClick={addLocatie} disabled={locatieBusy || !newLocatieEticheta.trim() || !newLocatieProprietarId} style={{ border:'none', borderRadius:'8px', background:firma.culoare, color:'#fff', padding:'9px 14px', cursor:'pointer', fontSize:'12px', fontWeight:700, opacity:(locatieBusy || !newLocatieEticheta.trim() || !newLocatieProprietarId)?.5:1 }}>Adaugă</button>
+                </div>
+                {locatii.length > 0 && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
+                    {locatii.map(l => (
+                      <div key={l.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'11px', color:'var(--c-aaaaaa)' }}>
+                        <span style={{ flex:1 }}>{l.eticheta} → <b style={{ color:'var(--c-dddddd)' }}>{l.proprietari?.nume || '?'}</b></span>
+                        <button onClick={()=>removeLocatie(l)} style={{ background:'none', border:'none', color:'var(--accent-red)', cursor:'pointer', fontSize:'11px' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:'8px' }}>
             <input value={owner} onChange={e=>setOwner(e.target.value)} placeholder="Proprietar / beneficiar implicit" style={INP}/>
             <input value={beneficiaryFunction} onChange={e=>setBeneficiaryFunction(e.target.value)} placeholder="Calitate / funcție" style={INP}/>

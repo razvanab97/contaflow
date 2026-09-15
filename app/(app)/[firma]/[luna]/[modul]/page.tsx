@@ -78,7 +78,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
     luna_id: luni.find((l: any) => l.firma_id === f.id && l.luna?.startsWith(luna))?.id || null,
   })).filter((f: any) => f.luna_id)
 
-  const proprietari = proprietariRaw.map((p: any) => ({ nume: p.nume, serieCi: p.serie_ci || '', numarCi: p.numar_ci || '' }))
+  const proprietari = proprietariRaw.map((p: any) => ({ id: p.id, nume: p.nume, serieCi: p.serie_ci || '', numarCi: p.numar_ci || '' }))
 
   // Alias-uri pentru modul-urile vechi din checklist_templates (pot diferi de slug-urile noi)
   const MODUL_ALIASES: Record<string, string[]> = {
