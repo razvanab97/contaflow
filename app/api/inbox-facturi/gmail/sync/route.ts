@@ -4,7 +4,12 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 import { importInboxDocument } from '@/lib/inbox-facturi'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+// Planul Vercel Hobby taie functiile serverless la 60s indiferent ce declaram aici -
+// valoarea reflecta plafonul real, nu una aspirationala. Job-ul insusi se opreste
+// singur cu marja (JOB_TIME_BUDGET_MS mai jos) inainte sa fie omorat brutal la mijlocul
+// unei scrieri, ca sa nu mai ramana blocat la "running" pentru totdeauna.
+export const maxDuration = 60
+const JOB_TIME_BUDGET_MS = 45_000
 
 type InboxSource = {
   id: string
@@ -218,6 +223,8 @@ async function updateJobProgress(sb: ReturnType<typeof getServiceSupabase>, job:
 }
 
 async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
+  const startedAt = Date.now()
+  const timeIsUp = () => Date.now() - startedAt > JOB_TIME_BUDGET_MS
   const sb = getServiceSupabase()
   await sb.from('inbox_sync_jobs').update({
     status: 'running',
@@ -264,16 +271,26 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
       text: `Caut în Gmail ${source.eticheta}${source.email ? ` (${source.email})` : ''}`,
       detail: `${sinceDate}${untilDate ? ` → ${untilDate}` : ' → azi'}`,
     })
-    const messages = await listGmailMessages(accessToken, query, maxMessages)
-    await updateJobProgress(sb, job, { messagesChecked: messages.length }, {
+    const allMessages = await listGmailMessages(accessToken, query, maxMessages)
+    const { data: alreadySeenRows } = await sb
+      .from('inbox_gmail_processed')
+      .select('message_id')
+      .eq('source_id', job.source_id)
+      .in('message_id', allMessages.map(m => m.id))
+    const alreadySeen = new Set((alreadySeenRows || []).map(r => r.message_id))
+    const messages = allMessages.filter(m => !alreadySeen.has(m.id))
+    await updateJobProgress(sb, job, { messagesChecked: allMessages.length }, {
       status: 'info',
-      text: `Am găsit ${messages.length} emailuri cu PDF în interval`,
+      text: `Am găsit ${allMessages.length} emailuri cu PDF în interval, ${messages.length} noi de verificat`,
       detail: query,
     })
 
     const imported = []
+    const processedIds: string[] = []
     let pdfsFound = 0
-    for (const messageRef of messages) {
+    let stoppedEarly = false
+    messageLoop: for (const messageRef of messages) {
+      if (timeIsUp()) { stoppedEarly = true; break }
       const msg = await gmailJson<GmailMessage & { payload?: GmailPart & { headers?: GmailHeader[] } }>(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageRef.id)}?format=full`,
         accessToken
@@ -288,6 +305,7 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
         detail: `${from} · ${pdfParts.length} PDF`,
       })
       for (const part of pdfParts) {
+        if (timeIsUp()) { stoppedEarly = true; break messageLoop }
         pdfsFound += 1
         const fallbackName = `gmail_${messageRef.id}_${part.partId || pdfsFound}.pdf`
         const fileName = part.filename || fallbackName
@@ -323,6 +341,12 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
           detail: [result.targetFirma, result.extracted?.furnizor, result.skipReason].filter(Boolean).join(' · '),
         })
       }
+      processedIds.push(messageRef.id)
+    }
+
+    if (processedIds.length) {
+      await sb.from('inbox_gmail_processed')
+        .upsert(processedIds.map(message_id => ({ source_id: job.source_id, message_id })), { onConflict: 'source_id,message_id', ignoreDuplicates: true })
     }
 
     await sb.from('inbox_surse_email').update({
@@ -331,6 +355,14 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
       last_sync_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', job.source_id)
+
+    if (stoppedEarly) {
+      await updateJobProgress(sb, job, {}, {
+        status: 'info',
+        text: 'M-am oprit la timp ca să nu rămână jobul agățat (plan Vercel Hobby, 60s)',
+        detail: 'Apasă din nou „Sincronizează” pentru restul emailurilor — ce s-a importat deja nu se reia.',
+      })
+    }
 
     const result = {
       messagesChecked: messages.length,

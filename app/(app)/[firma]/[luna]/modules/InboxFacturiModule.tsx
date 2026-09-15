@@ -110,8 +110,8 @@ const SOURCES: { key:string; title:string; provider: InboxSource['provider']; de
     key: 'oblio',
     title: 'Oblio',
     provider: 'oblio',
-    desc: 'API token pentru facturi și documente e-Factura disponibile în Oblio',
-    hint: 'În aplicație salvăm contul Oblio; token-ul API se ține server-side.',
+    desc: 'Doar conectare cont — Oblio nu oferă acces API la facturile primite de la furnizori',
+    hint: 'API-ul Oblio arată doar facturile emise de firmă, nu și cele primite, deci nu poate alimenta acest inbox. Conexiunea rămâne salvată pentru eventuale utilizări viitoare.',
     placeholder: 'cont@oblio.eu',
   },
 ]
