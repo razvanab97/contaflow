@@ -56,7 +56,7 @@ async function markMatchingRestantePaid(sb: ReturnType<typeof getServiceSupabase
     .select('id,numar_document,furnizor,suma')
     .eq('firma_id', firmaId)
     .eq('platit', false)
-    .like('fisier_path', '%/facturi-restante/%')
+    .or('fisier_path.like.%/facturi-restante/%,fisier_path.like.%/inbox-facturi/%')
   const txSuma = Math.abs(Number(transaction.suma))
   const ids = (rest || [])
     .filter(doc => sameDocNumber(doc.numar_document, reference) || (

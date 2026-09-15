@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
   const { data, error } = await sb
     .from('documente')
-    .select('id,fisier_nume,fisier_tip,furnizor,numar_document,suma,data_document,created_at')
+    .select('id,fisier_nume,fisier_tip,furnizor,numar_document,suma,data_document,created_at,platit,data_platii,tranzactie_id')
     .eq('firma_id', firmaId)
     .eq('luna_id', lunaId)
     .like('fisier_path', '%/inbox-facturi/%')

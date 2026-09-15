@@ -136,14 +136,16 @@ export async function GET(req: NextRequest) {
     .select('id,fisier_nume,fisier_tip,tip_document,furnizor,modul,numar_document,suma,data_document,created_at,platit,data_platii')
     .not('fisier_path', 'like', '%/tx/%')
     .not('fisier_path', 'like', '%/checklist/%')
-    .like('fisier_path', `%/${section}/%`)
     .order('created_at', { ascending: true })
 
   // Facturi restante raman vizibile pe toata firma pana sunt achitate, nu doar in luna in care au fost adaugate
   if (section === 'facturi-restante' && firmaId) {
-    query = query.eq('firma_id', firmaId).or(`luna_id.eq.${lunaId},platit.eq.false`)
+    query = query
+      .eq('firma_id', firmaId)
+      .or('fisier_path.like.%/facturi-restante/%,fisier_path.like.%/inbox-facturi/%')
+      .or(`luna_id.eq.${lunaId},platit.eq.false`)
   } else {
-    query = query.eq('luna_id', lunaId)
+    query = query.like('fisier_path', `%/${section}/%`).eq('luna_id', lunaId)
   }
 
   const { data, error } = await query

@@ -8,7 +8,8 @@ export async function PATCH(req: NextRequest) {
 
   const sb = getServiceSupabase()
   const { data: doc } = await sb.from('documente').select('id,fisier_path').eq('id', id).single()
-  if (!doc || !String(doc.fisier_path).includes('/facturi-restante/'))
+  const path = String(doc?.fisier_path || '')
+  if (!doc || (!path.includes('/facturi-restante/') && !path.includes('/inbox-facturi/')))
     return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
 
   const { error } = await sb.from('documente')

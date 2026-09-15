@@ -66,7 +66,7 @@ function supplierMatch(a?: string | null, b?: string | null) {
 
 async function markMatchingRestantePaid(firmaId: string, tx: any, furnizor: string, numDoc: string) {
   const restRes = await fetch(
-    `${SB}/rest/v1/documente?firma_id=eq.${encodeURIComponent(firmaId)}&platit=eq.false&fisier_path=like.*%2Ffacturi-restante%2F*&select=id,numar_document,furnizor,suma`,
+    `${SB}/rest/v1/documente?firma_id=eq.${encodeURIComponent(firmaId)}&platit=eq.false&or=(fisier_path.like.*%2Ffacturi-restante%2F*,fisier_path.like.*%2Finbox-facturi%2F*)&select=id,numar_document,furnizor,suma`,
     { headers: H }
   )
   if (!restRes.ok) return

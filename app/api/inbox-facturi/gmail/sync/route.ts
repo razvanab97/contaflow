@@ -57,6 +57,7 @@ type SyncJob = {
   firma_id: string
   luna_id: string
   luna: string
+  result?: { sinceDate?: string; untilDate?: string } | null
 }
 
 function decodeBase64Url(data: string) {
@@ -85,6 +86,21 @@ function previousMonthStartForGmail(workMonth: string) {
     iso: `${year}-${month}-01`,
     gmail: `${year}/${month}/01`,
   }
+}
+
+function cleanIsoDate(value: unknown) {
+  const text = String(value || '')
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null
+}
+
+function gmailDate(value: string) {
+  return value.replace(/-/g, '/')
+}
+
+function addOneDayIso(value: string) {
+  const date = new Date(value + 'T00:00:00Z')
+  date.setUTCDate(date.getUTCDate() + 1)
+  return date.toISOString().slice(0, 10)
 }
 
 async function refreshAccessToken(source: InboxSource) {
@@ -166,8 +182,11 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
     const accessToken = await refreshAccessToken(source as InboxSource)
     if (!accessToken) throw new Error('Conexiunea Gmail nu are access token. Reconectează contul Google.')
 
-    const since = previousMonthStartForGmail(job.luna)
-    const query = `has:attachment filename:pdf after:${since.gmail}`
+    const defaultSince = previousMonthStartForGmail(job.luna)
+    const sinceDate = cleanIsoDate(job.result?.sinceDate) || defaultSince.iso
+    const untilDate = cleanIsoDate(job.result?.untilDate)
+    const untilQuery = untilDate ? ` before:${gmailDate(addOneDayIso(untilDate))}` : ''
+    const query = `has:attachment filename:pdf after:${gmailDate(sinceDate)}${untilQuery}`
     const messages = await listGmailMessages(accessToken, query, maxMessages)
 
     const imported = []
@@ -215,7 +234,8 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
     const result = {
       messagesChecked: messages.length,
       pdfsFound,
-      since: since.iso,
+      since: sinceDate,
+      until: untilDate,
       imported,
     }
     const skipped = imported.filter(item => item.skipped).length
@@ -228,7 +248,7 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
       imported_count: saved,
       duplicate_count: duplicates,
       skipped_count: skipped,
-      since_date: since.iso,
+      since_date: sinceDate,
       result,
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -268,14 +288,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { sourceId, firmaId, lunaId, luna, max = 100 } = await req.json().catch(() => ({}))
+  const { sourceId, firmaId, lunaId, luna, max = 100, sinceDate, untilDate } = await req.json().catch(() => ({}))
   const cleanSourceId = String(sourceId || '')
   const cleanFirmaId = String(firmaId || '')
   const cleanLunaId = String(lunaId || '')
   const cleanLuna = String(luna || '')
   const maxMessages = Math.min(Math.max(Number(max) || 100, 1), 100)
+  const cleanSinceDate = cleanIsoDate(sinceDate)
+  const cleanUntilDate = cleanIsoDate(untilDate)
   if (!cleanSourceId || !cleanFirmaId || !cleanLunaId || !cleanLuna) {
     return NextResponse.json({ error: 'sourceId/firmaId/lunaId/luna lipsesc' }, { status: 400 })
+  }
+  if ((sinceDate && !cleanSinceDate) || (untilDate && !cleanUntilDate)) {
+    return NextResponse.json({ error: 'Intervalul trebuie să fie în format AAAA-LL-ZZ' }, { status: 400 })
+  }
+  if (cleanSinceDate && cleanUntilDate && cleanSinceDate > cleanUntilDate) {
+    return NextResponse.json({ error: 'Data de început nu poate fi după data de final' }, { status: 400 })
   }
 
   const sb = getServiceSupabase()
@@ -295,8 +323,9 @@ export async function POST(req: NextRequest) {
     luna_id: cleanLunaId,
     luna: cleanLuna,
     status: 'queued',
+    result: { sinceDate: cleanSinceDate, untilDate: cleanUntilDate },
     updated_at: new Date().toISOString(),
-  }).select('id,source_id,firma_id,luna_id,luna,status,created_at,updated_at').single()
+  }).select('id,source_id,firma_id,luna_id,luna,status,result,created_at,updated_at').single()
   if (error || !job) return NextResponse.json({ error: error?.message || 'Jobul nu a putut fi creat' }, { status: 500 })
 
   after(async () => {

@@ -39,6 +39,17 @@ create index if not exists inbox_surse_email_provider_user_idx on inbox_surse_em
 alter table inbox_surse_email enable row level security;
 drop policy if exists "allow all" on inbox_surse_email;
 
+alter table documente add column if not exists platit boolean not null default false;
+alter table documente add column if not exists data_platii date;
+alter table documente add column if not exists document_hash text;
+alter table documente add column if not exists factura_fingerprint text;
+alter table documente add column if not exists asociere_scor numeric;
+alter table documente add column if not exists asociere_detalii text;
+
+create index if not exists documente_document_hash_idx on documente(document_hash);
+create index if not exists documente_factura_fingerprint_idx on documente(firma_id, factura_fingerprint);
+create index if not exists documente_platit_idx on documente(firma_id, platit);
+
 create table if not exists inbox_sync_jobs (
   id uuid primary key default gen_random_uuid(),
   source_id uuid references inbox_surse_email(id) on delete cascade,

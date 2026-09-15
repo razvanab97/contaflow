@@ -12,6 +12,9 @@ interface Doc {
   numar_document?: string | null
   suma?: number | null
   data_document?: string | null
+  platit?: boolean | null
+  data_platii?: string | null
+  tranzactie_id?: string | null
 }
 interface ImportResult {
   duplicate: boolean
@@ -48,7 +51,7 @@ interface SyncJob {
   skipped_count?: number | null
   since_date?: string | null
   error_message?: string | null
-  result?: { imported?: ImportResult[] } | null
+  result?: { imported?: ImportResult[]; since?: string; until?: string } | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -96,6 +99,19 @@ function isPreviewable(tip: string | null | undefined, nume: string) {
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 
+function defaultSyncStart(workMonth: string) {
+  const match = workMonth.match(/^(\d{4})-(\d{2})/)
+  const base = match ? new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1)) : new Date()
+  const prev = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() - 1, 1))
+  return prev.toISOString().slice(0, 10)
+}
+
+function todayIso() {
+  const date = new Date()
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+  return date.toISOString().slice(0, 10)
+}
+
 export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   firma: Firma
   lunaId: string
@@ -119,6 +135,10 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null)
   const [syncMessage, setSyncMessage] = useState('')
   const [syncJobs, setSyncJobs] = useState<SyncJob[]>([])
+  const [syncStartDate, setSyncStartDate] = useState(() => defaultSyncStart(luna))
+  const [syncEndDate, setSyncEndDate] = useState(() => todayIso())
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set())
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
 
@@ -150,7 +170,8 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     if (latestDone?.result?.imported) {
       setResults(latestDone.result.imported)
       const since = latestDone.since_date ? ` din ${new Date(latestDone.since_date).toLocaleDateString('ro-RO')}` : ''
-      setSyncMessage(`Ultimul Gmail: ${latestDone.messages_checked || 0} emailuri verificate${since} până azi, ${latestDone.pdfs_found || 0} PDF-uri găsite, ${latestDone.imported_count || 0} importate, ${latestDone.duplicate_count || 0} duplicate, ${latestDone.skipped_count || 0} fără legătură cu firmele.`)
+      const until = latestDone.result?.until ? ` până la ${new Date(latestDone.result.until).toLocaleDateString('ro-RO')}` : ' până azi'
+      setSyncMessage(`Ultimul Gmail: ${latestDone.messages_checked || 0} emailuri verificate${since}${until}, ${latestDone.pdfs_found || 0} PDF-uri găsite, ${latestDone.imported_count || 0} importate, ${latestDone.duplicate_count || 0} duplicate, ${latestDone.skipped_count || 0} sărite.`)
       await load()
       await loadSources()
     }
@@ -189,6 +210,55 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     else {
       const data = await res.json().catch(() => ({}))
       setError(data.error || 'Documentul nu a putut fi șters')
+    }
+  }
+
+  async function deleteSelectedDocs() {
+    const ids = [...selectedDocIds]
+    if (!ids.length) return
+    if (!confirm(`Ștergi ${ids.length} facturi selectate din Inbox Facturi?`)) return
+    setDeleteBusy(true)
+    setError('')
+    const deletedIds = new Set<string>()
+    for (const id of ids) {
+      const res = await fetch(`/api/chitante/document?id=${encodeURIComponent(id)}`, { method:'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Unele facturi nu au putut fi șterse')
+        break
+      }
+      deletedIds.add(id)
+    }
+    setDocs(prev => prev.filter(doc => !deletedIds.has(doc.id)))
+    setSelectedDocIds(prev => new Set([...prev].filter(id => !deletedIds.has(id))))
+    setDeleteBusy(false)
+  }
+
+  function toggleSelectedDoc(id: string) {
+    setSelectedDocIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllDocs() {
+    setSelectedDocIds(prev => prev.size === docs.length ? new Set() : new Set(docs.map(doc => doc.id)))
+  }
+
+  async function togglePaid(doc: Doc) {
+    const next = !doc.platit
+    setDocs(prev => prev.map(item => item.id === doc.id ? { ...item, platit: next, data_platii: next ? todayIso() : null } : item))
+    const res = await fetch('/api/chitante/plata', {
+      method:'PATCH',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ id: doc.id, platit: next }),
+    })
+    if (!res.ok) {
+      setDocs(prev => prev.map(item => item.id === doc.id ? doc : item))
+      const data = await res.json().catch(() => ({}))
+      setError(data.error || 'Statusul de plată nu a putut fi schimbat')
     }
   }
 
@@ -282,7 +352,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     const res = await fetch('/api/inbox-facturi/gmail/sync', {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ sourceId: source.id, firmaId: firma.id, lunaId, luna }),
+      body: JSON.stringify({ sourceId: source.id, firmaId: firma.id, lunaId, luna, sinceDate: syncStartDate, untilDate: syncEndDate }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -305,7 +375,8 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     if (job.status === 'running') return 'Sincronizare în fundal...'
     if (job.status === 'error') return `Eroare sync: ${job.error_message || 'verifică reconectarea'}`
     const since = job.since_date ? ` din ${new Date(job.since_date).toLocaleDateString('ro-RO')}` : ''
-    return `Ultimul sync${since}: ${job.imported_count || 0} noi, ${job.duplicate_count || 0} duplicate, ${job.skipped_count || 0} sărite`
+    const until = job.result?.until ? ` până la ${new Date(job.result.until).toLocaleDateString('ro-RO')}` : ''
+    return `Ultimul sync${since}${until}: ${job.imported_count || 0} noi, ${job.duplicate_count || 0} duplicate, ${job.skipped_count || 0} sărite`
   }
 
   return (
@@ -371,27 +442,57 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
           <div style={{ fontSize:'12px', color:'var(--c-888888)', lineHeight:1.45 }}>
             Încarcă facturi primite pe email/Oblio. AI-ul detectează firma după CIF/nume, verifică duplicatele și salvează documentul la firma potrivită.
           </div>
+          <div style={{ marginTop:'14px', display:'flex', flexWrap:'wrap', alignItems:'end', gap:'10px' }}>
+            <label style={{ display:'flex', flexDirection:'column', gap:'4px', fontSize:'10px', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--c-777777)' }}>
+              Sincronizează de la
+              <input type="date" value={syncStartDate} onChange={e => setSyncStartDate(e.target.value)} style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
+            </label>
+            <label style={{ display:'flex', flexDirection:'column', gap:'4px', fontSize:'10px', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--c-777777)' }}>
+              Până la
+              <input type="date" value={syncEndDate} onChange={e => setSyncEndDate(e.target.value)} style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
+            </label>
+            <div style={{ fontSize:'11px', color:'var(--c-777777)', lineHeight:1.45, paddingBottom:'8px' }}>
+              Intervalul se aplică la butonul „Sincronizează” de pe Gmail 1/Gmail 2.
+            </div>
+          </div>
         </div>
 
         <div style={{ padding:'18px 22px' }}>
           {loaded && docs.length > 0 && (
             <div style={{ display:'flex', flexDirection:'column', gap:'7px', marginBottom:'16px' }}>
+              <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between', gap:'10px', marginBottom:'4px' }}>
+                <button onClick={toggleAllDocs} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'8px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-aaaaaa)', cursor:'pointer' }}>
+                  {selectedDocIds.size === docs.length ? 'Deselectează toate' : 'Selectează toate'}
+                </button>
+                {selectedDocIds.size > 0 && (
+                  <button onClick={deleteSelectedDocs} disabled={deleteBusy} style={{ fontSize:'11px', fontWeight:800, padding:'7px 10px', borderRadius:'8px', border:'1px solid rgba(239,68,68,.35)', background:'rgba(239,68,68,.08)', color:'var(--accent-red)', cursor:'pointer', opacity:deleteBusy ? .65 : 1 }}>
+                    Șterge selectate ({selectedDocIds.size})
+                  </button>
+                )}
+              </div>
               {docs.map(doc => {
                 const kind = isPreviewable(doc.fisier_tip, doc.fisier_nume)
                 const open = previewIds.has(doc.id)
+                const selected = selectedDocIds.has(doc.id)
                 return (
                   <div key={doc.id}>
                     <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'10px 12px', background:'var(--c-161616)', border:'1px solid var(--c-222222)', borderRadius:'9px' }}>
-                      <div style={{ width:8, height:8, borderRadius:'50%', background:firma.culoare, flexShrink:0 }}/>
+                      <input type="checkbox" checked={selected} onChange={() => toggleSelectedDoc(doc.id)} style={{ width:15, height:15, accentColor:firma.culoare, cursor:'pointer' }}/>
+                      <div style={{ width:8, height:8, borderRadius:'50%', background:doc.platit ? 'var(--accent-green)' : firma.culoare, flexShrink:0 }}/>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize:'12px', fontWeight:700, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</div>
                         <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'3px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                           {[doc.numar_document && `nr. ${doc.numar_document}`, doc.suma != null && `${doc.suma.toFixed(2)}`, doc.data_document].filter(Boolean).join(' · ') || doc.furnizor || 'fără detalii extrase'}
+                          {doc.tranzactie_id ? ' · legată de tranzacție' : ''}
+                          {doc.platit ? ` · plătită${doc.data_platii ? ` ${doc.data_platii}` : ''}` : ' · neplătită'}
                         </div>
                       </div>
+                      <button onClick={() => togglePaid(doc)} style={{ fontSize:'11px', fontWeight:700, padding:'6px 9px', borderRadius:'7px', border:`1px solid ${doc.platit ? 'rgba(74,222,128,.35)' : 'rgba(251,146,60,.35)'}`, background:doc.platit?'rgba(74,222,128,.08)':'rgba(251,146,60,.08)', color:doc.platit?'var(--accent-green)':legibil(firma.culoare), cursor:'pointer' }}>
+                        {doc.platit ? 'Plătită' : 'Setează plătit'}
+                      </button>
                       {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'11px', fontWeight:600, color:open?'var(--c-dddddd)':'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
                       <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:700, color:legibil(firma.culoare), textDecoration:'none' }}>↓</a>
-                      <button onClick={() => deleteDoc(doc)} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>×</button>
+                      <button onClick={() => deleteDoc(doc)} style={{ fontSize:'11px', fontWeight:700, padding:'6px 9px', borderRadius:'7px', border:'1px solid rgba(239,68,68,.35)', background:'rgba(239,68,68,.06)', color:'var(--accent-red)', cursor:'pointer' }}>Șterge</button>
                     </div>
                     {open && kind === 'pdf' && <iframe src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} style={{ width:'100%', height:'65vh', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />}
                     {open && kind === 'image' && <img src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} alt={doc.fisier_nume} style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />}
