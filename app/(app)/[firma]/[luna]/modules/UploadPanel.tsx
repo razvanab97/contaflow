@@ -101,6 +101,9 @@ export default function UploadPanel({
   const [showOnlyMissing, setShowOnlyMissing] = useState(false)
   const [reconcilBusy, setReconcilBusy] = useState(false)
   const [reconcilMessage, setReconcilMessage] = useState('')
+  const [attachPickerFor, setAttachPickerFor] = useState<string | null>(null)
+  const [attachPick, setAttachPick] = useState<Record<string, string>>({})
+  const [attachBusy, setAttachBusy] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
   const INP: React.CSSProperties = { fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-bbbbbb)', outline: 'none', width: '100%' }
@@ -224,6 +227,25 @@ export default function UploadPanel({
     else { const d = await res.json().catch(() => ({})); setAirbnbExpectedError(d.error || 'Nu am putut detașa factura') }
   }
 
+  async function atribuieManualFactura(itemId: string) {
+    const docId = attachPick[itemId]
+    if (!docId) return
+    setAttachBusy(itemId)
+    const res = await fetch('/api/airbnb/facturi-asteptate/reconciliaza', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: itemId, docId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setAirbnbExpectedError(data.error || 'Nu am putut atașa factura')
+    else {
+      setAttachPickerFor(null)
+      setAttachPick(prev => { const next = { ...prev }; delete next[itemId]; return next })
+      await loadAirbnbExpected()
+    }
+    setAttachBusy(null)
+  }
+
   // Reconciliere borderou ↔ facturi: câte rezervări au factură, câte lipsesc,
   // și câte facturi din lista de mai jos nu s-au putut asocia cu nicio rezervare.
   const airbnbMatchedIds = new Set(airbnbExpected.map(i => i.factura_document_id).filter(Boolean) as string[])
@@ -233,6 +255,8 @@ export default function UploadPanel({
     ? new Set(docs.filter(d => !airbnbMatchedIds.has(d.id)).map(d => d.id))
     : new Set<string>()
   const airbnbVisibleExpected = showOnlyMissing ? airbnbExpected.filter(i => !i.factura_document_id) : airbnbExpected
+  // Facturile deja asociate unei rezervări nu mai apar în lista de jos — rămân vizibile doar prin rezervarea lor de mai sus.
+  const visibleDocs = section === 'airbnb-facturi' ? docs.filter(d => !airbnbMatchedIds.has(d.id)) : docs
 
   return (
     <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', overflow: 'hidden' }}>
@@ -302,12 +326,31 @@ export default function UploadPanel({
                           {dates || formatDate(item.data_tranzactie)} {item.anunt ? `· ${item.anunt}` : ''}
                         </div>
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                        <span style={{ fontSize:'10px', fontWeight:700, color:attached ? 'var(--accent-mint)' : 'var(--c-888888)' }}>
-                          {attached ? 'atașată' : 'de atașat'}{attached && item.asociere_metoda === 'taxa_servicii_exacta' ? ' (auto)' : ''}
-                        </span>
-                        {attached && <a href={`/api/chitante/document?id=${encodeURIComponent(item.factura_document_id!)}`} style={{ fontSize:'10px', color:legibil(culoare), textDecoration:'none' }}>↓</a>}
-                        {attached && <button onClick={() => detaseazaFactura(item)} title="Detașează factura de la această rezervare" style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer', padding:0 }}>✕</button>}
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        {attached ? (
+                          <>
+                            <span style={{ fontSize:'10px', fontWeight:700, color:'var(--accent-mint)' }}>
+                              atașată{item.asociere_metoda === 'taxa_servicii_exacta' ? ' (auto)' : ''}
+                            </span>
+                            <a href={`/api/chitante/document?id=${encodeURIComponent(item.factura_document_id!)}`} style={{ fontSize:'10px', color:legibil(culoare), textDecoration:'none' }}>↓</a>
+                            <button onClick={() => detaseazaFactura(item)} title="Detașează factura de la această rezervare" style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer', padding:0 }}>✕</button>
+                          </>
+                        ) : attachPickerFor === item.id ? (
+                          <>
+                            <select value={attachPick[item.id] || ''} onChange={e => setAttachPick(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ fontSize:'10px', padding:'4px 6px', borderRadius:'6px', border:'1px solid var(--c-2a2a2a)', background:'var(--c-0f0f0f)', color:'var(--c-cccccc)', maxWidth:'160px' }}>
+                              <option value="">Alege factura...</option>
+                              {visibleDocs.map(doc => <option key={doc.id} value={doc.id}>{docLabel(doc)}</option>)}
+                            </select>
+                            <button onClick={() => atribuieManualFactura(item.id)} disabled={!attachPick[item.id] || attachBusy === item.id} style={{ fontSize:'10px', fontWeight:700, padding:'4px 8px', borderRadius:'6px', border:'none', background:culoare, color:'var(--c-ffffff)', cursor:'pointer', opacity:(!attachPick[item.id] || attachBusy === item.id) ? .5 : 1 }}>
+                              {attachBusy === item.id ? '...' : 'Leagă'}
+                            </button>
+                            <button onClick={() => setAttachPickerFor(null)} style={{ fontSize:'10px', color:'var(--c-888888)', background:'transparent', border:'none', cursor:'pointer' }}>Anulează</button>
+                          </>
+                        ) : (
+                          <button onClick={() => setAttachPickerFor(item.id)} style={{ fontSize:'10px', fontWeight:700, padding:'4px 9px', borderRadius:'6px', border:'1px solid var(--c-333333)', background:'transparent', color:'var(--c-999999)', cursor:'pointer' }}>
+                            Atașează factură
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -318,9 +361,12 @@ export default function UploadPanel({
         )}
 
         {/* Document list */}
-        {loaded && docs.length > 0 && (
+        {section === 'airbnb-facturi' && loaded && docs.length > 0 && visibleDocs.length === 0 && (
+          <div style={{ fontSize: '11px', color: 'var(--accent-mint)', marginBottom: '16px' }}>Toate facturile sunt deja asociate cu o rezervare din borderou.</div>
+        )}
+        {loaded && visibleDocs.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
-            {(showPaidToggle ? [...docs].sort((a, b) => Number(!!a.platit) - Number(!!b.platit)) : docs).map(doc => {
+            {(showPaidToggle ? [...visibleDocs].sort((a, b) => Number(!!a.platit) - Number(!!b.platit)) : visibleDocs).map(doc => {
               const isPaid = showPaidToggle && !!doc.platit
               const kind = isPreviewable(doc.fisier_tip, doc.fisier_nume)
               const open = previewIds.has(doc.id)
@@ -337,11 +383,6 @@ export default function UploadPanel({
                       </div>
                     </div>
                     {doc.tip_document && <span style={{ fontSize: '10px', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
-                    {airbnbOrphanDocIds.has(doc.id) && (
-                      <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--accent-red)', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', borderRadius: '999px', padding: '2px 7px', flexShrink: 0 }} title="Nu s-a putut asocia cu nicio rezervare din borderoul Airbnb">
-                        fără rezervare
-                      </span>
-                    )}
                     {showPaidToggle && (
                       <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>
                         {isPaid ? 'Anulează' : 'Marchează achitat'}

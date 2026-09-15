@@ -50,6 +50,24 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ matched: potriviri.length, ramanNepotrivite: (rows?.length || 0) - potriviri.length })
 }
 
+export async function PATCH(req: NextRequest) {
+  const { id, docId } = await req.json().catch(() => ({}))
+  const cleanId = String(id || '')
+  const cleanDocId = String(docId || '')
+  if (!cleanId || !cleanDocId) return NextResponse.json({ error: 'id/docId lipsesc' }, { status: 400 })
+
+  const sb = getServiceSupabase()
+  const { error } = await sb.from('airbnb_facturi_asteptate').update({
+    factura_document_id: cleanDocId,
+    status: 'atasata',
+    asociere_scor: null,
+    asociere_metoda: 'manual',
+    updated_at: new Date().toISOString(),
+  }).eq('id', cleanId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id lipsește' }, { status: 400 })
