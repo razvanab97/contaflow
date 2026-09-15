@@ -159,12 +159,14 @@ export async function POST(req: NextRequest) {
   })
   if (!response.ok) {
     const bookingLoginRequired = source.hostname.endsWith('booking.com') && response.status === 401
+    const upstreamBody = await response.text().catch(() => '')
     return NextResponse.json({
       error: bookingLoginRequired
         ? 'Booking cere autentificare server. Pentru import direct setează BOOKING_COOKIE în .env.local cu cookie-ul sesiunii Booking.'
         : `Platforma sursă a răspuns cu status ${response.status}`,
       bookingLoginRequired,
       sourceUrl: bookingLoginRequired ? source.toString() : undefined,
+      debug: { hasBookingCookie: !!process.env.BOOKING_COOKIE, bookingCookieLen: (process.env.BOOKING_COOKIE || '').length, upstreamBody: upstreamBody.slice(0, 500) },
     }, { status: bookingLoginRequired ? 401 : 502 })
   }
   const contentType = response.headers.get('content-type') || ''
