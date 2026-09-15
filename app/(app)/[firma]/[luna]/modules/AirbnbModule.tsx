@@ -16,7 +16,7 @@ const CONFIG = {
   'airbnb-facturi': {
     title: 'Airbnb · Facturi',
     description: 'Facturi individuale din platforma Airbnb',
-    linkPlaceholder: 'Link PDF factură Airbnb',
+    linkPlaceholder: 'Link factură Airbnb sau PDF',
     docTypes: [{ value: 'factura', label: 'Factură' }, { value: 'borderou', label: 'Borderou' }],
   },
   'airbnb-borderou': {

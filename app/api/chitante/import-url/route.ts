@@ -1,5 +1,6 @@
 import { isIP } from 'node:net'
 import { NextRequest, NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
 const ACCOUNTING_SECTIONS = new Set([
@@ -48,6 +49,71 @@ function supplierMatch(a?: string | null, b?: string | null) {
   const ca = String(a || '').split('|')[0]?.toLowerCase().trim() || ''
   const cb = String(b || '').toLowerCase().trim()
   return ca.length >= 4 && cb.length >= 4 && (ca.includes(cb) || cb.includes(ca))
+}
+
+type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null }
+
+async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null> {
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: bytes.toString('base64') } },
+        { type: 'text', text: 'Extrage datele acestei facturi/document PDF. Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului","numarDocument":"seria si numarul documentului sau codul rezervarii, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ"}. Pentru facturi Airbnb, copiaza si codul rezervarii daca apare. Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+      ] }],
+    })
+    const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (!match) return null
+    const parsed = JSON.parse(match[0])
+    return {
+      furnizor: typeof parsed.furnizor === 'string' ? parsed.furnizor : null,
+      numarDocument: typeof parsed.numarDocument === 'string' ? parsed.numarDocument : null,
+      suma: typeof parsed.suma === 'number' ? parsed.suma : null,
+      dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+function normalizedText(...values: Array<string | null | undefined>) {
+  return values.join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+async function linkAirbnbInvoiceIfPossible(sb: ReturnType<typeof getServiceSupabase>, params: {
+  firmaId: string
+  lunaId: string
+  documentId: string
+  fileName: string
+  sourceUrl: string
+  extractie: GenericExtractie | null
+}) {
+  const { data: expected } = await sb
+    .from('airbnb_facturi_asteptate')
+    .select('id,cod_confirmare,suma')
+    .eq('firma_id', params.firmaId)
+    .eq('luna_id', params.lunaId)
+    .is('factura_document_id', null)
+
+  if (!expected?.length) return null
+  const haystack = normalizedText(params.fileName, params.sourceUrl, params.extractie?.numarDocument, params.extractie?.furnizor)
+  const amount = typeof params.extractie?.suma === 'number' ? params.extractie.suma : null
+  const match = expected.find(row => {
+    const code = normalizedText(row.cod_confirmare)
+    if (code && haystack.includes(code)) return true
+    const expectedAmount = typeof row.suma === 'number' ? row.suma : Number(row.suma)
+    return amount != null && Number.isFinite(expectedAmount) && Math.abs(expectedAmount - amount) < 0.01
+  })
+  if (!match) return null
+
+  await sb
+    .from('airbnb_facturi_asteptate')
+    .update({ factura_document_id: params.documentId, status: 'atasata', updated_at: new Date().toISOString() })
+    .eq('id', match.id)
+  return match.id
 }
 
 async function markMatchingRestantePaid(sb: ReturnType<typeof getServiceSupabase>, firmaId: string, transaction: { data_tranzactie:string; descriere_curatata:string|null; descriere:string|null; suma:number }, supplier?: string, reference?: string) {
@@ -105,6 +171,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Linkul nu a returnat un fișier PDF' }, { status: 422 })
 
   const sb = getServiceSupabase()
+  const shouldAnalyze = isAccountingSection && section === 'airbnb-facturi'
+  const genericExtractie = shouldAnalyze ? await analyzeGenericPdf(bytes) : null
   let transaction: { id:string; document_id:string|null; extras_id:string; data_tranzactie:string; descriere_curatata:string|null; descriere:string|null; suma:number } | null = null
   if (transactionId) {
     const result = await sb.from('tranzactii')
@@ -115,7 +183,12 @@ export async function POST(req: NextRequest) {
   }
 
   const sourceName = source.hostname.replace(/^www\./, '')
-  const details = [supplier, description, reference, transaction?.descriere_curatata || transaction?.descriere].filter(Boolean).join(' ')
+  const details = [
+    supplier || genericExtractie?.furnizor,
+    description,
+    reference || genericExtractie?.numarDocument || source.pathname.split('/').filter(Boolean).pop(),
+    transaction?.descriere_curatata || transaction?.descriere,
+  ].filter(Boolean).join(' ')
   const transactionPrefix = transaction ? `${safePart(transaction.data_tranzactie, 'fara_data')}_${safePart(Number(transaction.suma).toFixed(2), 'fara_suma')}_` : ''
   const fileName = `${transactionPrefix}${safePart(details, sourceName)}_${safePart(documentType, 'document')}_${Date.now()}.pdf`
   const destination = itemId ? `checklist/${itemId}` : transactionId ? `tx/${transactionId}` : section
@@ -130,10 +203,10 @@ export async function POST(req: NextRequest) {
     tranzactie_id:transactionId || null,
     ...(transactionId ? { modul:'extras' } : isAccountingSection ? { modul:'acte_contabile' } : {}),
     tip_document:documentType,
-    furnizor:[supplier, description && `Descriere: ${description}`, reference && `Referinta: ${reference}`, `Sursa: ${sourceName}`].filter(Boolean).join(' | '),
-    numar_document: reference || null,
-    suma: transaction ? Math.abs(Number(transaction.suma)) : null,
-    data_document: transaction?.data_tranzactie || null,
+    furnizor:[supplier || genericExtractie?.furnizor, description && `Descriere: ${description}`, (reference || genericExtractie?.numarDocument) && `Referinta: ${reference || genericExtractie?.numarDocument}`, `Sursa: ${sourceName}`].filter(Boolean).join(' | '),
+    numar_document: reference || genericExtractie?.numarDocument || null,
+    suma: transaction ? Math.abs(Number(transaction.suma)) : genericExtractie?.suma ?? null,
+    data_document: transaction?.data_tranzactie || genericExtractie?.dataDocument || null,
     fisier_path:path,
     fisier_nume:fileName,
     fisier_tip:'application/pdf',
@@ -165,5 +238,17 @@ export async function POST(req: NextRequest) {
     if (oldPath && oldPath !== path) await sb.storage.from('documente').remove([oldPath])
     await markMatchingRestantePaid(sb, firmaId, transaction, supplier, reference)
   }
-  return NextResponse.json({ doc:data })
+
+  let airbnbLinkedId: string | null = null
+  if (section === 'airbnb-facturi') {
+    airbnbLinkedId = await linkAirbnbInvoiceIfPossible(sb, {
+      firmaId,
+      lunaId,
+      documentId: data.id,
+      fileName,
+      sourceUrl: source.toString(),
+      extractie: genericExtractie,
+    })
+  }
+  return NextResponse.json({ doc:data, airbnbLinkedId })
 }
