@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 89, text: 'Inbox Facturi: Maxy și Verk importă doar facturile reale cu serie/număr care începe cu FS; proformele și documentele cu alt prefix sunt sărite la sincronizare' },
   { v: 88, text: 'Inbox Facturi: sincronizarea Gmail are interval de date selectabil, sare AWB/packing/shipping documents, deduplică facturile între canale, permite ștergere multiplă și poate marca/linka automat facturile cu tranzacțiile potrivite' },
   { v: 87, text: 'Inbox Facturi: cardul Oblio are conectare reală cu email + token API; testează autentificarea, citește firmele din cont și salvează conexiunea securizat' },
   { v: 86, text: 'Inbox Facturi: sincronizarea Gmail scanează până la 100 de emailuri cu PDF, paginat, ca să prindă facturile din august precum ISO/Verk/Skoutz chiar dacă sunt mai jos în inbox' },

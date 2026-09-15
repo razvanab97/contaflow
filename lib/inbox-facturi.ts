@@ -83,7 +83,24 @@ function isNonInvoiceName(name: string) {
   const value = normalizeText(name)
   const hasInvoiceWords = /\b(factura|invoice|fiscal|receipt|chitanta|faktura|vat)\b/.test(value)
   const hasAwbWords = /\b(awb|shipping|shipment|delivery note|packing list|courier label|label|sameday|cargus|gls)\b/.test(value)
-  return hasAwbWords && !hasInvoiceWords
+  const isProforma = /\b(proforma|pro forme|pro-forma)\b/.test(value)
+  return (hasAwbWords && !hasInvoiceWords) || isProforma
+}
+
+function isMaxyOrVerk(value: string | null | undefined) {
+  const text = normalizeText(value)
+  return /\b(maxy|verk)\b/.test(text)
+}
+
+function startsWithFs(value: string | null | undefined) {
+  return /^fs\b/i.test(String(value || '').trim()) || /^fs[_\-\s]*/i.test(String(value || '').trim())
+}
+
+function shouldSkipMaxyVerk(extracted: ExtractieInbox | null, originalName: string) {
+  const supplier = extracted?.furnizor || originalName
+  if (!isMaxyOrVerk(supplier)) return false
+  if (startsWithFs(extracted?.numarDocument) || startsWithFs(originalName)) return false
+  return true
 }
 
 function invoiceFingerprint(firmaId: string, extracted: ExtractieInbox | null) {
@@ -203,6 +220,7 @@ Raspunde DOAR cu JSON:
 {"firmaSlug":"slug-ul firmei sau null","firmaCui":"CUI/CIF gasit pe document pentru firma noastra sau null","incredereFirma":"sigur|posibil|necunoscut","esteFactura":true,"furnizor":"emitent/furnizor sau null","numarDocument":"seria si numarul facturii/documentului sau null","suma":123.45,"moneda":"RON|EUR|HUF|BGN sau null","dataDocument":"AAAA-LL-ZZ sau null","tipDocument":"factura|chitanta|invoice|altul","motiv":"pe scurt de ce ai ales firma"}.
 Nu inventa valori. Daca documentul contine mai multe firme, firma noastra este beneficiarul/cumparatorul, nu furnizorul.
 Accepta furnizori externi/straini (de exemplu ISO/Maxy/Verk/Jumbo/Anthropic/OpenAI), dar numai daca documentul indica una dintre firmele noastre ca beneficiar/cumparator, prin CUI/CIF, nume firma sau adresa. Daca documentul pare personal sau pentru alta entitate, seteaza firmaSlug si firmaCui null, incredereFirma necunoscut.
+Pentru Maxy si Verk accepta doar facturi reale cu numar/serie care incepe cu "FS"; proformele sau documentele cu alt prefix nu sunt utile si trebuie marcate cu "esteFactura":false.
 Nu importa AWB-uri, etichete de transport, packing list, shipping documents sau delivery notes: pentru acestea seteaza "esteFactura":false si "tipDocument":"altul", chiar daca apar sume sau furnizori.` },
       ] }],
     })
@@ -285,6 +303,16 @@ export async function importInboxDocument({
       duplicate: false,
       skipped: true,
       skipReason: 'Documentul pare AWB/transport, nu factură',
+      targetFirma: null,
+      source: sourceLabel || null,
+      extracted,
+    }
+  }
+  if (shouldSkipMaxyVerk(extracted, originalName)) {
+    return {
+      duplicate: false,
+      skipped: true,
+      skipReason: 'Maxy/Verk: se importă doar facturi cu număr FS, nu proforme',
       targetFirma: null,
       source: sourceLabel || null,
       extracted,
