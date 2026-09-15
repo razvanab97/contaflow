@@ -246,6 +246,23 @@ Nu importa AWB-uri, etichete de transport, packing list, shipping documents sau 
   }
 }
 
+export async function ensureLocalUploadSource(sb: SupabaseService, firmaId: string) {
+  const { data: existing } = await sb
+    .from('inbox_surse_email')
+    .select('id')
+    .eq('firma_id', firmaId)
+    .eq('provider', 'local_upload')
+    .limit(1)
+  if (existing?.[0]?.id) return existing[0].id as string
+  const { data: created, error } = await sb
+    .from('inbox_surse_email')
+    .insert({ firma_id: firmaId, provider: 'local_upload', eticheta: 'Fișiere locale', status: 'activ' })
+    .select('id')
+    .single()
+  if (error || !created) throw new Error(error?.message || 'Sursa locală nu a putut fi creată')
+  return created.id as string
+}
+
 export async function importInboxDocument({
   sb,
   bytes,

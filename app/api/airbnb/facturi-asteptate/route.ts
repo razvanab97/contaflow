@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
       castiguri_brute,
       status,
       factura_document_id,
+      asociere_metoda,
       documente:factura_document_id(fisier_nume)
     `)
     .eq('firma_id', firmaId)

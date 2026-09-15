@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { ensureLocalUploadSource } from '@/lib/inbox-facturi'
 
-const PROVIDERS = new Set(['gmail', 'icloud_imap', 'oblio'])
+const PROVIDERS = new Set(['gmail', 'icloud_imap', 'oblio', 'local_upload'])
 const STATUSES = new Set(['neconectat', 'activ', 'eroare', 'pauzat'])
 
 export async function GET(req: NextRequest) {
@@ -9,6 +10,9 @@ export async function GET(req: NextRequest) {
   if (!firmaId) return NextResponse.json({ error: 'firmaId lipsește' }, { status: 400 })
 
   const sb = getServiceSupabase()
+  // Sursa "Fișiere locale" nu are credențiale reale, așa că e creată automat
+  // la prima listare, ca să apară în UI fără un pas separat de "conectare".
+  await ensureLocalUploadSource(sb, firmaId)
   const { data, error } = await sb
     .from('inbox_surse_email')
     .select('id,provider,eticheta,email,status,last_sync_at,updated_at')

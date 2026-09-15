@@ -27,6 +27,7 @@ interface AirbnbExpectedInvoice {
   suma?: number | null
   status?: string | null
   factura_document_id?: string | null
+  asociere_metoda?: string | null
   documente?: { fisier_nume?: string | null } | null
 }
 
@@ -97,6 +98,9 @@ export default function UploadPanel({
   const [error, setError] = useState('')
   const [drag, setDrag] = useState(false)
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
+  const [showOnlyMissing, setShowOnlyMissing] = useState(false)
+  const [reconcilBusy, setReconcilBusy] = useState(false)
+  const [reconcilMessage, setReconcilMessage] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
   const INP: React.CSSProperties = { fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-bbbbbb)', outline: 'none', width: '100%' }
@@ -196,6 +200,40 @@ export default function UploadPanel({
     setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }
 
+  async function reconciliazaAutomat() {
+    setReconcilBusy(true)
+    setReconcilMessage('')
+    const res = await fetch('/api/airbnb/facturi-asteptate/reconciliaza', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firmaId, lunaId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setReconcilMessage(data.error || 'Reconcilierea a eșuat')
+    else {
+      setReconcilMessage(data.matched > 0 ? `${data.matched} facturi asociate automat (sumă identică cu taxa de servicii din borderou).` : 'Nu am găsit potriviri noi după taxa de servicii.')
+      await loadAirbnbExpected()
+    }
+    setReconcilBusy(false)
+  }
+
+  async function detaseazaFactura(item: AirbnbExpectedInvoice) {
+    if (!confirm(`Detașezi factura de la rezervarea ${item.cod_confirmare}?`)) return
+    const res = await fetch(`/api/airbnb/facturi-asteptate/reconciliaza?id=${encodeURIComponent(item.id)}`, { method: 'DELETE' })
+    if (res.ok) await loadAirbnbExpected()
+    else { const d = await res.json().catch(() => ({})); setAirbnbExpectedError(d.error || 'Nu am putut detașa factura') }
+  }
+
+  // Reconciliere borderou ↔ facturi: câte rezervări au factură, câte lipsesc,
+  // și câte facturi din lista de mai jos nu s-au putut asocia cu nicio rezervare.
+  const airbnbMatchedIds = new Set(airbnbExpected.map(i => i.factura_document_id).filter(Boolean) as string[])
+  const airbnbMatched = airbnbExpected.filter(i => i.factura_document_id).length
+  const airbnbMissing = airbnbExpected.length - airbnbMatched
+  const airbnbOrphanDocIds = section === 'airbnb-facturi' && airbnbExpected.length > 0
+    ? new Set(docs.filter(d => !airbnbMatchedIds.has(d.id)).map(d => d.id))
+    : new Set<string>()
+  const airbnbVisibleExpected = showOnlyMissing ? airbnbExpected.filter(i => !i.factura_document_id) : airbnbExpected
+
   return (
     <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', overflow: 'hidden' }}>
       <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--c-1a1a1a)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
@@ -213,24 +251,45 @@ export default function UploadPanel({
       <div style={{ padding: '18px 22px' }}>
         {section === 'airbnb-facturi' && (
           <div style={{ marginBottom: '16px', padding: '12px', border: '1px solid var(--c-1f1f1f)', borderRadius: '10px', background: 'var(--c-0d0d0d)' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', marginBottom:'8px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', marginBottom:'8px', flexWrap:'wrap' }}>
               <div>
                 <div style={{ fontSize:'12px', fontWeight:700, color:'var(--c-dddddd)' }}>Facturi cerute de borderoul Airbnb</div>
                 <div style={{ fontSize:'10px', color:'var(--c-777777)' }}>Se generează automat când încarci CSV-ul în Airbnb · Borderou. PDF-urile puse aici se asociază după cod rezervare sau sumă.</div>
               </div>
               {airbnbExpected.length > 0 && (
-                <span style={{ fontSize:'10px', fontWeight:700, color:legibil(culoare), background:tint(r, .1), border:`1px solid ${tint(r, .35)}`, borderRadius:'999px', padding:'4px 8px', flexShrink:0 }}>
-                  {airbnbExpected.filter(i => i.factura_document_id).length}/{airbnbExpected.length} atașate
-                </span>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:'6px', flexShrink:0 }}>
+                  <span style={{ fontSize:'10px', fontWeight:700, color:'var(--accent-mint)', background:'light-dark(rgba(5,150,105,.12), rgba(110,231,176,.1))', border:'1px solid light-dark(rgba(5,150,105,.35), rgba(110,231,176,.3))', borderRadius:'999px', padding:'4px 8px' }}>
+                    {airbnbMatched}/{airbnbExpected.length} atașate
+                  </span>
+                  {airbnbMissing > 0 && (
+                    <button onClick={() => setShowOnlyMissing(v => !v)} style={{ fontSize:'10px', fontWeight:700, color:'#f97316', background:'rgba(251,146,60,.1)', border:'1px solid rgba(251,146,60,.35)', borderRadius:'999px', padding:'4px 8px', cursor:'pointer' }}>
+                      {showOnlyMissing ? 'arată toate' : `${airbnbMissing} lipsă`}
+                    </button>
+                  )}
+                  {airbnbOrphanDocIds.size > 0 && (
+                    <span style={{ fontSize:'10px', fontWeight:700, color:'var(--accent-red)', background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.3)', borderRadius:'999px', padding:'4px 8px' }} title="Facturi din lista de mai jos care nu s-au putut asocia cu nicio rezervare din borderou">
+                      {airbnbOrphanDocIds.size} fără rezervare
+                    </span>
+                  )}
+                  {airbnbMissing > 0 && airbnbOrphanDocIds.size > 0 && (
+                    <button onClick={reconciliazaAutomat} disabled={reconcilBusy} style={{ fontSize:'10px', fontWeight:700, padding:'4px 8px', borderRadius:'999px', border:`1px solid ${culoare}`, background:'transparent', color:legibil(culoare), cursor:'pointer', opacity:reconcilBusy?.6:1 }}>
+                      {reconcilBusy ? 'Reconciliez...' : 'Reconciliază automat'}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
+            {reconcilMessage && <div style={{ fontSize:'11px', color:'var(--c-aaaaaa)', marginBottom:'8px' }}>{reconcilMessage}</div>}
             {airbnbExpectedError && <div style={{ fontSize:'11px', color:'var(--accent-red)' }}>{airbnbExpectedError}</div>}
             {!airbnbExpectedError && airbnbExpected.length === 0 && (
               <div style={{ fontSize:'11px', color:'var(--c-777777)' }}>Nu există încă facturi așteptate. Încarcă borderoul CSV Airbnb în modulul „Airbnb · Borderou”.</div>
             )}
-            {airbnbExpected.length > 0 && (
+            {airbnbExpected.length > 0 && showOnlyMissing && airbnbVisibleExpected.length === 0 && (
+              <div style={{ fontSize:'11px', color:'var(--accent-mint)' }}>Toate rezervările au factură atașată.</div>
+            )}
+            {airbnbVisibleExpected.length > 0 && (
               <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
-                {airbnbExpected.map(item => {
+                {airbnbVisibleExpected.map(item => {
                   const attached = !!item.factura_document_id
                   const dates = [formatDate(item.data_start), formatDate(item.data_sfarsit)].filter(Boolean).join(' - ')
                   return (
@@ -244,8 +303,11 @@ export default function UploadPanel({
                         </div>
                       </div>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                        <span style={{ fontSize:'10px', fontWeight:700, color:attached ? 'var(--accent-mint)' : 'var(--c-888888)' }}>{attached ? 'atașată' : 'de atașat'}</span>
+                        <span style={{ fontSize:'10px', fontWeight:700, color:attached ? 'var(--accent-mint)' : 'var(--c-888888)' }}>
+                          {attached ? 'atașată' : 'de atașat'}{attached && item.asociere_metoda === 'taxa_servicii_exacta' ? ' (auto)' : ''}
+                        </span>
                         {attached && <a href={`/api/chitante/document?id=${encodeURIComponent(item.factura_document_id!)}`} style={{ fontSize:'10px', color:legibil(culoare), textDecoration:'none' }}>↓</a>}
+                        {attached && <button onClick={() => detaseazaFactura(item)} title="Detașează factura de la această rezervare" style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer', padding:0 }}>✕</button>}
                       </div>
                     </div>
                   )
@@ -275,6 +337,11 @@ export default function UploadPanel({
                       </div>
                     </div>
                     {doc.tip_document && <span style={{ fontSize: '10px', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
+                    {airbnbOrphanDocIds.has(doc.id) && (
+                      <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--accent-red)', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', borderRadius: '999px', padding: '2px 7px', flexShrink: 0 }} title="Nu s-a putut asocia cu nicio rezervare din borderoul Airbnb">
+                        fără rezervare
+                      </span>
+                    )}
                     {showPaidToggle && (
                       <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>
                         {isPaid ? 'Anulează' : 'Marchează achitat'}

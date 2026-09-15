@@ -34,11 +34,20 @@ interface ImportResult {
 }
 interface InboxSource {
   id: string
-  provider: 'gmail' | 'icloud_imap' | 'oblio'
+  provider: 'gmail' | 'icloud_imap' | 'oblio' | 'local_upload'
   eticheta: string
   email: string | null
   status: 'neconectat' | 'activ' | 'eroare' | 'pauzat'
   last_sync_at?: string | null
+}
+interface LocalFile {
+  id: string
+  fisier_nume: string
+  fisier_tip?: string | null
+  fisier_marime?: number | null
+  status: 'pending' | 'eroare'
+  error_message?: string | null
+  created_at?: string | null
 }
 interface SyncJob {
   id: string
@@ -161,7 +170,13 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const [syncEndDate, setSyncEndDate] = useState(() => todayIso())
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set())
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const [localFiles, setLocalFiles] = useState<LocalFile[]>([])
+  const [localBusy, setLocalBusy] = useState(false)
+  const [localDrag, setLocalDrag] = useState(false)
+  const [localError, setLocalError] = useState('')
+  const [localSyncing, setLocalSyncing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const localFileRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
 
   const load = useCallback(async () => {
@@ -172,6 +187,14 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   }, [firma.id, lunaId])
 
   useEffect(() => { load() }, [load])
+
+  const loadLocalFiles = useCallback(async () => {
+    const res = await fetch(`/api/inbox-facturi/local?firmaId=${encodeURIComponent(firma.id)}&lunaId=${encodeURIComponent(lunaId)}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) setLocalFiles(data.files || [])
+  }, [firma.id, lunaId])
+
+  useEffect(() => { loadLocalFiles() }, [loadLocalFiles])
 
   const loadSources = useCallback(async () => {
     const res = await fetch(`/api/inbox-facturi/surse?firmaId=${encodeURIComponent(firma.id)}`)
@@ -192,12 +215,13 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     if (latestDone?.result?.imported) {
       setResults(latestDone.result.imported)
       const since = latestDone.since_date ? ` din ${new Date(latestDone.since_date).toLocaleDateString('ro-RO')}` : ''
-      const until = latestDone.result?.until ? ` până la ${new Date(latestDone.result.until).toLocaleDateString('ro-RO')}` : ' până azi'
-      setSyncMessage(`Ultimul Gmail: ${latestDone.messages_checked || 0} emailuri verificate${since}${until}, ${latestDone.pdfs_found || 0} PDF-uri găsite, ${latestDone.imported_count || 0} importate, ${latestDone.duplicate_count || 0} duplicate, ${latestDone.skipped_count || 0} sărite.`)
+      const until = latestDone.result?.until ? ` până la ${new Date(latestDone.result.until).toLocaleDateString('ro-RO')}` : ''
+      setSyncMessage(`Ultima sincronizare: ${latestDone.messages_checked || 0} verificate${since}${until}, ${latestDone.pdfs_found || 0} găsite, ${latestDone.imported_count || 0} importate, ${latestDone.duplicate_count || 0} duplicate, ${latestDone.skipped_count || 0} sărite.`)
       await load()
       await loadSources()
+      await loadLocalFiles()
     }
-  }, [firma.id, load, loadSources])
+  }, [firma.id, load, loadSources, loadLocalFiles])
 
   useEffect(() => { loadSyncJobs() }, [loadSyncJobs])
 
@@ -223,6 +247,50 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     else setResults(data.imported || [])
     await load()
     setBusy(false)
+  }
+
+  async function uploadLocal(files: FileList) {
+    if (!files.length) return
+    setLocalBusy(true)
+    setLocalError('')
+    const fd = new FormData()
+    Array.from(files).forEach(file => fd.append('file', file))
+    fd.append('firmaId', firma.id)
+    fd.append('lunaId', lunaId)
+    fd.append('luna', luna)
+    const res = await fetch('/api/inbox-facturi/local/upload', { method:'POST', body:fd })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setLocalError(data.error || 'Fișierele nu au putut fi încărcate')
+    else { setLocalFiles(data.files || []); await loadSources() }
+    setLocalBusy(false)
+  }
+
+  async function removeLocalFile(id: string) {
+    const res = await fetch(`/api/inbox-facturi/local?id=${encodeURIComponent(id)}`, { method:'DELETE' })
+    if (res.ok) setLocalFiles(prev => prev.filter(f => f.id !== id))
+    else {
+      const data = await res.json().catch(() => ({}))
+      setLocalError(data.error || 'Fișierul nu a putut fi șters')
+    }
+  }
+
+  async function syncLocal(source: InboxSource) {
+    setLocalSyncing(true)
+    setError('')
+    setSyncMessage('Sincronizarea fișierelor locale a pornit în fundal.')
+    setResults([])
+    const res = await fetch('/api/inbox-facturi/local/sync', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ sourceId: source.id, firmaId: firma.id, lunaId, luna }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setError(data.error || 'Sincronizarea locală a eșuat')
+    else {
+      setSyncMessage(data.alreadyRunning ? 'Sincronizarea fișierelor locale rulează deja.' : 'Sincronizarea fișierelor locale rulează în fundal.')
+      await loadSyncJobs()
+    }
+    setLocalSyncing(false)
   }
 
   async function deleteDoc(doc: Doc) {
@@ -406,6 +474,10 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const liveActivity = liveJob?.result?.activity || []
   const liveRunning = (liveJob?.status === 'queued' || liveJob?.status === 'running') && !isJobStale(liveJob)
 
+  const localSource = sourceFor('Fișiere locale')
+  const localJob = latestJobFor(localSource?.id)
+  const localJobRunning = (localJob?.status === 'queued' || localJob?.status === 'running') && !isJobStale(localJob)
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
@@ -461,6 +533,52 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
             )}
           </div>
         )})}
+
+        <div style={{ background:'var(--c-111111)', border:'1px solid rgba(74,222,128,.25)', borderRadius:'12px', padding:'14px 16px' }}>
+          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
+            <div>
+              <div style={{ fontSize:'13px', fontWeight:700, color:'var(--c-eeeeee)', marginBottom:'4px' }}>Fișiere locale</div>
+              <div style={{ fontSize:'11px', color:'var(--c-888888)', lineHeight:1.45 }}>Încărcate manual de pe calculator, separat de sursele de mai sus</div>
+            </div>
+            <div style={{ flexShrink:0, display:'inline-flex', padding:'4px 8px', borderRadius:'999px', background:localFiles.length ? 'rgba(251,146,60,.12)' : 'rgba(74,222,128,.12)', color:localFiles.length ? '#f97316' : 'var(--accent-green)', fontSize:'10px', fontWeight:700 }}>
+              {localFiles.length ? `${localFiles.length} de sincronizat` : 'gata'}
+            </div>
+          </div>
+          <div style={{ marginTop:'9px', fontSize:'10px', color:'var(--c-666666)', lineHeight:1.45 }}>Fișierele stau aici până apeși „Sincronizează”; abia atunci ajung în listă mai jos.</div>
+          {localSource?.last_sync_at && <div style={{ marginTop:'5px', fontSize:'10px', color:'var(--c-666666)' }}>Ultima sincronizare: {new Date(localSource.last_sync_at).toLocaleString('ro-RO')}</div>}
+          {localJob && <div style={{ marginTop:'5px', fontSize:'10px', color:localJob.status === 'error' ? 'var(--accent-red)' : localJobRunning ? legibil(firma.culoare) : 'var(--c-666666)' }}>{jobText(localJob)}</div>}
+
+          {localFiles.length > 0 && (
+            <div style={{ marginTop:'10px', display:'flex', flexDirection:'column', gap:'5px', maxHeight:'140px', overflow:'auto' }}>
+              {localFiles.map(f => (
+                <div key={f.id} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'6px 8px', background:'var(--c-161616)', borderRadius:'7px' }}>
+                  <div style={{ flex:1, minWidth:0, fontSize:'11px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={f.error_message || undefined}>{f.fisier_nume}</div>
+                  {f.status === 'eroare' && <span style={{ fontSize:'9px', color:'var(--accent-red)', flexShrink:0 }}>eroare</span>}
+                  <button onClick={() => removeLocalFile(f.id)} style={{ fontSize:'11px', color:'var(--c-888888)', background:'transparent', border:'none', cursor:'pointer', flexShrink:0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ marginTop:'10px', display:'flex', flexWrap:'wrap', gap:'7px' }}>
+            <div
+              onClick={() => localFileRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setLocalDrag(true) }}
+              onDragLeave={() => setLocalDrag(false)}
+              onDrop={e => { e.preventDefault(); setLocalDrag(false); if (e.dataTransfer.files.length) uploadLocal(e.dataTransfer.files) }}
+              style={{ flex:1, minWidth:'140px', border:`1.5px dashed ${localDrag ? firma.culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'9px', textAlign:'center', cursor:'pointer', fontSize:'11px', fontWeight:700, color:'var(--c-888888)', background:localDrag ? tint(r,.06) : 'transparent' }}
+            >
+              {localBusy ? 'Se încarcă...' : '+ Adaugă fișiere'}
+            </div>
+            <input ref={localFileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { if (e.target.files) uploadLocal(e.target.files); e.target.value='' }}/>
+            {localSource?.id && (
+              <button onClick={() => syncLocal(localSource)} disabled={localSyncing || localJobRunning || localFiles.length === 0} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid rgba(74,222,128,.35)', background:'rgba(74,222,128,.08)', color:'var(--accent-green)', cursor:'pointer', opacity:(localSyncing || localJobRunning || localFiles.length === 0) ? .5 : 1 }}>
+                {localJobRunning ? 'Rulează...' : localSyncing ? 'Pornește...' : `Sincronizează${localFiles.length ? ` (${localFiles.length})` : ''}`}
+              </button>
+            )}
+          </div>
+          {localError && <div style={{ marginTop:'8px', fontSize:'10px', color:'var(--accent-red)' }}>{localError}</div>}
+        </div>
       </div>
 
       <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'14px', overflow:'hidden' }}>
