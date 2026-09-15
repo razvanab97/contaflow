@@ -2,8 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createHash } from 'node:crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { isEonInvoice, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
+
+type ExtractedInvoice = { category?:string; amount?:number; supplier?:string; series?:string; invoiceNumber?:string; apartment?:string; invoiceDate?:string; representingPeriod?:string }
+
+async function extractInvoiceData(client: Anthropic, bytes: Buffer, mimeType: string): Promise<ExtractedInvoice> {
+  const source = mimeType === 'application/pdf'
+    ? { type:'document' as const, source:{ type:'base64' as const, media_type:'application/pdf' as const, data:bytes.toString('base64') } }
+    : { type:'image' as const, source:{ type:'base64' as const, media_type:mimeType as 'image/jpeg'|'image/png', data:bytes.toString('base64') } }
+  const response = await client.messages.create({
+    model:'claude-haiku-4-5-20251001',
+    max_tokens:500,
+    messages:[{ role:'user', content:[
+      source,
+      { type:'text', text:'Extrage datele facturii sau chitantei pentru o dispozitie de plata. Citeste cu atentie textul scris de mana. Returneaza doar JSON: {"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria documentului","invoiceNumber":"numarul documentului","apartment":"numarul apartamentului","invoiceDate":"ZZ.LL.AAAA","representingPeriod":"copiaza exact textul din campul reprezentand/pentru luna — poate fi o luna (ex: Mai 2026) sau doua luni (ex: Mai si Iunie 2026) — lasa null daca nu exista acest camp"}. Nu scrie descrieri lungi, nu inventa date.' },
+    ] }],
+  })
+  const raw = response.content.filter(block=>block.type==='text').map(block=>(block as {text:string}).text).join('')
+  const match = raw.match(/\{[\s\S]*\}/)
+  try { return match ? JSON.parse(match[0]) as ExtractedInvoice : {} } catch { return {} }
+}
 
 function safePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || fallback
@@ -117,24 +137,33 @@ export async function POST(req: NextRequest) {
     if (!file || !firmaId || !lunaId || !ALLOWED_TYPES.has(file.type))
       return NextResponse.json({ error:'Fișier sau date lipsă' }, { status:400 })
 
-    const bytes = Buffer.from(await file.arrayBuffer())
-    const documentHash = createHash('sha256').update(bytes).digest('hex')
+    let bytes: Buffer = Buffer.from(await file.arrayBuffer())
     const client = new Anthropic({ apiKey:process.env.ANTHROPIC_API_KEY })
-    const source = file.type === 'application/pdf'
-      ? { type:'document' as const, source:{ type:'base64' as const, media_type:'application/pdf' as const, data:bytes.toString('base64') } }
-      : { type:'image' as const, source:{ type:'base64' as const, media_type:file.type as 'image/jpeg'|'image/png', data:bytes.toString('base64') } }
-    const response = await client.messages.create({
-      model:'claude-haiku-4-5-20251001',
-      max_tokens:500,
-      messages:[{ role:'user', content:[
-        source,
-        { type:'text', text:'Extrage datele facturii sau chitantei pentru o dispozitie de plata. Citeste cu atentie textul scris de mana. Returneaza doar JSON: {"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria documentului","invoiceNumber":"numarul documentului","apartment":"numarul apartamentului","invoiceDate":"ZZ.LL.AAAA","representingPeriod":"copiaza exact textul din campul reprezentand/pentru luna — poate fi o luna (ex: Mai 2026) sau doua luni (ex: Mai si Iunie 2026) — lasa null daca nu exista acest camp"}. Nu scrie descrieri lungi, nu inventa date.' },
-      ] }],
-    })
-    const raw = response.content.filter(block=>block.type==='text').map(block=>(block as {text:string}).text).join('')
-    const match = raw.match(/\{[\s\S]*\}/)
-    let extracted:{category?:string;amount?:number;supplier?:string;series?:string;invoiceNumber?:string;apartment?:string;invoiceDate?:string;representingPeriod?:string} = {}
-    try { extracted = match ? JSON.parse(match[0]) : {} } catch {}
+    let extracted = await extractInvoiceData(client, bytes, file.type)
+
+    console.log(`[Invoice PDF] Provider: ${extracted.supplier || 'necunoscut'}`)
+    if (file.type === 'application/pdf') {
+      const originalPageCount = await pdfPageCount(bytes)
+      if (isEonInvoice(extracted.supplier) && originalPageCount > 1) {
+        console.log(`[Invoice PDF] Original pages: ${originalPageCount}`)
+        console.log('[Invoice PDF] Splitting E.ON invoice')
+        console.log('[Invoice PDF] Keeping page 1 only')
+        try {
+          bytes = await keepOnlyFirstPage(bytes)
+        } catch (splitError) {
+          console.error('[Invoice PDF] E.ON split failed:', splitError)
+          return NextResponse.json({ error:'Nu am putut procesa factura E.ON: splitarea paginilor a eșuat' }, { status:500 })
+        }
+        console.log('[Invoice PDF] Final pages: 1')
+        // Re-extragem din PDF-ul cu o singură pagină, ca datele folosite mai jos (sumă, apartament,
+        // perioadă) să corespundă exact fișierului care chiar se salvează, nu celui original.
+        extracted = await extractInvoiceData(client, bytes, file.type)
+      } else {
+        console.log('[Invoice PDF] Standard PDF processing')
+      }
+    }
+
+    const documentHash = createHash('sha256').update(bytes).digest('hex')
     const purpose = dispositionPurpose(extracted)
     const sb = getServiceSupabase()
     const utilitate = dispositionUtility(extracted)
