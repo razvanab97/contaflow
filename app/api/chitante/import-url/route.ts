@@ -51,7 +51,7 @@ function supplierMatch(a?: string | null, b?: string | null) {
   return ca.length >= 4 && cb.length >= 4 && (ca.includes(cb) || cb.includes(ca))
 }
 
-type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null }
+type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; codLocatie: string | null }
 
 async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null> {
   try {
@@ -61,7 +61,7 @@ async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null
       max_tokens: 500,
       messages: [{ role: 'user', content: [
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: bytes.toString('base64') } },
-        { type: 'text', text: 'Extrage datele acestei facturi/document PDF. Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului","numarDocument":"seria si numarul documentului sau codul rezervarii, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ"}. Pentru facturi Airbnb, copiaza si codul rezervarii daca apare. Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+        { type: 'text', text: 'Extrage datele acestei facturi/document PDF. Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului","numarDocument":"seria si numarul documentului sau codul rezervarii, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null"}. Pentru facturi Airbnb, copiaza si codul rezervarii daca apare. Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -73,6 +73,7 @@ async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null
       numarDocument: typeof parsed.numarDocument === 'string' ? parsed.numarDocument : null,
       suma: typeof parsed.suma === 'number' ? parsed.suma : null,
       dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
+      codLocatie: typeof parsed.codLocatie === 'string' && parsed.codLocatie.trim() ? parsed.codLocatie.trim() : null,
     }
   } catch {
     return null
@@ -207,6 +208,7 @@ export async function POST(req: NextRequest) {
     numar_document: reference || genericExtractie?.numarDocument || null,
     suma: transaction ? Math.abs(Number(transaction.suma)) : genericExtractie?.suma ?? null,
     data_document: transaction?.data_tranzactie || genericExtractie?.dataDocument || null,
+    cod_unitate_booking: genericExtractie?.codLocatie || null,
     fisier_path:path,
     fisier_nume:fileName,
     fisier_tip:'application/pdf',

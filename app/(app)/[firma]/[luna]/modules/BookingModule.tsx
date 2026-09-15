@@ -2,6 +2,7 @@
 import TaskSection, { TaskItem } from './TaskSection'
 import UploadPanel from './UploadPanel'
 import OldItemDocs, { ChecklistItem } from './OldItemDocs'
+import BookingLocatiiSummary from './BookingLocatiiSummary'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props {
@@ -27,8 +28,10 @@ const CONFIG = {
   },
 }
 
+// O singură pagină pentru tot Booking, indiferent din ce link al sidebar-ului s-a ajuns aici
+// (Booking · Facturi sau Booking · Borderou) — ca factura de comision și borderoul aceleiași
+// proprietăți să apară mereu împreună, nu pe pagini separate.
 export default function BookingModule({ firma, lunaId, tasks, section, checklistItems }: Props) {
-  const cfg = CONFIG[section]
   const sorted = [...checklistItems].sort((a, b) => (a.checklist_templates?.ordine || 0) - (b.checklist_templates?.ordine || 0))
 
   return (
@@ -46,16 +49,29 @@ export default function BookingModule({ firma, lunaId, tasks, section, checklist
         </div>
       )}
 
+      <BookingLocatiiSummary firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare}/>
+
       <UploadPanel
         firmaId={firma.id}
         lunaId={lunaId}
-        section={section}
+        section="booking-facturi"
         culoare={firma.culoare}
-        title={cfg.title}
-        description={cfg.description}
+        title={CONFIG['booking-facturi'].title}
+        description={CONFIG['booking-facturi'].description}
         showLinkImport
-        linkPlaceholder={cfg.linkPlaceholder}
-        documentTypeOptions={cfg.docTypes}
+        linkPlaceholder={CONFIG['booking-facturi'].linkPlaceholder}
+        documentTypeOptions={CONFIG['booking-facturi'].docTypes}
+      />
+      <UploadPanel
+        firmaId={firma.id}
+        lunaId={lunaId}
+        section="booking-borderou"
+        culoare={firma.culoare}
+        title={CONFIG['booking-borderou'].title}
+        description={CONFIG['booking-borderou'].description}
+        showLinkImport
+        linkPlaceholder={CONFIG['booking-borderou'].linkPlaceholder}
+        documentTypeOptions={CONFIG['booking-borderou'].docTypes}
       />
     </div>
   )

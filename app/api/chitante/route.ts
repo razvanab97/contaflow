@@ -69,7 +69,7 @@ async function analyzeAngajatiDoc(bytes: Uint8Array, mediaType: string): Promise
   }
 }
 
-type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null }
+type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; codLocatie: string | null }
 type AirbnbBorderouRow = {
   uniqueKey: string
   codConfirmare: string
@@ -98,7 +98,7 @@ async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<
       max_tokens: 500,
       messages: [{ role: 'user', content: [
         source,
-        { type: 'text', text: 'Extrage datele acestui document (factura, chitanta, borderou sau alt act contabil). Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului sau al platformei","numarDocument":"seria si numarul documentului, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ"}. "suma" e suma totala. "dataDocument" e data emiterii (format ISO). Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+        { type: 'text', text: 'Extrage datele acestui document (factura, chitanta, borderou sau alt act contabil). Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului sau al platformei","numarDocument":"seria si numarul documentului, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null"}. "suma" e suma totala. "dataDocument" e data emiterii (format ISO). Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -110,6 +110,7 @@ async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<
       numarDocument: typeof parsed.numarDocument === 'string' ? parsed.numarDocument : null,
       suma: typeof parsed.suma === 'number' ? parsed.suma : null,
       dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
+      codLocatie: typeof parsed.codLocatie === 'string' && parsed.codLocatie.trim() ? parsed.codLocatie.trim() : null,
     }
   } catch {
     return null
@@ -299,7 +300,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
   let query = sb
     .from('documente')
-    .select('id,fisier_nume,fisier_tip,tip_document,furnizor,modul,numar_document,suma,data_document,created_at,platit,data_platii')
+    .select('id,fisier_nume,fisier_tip,tip_document,furnizor,modul,numar_document,suma,data_document,created_at,platit,data_platii,cod_unitate_booking')
     .not('fisier_path', 'like', '%/tx/%')
     .not('fisier_path', 'like', '%/checklist/%')
     .order('created_at', { ascending: true })
@@ -395,6 +396,7 @@ export async function POST(req: NextRequest) {
       numar_document: reference || genericExtractie?.numarDocument || null,
       suma: genericExtractie?.suma ?? null,
       data_document: genericExtractie?.dataDocument || null,
+      cod_unitate_booking: genericExtractie?.codLocatie || null,
       fisier_path: path,
       fisier_nume: fileName,
       fisier_tip: isAirbnbCsv ? 'text/csv' : file.type,
