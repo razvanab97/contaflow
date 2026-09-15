@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 95, text: 'Dispoziții de plată: alegi proprietatea dintr-un dropdown (gestionabil, adaugi/ștergi din pagină) și proprietarul se precompletează automat cu nume și serie/număr CI, fără căutare manuală. Fix: numele cu diacritice nu mai apar trunchiate în PDF (ex. "Bordeanu Dănuț" nu mai ieșea ca "Bordeanu Dnu")' },
   { v: 94, text: 'Airbnb Facturi: importul din link citește PDF-ul facturii, salvează datele extrase și îl asociază automat cu rezervarea din borderou când găsește codul sau suma' },
   { v: 93, text: 'Airbnb: borderoul acceptă CSV, generează automat lista de facturi așteptate pentru rezervări, iar PDF-urile încărcate în Airbnb Facturi se asociază singure după cod/sumă' },
   { v: 92, text: 'Inbox Facturi: jurnalul live Gmail pornește imediat la apăsarea sincronizării, are timeout pe apelurile Google și deblochează automat job-urile rămase fără progres' },
