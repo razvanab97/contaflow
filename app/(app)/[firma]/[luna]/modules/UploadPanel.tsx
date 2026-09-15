@@ -156,19 +156,44 @@ export default function UploadPanel({
     onChange?.()
   }
 
-  async function importLink() {
-    if (!link) return
+  async function importLink(urlOverride?: string) {
+    const targetUrl = urlOverride || link
+    if (!targetUrl) return
     setBusy(true); setError('')
     const res = await fetch('/api/chitante/import-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: link, firmaId, lunaId, section, supplier, documentType }),
+      body: JSON.stringify({ url: targetUrl, firmaId, lunaId, section, supplier, documentType }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setError(data.error || 'Importul nu a reușit')
     else { setLink(''); await load(); await loadAirbnbExpected() }
     setBusy(false)
   }
+
+  useEffect(() => {
+    function handlePaste(e: ClipboardEvent) {
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      const files = Array.from(e.clipboardData?.files || [])
+      if (files.length) {
+        e.preventDefault()
+        const dt = new DataTransfer()
+        files.forEach(file => dt.items.add(file))
+        upload(dt.files)
+        return
+      }
+      if (!showLinkImport) return
+      const text = e.clipboardData?.getData('text/plain')?.trim()
+      if (text && /^https?:\/\//i.test(text)) {
+        e.preventDefault()
+        setLink(text)
+        importLink(text)
+      }
+    }
+    window.addEventListener('paste', handlePaste)
+    return () => window.removeEventListener('paste', handlePaste)
+  })
 
   async function savePdf() {
     setPdfBusy(true)
@@ -215,7 +240,7 @@ export default function UploadPanel({
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setReconcilMessage(data.error || 'Reconcilierea a eșuat')
     else {
-      setReconcilMessage(data.matched > 0 ? `${data.matched} facturi asociate automat (sumă identică cu taxa de servicii din borderou).` : 'Nu am găsit potriviri noi după taxa de servicii.')
+      setReconcilMessage(data.matched > 0 ? `${data.matched} facturi asociate automat (${data.dupaCod} după codul de rezervare, ${data.dupaSuma} după sumă exactă).` : 'Nu am găsit potriviri noi.')
       await loadAirbnbExpected()
     }
     setReconcilBusy(false)
@@ -334,7 +359,7 @@ export default function UploadPanel({
                         {attached ? (
                           <>
                             <span style={{ fontSize:'10px', fontWeight:700, color:'var(--accent-mint)' }}>
-                              atașată{item.asociere_metoda === 'taxa_servicii_exacta' ? ' (auto)' : ''}
+                              atașată{item.asociere_metoda === 'cod_rezervare' ? ' (auto · cod)' : item.asociere_metoda === 'taxa_servicii_exacta' ? ' (auto · sumă)' : ''}
                             </span>
                             <a href={`/api/chitante/document?id=${encodeURIComponent(item.factura_document_id!)}`} style={{ fontSize:'10px', color:legibil(culoare), textDecoration:'none' }}>↓</a>
                             <button onClick={() => detaseazaFactura(item)} title="Detașează factura de la această rezervare" style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer', padding:0 }}>✕</button>
@@ -427,7 +452,7 @@ export default function UploadPanel({
         {showLinkImport && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginBottom: '10px' }}>
             <input value={link} onChange={e => setLink(e.target.value)} placeholder={linkPlaceholder || 'Link PDF (HTTPS)'} style={INP}/>
-            <button onClick={importLink} disabled={busy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: '8px', background: culoare, color: 'var(--c-ffffff)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: busy || !link ? .5 : 1 }}>
+            <button onClick={() => importLink()} disabled={busy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: '8px', background: culoare, color: 'var(--c-ffffff)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: busy || !link ? .5 : 1 }}>
               Import
             </button>
           </div>
