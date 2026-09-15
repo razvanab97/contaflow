@@ -1,6 +1,8 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
-import { legibil } from '@/lib/colors'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { legibil, tint } from '@/lib/colors'
+
+function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 
 interface Doc {
   id: string
@@ -45,6 +47,11 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
   const [showBulk, setShowBulk] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [uploadBusy, setUploadBusy] = useState(false)
+  const [drag, setDrag] = useState(false)
+  const [link, setLink] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const r = rgb(culoare)
 
   const load = useCallback(async () => {
     const [locRes, facturiRes, borderouRes] = await Promise.all([
@@ -86,6 +93,61 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
     else { setBulkText(''); setShowBulk(false); await load() }
     setBusy(false)
   }
+
+  async function uploadFiles(files: FileList) {
+    if (!files.length) return
+    setUploadBusy(true); setError('')
+    for (const file of Array.from(files)) {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('firmaId', firmaId)
+      fd.append('lunaId', lunaId)
+      fd.append('section', 'booking-auto')
+      fd.append('category', 'altul')
+      const res = await fetch('/api/chitante', { method: 'POST', body: fd })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error || 'Eroare upload'); break }
+    }
+    await load()
+    setUploadBusy(false)
+  }
+
+  async function importLink(urlOverride?: string) {
+    const targetUrl = urlOverride || link
+    if (!targetUrl) return
+    setUploadBusy(true); setError('')
+    const res = await fetch('/api/chitante/import-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: targetUrl, firmaId, lunaId, section: 'booking-auto' }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setError(data.error || 'Importul nu a reușit')
+    else { setLink(''); await load() }
+    setUploadBusy(false)
+  }
+
+  useEffect(() => {
+    function handlePaste(e: ClipboardEvent) {
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      const files = Array.from(e.clipboardData?.files || [])
+      if (files.length) {
+        e.preventDefault()
+        const dt = new DataTransfer()
+        files.forEach(file => dt.items.add(file))
+        uploadFiles(dt.files)
+        return
+      }
+      const text = e.clipboardData?.getData('text/plain')?.trim()
+      if (text && /^https?:\/\//i.test(text)) {
+        e.preventDefault()
+        setLink(text)
+        importLink(text)
+      }
+    }
+    window.addEventListener('paste', handlePaste)
+    return () => window.removeEventListener('paste', handlePaste)
+  })
 
   async function removeLocatie(loc: Locatie) {
     if (!confirm(`Ștergi locația „${loc.denumire}" (${loc.cod})? Documentele deja încărcate rămân, doar nu vor mai fi grupate sub ea.`)) return
@@ -175,6 +237,36 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
               </div>
             )
           })}
+        </div>
+
+        <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--c-1a1a1a)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--c-dddddd)', marginBottom: '4px' }}>Adaugă facturi sau borderouri Booking</div>
+          <div style={{ fontSize: '10px', color: 'var(--c-777777)', marginBottom: '10px' }}>Un singur loc pentru ambele — AI-ul recunoaște ce e fiecare fișier și îl pune la proprietatea potrivită.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginBottom: '10px' }}>
+            <input value={link} onChange={e => setLink(e.target.value)} placeholder="Link PDF Booking.com" style={{ fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
+            <button onClick={() => importLink()} disabled={uploadBusy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: '8px', background: culoare, color: '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: uploadBusy || !link ? .5 : 1 }}>
+              Import
+            </button>
+          </div>
+          <div
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDrag(true) }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files) }}
+            style={{
+              border: `1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`,
+              borderRadius: '10px', padding: '18px',
+              textAlign: 'center', cursor: 'pointer',
+              background: drag ? tint(r, .04) : 'var(--c-0d0d0d)',
+              transition: 'all .15s',
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-666666)', marginBottom: '3px' }}>
+              {uploadBusy ? 'Se încarcă...' : 'Adaugă fișiere'}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--c-888888)' }}>PDF, JPG, PNG · drag & drop, click sau Cmd+V</div>
+          </div>
+          <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} onChange={e => { if (e.target.files) uploadFiles(e.target.files); e.target.value = '' }}/>
         </div>
 
         {(facturiFaraLocatie.length > 0 || borderouFaraLocatie.length > 0) && (

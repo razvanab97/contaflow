@@ -5,7 +5,7 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 
 const ACCOUNTING_SECTIONS = new Set([
   'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
-  'booking-facturi', 'booking-borderou',
+  'booking-facturi', 'booking-borderou', 'booking-auto',
   'airbnb-facturi', 'airbnb-borderou',
   '5stardesk', 'trendyol', 'acte-contabile', 'angajati',
 ])
@@ -51,7 +51,7 @@ function supplierMatch(a?: string | null, b?: string | null) {
   return ca.length >= 4 && cb.length >= 4 && (ca.includes(cb) || cb.includes(ca))
 }
 
-type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; codLocatie: string | null }
+type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; codLocatie: string | null; tipDocumentBooking: 'factura' | 'borderou' | null }
 
 async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null> {
   try {
@@ -61,7 +61,7 @@ async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null
       max_tokens: 500,
       messages: [{ role: 'user', content: [
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: bytes.toString('base64') } },
-        { type: 'text', text: 'Extrage datele acestei facturi/document PDF. Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului","numarDocument":"seria si numarul documentului sau codul rezervarii, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null"}. Pentru facturi Airbnb, copiaza si codul rezervarii daca apare. Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+        { type: 'text', text: 'Extrage datele acestei facturi/document PDF. Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului","numarDocument":"seria si numarul documentului sau codul rezervarii, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null","tipDocumentBooking":"factura (daca documentul e o FACTURA de comision Booking.com, cu \'Suma totala de plata\') sau borderou (daca e un centralizator/sumar de plati cu lista de rezervari), altfel null"}. Pentru facturi Airbnb, copiaza si codul rezervarii daca apare. Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -74,6 +74,7 @@ async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null
       suma: typeof parsed.suma === 'number' ? parsed.suma : null,
       dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
       codLocatie: typeof parsed.codLocatie === 'string' && parsed.codLocatie.trim() ? parsed.codLocatie.trim() : null,
+      tipDocumentBooking: parsed.tipDocumentBooking === 'factura' || parsed.tipDocumentBooking === 'borderou' ? parsed.tipDocumentBooking : null,
     }
   } catch {
     return null
@@ -172,8 +173,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Linkul nu a returnat un fișier PDF' }, { status: 422 })
 
   const sb = getServiceSupabase()
-  const shouldAnalyze = isAccountingSection && section === 'airbnb-facturi'
+  const shouldAnalyze = isAccountingSection && (section === 'airbnb-facturi' || section === 'booking-auto')
   const genericExtractie = shouldAnalyze ? await analyzeGenericPdf(bytes) : null
+  // La Booking, un singur link/dropzone primeste si facturi si borderouri - AI-ul decide unde se duce fiecare.
+  const effectiveSection = section === 'booking-auto'
+    ? (genericExtractie?.tipDocumentBooking === 'borderou' ? 'booking-borderou' : 'booking-facturi')
+    : section
+  const effectiveDocumentType = section === 'booking-auto' ? (genericExtractie?.tipDocumentBooking || 'factura') : documentType
   let transaction: { id:string; document_id:string|null; extras_id:string; data_tranzactie:string; descriere_curatata:string|null; descriere:string|null; suma:number } | null = null
   if (transactionId) {
     const result = await sb.from('tranzactii')
@@ -191,8 +197,8 @@ export async function POST(req: NextRequest) {
     transaction?.descriere_curatata || transaction?.descriere,
   ].filter(Boolean).join(' ')
   const transactionPrefix = transaction ? `${safePart(transaction.data_tranzactie, 'fara_data')}_${safePart(Number(transaction.suma).toFixed(2), 'fara_suma')}_` : ''
-  const fileName = `${transactionPrefix}${safePart(details, sourceName)}_${safePart(documentType, 'document')}_${Date.now()}.pdf`
-  const destination = itemId ? `checklist/${itemId}` : transactionId ? `tx/${transactionId}` : section
+  const fileName = `${transactionPrefix}${safePart(details, sourceName)}_${safePart(effectiveDocumentType, 'document')}_${Date.now()}.pdf`
+  const destination = itemId ? `checklist/${itemId}` : transactionId ? `tx/${transactionId}` : effectiveSection
   const path = `${firmaId}/${lunaId}/${destination}/${fileName}`
   const { error: storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType:'application/pdf' })
   if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
@@ -203,7 +209,7 @@ export async function POST(req: NextRequest) {
     checklist_item_id:itemId || null,
     tranzactie_id:transactionId || null,
     ...(transactionId ? { modul:'extras' } : isAccountingSection ? { modul:'acte_contabile' } : {}),
-    tip_document:documentType,
+    tip_document:effectiveDocumentType,
     furnizor:[supplier || genericExtractie?.furnizor, description && `Descriere: ${description}`, (reference || genericExtractie?.numarDocument) && `Referinta: ${reference || genericExtractie?.numarDocument}`, `Sursa: ${sourceName}`].filter(Boolean).join(' | '),
     numar_document: reference || genericExtractie?.numarDocument || null,
     suma: transaction ? Math.abs(Number(transaction.suma)) : genericExtractie?.suma ?? null,

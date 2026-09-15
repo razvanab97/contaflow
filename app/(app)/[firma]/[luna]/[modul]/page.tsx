@@ -58,7 +58,10 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   const taskMap: Record<string, boolean> = {}
   for (const ts of taskStariRaw) taskMap[ts.task_key] = ts.completat
 
-  const tasks = modulDef.tasks.map(t => ({ ...t, completat: taskMap[t.key] ?? false }))
+  // Booking · Borderou nu mai are propria pagină (a fost unită cu Booking · Facturi într-un
+  // singur tab) - task-ul lui ramane totusi vizibil/bifabil, pe pagina combinata.
+  const extraTaskDefs = modulSlug === 'booking-facturi' ? (MODULE_DEFS['booking-borderou']?.tasks || []) : []
+  const tasks = [...modulDef.tasks, ...extraTaskDefs].map(t => ({ ...t, completat: taskMap[t.key] ?? false }))
 
   const ll = accountingFullLabel(luna)
   const periodLabel = accountingPeriodLabel(luna)
@@ -101,9 +104,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'trendyol':
         return <TrendyolModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} checklistItems={oldItems('trendyol')}/>
       case 'booking-facturi':
-        return <BookingModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="booking-facturi" checklistItems={oldItems('booking-facturi')}/>
-      case 'booking-borderou':
-        return <BookingModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="booking-borderou" checklistItems={oldItems('booking-borderou')}/>
+        return <BookingModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="booking-facturi" checklistItems={[...oldItems('booking-facturi'), ...oldItems('booking-borderou')]}/>
       case 'airbnb-facturi':
         return <AirbnbModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} section="airbnb-facturi" checklistItems={oldItems('airbnb-facturi')}/>
       case 'airbnb-borderou':

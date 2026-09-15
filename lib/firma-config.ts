@@ -215,7 +215,7 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
   },
   abxhomes: {
     slug: 'abxhomes',
-    module: [...COMUNE, 'booking-facturi', 'booking-borderou', 'airbnb-facturi', 'airbnb-borderou', '5stardesk'],
+    module: [...COMUNE, 'booking-facturi', 'airbnb-facturi', 'airbnb-borderou', '5stardesk'],
     legal: {
       nrRegCom: 'J2025022705009',
       cif: '51540013',

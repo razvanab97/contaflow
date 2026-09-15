@@ -9,7 +9,7 @@ const ALLOWED_CATEGORIES = new Set(['utilitati', 'chirie', 'altul'])
 const ALLOWED_DOCUMENT_TYPES = new Set(['factura', 'chitanta', 'borderou', 'raport_csv', 'contract', 'altul'])
 const ALLOWED_SECTIONS = new Set([
   'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
-  'booking-facturi', 'booking-borderou',
+  'booking-facturi', 'booking-borderou', 'booking-auto',
   'airbnb-facturi', 'airbnb-borderou',
   '5stardesk', 'trendyol', 'acte-contabile', 'angajati',
 ])
@@ -69,7 +69,7 @@ async function analyzeAngajatiDoc(bytes: Uint8Array, mediaType: string): Promise
   }
 }
 
-type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; codLocatie: string | null }
+type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; codLocatie: string | null; tipDocumentBooking: 'factura' | 'borderou' | null }
 type AirbnbBorderouRow = {
   uniqueKey: string
   codConfirmare: string
@@ -98,7 +98,7 @@ async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<
       max_tokens: 500,
       messages: [{ role: 'user', content: [
         source,
-        { type: 'text', text: 'Extrage datele acestui document (factura, chitanta, borderou sau alt act contabil). Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului sau al platformei","numarDocument":"seria si numarul documentului, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null"}. "suma" e suma totala. "dataDocument" e data emiterii (format ISO). Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+        { type: 'text', text: 'Extrage datele acestui document (factura, chitanta, borderou sau alt act contabil). Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului sau al platformei","numarDocument":"seria si numarul documentului, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null","tipDocumentBooking":"factura (daca documentul e o FACTURA de comision Booking.com, cu \'Suma totala de plata\') sau borderou (daca e un centralizator/sumar de plati cu lista de rezervari), altfel null"}. "suma" e suma totala. "dataDocument" e data emiterii (format ISO). Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -111,6 +111,7 @@ async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<
       suma: typeof parsed.suma === 'number' ? parsed.suma : null,
       dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
       codLocatie: typeof parsed.codLocatie === 'string' && parsed.codLocatie.trim() ? parsed.codLocatie.trim() : null,
+      tipDocumentBooking: parsed.tipDocumentBooking === 'factura' || parsed.tipDocumentBooking === 'borderou' ? parsed.tipDocumentBooking : null,
     }
   } catch {
     return null
@@ -350,10 +351,6 @@ export async function POST(req: NextRequest) {
   const sb = getServiceSupabase()
 
   let uploadBytes: Uint8Array = new Uint8Array(await file.arrayBuffer())
-  if (section === 'booking-facturi' && file.type === 'application/pdf') {
-    const stripped = await stripLastPageIfExtra(uploadBytes)
-    if (stripped) uploadBytes = stripped
-  }
 
   // La Documente angajați, AI-ul citește documentul și decide singur ce e (nu mai contează
   // ce alegi tu din dropdown) — folosim tipul + eticheta lui pentru denumire, nu selecția manuală
@@ -371,12 +368,25 @@ export async function POST(req: NextRequest) {
     genericExtractie = await analyzeGenericDoc(uploadBytes, file.type)
   }
 
+  // La Booking, un singur dropzone primeste si facturi si borderouri - AI-ul decide unde
+  // se duce fiecare fisier, ca sa nu mai fie nevoie sa le adaugi separat.
+  let effectiveSection = section
+  if (section === 'booking-auto') {
+    effectiveSection = genericExtractie?.tipDocumentBooking === 'borderou' ? 'booking-borderou' : 'booking-facturi'
+    if (!effectiveDocumentType) effectiveDocumentType = genericExtractie?.tipDocumentBooking || 'factura'
+  }
+
+  if (effectiveSection === 'booking-facturi' && file.type === 'application/pdf') {
+    const stripped = await stripLastPageIfExtra(uploadBytes)
+    if (stripped) uploadBytes = stripped
+  }
+
   // Numele fisierului trebuie sa spuna ce e documentul — preferam ce a citit AI-ul (furnizor + numar
   // document), completat cu ce ai scris tu manual; daca AI-ul n-a gasit nimic, ramane eticheta tipului
   const effectiveSupplier = supplier || genericExtractie?.furnizor || ''
   const details = [effectiveDocumentTypeLabel, genericExtractie?.furnizor, genericExtractie?.numarDocument, supplier, description, reference].filter(Boolean).join(' ')
   const fileName = `${safeFilePart(details, effectiveType)}_${Date.now()}.${extension}`
-  const path = `${firmaId}/${lunaId}/${section}/${fileName}`
+  const path = `${firmaId}/${lunaId}/${effectiveSection}/${fileName}`
 
   const { error: storageError } = await sb.storage.from('documente').upload(path, uploadBytes, {
     contentType: isAirbnbCsv ? 'text/csv' : file.type,
