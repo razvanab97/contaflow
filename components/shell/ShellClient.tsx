@@ -28,6 +28,7 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
 
   const [firmeNav, setFirmeNav] = useState(initialFirmeNav)
   const [restanteCount, setRestanteCount] = useState(0)
+  const [moduleComplete, setModuleComplete] = useState<Record<string, boolean>>({})
 
   const firmaAtivaObj = firmeNav.find(f => f.slug === firmaSlug)
   const firmaId = firmaAtivaObj?.id
@@ -37,16 +38,18 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
     let cancelled = false
     const qs = new URLSearchParams({ luna: lunaEfectiva })
     if (firmaId) qs.set('firmaId', firmaId)
+    if (firmaSlug) qs.set('firmaSlug', firmaSlug)
     fetch(`/api/shell-nav?${qs}`)
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
         if (cancelled || !data) return
         if (data.firmeNav) setFirmeNav(data.firmeNav)
         setRestanteCount(data.restanteCount || 0)
+        setModuleComplete(data.moduleComplete || {})
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [lunaEfectiva, firmaId, initialLuna])
+  }, [lunaEfectiva, firmaId, firmaSlug, initialLuna])
 
   const modules = firmaSlug ? getFirmaModules(firmaSlug) : undefined
 
@@ -59,6 +62,7 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
         firmaAtiva={firmaSlug}
         moduleFirma={modules}
         restanteCount={restanteCount}
+        moduleComplete={moduleComplete}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {firmaAtivaObj && (

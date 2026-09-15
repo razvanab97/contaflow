@@ -14,15 +14,21 @@ const LUNA = currentWorkMonthKey()
 function ini(n: string) { return n.split(' ').filter((w:string) => /^[A-ZĂÎȘȚ]/.test(w)).slice(0,2).map((w:string)=>w[0]).join('') }
 
 export default async function Dashboard() {
-  const [firme, luni, taskStariRaw, proprietariRaw] = await Promise.all([
+  const [firme, luni] = await Promise.all([
     dbSelect('firme', { eq: { activa: true }, order: 'created_at' }),
     dbSelect('luni_contabile', { select: '*' }),
-    dbSelect('task_stari', { select: 'luna_id,completat' }),
-    dbSelect('proprietari', { select: 'id,firma_id,nume,serie_ci,numar_ci', order: 'ordine' }),
   ])
 
   const luniMap: Record<string, any> = {}
   for (const l of luni) luniMap[`${l.firma_id}_${l.luna?.slice(0,7)}`] = l
+
+  // Doar luna curenta pe firmele active - task_stari creste nemarginit in timp, nu are rost
+  // sa citim tot istoricul doar ca sa aratam procentul lunii afisate acum pe Dashboard.
+  const lunaIds = firme.map((f: any) => luniMap[`${f.id}_${LUNA}`]?.id).filter(Boolean)
+  const [taskStariRaw, proprietariRaw] = await Promise.all([
+    lunaIds.length ? dbSelect('task_stari', { select: 'luna_id,completat', in: { luna_id: lunaIds } }) : Promise.resolve([]),
+    dbSelect('proprietari', { select: 'id,firma_id,nume,serie_ci,numar_ci', order: 'ordine' }),
+  ])
 
   const taskCount: Record<string, { done: number }> = {}
   for (const ts of taskStariRaw) {

@@ -21,9 +21,10 @@ interface Props {
   firmaAtiva?: string
   moduleFirma?: ModuleDef[]
   restanteCount?: number
+  moduleComplete?: Record<string, boolean>
 }
 
-export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, moduleFirma, restanteCount }: Props) {
+export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, moduleFirma, restanteCount, moduleComplete }: Props) {
   const pathname = usePathname()
   const isDashboard = pathname === '/dashboard'
   const [open, setOpen] = useState(false)
@@ -218,6 +219,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
               ? `/${firmaAtiva}/${lunaCurenta}/${m.linkDirect}`
               : `/${firmaAtiva}/${lunaCurenta}/${m.slug}`
             const isCurrentMod = m.slug === modulActiv
+            const isComplete = !!moduleComplete?.[m.slug]
             return (
               <Link key={m.slug} href={href} style={{
                 display: 'flex', alignItems: 'center', gap: '9px',
@@ -232,7 +234,8 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
                 <span style={{
                   flex: 1, minWidth: 0,
                   fontSize: '13px', fontWeight: isCurrentMod ? 600 : 500,
-                  color: isCurrentMod ? 'var(--accent-hover)' : 'var(--text-secondary)',
+                  color: isCurrentMod ? 'var(--accent-hover)' : isComplete ? 'var(--text-muted)' : 'var(--text-secondary)',
+                  textDecoration: isComplete ? 'line-through' : 'none',
                 }}>
                   {m.label}
                 </span>
