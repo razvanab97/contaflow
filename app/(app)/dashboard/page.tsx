@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import DocumenteGenerale from '@/components/DocumenteGenerale'
 import FirmaQuickInfo from '@/components/FirmaQuickInfo'
+import FacturiLocaleGlobal from '@/components/FacturiLocaleGlobal'
 import { dbSelect } from '@/lib/db'
 import { getRestanteCount } from '@/lib/queries'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
@@ -63,6 +64,8 @@ export default async function Dashboard() {
             )}
           </p>
         </div>
+
+        <FacturiLocaleGlobal firme={firme.map((f: any) => ({ id: f.id, nume: f.nume }))} />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(440px, 100%), 1fr))', gap: '12px' }}>
           {firme.map((f: any) => {

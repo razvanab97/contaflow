@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "watch:facturi": "node scripts/watch-facturi-locale.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",
