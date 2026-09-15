@@ -41,6 +41,9 @@ type GmailPart = {
 
 type GmailMessage = {
   id: string
+  threadId?: string
+  snippet?: string
+  internalDate?: string
   payload?: GmailPart
   error?: { message?: string }
 }
@@ -60,6 +63,8 @@ type SyncJob = {
   result?: { sinceDate?: string; untilDate?: string } | null
 }
 
+type GmailHeader = { name?: string; value?: string }
+
 function decodeBase64Url(data: string) {
   const normalized = data.replace(/-/g, '+').replace(/_/g, '/')
   return new Uint8Array(Buffer.from(normalized, 'base64'))
@@ -72,6 +77,10 @@ function collectPdfParts(part: GmailPart | undefined, out: GmailPart[] = []) {
   if (isPdf && (part.body?.attachmentId || part.body?.data)) out.push(part)
   for (const child of part.parts || []) collectPdfParts(child, out)
   return out
+}
+
+function headerValue(headers: GmailHeader[] | undefined, name: string) {
+  return (headers || []).find(header => header.name?.toLowerCase() === name.toLowerCase())?.value || ''
 }
 
 function previousMonthStartForGmail(workMonth: string) {
@@ -101,6 +110,18 @@ function addOneDayIso(value: string) {
   const date = new Date(value + 'T00:00:00Z')
   date.setUTCDate(date.getUTCDate() + 1)
   return date.toISOString().slice(0, 10)
+}
+
+function gmailQuery(workMonth: string, sinceDate?: string | null, untilDate?: string | null) {
+  const defaultSince = previousMonthStartForGmail(workMonth)
+  const since = cleanIsoDate(sinceDate) || defaultSince.iso
+  const until = cleanIsoDate(untilDate)
+  const untilQuery = until ? ` before:${gmailDate(addOneDayIso(until))}` : ''
+  return {
+    query: `has:attachment filename:pdf after:${gmailDate(since)}${untilQuery}`,
+    since,
+    until,
+  }
 }
 
 async function refreshAccessToken(source: InboxSource) {
@@ -182,11 +203,7 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
     const accessToken = await refreshAccessToken(source as InboxSource)
     if (!accessToken) throw new Error('Conexiunea Gmail nu are access token. Reconectează contul Google.')
 
-    const defaultSince = previousMonthStartForGmail(job.luna)
-    const sinceDate = cleanIsoDate(job.result?.sinceDate) || defaultSince.iso
-    const untilDate = cleanIsoDate(job.result?.untilDate)
-    const untilQuery = untilDate ? ` before:${gmailDate(addOneDayIso(untilDate))}` : ''
-    const query = `has:attachment filename:pdf after:${gmailDate(sinceDate)}${untilQuery}`
+    const { query, since: sinceDate, until: untilDate } = gmailQuery(job.luna, job.result?.sinceDate, job.result?.untilDate)
     const messages = await listGmailMessages(accessToken, query, maxMessages)
 
     const imported = []
@@ -288,7 +305,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { sourceId, firmaId, lunaId, luna, max = 100, sinceDate, untilDate } = await req.json().catch(() => ({}))
+  const { sourceId, firmaId, lunaId, luna, max = 100, sinceDate, untilDate, preview = false } = await req.json().catch(() => ({}))
   const cleanSourceId = String(sourceId || '')
   const cleanFirmaId = String(firmaId || '')
   const cleanLunaId = String(lunaId || '')
@@ -307,6 +324,60 @@ export async function POST(req: NextRequest) {
   }
 
   const sb = getServiceSupabase()
+  if (preview) {
+    const { data: source, error: sourceError } = await sb
+      .from('inbox_surse_email')
+      .select('id,firma_id,provider,eticheta,email,access_token,refresh_token,token_expires_at')
+      .eq('id', cleanSourceId)
+      .eq('firma_id', cleanFirmaId)
+      .eq('provider', 'gmail')
+      .single()
+    if (sourceError || !source) return NextResponse.json({ error: sourceError?.message || 'Sursa Gmail nu există' }, { status: 404 })
+    try {
+      const accessToken = await refreshAccessToken(source as InboxSource)
+      if (!accessToken) throw new Error('Conexiunea Gmail nu are access token. Reconectează contul Google.')
+      const range = gmailQuery(cleanLuna, cleanSinceDate, cleanUntilDate)
+      const messages = await listGmailMessages(accessToken, range.query, maxMessages)
+      const previewRows = []
+      let pdfsFound = 0
+      for (const messageRef of messages) {
+        const msg = await gmailJson<GmailMessage & { payload?: GmailPart & { headers?: GmailHeader[] } }>(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageRef.id)}?format=full`,
+          accessToken
+        )
+        const pdfs = collectPdfParts(msg.payload).map(part => ({
+          filename: part.filename || `gmail_${messageRef.id}_${part.partId || ''}.pdf`,
+          size: part.body?.size || null,
+        }))
+        pdfsFound += pdfs.length
+        if (pdfs.length) {
+          const headers = msg.payload?.headers || []
+          previewRows.push({
+            id: msg.id,
+            threadId: msg.threadId || messageRef.threadId || null,
+            subject: headerValue(headers, 'Subject') || '(fără subiect)',
+            from: headerValue(headers, 'From'),
+            date: headerValue(headers, 'Date'),
+            snippet: msg.snippet || '',
+            pdfs,
+          })
+        }
+      }
+      return NextResponse.json({
+        preview: true,
+        source: { id: source.id, eticheta: source.eticheta, email: source.email },
+        sinceDate: range.since,
+        untilDate: range.until,
+        query: range.query,
+        messagesChecked: messages.length,
+        pdfsFound,
+        messages: previewRows,
+      })
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : 'Preview-ul Gmail a eșuat' }, { status: 500 })
+    }
+  }
+
   const { data: running } = await sb
     .from('inbox_sync_jobs')
     .select('id,status,created_at')
