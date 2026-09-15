@@ -60,10 +60,26 @@ type SyncJob = {
   firma_id: string
   luna_id: string
   luna: string
-  result?: { sinceDate?: string; untilDate?: string } | null
+  result?: SyncResult | null
 }
 
 type GmailHeader = { name?: string; value?: string }
+type SyncActivity = {
+  time: string
+  status: 'info' | 'email' | 'pdf' | 'importat' | 'duplicat' | 'sarit' | 'eroare'
+  text: string
+  detail?: string | null
+}
+type SyncResult = {
+  sinceDate?: string | null
+  untilDate?: string | null
+  since?: string | null
+  until?: string | null
+  imported?: Awaited<ReturnType<typeof importInboxDocument>>[]
+  activity?: SyncActivity[]
+  messagesChecked?: number
+  pdfsFound?: number
+}
 
 function decodeBase64Url(data: string) {
   const normalized = data.replace(/-/g, '+').replace(/_/g, '/')
@@ -182,6 +198,22 @@ async function listGmailMessages(accessToken: string, query: string, maxMessages
   return messages
 }
 
+async function updateJobProgress(sb: ReturnType<typeof getServiceSupabase>, job: SyncJob, patch: Partial<SyncResult>, activity?: Omit<SyncActivity, 'time'>) {
+  const previous = job.result || {}
+  const nextActivity = [
+    ...(previous.activity || []),
+    ...(activity ? [{ ...activity, time: new Date().toISOString() }] : []),
+  ].slice(-80)
+  const next = { ...previous, ...patch, activity: nextActivity }
+  job.result = next
+  await sb.from('inbox_sync_jobs').update({
+    result: next,
+    messages_checked: next.messagesChecked || 0,
+    pdfs_found: next.pdfsFound || 0,
+    updated_at: new Date().toISOString(),
+  }).eq('id', job.id)
+}
+
 async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
   const sb = getServiceSupabase()
   await sb.from('inbox_sync_jobs').update({
@@ -204,20 +236,43 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
     if (!accessToken) throw new Error('Conexiunea Gmail nu are access token. Reconectează contul Google.')
 
     const { query, since: sinceDate, until: untilDate } = gmailQuery(job.luna, job.result?.sinceDate, job.result?.untilDate)
+    await updateJobProgress(sb, job, { since: sinceDate, until: untilDate, messagesChecked: 0, pdfsFound: 0, imported: [] }, {
+      status: 'info',
+      text: `Caut în Gmail ${source.eticheta}${source.email ? ` (${source.email})` : ''}`,
+      detail: `${sinceDate}${untilDate ? ` → ${untilDate}` : ' → azi'}`,
+    })
     const messages = await listGmailMessages(accessToken, query, maxMessages)
+    await updateJobProgress(sb, job, { messagesChecked: messages.length }, {
+      status: 'info',
+      text: `Am găsit ${messages.length} emailuri cu PDF în interval`,
+      detail: query,
+    })
 
     const imported = []
     let pdfsFound = 0
     for (const messageRef of messages) {
-      const msg = await gmailJson<GmailMessage>(
+      const msg = await gmailJson<GmailMessage & { payload?: GmailPart & { headers?: GmailHeader[] } }>(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageRef.id)}?format=full`,
         accessToken
       )
+      const headers = msg.payload?.headers || []
+      const subject = headerValue(headers, 'Subject') || '(fără subiect)'
+      const from = headerValue(headers, 'From') || 'expeditor necunoscut'
       const pdfParts = collectPdfParts(msg.payload)
+      await updateJobProgress(sb, job, { messagesChecked: messages.length, pdfsFound }, {
+        status: 'email',
+        text: `Citesc email: ${subject}`,
+        detail: `${from} · ${pdfParts.length} PDF`,
+      })
       for (const part of pdfParts) {
         pdfsFound += 1
         const fallbackName = `gmail_${messageRef.id}_${part.partId || pdfsFound}.pdf`
         const fileName = part.filename || fallbackName
+        await updateJobProgress(sb, job, { messagesChecked: messages.length, pdfsFound }, {
+          status: 'pdf',
+          text: `Analizez PDF: ${fileName}`,
+          detail: subject,
+        })
         const bytes = part.body?.data
           ? decodeBase64Url(part.body.data)
           : part.body?.attachmentId
@@ -227,7 +282,7 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
               )).data || '')
             : null
         if (!bytes?.length) continue
-        imported.push(await importInboxDocument({
+        const result = await importInboxDocument({
           sb,
           bytes,
           mediaType: 'application/pdf',
@@ -237,7 +292,13 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
           luna: job.luna,
           sourceLabel: `${source.eticheta}${source.email ? ` (${source.email})` : ''}`,
           requireDetectedFirm: true,
-        }))
+        })
+        imported.push(result)
+        await updateJobProgress(sb, job, { messagesChecked: messages.length, pdfsFound, imported }, {
+          status: result.skipped ? 'sarit' : result.duplicate ? 'duplicat' : 'importat',
+          text: `${result.skipped ? 'Sărit' : result.duplicate ? 'Duplicat' : 'Importat'}: ${fileName}`,
+          detail: [result.targetFirma, result.extracted?.furnizor, result.skipReason].filter(Boolean).join(' · '),
+        })
       }
     }
 
@@ -254,6 +315,7 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
       since: sinceDate,
       until: untilDate,
       imported,
+      activity: job.result?.activity || [],
     }
     const skipped = imported.filter(item => item.skipped).length
     const duplicates = imported.filter(item => item.duplicate).length

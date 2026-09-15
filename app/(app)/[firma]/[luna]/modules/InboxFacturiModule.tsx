@@ -42,6 +42,9 @@ interface InboxSource {
 }
 interface SyncJob {
   id: string
+  firma_id?: string
+  luna_id?: string
+  luna?: string
   source_id: string
   status: 'queued' | 'running' | 'done' | 'error'
   messages_checked?: number | null
@@ -51,26 +54,22 @@ interface SyncJob {
   skipped_count?: number | null
   since_date?: string | null
   error_message?: string | null
-  result?: { imported?: ImportResult[]; since?: string; until?: string } | null
+  result?: {
+    imported?: ImportResult[]
+    since?: string
+    until?: string
+    activity?: SyncActivity[]
+    messagesChecked?: number
+    pdfsFound?: number
+  } | null
   created_at?: string | null
   updated_at?: string | null
 }
-interface GmailPreviewRow {
-  id: string
-  threadId?: string | null
-  subject: string
-  from: string
-  date: string
-  snippet?: string
-  pdfs: { filename: string; size?: number | null }[]
-}
-interface GmailPreview {
-  source: { id: string; eticheta: string; email?: string | null }
-  sinceDate: string
-  untilDate?: string | null
-  messagesChecked: number
-  pdfsFound: number
-  messages: GmailPreviewRow[]
+interface SyncActivity {
+  time: string
+  status: 'info' | 'email' | 'pdf' | 'importat' | 'duplicat' | 'sarit' | 'eroare'
+  text: string
+  detail?: string | null
 }
 
 const SOURCES: { key:string; title:string; provider: InboxSource['provider']; desc:string; hint:string; placeholder:string }[] = [
@@ -154,8 +153,6 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const [syncJobs, setSyncJobs] = useState<SyncJob[]>([])
   const [syncStartDate, setSyncStartDate] = useState(() => defaultSyncStart(luna))
   const [syncEndDate, setSyncEndDate] = useState(() => todayIso())
-  const [previewBusySourceId, setPreviewBusySourceId] = useState<string | null>(null)
-  const [gmailPreview, setGmailPreview] = useState<GmailPreview | null>(null)
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set())
   const [deleteBusy, setDeleteBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -383,22 +380,6 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     setSyncingSourceId(null)
   }
 
-  async function previewGmail(source: InboxSource) {
-    setPreviewBusySourceId(source.id)
-    setError('')
-    setSyncMessage('')
-    setGmailPreview(null)
-    const res = await fetch('/api/inbox-facturi/gmail/sync', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ sourceId: source.id, firmaId: firma.id, lunaId, luna, sinceDate: syncStartDate, untilDate: syncEndDate, preview: true }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) setError(data.error || 'Preview-ul Gmail a eșuat')
-    else setGmailPreview(data)
-    setPreviewBusySourceId(null)
-  }
-
   function latestJobFor(sourceId: string | undefined) {
     if (!sourceId) return null
     return syncJobs.find(job => job.source_id === sourceId) || null
@@ -413,6 +394,11 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
     const until = job.result?.until ? ` până la ${new Date(job.result.until).toLocaleDateString('ro-RO')}` : ''
     return `Ultimul sync${since}${until}: ${job.imported_count || 0} noi, ${job.duplicate_count || 0} duplicate, ${job.skipped_count || 0} sărite`
   }
+
+  const liveJob = syncJobs.find(job => job.status === 'running' || job.status === 'queued') || syncJobs[0] || null
+  const liveSource = liveJob ? sources.find(source => source.id === liveJob.source_id) : null
+  const liveActivity = liveJob?.result?.activity || []
+  const liveRunning = liveJob?.status === 'queued' || liveJob?.status === 'running'
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
@@ -455,11 +441,6 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
                 {sourceDef.provider === 'gmail' && (
                   <button onClick={() => connectGmail(sourceDef)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', cursor:'pointer' }}>
                     {active ? 'Reconectează Google' : 'Conectează Google'}
-                  </button>
-                )}
-                {sourceDef.provider === 'gmail' && source?.id && active && (
-                  <button onClick={() => previewGmail(source)} disabled={previewBusySourceId === source.id} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid rgba(59,130,246,.35)', background:'rgba(59,130,246,.08)', color:'var(--accent-blue)', cursor:'pointer', opacity:previewBusySourceId === source.id ? .65 : 1 }}>
-                    {previewBusySourceId === source.id ? 'Verifică...' : 'Preview'}
                   </button>
                 )}
                 {sourceDef.provider === 'gmail' && source?.id && active && (
@@ -564,38 +545,33 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
           </div>
           <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { if (e.target.files) upload(e.target.files); e.target.value='' }}/>
 
-          {gmailPreview && (
-            <div style={{ marginTop:'14px', padding:'12px', borderRadius:'10px', border:'1px solid rgba(59,130,246,.25)', background:'rgba(59,130,246,.06)' }}>
+          {liveJob && (
+            <div style={{ marginTop:'14px', padding:'12px', borderRadius:'10px', border:`1px solid ${liveRunning ? 'rgba(59,130,246,.25)' : 'var(--c-222222)'}`, background:liveRunning ? 'rgba(59,130,246,.06)' : 'var(--c-0f0f0f)' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', marginBottom:'8px' }}>
                 <div>
-                  <div style={{ fontSize:'12px', fontWeight:800, color:'var(--c-dddddd)' }}>Preview {gmailPreview.source.eticheta}{gmailPreview.source.email ? ` · ${gmailPreview.source.email}` : ''}</div>
+                  <div style={{ fontSize:'12px', fontWeight:800, color:'var(--c-dddddd)' }}>
+                    Ce citește sincronizarea{liveSource ? ` · ${liveSource.eticheta}${liveSource.email ? ` (${liveSource.email})` : ''}` : ''}
+                  </div>
                   <div style={{ fontSize:'10px', color:'var(--c-888888)', marginTop:'3px' }}>
-                    {gmailPreview.messagesChecked} emailuri verificate · {gmailPreview.pdfsFound} PDF-uri găsite · {gmailPreview.sinceDate}{gmailPreview.untilDate ? ` → ${gmailPreview.untilDate}` : ' → azi'}
+                    Status: {liveJob.status} · {liveJob.result?.messagesChecked ?? liveJob.messages_checked ?? 0} emailuri · {liveJob.result?.pdfsFound ?? liveJob.pdfs_found ?? 0} PDF-uri · {liveJob.since_date || liveJob.result?.since || syncStartDate}{(liveJob.result?.until || syncEndDate) ? ` → ${liveJob.result?.until || syncEndDate}` : ' → azi'}
                   </div>
                 </div>
-                <button onClick={() => {
-                  const source = sources.find(item => item.id === gmailPreview.source.id)
-                  if (source) syncGmail(source)
-                }} style={{ fontSize:'11px', fontWeight:800, padding:'7px 10px', borderRadius:'8px', border:'1px solid rgba(74,222,128,.35)', background:'rgba(74,222,128,.08)', color:'var(--accent-green)', cursor:'pointer' }}>
-                  Importă această listă
-                </button>
+                <span style={{ fontSize:'10px', fontWeight:800, padding:'4px 8px', borderRadius:'999px', background:liveRunning ? 'rgba(59,130,246,.12)' : 'var(--c-161616)', color:liveRunning ? 'var(--accent-blue)' : 'var(--c-777777)' }}>
+                  {liveRunning ? 'live' : 'ultimul sync'}
+                </span>
               </div>
-              {gmailPreview.messages.length === 0 ? (
-                <div style={{ fontSize:'11px', color:'var(--c-888888)' }}>Nu s-au găsit emailuri cu PDF în intervalul ales.</div>
+              {liveActivity.length === 0 ? (
+                <div style={{ fontSize:'11px', color:'var(--c-888888)' }}>Jurnalul apare aici imediat ce pornești sincronizarea Gmail.</div>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:'6px', maxHeight:'260px', overflow:'auto' }}>
-                  {gmailPreview.messages.map(row => (
-                    <div key={row.id} style={{ padding:'9px 10px', borderRadius:'8px', border:'1px solid rgba(59,130,246,.18)', background:'var(--c-111111)' }}>
-                      <div style={{ fontSize:'11px', fontWeight:800, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{row.subject}</div>
-                      <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'3px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                        {row.from || 'expeditor necunoscut'} · {row.date || 'dată necunoscută'} · {row.pdfs.length} PDF
-                      </div>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:'5px', marginTop:'6px' }}>
-                        {row.pdfs.map((pdf, idx) => (
-                          <span key={`${row.id}-${idx}`} style={{ fontSize:'10px', color:'var(--c-aaaaaa)', border:'1px solid var(--c-262626)', borderRadius:'999px', padding:'3px 7px', background:'var(--c-161616)' }}>
-                            {pdf.filename}{pdf.size ? ` · ${Math.round(pdf.size / 1024)} KB` : ''}
-                          </span>
-                        ))}
+                  {[...liveActivity].reverse().map((row, idx) => (
+                    <div key={`${row.time}-${idx}`} style={{ display:'flex', gap:'8px', alignItems:'flex-start', padding:'8px 10px', borderRadius:'8px', border:'1px solid rgba(59,130,246,.16)', background:'var(--c-111111)' }}>
+                      <div style={{ width:8, height:8, borderRadius:'50%', background:row.status === 'importat' ? 'var(--accent-green)' : row.status === 'duplicat' ? '#f97316' : row.status === 'sarit' || row.status === 'eroare' ? 'var(--accent-red)' : 'var(--accent-blue)', marginTop:'4px', flexShrink:0 }}/>
+                      <div style={{ minWidth:0, flex:1 }}>
+                        <div style={{ fontSize:'11px', fontWeight:750, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{row.text}</div>
+                        <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {new Date(row.time).toLocaleTimeString('ro-RO')} {row.detail ? `· ${row.detail}` : ''}
+                        </div>
                       </div>
                     </div>
                   ))}
