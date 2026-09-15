@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { legibil, tint } from '@/lib/colors'
+import CopyButton from '@/components/CopyButton'
 
 interface Doc {
   id: string
@@ -319,8 +320,11 @@ export default function UploadPanel({
                   return (
                     <div key={item.id} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'10px', alignItems:'center', padding:'8px 10px', border:'1px solid var(--c-222222)', borderRadius:'8px', background:attached ? 'light-dark(rgba(5,150,105,.12), rgba(110,231,176,.06))' : 'var(--c-141414)' }}>
                       <div style={{ minWidth:0 }}>
-                        <div style={{ fontSize:'12px', fontWeight:700, color:attached ? 'var(--accent-mint)' : 'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                          {item.cod_confirmare} · {item.oaspete || 'oaspete necitit'} · {formatCurrency(item.suma, item.moneda)}
+                        <div style={{ display:'flex', alignItems:'center', gap:'6px', minWidth:0 }}>
+                          <span style={{ fontSize:'12px', fontWeight:700, color:attached ? 'var(--accent-mint)' : 'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {item.cod_confirmare} · {item.oaspete || 'oaspete necitit'} · {formatCurrency(item.suma, item.moneda)}
+                          </span>
+                          <CopyButton value={item.cod_confirmare} />
                         </div>
                         <div style={{ fontSize:'10px', color:'var(--c-666666)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:'2px' }}>
                           {dates || formatDate(item.data_tranzactie)} {item.anunt ? `· ${item.anunt}` : ''}
