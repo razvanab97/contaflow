@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { importInboxDocument } from '@/lib/inbox-facturi'
+import { importInboxDocumentSplitting } from '@/lib/inbox-facturi'
 
 export const dynamic = 'force-dynamic'
 // Planul Vercel Hobby taie functiile serverless la 60s indiferent ce declaram aici -
@@ -80,7 +80,7 @@ type SyncResult = {
   untilDate?: string | null
   since?: string | null
   until?: string | null
-  imported?: Awaited<ReturnType<typeof importInboxDocument>>[]
+  imported?: Awaited<ReturnType<typeof importInboxDocumentSplitting>>
   activity?: SyncActivity[]
   messagesChecked?: number
   pdfsFound?: number
@@ -323,7 +323,7 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
               )).data || '')
             : null
         if (!bytes?.length) continue
-        const result = await importInboxDocument({
+        const results = await importInboxDocumentSplitting({
           sb,
           bytes,
           mediaType: 'application/pdf',
@@ -334,12 +334,15 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
           sourceLabel: `${source.eticheta}${source.email ? ` (${source.email})` : ''}`,
           requireDetectedFirm: true,
         })
-        imported.push(result)
-        await updateJobProgress(sb, job, { messagesChecked: messages.length, pdfsFound, imported }, {
-          status: result.skipped ? 'sarit' : result.duplicate ? 'duplicat' : 'importat',
-          text: `${result.skipped ? 'Sărit' : result.duplicate ? 'Duplicat' : 'Importat'}: ${fileName}`,
-          detail: [result.targetFirma, result.extracted?.furnizor, result.skipReason].filter(Boolean).join(' · '),
-        })
+        imported.push(...results)
+        const numeStatus = results.length > 1 ? `${fileName} (${results.length} documente)` : fileName
+        for (const result of results) {
+          await updateJobProgress(sb, job, { messagesChecked: messages.length, pdfsFound, imported }, {
+            status: result.skipped ? 'sarit' : result.duplicate ? 'duplicat' : 'importat',
+            text: `${result.skipped ? 'Sărit' : result.duplicate ? 'Duplicat' : 'Importat'}: ${numeStatus}`,
+            detail: [result.targetFirma, result.extracted?.furnizor, result.skipReason].filter(Boolean).join(' · '),
+          })
+        }
       }
       processedIds.push(messageRef.id)
     }

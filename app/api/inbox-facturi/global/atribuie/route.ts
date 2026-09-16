@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { importInboxDocument } from '@/lib/inbox-facturi'
+import { importInboxDocumentSplitting } from '@/lib/inbox-facturi'
 import { currentWorkMonthKey } from '@/lib/accounting-period'
 
 export const maxDuration = 60
@@ -34,9 +34,9 @@ export async function POST(req: NextRequest) {
   if (downloadError || !blob) return NextResponse.json({ error: downloadError?.message || 'Fișierul nu a putut fi citit' }, { status: 500 })
   const bytes = new Uint8Array(await blob.arrayBuffer())
 
-  let result
+  let results
   try {
-    result = await importInboxDocument({
+    results = await importInboxDocumentSplitting({
       sb,
       bytes,
       mediaType: file.fisier_tip,
@@ -51,15 +51,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Import eșuat' }, { status: 500 })
   }
 
+  const primul = results[0]
+  const toateOk = results.every(r => !r.skipped)
   await sb.from('inbox_watch_files').update({
-    status: result.duplicate ? 'duplicat' : 'imported',
-    firma_id: result.doc?.firma_id || cleanFirmaId,
-    luna_id: result.doc?.luna_id || lunaRow.id,
-    document_id: result.doc?.id || null,
-    error_message: null,
+    status: results.length === 1 ? (primul.duplicate ? 'duplicat' : 'imported') : (toateOk ? 'imported' : 'eroare'),
+    firma_id: primul.doc?.firma_id || cleanFirmaId,
+    luna_id: primul.doc?.luna_id || lunaRow.id,
+    document_id: primul.doc?.id || null,
+    error_message: results.length > 1
+      ? `Fișier împărțit în ${results.length} documente separate - ${results.filter(r => !r.skipped).length} procesate, ${results.filter(r => r.skipped).length} sărite`
+      : null,
     synced_at: new Date().toISOString(),
   }).eq('id', cleanId)
-  if (!result.duplicate) await sb.storage.from('documente').remove([file.fisier_path])
+  const toateNeduplicat = results.every(r => !r.duplicate)
+  if (toateOk && toateNeduplicat) await sb.storage.from('documente').remove([file.fisier_path])
 
-  return NextResponse.json({ ok: true, result })
+  return NextResponse.json({ ok: true, results })
 }

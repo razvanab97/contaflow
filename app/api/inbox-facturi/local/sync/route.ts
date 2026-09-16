@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { importInboxDocument } from '@/lib/inbox-facturi'
+import { importInboxDocumentSplitting } from '@/lib/inbox-facturi'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -16,7 +16,7 @@ type SyncActivity = {
   detail?: string | null
 }
 type SyncResult = {
-  imported?: Awaited<ReturnType<typeof importInboxDocument>>[]
+  imported?: Awaited<ReturnType<typeof importInboxDocumentSplitting>>
   activity?: SyncActivity[]
   messagesChecked?: number
   pdfsFound?: number
@@ -87,9 +87,9 @@ async function runLocalSyncJob(job: SyncJob) {
       }
       const bytes = new Uint8Array(await blob.arrayBuffer())
 
-      let result
+      let results
       try {
-        result = await importInboxDocument({
+        results = await importInboxDocumentSplitting({
           sb,
           bytes,
           mediaType: file.fisier_tip,
@@ -106,21 +106,29 @@ async function runLocalSyncJob(job: SyncJob) {
         continue
       }
 
-      imported.push(result)
-      const nextStatus = result.skipped ? 'sarit' : result.duplicate ? 'duplicat' : 'imported'
+      imported.push(...results)
+      const primul = results[0]
+      const nextStatus = results.length === 1
+        ? (primul.skipped ? 'sarit' : primul.duplicate ? 'duplicat' : 'imported')
+        : (results.every(r => !r.skipped) ? 'imported' : 'eroare')
       await sb.from('inbox_local_files').update({
         status: nextStatus,
-        error_message: result.skipped ? result.skipReason || null : null,
-        document_id: result.doc?.id || null,
+        error_message: results.length > 1
+          ? `Fișier împărțit în ${results.length} documente separate - ${results.filter(r => !r.skipped).length} procesate, ${results.filter(r => r.skipped).length} sărite`
+          : (primul.skipped ? primul.skipReason || null : null),
+        document_id: primul.doc?.id || null,
         synced_at: new Date().toISOString(),
       }).eq('id', file.id)
-      // Copia din coadă nu mai e necesară: succesul a scris deja fișierul la calea lui finală.
+      // Copia din coadă nu mai e necesară: succesul a scris deja fișierul (fișierele) la calea lor finală.
       await sb.storage.from('documente').remove([file.fisier_path])
-      await updateJobProgress(sb, job, { imported }, {
-        status: result.skipped ? 'sarit' : result.duplicate ? 'duplicat' : 'importat',
-        text: `${result.skipped ? 'Sărit' : result.duplicate ? 'Duplicat' : 'Importat'}: ${file.fisier_nume}`,
-        detail: [result.targetFirma, result.extracted?.furnizor, result.skipReason].filter(Boolean).join(' · '),
-      })
+      const numeStatus = results.length > 1 ? `${file.fisier_nume} (${results.length} documente)` : file.fisier_nume
+      for (const result of results) {
+        await updateJobProgress(sb, job, { imported }, {
+          status: result.skipped ? 'sarit' : result.duplicate ? 'duplicat' : 'importat',
+          text: `${result.skipped ? 'Sărit' : result.duplicate ? 'Duplicat' : 'Importat'}: ${numeStatus}`,
+          detail: [result.targetFirma, result.extracted?.furnizor, result.skipReason].filter(Boolean).join(' · '),
+        })
+      }
     }
 
     await sb.from('inbox_surse_email').update({

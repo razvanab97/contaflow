@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { importInboxDocument } from '@/lib/inbox-facturi'
+import { importInboxDocumentSplitting } from '@/lib/inbox-facturi'
 
 export const maxDuration = 120
 
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   for (const file of files) {
     const bytes = new Uint8Array(await file.arrayBuffer())
     try {
-      imported.push(await importInboxDocument({
+      imported.push(...await importInboxDocumentSplitting({
         sb: getServiceSupabase(),
         bytes,
         mediaType: file.type,

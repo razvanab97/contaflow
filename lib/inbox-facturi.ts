@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { FIRMA_CONFIGS } from '@/lib/firma-config'
+import { pdfPageCount, extractPageRange } from '@/lib/pdfBatch'
 
 type SupabaseService = ReturnType<typeof import('@/lib/supabase/server').getServiceSupabase>
 
@@ -439,4 +440,64 @@ export async function importInboxDocument({
     await sb.from('tranzactii').update({ document_id: doc.id, note: null, status_note: null }).eq('id', doc.tranzactie_id)
   }
   return { duplicate: false, doc, extracted, targetFirma: target?.nume || currentFirma?.nume || null, source: sourceLabel || null }
+}
+
+type SegmentDocument = { pageStart: number; pageEnd: number }
+
+// Peste acest numar de pagini merita verificat daca fisierul e de fapt un pachet cu mai multe
+// documente separate (ex. export in bloc ANAF SPV/Oblio) - facturile normale au rareori mai mult
+// de cateva pagini, deci sub prag nu cheltuim un apel AI suplimentar degeaba.
+const PRAG_PAGINI_VERIFICARE_PACHET = 4
+
+// Verifica daca PDF-ul contine de fapt mai multe documente distincte, unul dupa altul, si daca da
+// intoarce paginile fiecaruia. Intoarce null daca e un singur document sau daca verificarea esueaza
+// (in acel caz documentul se proceseaza intreg, nesplit, ca sa nu blocam complet sincronizarea).
+async function detecteazaDocumenteMultiple(bytes: Uint8Array): Promise<SegmentDocument[] | null> {
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: Buffer.from(bytes).toString('base64') } },
+        { type: 'text', text: `Acest fișier poate conține FIE un singur document contabil (factură/chitanță), posibil pe mai multe pagini, FIE mai multe documente complet separate, unul după altul (de exemplu un export în bloc din ANAF SPV sau Oblio, cu facturi de la furnizori diferiți, de obicei câte una pe pagină).
+Analizează fiecare pagină și determină unde începe fiecare document nou - o pagină cu un antet nou de factură/chitanță (furnizor, număr de document, dată proprii) e un document nou, chiar dacă formatul vizual seamănă cu pagina anterioară.
+Returnează DOAR JSON, fără alt text: {"documente":[{"pageStart":1,"pageEnd":1},{"pageStart":2,"pageEnd":2}]} - pageStart/pageEnd sunt numere de pagină începând de la 1, inclusiv. Dacă tot fișierul e UN SINGUR document, returnează un singur element care acoperă toate paginile.` },
+      ] }],
+    })
+    const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
+    const parsed = extractJson<{ documente?: SegmentDocument[] }>(raw)
+    const segmente = (parsed?.documente || [])
+      .filter(s => Number.isFinite(s?.pageStart) && Number.isFinite(s?.pageEnd) && s.pageStart >= 1 && s.pageEnd >= s.pageStart)
+      .sort((a, b) => a.pageStart - b.pageStart)
+    return segmente.length ? segmente : null
+  } catch {
+    return null
+  }
+}
+
+// Ca importInboxDocument, dar verifica intai daca fisierul contine de fapt mai multe documente
+// separate (pachet) - daca da, il imparte fizic si proceseaza fiecare bucata independent, cu
+// datele ei proprii, in loc sa citeasca doar primul document gasit si sa piarda restul.
+export async function importInboxDocumentSplitting(params: Parameters<typeof importInboxDocument>[0]): Promise<InboxImportResult[]> {
+  if (params.mediaType === 'application/pdf') {
+    try {
+      const pageCount = await pdfPageCount(Buffer.from(params.bytes))
+      if (pageCount > PRAG_PAGINI_VERIFICARE_PACHET) {
+        const segmente = await detecteazaDocumenteMultiple(params.bytes)
+        if (segmente && segmente.length > 1) {
+          const rezultate: InboxImportResult[] = []
+          for (const segment of segmente) {
+            const bucataBytes = await extractPageRange(Buffer.from(params.bytes), segment.pageStart, segment.pageEnd)
+            const numeBucata = `${params.originalName.replace(/\.[^.]+$/, '')}_p${segment.pageStart}-${segment.pageEnd}.pdf`
+            rezultate.push(await importInboxDocument({ ...params, bytes: bucataBytes, originalName: numeBucata }))
+          }
+          return rezultate
+        }
+      }
+    } catch {
+      // detectia/splitarea a esuat - continuam mai jos cu documentul intreg, nesplit.
+    }
+  }
+  return [await importInboxDocument(params)]
 }

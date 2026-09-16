@@ -29,3 +29,24 @@ export async function extractInBatches<T>(bytes: Buffer, pagesPerBatch: number, 
   }
   return results
 }
+
+export async function pdfPageCount(bytes: Buffer): Promise<number> {
+  const source = await PDFDocument.load(bytes)
+  return source.getPageCount()
+}
+
+// Extrage un interval arbitrar de pagini [pageStart, pageEnd] (index de la 1, inclusiv) intr-un
+// PDF nou - folosit pentru a separa un fisier care contine mai multe documente distincte
+// (ex. un export in bloc din ANAF/Oblio cu zeci de facturi de la furnizori diferiti) in fisiere
+// individuale, ca fiecare sa fie procesat separat cu datele lui corecte.
+export async function extractPageRange(bytes: Buffer, pageStart: number, pageEnd: number): Promise<Buffer> {
+  const source = await PDFDocument.load(bytes)
+  const pageCount = source.getPageCount()
+  const start = Math.max(1, pageStart)
+  const end = Math.min(pageCount, pageEnd)
+  const indices = Array.from({ length: Math.max(0, end - start + 1) }, (_, i) => start - 1 + i)
+  const out = await PDFDocument.create()
+  const pages = await out.copyPages(source, indices)
+  pages.forEach(p => out.addPage(p))
+  return Buffer.from(await out.save())
+}

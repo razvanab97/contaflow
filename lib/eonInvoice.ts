@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib'
+export { pdfPageCount } from '@/lib/pdfBatch'
 
 // Detectează dacă furnizorul extras de AI este E.ON (E.ON, E.ON Energie România, E.ON Energie
 // Romania, E.ON Energie România S.A. etc.). Acceptă și varianta fără punct ("EON"), dar cere
@@ -6,11 +7,6 @@ import { PDFDocument } from 'pdf-lib'
 export function isEonInvoice(supplier: string | null | undefined): boolean {
   const normalized = String(supplier || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   return /\be\.?\s*-?\s*on\b/.test(normalized)
-}
-
-export async function pdfPageCount(pdfBuffer: Buffer): Promise<number> {
-  const pdf = await PDFDocument.load(pdfBuffer)
-  return pdf.getPageCount()
 }
 
 // Reconstruiește fizic PDF-ul păstrând DOAR prima pagină - pentru facturile E.ON, ale căror

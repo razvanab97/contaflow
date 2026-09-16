@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { importInboxDocument } from '@/lib/inbox-facturi'
+import { importInboxDocumentSplitting } from '@/lib/inbox-facturi'
 import { currentWorkMonthKey } from '@/lib/accounting-period'
 
 export const dynamic = 'force-dynamic'
@@ -30,9 +30,9 @@ export async function POST() {
     }
     const bytes = new Uint8Array(await blob.arrayBuffer())
 
-    let result
+    let results
     try {
-      result = await importInboxDocument({
+      results = await importInboxDocumentSplitting({
         sb,
         bytes,
         mediaType: file.fisier_tip,
@@ -50,19 +50,31 @@ export async function POST() {
       continue
     }
 
-    const nextStatus = result.skipped ? 'nedetectat' : result.duplicate ? 'duplicat' : 'imported'
+    // Un singur fisier de intrare poate produce mai multe documente (pachet ANAF/Oblio impartit) -
+    // randul din coada arata rezumat cate au reusit, dar fiecare document e deja salvat corect
+    // separat in tabelul documente.
+    const primul = results[0]
+    const toateOk = results.every(r => !r.skipped)
+    const nextStatus = results.length === 1
+      ? (primul.skipped ? 'nedetectat' : primul.duplicate ? 'duplicat' : 'imported')
+      : (toateOk ? 'imported' : 'eroare')
+    const rezumat = results.length > 1
+      ? `Fișier împărțit în ${results.length} documente separate - ${results.filter(r => !r.skipped).length} procesate, ${results.filter(r => r.skipped).length} sărite`
+      : (primul.skipped ? primul.skipReason || null : null)
     await sb.from('inbox_watch_files').update({
       status: nextStatus,
-      error_message: result.skipped ? result.skipReason || null : null,
-      firma_id: result.doc?.firma_id || null,
-      luna_id: result.doc?.luna_id || null,
-      document_id: result.doc?.id || null,
+      error_message: rezumat,
+      firma_id: primul.doc?.firma_id || null,
+      luna_id: primul.doc?.luna_id || null,
+      document_id: primul.doc?.id || null,
       synced_at: new Date().toISOString(),
     }).eq('id', file.id)
     if (nextStatus === 'imported' || nextStatus === 'duplicat') {
       await sb.storage.from('documente').remove([file.fisier_path])
     }
-    rezultate.push({ fisier: file.fisier_nume, status: nextStatus, firma: result.targetFirma })
+    for (const result of results) {
+      rezultate.push({ fisier: file.fisier_nume, status: result.skipped ? 'nedetectat' : result.duplicate ? 'duplicat' : 'imported', firma: result.targetFirma })
+    }
   }
 
   return NextResponse.json({
