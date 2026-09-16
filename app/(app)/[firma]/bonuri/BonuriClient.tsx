@@ -60,46 +60,57 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume }: { firmaId
     return () => { stream?.getTracks().forEach(t => t.stop()) }
   }, [stream])
 
-  // Identifica dreptunghiul bonului in poza (Claude vision) si il decupeaza pe client (canvas) -
-  // elimina fundalul/masa/mana din jur, pastreaza doar bonul, inainte sa trimitem poza la citirea
-  // de date. Daca nu se detecteaza clar un bon (sau fisierul nu e imagine), fisierul original
-  // ramane neschimbat - nu blocheaza niciodata upload-ul.
-  async function decupeazaImagine(file: File): Promise<File> {
-    if (!file.type.startsWith('image/')) return file
+// Identifica dreptunghiul (dreptunghiurile) bonurilor din poza (Claude vision) si le decupeaza pe
+  // client (canvas) - elimina fundalul/masa/mana din jur, pastreaza doar bonul, inainte de citirea
+  // datelor. O poza poate contine mai multe bonuri alaturate (ex. mai multe fotografiate impreuna
+  // la final de luna) - in acel caz intoarce cate un fisier separat pentru fiecare, ca fiecare sa
+  // devina propriul lui bon la incarcare. Daca nu se detecteaza niciun bon (sau fisierul nu e
+  // imagine), fisierul original ramane neschimbat, intr-o lista de un singur element - nu
+  // blocheaza niciodata upload-ul.
+  async function decupeazaImagine(file: File): Promise<File[]> {
+    if (!file.type.startsWith('image/')) return [file]
     try {
       const fd = new FormData()
       fd.append('file', file)
       const res = await fetch('/api/bonuri/decupaj', { method: 'POST', body: fd })
       const data = await res.json().catch(() => ({}))
-      const box = data?.box
-      if (!res.ok || !box) return file
+      const boxes: { x: number; y: number; width: number; height: number }[] = res.ok ? (data?.boxes || []) : []
+      if (!boxes.length) return [file]
 
       const bitmap = await createImageBitmap(file)
-      const sx = Math.round(box.x * bitmap.width)
-      const sy = Math.round(box.y * bitmap.height)
-      const sw = Math.round(box.width * bitmap.width)
-      const sh = Math.round(box.height * bitmap.height)
-      if (sw < 20 || sh < 20) return file
+      const baseName = file.name.replace(/\.[^.]+$/, '')
+      const decupate: File[] = []
+      for (let i = 0; i < boxes.length; i++) {
+        const box = boxes[i]
+        const sx = Math.round(box.x * bitmap.width)
+        const sy = Math.round(box.y * bitmap.height)
+        const sw = Math.round(box.width * bitmap.width)
+        const sh = Math.round(box.height * bitmap.height)
+        if (sw < 20 || sh < 20) continue
 
-      const canvas = document.createElement('canvas')
-      canvas.width = sw
-      canvas.height = sh
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return file
-      ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh)
-      const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
-      if (!blob) return file
-      return new File([blob], file.name.replace(/\.[^.]+$/, '') + '_scanat.jpg', { type: 'image/jpeg' })
+        const canvas = document.createElement('canvas')
+        canvas.width = sw
+        canvas.height = sh
+        const ctx = canvas.getContext('2d')
+        if (!ctx) continue
+        ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh)
+        const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+        if (!blob) continue
+        const suffix = boxes.length > 1 ? `_scanat_${i + 1}` : '_scanat'
+        decupate.push(new File([blob], `${baseName}${suffix}.jpg`, { type: 'image/jpeg' }))
+      }
+      return decupate.length ? decupate : [file]
     } catch {
-      return file
+      return [file]
     }
   }
 
   async function uploadFiles(files: FileList | File[]) {
     setUploading(true); setUploadError('')
     const noiSchimbate: string[] = []
-    for (const rawFile of Array.from(files)) {
-      const file = await decupeazaImagine(rawFile)
+    const toateFisierele: File[] = []
+    for (const rawFile of Array.from(files)) toateFisierele.push(...await decupeazaImagine(rawFile))
+    for (const file of toateFisierele) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('firmaId', firmaId)
@@ -205,9 +216,9 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume }: { firmaId
               style={{ border: `1.5px dashed ${drag ? 'var(--c-555555)' : 'var(--c-2a2a2a)'}`, borderRadius: '10px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--c-0d0d0d)' }}
             >
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-888888)' }}>
-                {uploading ? 'Se decupează și se citește bonul...' : '+ Adaugă bon fiscal'}
+                {uploading ? 'Se decupează și se citesc bonurile...' : '+ Adaugă bon fiscal'}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--c-666666)', marginTop: '3px' }}>PDF, JPG, PNG · pozele se decupează automat (fără fundal), comerciantul, suma, data și tipul se citesc automat</div>
+              <div style={{ fontSize: '12px', color: 'var(--c-666666)', marginTop: '3px' }}>PDF, JPG, PNG · o poză poate avea mai multe bonuri alăturate, se decupează și se salvează automat separat, fără fundal - comerciantul, suma, data și tipul se citesc automat pentru fiecare</div>
             </div>
             <input ref={inputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={hiddenInputStyle} onChange={e => e.target.files?.length && uploadFiles(e.target.files)}/>
             <button onClick={openCamera} style={{ marginTop: '10px', fontSize: '12px', fontWeight: 600, padding: '7px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', cursor: 'pointer' }}>📷 Fotografiază bon (camera laptop)</button>
