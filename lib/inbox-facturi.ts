@@ -10,9 +10,16 @@ type FirmaCandidate = {
   slug: string
   nume: string
   cui: string | null
+  cuiToate: string[]
   nrRegCom: string | null
   luna_id: string | null
   luna: string | null
+}
+
+// CUI-uri suplimentare, valide pentru aceeași firmă, pe lângă cel principal din firme.cui
+// (folosit doar la recunoașterea facturilor - firme.cui rămâne cel oficial pentru documente).
+const CUI_ALTERNATIVE: Record<string, string[]> = {
+  abxhomes: ['51842895'],
 }
 
 type ExtractieInbox = {
@@ -208,6 +215,7 @@ async function analyzeInvoice(bytes: Uint8Array, mediaType: string, candidates: 
       slug: f.slug,
       nume: f.nume,
       cui: f.cui,
+      cuiValide: f.cuiToate,
       cifPreset: FIRMA_CONFIGS[f.slug]?.legal?.cif || null,
       regCom: f.nrRegCom || FIRMA_CONFIGS[f.slug]?.legal?.nrRegCom || null,
     }))
@@ -216,7 +224,7 @@ async function analyzeInvoice(bytes: Uint8Array, mediaType: string, candidates: 
       max_tokens: 900,
       messages: [{ role: 'user', content: [
         source,
-        { type: 'text', text: `Acesta este un document contabil primit in inbox (factura, chitanta, invoice, e-Factura sau document similar). Identifica pentru care dintre firmele noastre este documentul, folosind mai ales CUI/CIF/cod fiscal si apoi numele firmei. Firme disponibile: ${JSON.stringify(firme)}.
+        { type: 'text', text: `Acesta este un document contabil primit in inbox (factura, chitanta, invoice, e-Factura sau document similar). Identifica pentru care dintre firmele noastre este documentul, folosind mai ales CUI/CIF/cod fiscal si apoi numele firmei. O firma poate avea mai multe CUI-uri valide - lista completa e in "cuiValide"; orice CUI din acea lista gasit pe document conteaza ca potrivire sigura pentru firma respectiva. Firme disponibile: ${JSON.stringify(firme)}.
 Raspunde DOAR cu JSON:
 {"firmaSlug":"slug-ul firmei sau null","firmaCui":"CUI/CIF gasit pe document pentru firma noastra sau null","incredereFirma":"sigur|posibil|necunoscut","esteFactura":true,"furnizor":"emitent/furnizor sau null","numarDocument":"seria si numarul facturii/documentului sau null","suma":123.45,"moneda":"RON|EUR|HUF|BGN sau null","dataDocument":"AAAA-LL-ZZ sau null","tipDocument":"factura|chitanta|invoice|altul","motiv":"pe scurt de ce ai ales firma"}.
 Nu inventa valori. Daca documentul contine mai multe firme, firma noastra este beneficiarul/cumparatorul, nu furnizorul.
@@ -305,15 +313,19 @@ export async function importInboxDocument({
   const currentFirma = firmaRows.find(f => f.id === firmaId)
   const candidates: FirmaCandidate[] = firmaRows
     .filter(f => f.slug !== 'proiect-ab-textile')
-    .map(f => ({
-      id: f.id,
-      slug: f.slug,
-      nume: f.nume,
-      cui: f.cui || FIRMA_CONFIGS[f.slug]?.legal?.cif || null,
-      nrRegCom: f.nr_reg_com || FIRMA_CONFIGS[f.slug]?.legal?.nrRegCom || null,
-      luna_id: luniRows.find(l => l.firma_id === f.id && l.luna?.startsWith(luna))?.id || null,
-      luna: luniRows.find(l => l.firma_id === f.id && l.luna?.startsWith(luna))?.luna || null,
-    }))
+    .map(f => {
+      const cuiPrincipal = f.cui || FIRMA_CONFIGS[f.slug]?.legal?.cif || null
+      return {
+        id: f.id,
+        slug: f.slug,
+        nume: f.nume,
+        cui: cuiPrincipal,
+        cuiToate: [cuiPrincipal, ...(CUI_ALTERNATIVE[f.slug] || [])].filter((v): v is string => !!v),
+        nrRegCom: f.nr_reg_com || FIRMA_CONFIGS[f.slug]?.legal?.nrRegCom || null,
+        luna_id: luniRows.find(l => l.firma_id === f.id && l.luna?.startsWith(luna))?.id || null,
+        luna: luniRows.find(l => l.firma_id === f.id && l.luna?.startsWith(luna))?.luna || null,
+      }
+    })
 
   const extracted = await analyzeInvoice(bytes, mediaType, candidates)
   if (extracted && !extracted.esteFactura) {
@@ -336,7 +348,7 @@ export async function importInboxDocument({
       extracted,
     }
   }
-  const byCui = candidates.find(f => norm(f.cui) && norm(f.cui) === norm(extracted?.firmaCui))
+  const byCui = candidates.find(f => f.cuiToate.some(c => norm(c) && norm(c) === norm(extracted?.firmaCui)))
   const bySlug = candidates.find(f => f.slug === extracted?.firmaSlug)
   const detected = extracted?.incredereFirma === 'sigur' ? (byCui || bySlug) : byCui || null
   if (requireDetectedFirm && !detected) {

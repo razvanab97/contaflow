@@ -70,6 +70,7 @@ export default function FacturiLocaleGlobal({ firme }: Props) {
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setMessage(data.error || 'Atribuirea a eșuat')
+    else setFiles(prev => prev.filter(f => f.id !== file.id)) // dispare imediat, fara sa astepte reload-ul
     await load()
     setAssignBusy(null)
   }

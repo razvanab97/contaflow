@@ -21,12 +21,14 @@ export async function POST(req: NextRequest) {
   if (!['nedetectat', 'eroare'].includes(file.status)) return NextResponse.json({ error: 'Fișierul a fost deja procesat' }, { status: 400 })
 
   const luna = currentWorkMonthKey()
+  // "luna" e coloana de tip date (mereu prima zi a lunii) - .like() nu functioneaza pe o
+  // coloana de tip date in Postgres/PostgREST (eroare de operator), asa ca interogarea
+  // esua mereu, indiferent de firma, cu un mesaj fals ca luna nu ar fi inceputa.
   const { data: lunaRow, error: lunaError } = await sb
     .from('luni_contabile')
     .select('id')
     .eq('firma_id', cleanFirmaId)
-    .like('luna', `${luna}%`)
-    .limit(1)
+    .eq('luna', `${luna}-01`)
     .single()
   if (lunaError || !lunaRow) return NextResponse.json({ error: 'Firma aleasă nu are încă începută luna curentă' }, { status: 400 })
 
