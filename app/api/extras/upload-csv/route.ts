@@ -326,12 +326,15 @@ export async function POST(req: NextRequest) {
     const results: any[] = []
 
     for (const [valuta, valRows] of Object.entries(byValuta)) {
-      // Clear old statement for this luna and valuta
-      const old = await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${valuta}&select=id`)
+      const iban = parsedData.iban || null
+      // Inlocuieste extrasul existent doar daca e acelasi cont (acelasi IBAN) -
+      // altfel un al doilea cont cu aceeasi valuta (ex. RON) l-ar sterge pe primul.
+      const old = iban
+        ? await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${valuta}&iban=eq.${encodeURIComponent(iban)}&select=id`)
+        : []
       for (const e of old) await sbDelete(`tranzactii?extras_id=eq.${e.id}`)
       if (old.length > 0) await sbDelete(`extrase?id=in.(${old.map((e:any) => e.id).join(',')})`)
 
-      const iban = parsedData.iban || null
       const soldFinal = parsedData.sold_final !== undefined ? parsedData.sold_final : null
       const nrExtras = parsedData.numar_extras || null
       const perioadaStart = parsedData.perioada_start || null

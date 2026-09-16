@@ -97,10 +97,14 @@ function normalizeExtractedExtras(parsed: any, selectedValuta: string) {
   }
 }
 
-async function deleteExistingStatement(lunaId: string, valuta: string, explicitExtrasId?: string | null) {
+async function deleteExistingStatement(lunaId: string, valuta: string, iban: string, explicitExtrasId?: string | null) {
+  // Fara extrasId explicit (ex. "+ Adaugă cont"), inlocuim doar extrasul aceluiasi CONT
+  // (acelasi IBAN) - altfel un al doilea cont cu aceeasi moneda l-ar sterge pe primul.
   const ids = explicitExtrasId
     ? [explicitExtrasId]
-    : (await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${encodeURIComponent(valuta)}&select=id`)).map((extras: any) => extras.id)
+    : iban
+      ? (await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${encodeURIComponent(valuta)}&iban=eq.${encodeURIComponent(iban)}&select=id`)).map((extras: any) => extras.id)
+      : []
   for (const id of ids.filter(Boolean)) {
     await sbDelete(`tranzactii?extras_id=eq.${id}`)
     await sbDelete(`extrase?id=eq.${id}`)
@@ -127,7 +131,7 @@ async function saveStatement(params: {
   })
   if (!upRes.ok) throw new Error('Storage: ' + await upRes.text())
 
-  await deleteExistingStatement(lunaId, valuta, replaceExtrasId)
+  await deleteExistingStatement(lunaId, valuta, iban, replaceExtrasId)
 
   const { ok: eOk, data: extras } = await sbPost('extrase', {
     firma_id: firmaId, luna_id: lunaId,
