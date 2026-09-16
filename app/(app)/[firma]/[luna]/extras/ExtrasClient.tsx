@@ -796,6 +796,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   const addFileRef = useRef<HTMLInputElement>(null)
   const [sugestieBusy, setSugestieBusy] = useState(false)
   const [previewDocIds, setPreviewDocIds] = useState<Set<string>>(new Set())
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
   const [inboxSearchBusy, setInboxSearchBusy] = useState(false)
   const [inboxSearchDone, setInboxSearchDone] = useState(false)
   const [inboxCandidati, setInboxCandidati] = useState<InboxCandidat[]>([])
@@ -806,6 +807,21 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
 
   function toggleDocPreview(id: string) {
     setPreviewDocIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
+
+  // Sterge un document gresit atasat pe tranzactie - daca era documentul principal, tranzactia
+  // revine automat la "fara document" (vezi unlink-ul din /api/chitante/document DELETE).
+  async function deleteAttachedDoc(doc: { id:string; fisier_nume:string }) {
+    if (!confirm(`Ștergi „${doc.fisier_nume}" de pe această tranzacție?`)) return
+    setDeletingDocId(doc.id)
+    const res = await fetch(`/api/chitante/document?id=${encodeURIComponent(doc.id)}`, { method:'DELETE' })
+    setDeletingDocId(null)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      alert(data.error || 'Documentul nu a putut fi șters')
+      return
+    }
+    onRefresh()
   }
 
   async function confirmSugestie() {
@@ -1087,6 +1103,9 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                       </div>
                       {kind && <button onClick={() => toggleDocPreview(doc.id)} style={{ fontSize:'11px', fontWeight:600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer', flexShrink:0 }}>{open ? 'Ascunde' : 'Vezi'}</button>}
                       <a href={`/api/tranzactii/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare), flexShrink:0 }}>↓</a>
+                      <button onClick={() => deleteAttachedDoc(doc)} disabled={deletingDocId===doc.id} style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer', flexShrink:0, opacity:deletingDocId===doc.id?.6:1 }}>
+                        {deletingDocId===doc.id ? '...' : 'Șterge'}
+                      </button>
                     </div>
                     {open && kind === 'pdf' && (
                       <iframe src={`/api/tranzactii/document?id=${encodeURIComponent(doc.id)}&preview=1`} style={{ width:'100%', height:'55vh', border:'1px solid var(--c-1a1a1a)', borderRadius:'10px', marginTop:'6px', background:'var(--c-ffffff)' }} />

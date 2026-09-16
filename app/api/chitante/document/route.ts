@@ -48,8 +48,19 @@ export async function DELETE(req: NextRequest) {
   if (error || !doc) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
 
   const path = String(doc.fisier_path || '')
-  if (!DELETABLE_SECTIONS.some(section => path.includes(`/${section}/`)))
+  // "/tx/..." = document atasat direct pe o tranzactie din Extras de cont (nu printr-o sectiune
+  // UploadPanel) - stergerea e mereu permisa, tranzactia revine la "fara document" prin unlink-ul
+  // de mai jos.
+  if (!path.includes('/tx/') && !DELETABLE_SECTIONS.some(section => path.includes(`/${section}/`)))
     return NextResponse.json({ error: 'Acest document nu poate fi șters din această secțiune' }, { status: 403 })
+
+  // extras_id al tranzactiei (daca exista) - ca sa recalculam nr_documentate dupa stergere,
+  // altfel Extras de cont ar arata un numar de documente mai mare decat cel real.
+  let extrasId: string | null = null
+  if (doc.tranzactie_id) {
+    const { data: tx } = await sb.from('tranzactii').select('extras_id').eq('id', doc.tranzactie_id).single()
+    extrasId = tx?.extras_id || null
+  }
 
   const { error: unlinkError } = await sb.from('tranzactii').update({ document_id: null }).eq('document_id', id)
   if (unlinkError) return NextResponse.json({ error: unlinkError.message }, { status: 500 })
@@ -68,5 +79,11 @@ export async function DELETE(req: NextRequest) {
   }
 
   const { error: storageError } = await sb.storage.from('documente').remove([path])
+
+  if (extrasId) {
+    const { data: documentedTxs } = await sb.from('tranzactii').select('id').eq('extras_id', extrasId).not('document_id', 'is', null)
+    await sb.from('extrase').update({ nr_documentate: documentedTxs?.length || 0 }).eq('id', extrasId)
+  }
+
   return NextResponse.json({ ok: true, warning: storageError?.message || null })
 }
