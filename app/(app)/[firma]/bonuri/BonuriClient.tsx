@@ -23,8 +23,44 @@ function fmtData(s: string | null) {
 function norm(v: string | null | undefined) {
   return String(v || '').replace(/^RO/i, '').replace(/\D/g, '')
 }
+function fmtRon(n: number) {
+  return n.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function lunaLabel(s: string) {
+  const [y, m] = s.split('-')
+  const LUNI = ['', 'Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${LUNI[+m] || m} ${y}`
+}
+function editDistanceMax1(a: string, b: string) {
+  if (a === b) return true
+  if (Math.abs(a.length - b.length) > 1) return false
+  // Doar cazul simplu, suficient pentru CUI-uri (siruri scurte de cifre): o cifra lipsa/in plus/gresita.
+  if (a.length === b.length) {
+    let diff = 0
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) diff++
+    return diff <= 1
+  }
+  const [short, long] = a.length < b.length ? [a, b] : [b, a]
+  for (let skip = 0; skip < long.length; skip++) {
+    if (long.slice(0, skip) + long.slice(skip + 1) === short) return true
+  }
+  return false
+}
+// Cand CUI-ul citit de pe bon nu se potriveste exact cu nicio firma, dar difera de una singura
+// printr-o cifra (citire OCR gresita, foarte frecventa) - propune acea firma preselectata in
+// dropdown-ul de mutare, ca sa nu mai trebuiasca cautata manual din lista. Doar un indiciu, nu
+// muta nimic automat - tot trebuie confirmat cu un click pe "Mută".
+function bestGuessFirma(cuiClient: string | null, firmaCurentaId: string, firme: { id: string; nume: string; cui?: string | null }[]) {
+  const target = norm(cuiClient)
+  if (target.length < 6) return null
+  const candidati = firme.filter(f => f.id !== firmaCurentaId && f.cui && norm(f.cui).length >= 6)
+  const exact = candidati.find(f => norm(f.cui) === target)
+  if (exact) return exact.id
+  const apropiat = candidati.find(f => editDistanceMax1(norm(f.cui), target))
+  return apropiat ? apropiat.id : null
+}
 
-export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { firmaId: string; firmaCui?: string | null; firmaNume: string; firme: { id: string; nume: string }[] }) {
+export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { firmaId: string; firmaCui?: string | null; firmaNume: string; firme: { id: string; nume: string; cui?: string | null }[] }) {
   const [bonuri, setBonuri] = useState<Bon[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -191,8 +227,7 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { 
   // Muta manual un bon pe alta firma - pentru cazul in care CUI-ul citit pe bon apartine altei
   // firme decat cea pe care a fost incarcat, dar auto-rutarea la upload nu l-a mutat (sau bonul
   // a fost adaugat inainte ca CUI-ul sa fie completat corect).
-  async function moveBon(id: string) {
-    const targetFirmaId = movePick[id]
+  async function moveBon(id: string, targetFirmaId: string) {
     if (!targetFirmaId) return
     setMovingId(id); setMoveError('')
     const res = await fetch('/api/bonuri/muta', {
@@ -213,6 +248,23 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { 
 
   const asteptare = bonuri.filter(b => b.status === 'asteptare')
   const asociate = bonuri.filter(b => b.status === 'asociata')
+
+  // Calcul rapid, direct pe pagina - fara sa mai fie nevoie sa descarci PDF-ul doar ca sa vezi
+  // cat s-a cheltuit. Grupat dupa data reala de pe bon (nu dupa cand a fost incarcat).
+  const totalSuma = bonuri.reduce((s, b) => s + (b.suma || 0), 0)
+  const combustibilBonuri = bonuri.filter(b => b.tip === 'combustibil')
+  const combustibilSuma = combustibilBonuri.reduce((s, b) => s + (b.suma || 0), 0)
+  const altulBonuri = bonuri.filter(b => b.tip !== 'combustibil')
+  const altulSuma = altulBonuri.reduce((s, b) => s + (b.suma || 0), 0)
+  const peLuna = new Map<string, { count: number; suma: number }>()
+  for (const b of bonuri) {
+    const luna = (b.data_bon || b.created_at || '').slice(0, 7)
+    if (!luna) continue
+    const cur = peLuna.get(luna) || { count: 0, suma: 0 }
+    cur.count++; cur.suma += b.suma || 0
+    peLuna.set(luna, cur)
+  }
+  const luniSortate = [...peLuna.entries()].sort((a, b) => b[0].localeCompare(a[0]))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -259,13 +311,44 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { 
       )}
 
       {bonuri.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <a
-            href={`/api/bonuri/pdf?firmaId=${encodeURIComponent(firmaId)}&firmaNume=${encodeURIComponent(firmaNume)}`}
-            style={{ fontSize: '12px', fontWeight: 600, padding: '8px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', textDecoration: 'none' }}
-          >
-            ↓ Descarcă toate bonurile ({bonuri.length}) - PDF
-          </a>
+        <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Calcul</div>
+            <a
+              href={`/api/bonuri/pdf?firmaId=${encodeURIComponent(firmaId)}&firmaNume=${encodeURIComponent(firmaNume)}`}
+              style={{ fontSize: '12px', fontWeight: 600, padding: '7px 12px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', textDecoration: 'none', flexShrink: 0 }}
+            >
+              ↓ PDF ({bonuri.length} bonuri)
+            </a>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', marginBottom: luniSortate.length ? '18px' : 0 }}>
+            <div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-eeeeee)' }}>{fmtRon(totalSuma)} <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--c-666666)' }}>RON total</span></div>
+              <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px' }}>{bonuri.length} bonuri · {asteptare.length} în așteptare · {asociate.length} asociate</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--c-cccccc)' }}>{fmtRon(combustibilSuma)} RON</div>
+              <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px' }}>Combustibil ({combustibilBonuri.length})</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--c-cccccc)' }}>{fmtRon(altulSuma)} RON</div>
+              <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px' }}>Altul ({altulBonuri.length})</div>
+            </div>
+          </div>
+          {luniSortate.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {luniSortate.map(([luna, d]) => (
+                <div key={luna} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+                  <span style={{ width: '80px', color: 'var(--c-999999)', flexShrink: 0 }}>{lunaLabel(luna)}</span>
+                  <span style={{ flex: 1, height: '5px', borderRadius: '3px', background: 'var(--c-1e1e1e)', overflow: 'hidden' }}>
+                    <span style={{ display: 'block', height: '100%', width: `${totalSuma > 0 ? Math.max(3, (d.suma / totalSuma) * 100) : 0}%`, background: 'var(--accent-mint)' }} />
+                  </span>
+                  <span style={{ width: '110px', textAlign: 'right', color: 'var(--c-cccccc)', fontWeight: 600 }}>{fmtRon(d.suma)} RON</span>
+                  <span style={{ width: '70px', textAlign: 'right', color: 'var(--c-666666)' }}>{d.count} buc.</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -282,7 +365,12 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { 
             {asteptare.map(b => {
               const kind = isPreviewable(b.fisier_tip, b.fisier_nume)
               const open = previewIds.has(b.id)
-              const cuiMatch = b.cui_client && firmaCui ? norm(b.cui_client) === norm(firmaCui) : null
+              // Fuzzy, nu strict egal: o cifra citita gresit de AI (foarte frecvent, ex. "488872594"
+              // in loc de "48872594") nu trebuie sa declanseze un avertisment fals cand bonul e deja
+              // pe firma corecta - doar cazurile cu adevarat diferite raman semnalate.
+              const cuiMatch = b.cui_client && firmaCui ? editDistanceMax1(norm(b.cui_client), norm(firmaCui)) : null
+              const ghicitFirmaId = cuiMatch === false ? bestGuessFirma(b.cui_client, firmaId, firme) : null
+              const movePickValue = movePick[b.id] ?? ghicitFirmaId ?? ''
               return (
                 <div key={b.id}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '8px', padding: '10px 12px' }}>
@@ -317,19 +405,19 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { 
                       {cuiMatch === false && <span title="CUI diferit de firma curentă" style={{ fontSize: '11px', color: 'var(--accent-red)' }}>⚠</span>}
                     </div>
                     {cuiMatch === false && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} title={ghicitFirmaId ? 'CUI-ul aproape se potrivește cu această firmă (probabil o cifră citită greșit) - preselectată automat' : undefined}>
                         <select
-                          value={movePick[b.id] || ''}
+                          value={movePickValue}
                           onChange={e => setMovePick(prev => ({ ...prev, [b.id]: e.target.value }))}
-                          style={{ width: '130px', fontSize: '11px', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '4px 6px', outline: 'none' }}
+                          style={{ width: '130px', fontSize: '11px', color: ghicitFirmaId && !movePick[b.id] ? 'var(--accent-mint)' : 'var(--c-cccccc)', fontWeight: ghicitFirmaId && !movePick[b.id] ? 700 : 400, background: 'var(--c-0d0d0d)', border: `1px solid ${ghicitFirmaId && !movePick[b.id] ? 'var(--accent-mint)' : 'var(--c-2a2a2a)'}`, borderRadius: '6px', padding: '4px 6px', outline: 'none' }}
                         >
                           <option value="">Mută pe firma...</option>
                           {firme.filter(f => f.id !== firmaId).map(f => <option key={f.id} value={f.id}>{f.nume}</option>)}
                         </select>
                         <button
-                          onClick={() => moveBon(b.id)}
-                          disabled={!movePick[b.id] || movingId === b.id}
-                          style={{ fontSize: '11px', fontWeight: 700, padding: '4px 9px', borderRadius: '6px', border: '1px solid var(--accent-red)', background: 'transparent', color: 'var(--accent-red)', cursor: 'pointer', opacity: (!movePick[b.id] || movingId === b.id) ? .5 : 1 }}
+                          onClick={() => moveBon(b.id, movePickValue)}
+                          disabled={!movePickValue || movingId === b.id}
+                          style={{ fontSize: '11px', fontWeight: 700, padding: '4px 9px', borderRadius: '6px', border: '1px solid var(--accent-red)', background: 'transparent', color: 'var(--accent-red)', cursor: 'pointer', opacity: (!movePickValue || movingId === b.id) ? .5 : 1 }}
                         >
                           {movingId === b.id ? '...' : 'Mută'}
                         </button>

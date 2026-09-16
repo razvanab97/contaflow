@@ -41,7 +41,7 @@ export default async function BonuriPage({ params }: { params: Promise<{ firma: 
         </p>
       </div>
 
-      <BonuriClient firmaId={firma.id} firmaCui={firma.cui} firmaNume={firma.nume} firme={toateFirmele.map((f: any) => ({ id: f.id, nume: f.nume }))} />
+      <BonuriClient firmaId={firma.id} firmaCui={firma.cui} firmaNume={firma.nume} firme={toateFirmele.map((f: any) => ({ id: f.id, nume: f.nume, cui: f.cui || null }))} />
     </main>
   )
 }

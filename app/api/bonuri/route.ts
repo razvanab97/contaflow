@@ -16,15 +16,41 @@ function norm(value: string | null | undefined) {
 
 type FirmaCandidat = { id: string; nume: string; cuiToate: string[] }
 
+// O singura cifra citita gresit de AI din poza bonului (foarte frecvent - "488872594" in loc de
+// "48872594") nu trebuie sa lase bonul blocat pe firma gresita doar pentru ca CUI-ul citit nu se
+// potriveste caracter cu caracter. Suficient pentru CUI-uri (siruri scurte de cifre).
+function editDistanceMax1(a: string, b: string) {
+  if (a === b) return true
+  if (Math.abs(a.length - b.length) > 1) return false
+  if (a.length === b.length) {
+    let diff = 0
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) diff++
+    return diff <= 1
+  }
+  const [short, long] = a.length < b.length ? [a, b] : [b, a]
+  for (let skip = 0; skip < long.length; skip++) {
+    if (long.slice(0, skip) + long.slice(skip + 1) === short) return true
+  }
+  return false
+}
+
 // Firma pe care se incarca bonul e doar un punct de plecare - daca CUI-ul clientului citit pe bon
 // se potriveste cu O ALTA firma din sistem, bonul e atribuit automat acolo (la fel ca la Inbox
 // Facturi), ca sa nu ramana din greseala pe firma gresita doar pentru ca a fost incarcat de acolo.
+// Match exact intai; daca nu exista, incearca un match aproximativ (o cifra diferita) - dar DOAR
+// daca e unic, ca sa nu ghiceasca gresit intre doua firme cand CUI-ul citit e ambiguu.
 function gasesteFirmaDupaCui(candidati: FirmaCandidat[], cuiClient: string | null, firmaIncarcare: string) {
   if (!cuiClient) return { firmaId: firmaIncarcare, schimbata: false }
   const target = norm(cuiClient)
-  const match = candidati.find(f => f.cuiToate.includes(target))
-  if (!match) return { firmaId: firmaIncarcare, schimbata: false }
-  return { firmaId: match.id, firmaNume: match.nume, schimbata: match.id !== firmaIncarcare }
+  if (target.length < 6) return { firmaId: firmaIncarcare, schimbata: false }
+  const exact = candidati.find(f => f.cuiToate.includes(target))
+  if (exact) return { firmaId: exact.id, firmaNume: exact.nume, schimbata: exact.id !== firmaIncarcare }
+  const apropiate = candidati.filter(f => f.cuiToate.some(cui => cui.length >= 6 && editDistanceMax1(cui, target)))
+  if (apropiate.length === 1) {
+    const match = apropiate[0]
+    return { firmaId: match.id, firmaNume: match.nume, schimbata: match.id !== firmaIncarcare }
+  }
+  return { firmaId: firmaIncarcare, schimbata: false }
 }
 
 type ExtractieBon = {

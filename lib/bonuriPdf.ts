@@ -72,7 +72,31 @@ export async function generateBonuriPdfBytes(firmaId: string, firmaNume: string)
   page.drawText(safe(`${firmaNume} - Bonuri`), { x: margin, y, size: 15, font: fontBold, color: rgb(0.1, 0.1, 0.1) })
   y -= 20
   page.drawText(safe(`${bonuri.length} bonuri total, ${asteptare} in asteptare - suma totala ${total.toFixed(2)} RON`), { x: margin, y, size: 11, font: fontRegular, color: rgb(0.4, 0.4, 0.4) })
-  y -= 26
+  y -= 22
+
+  // Rezumat pe luna (dupa data reala de pe bon) - raspunde direct la "cat s-a cheltuit intr-o
+  // luna", fara sa mai fie nevoie sa numeri manual randurile din tabelul de mai jos.
+  const peLuna = new Map<string, { count: number; suma: number }>()
+  for (const b of bonuri) {
+    const luna = (b.data_bon || b.created_at || '').slice(0, 7)
+    if (!luna) continue
+    const cur = peLuna.get(luna) || { count: 0, suma: 0 }
+    cur.count++; cur.suma += Number(b.suma) || 0
+    peLuna.set(luna, cur)
+  }
+  const LUNI = ['', 'Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const luniSortate = [...peLuna.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+  if (luniSortate.length) {
+    ensureSpace(14 * luniSortate.length + 10)
+    for (const [luna, d] of luniSortate) {
+      const [yy, mm] = luna.split('-')
+      page.drawText(safe(`${LUNI[+mm] || mm} ${yy}`), { x: margin, y, size: 9.5, font: fontBold, color: rgb(0.25, 0.25, 0.25) })
+      page.drawText(safe(`${d.count} bonuri`), { x: margin + 90, y, size: 9.5, font: fontRegular, color: rgb(0.45, 0.45, 0.45) })
+      page.drawText(`${d.suma.toFixed(2)} RON`, { x: margin + 170, y, size: 9.5, font: fontRegular, color: rgb(0.25, 0.25, 0.25) })
+      y -= 14
+    }
+    y -= 10
+  }
 
   const colDate = margin, colComerciant = margin + 60, colTip = margin + 230, colCui = margin + 300, colSum = margin + 380, colStatus = margin + 450
   const rowFontSize = 9.5
