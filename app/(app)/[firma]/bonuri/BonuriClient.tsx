@@ -31,7 +31,12 @@ export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; f
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
+  const [notices, setNotices] = useState<string[]>([])
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraError, setCameraError] = useState('')
+  const [stream, setStream] = useState<MediaStream | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   function load() {
     fetch(`/api/bonuri?firmaId=${encodeURIComponent(firmaId)}`)
@@ -45,17 +50,63 @@ export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; f
 
   useEffect(() => { load() }, [firmaId])
 
-  async function uploadFiles(files: FileList) {
+  useEffect(() => {
+    if (videoRef.current && stream) videoRef.current.srcObject = stream
+  }, [stream])
+
+  useEffect(() => {
+    return () => { stream?.getTracks().forEach(t => t.stop()) }
+  }, [stream])
+
+  async function uploadFiles(files: FileList | File[]) {
     setUploading(true); setError('')
+    const noiSchimbate: string[] = []
     for (const file of Array.from(files)) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('firmaId', firmaId)
       const res = await fetch('/api/bonuri', { method: 'POST', body: fd })
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error || 'Eroare upload'); break }
+      const d = await res.json().catch(() => ({}))
+      const rezultate = d.bonuri || (d.bon ? [d.bon] : [])
+      for (const b of rezultate) {
+        if (b.firmaSchimbata && b.firmaNume) noiSchimbate.push(`"${b.comerciant || b.fisier_nume}" a fost atribuit automat firmei ${b.firmaNume} (CUI de pe bon corespunde acelei firme, nu firmei curente)`)
+      }
     }
     setUploading(false)
+    if (noiSchimbate.length) setNotices(prev => [...prev, ...noiSchimbate])
     load()
+  }
+
+  async function openCamera() {
+    setCameraError('')
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
+      setStream(s)
+      setCameraOpen(true)
+    } catch {
+      setCameraError('Nu am putut accesa camera — verifică permisiunile browserului.')
+    }
+  }
+
+  function closeCamera() {
+    stream?.getTracks().forEach(t => t.stop())
+    setStream(null)
+    setCameraOpen(false)
+  }
+
+  async function capturePhoto() {
+    const video = videoRef.current
+    if (!video || !video.videoWidth) return
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d')?.drawImage(video, 0, 0)
+    const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    closeCamera()
+    if (!blob) return
+    const file = new File([blob], `bon_camera_${Date.now()}.jpg`, { type: 'image/jpeg' })
+    await uploadFiles([file])
   }
 
   async function deleteBon(id: string) {
@@ -82,21 +133,46 @@ export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; f
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
-        <div
-          onClick={() => inputRef.current?.click()}
-          onDragOver={e => { e.preventDefault(); setDrag(true) }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files) }}
-          style={{ border: `1.5px dashed ${drag ? 'var(--c-555555)' : 'var(--c-2a2a2a)'}`, borderRadius: '10px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--c-0d0d0d)' }}
-        >
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-888888)' }}>
-            {uploading ? 'AI citește bonul...' : '+ Adaugă bon fiscal'}
+        {cameraOpen ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+            <video ref={videoRef} autoPlay playsInline style={{ width: '100%', maxHeight: '50vh', borderRadius: '10px', background: '#000' }} />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={capturePhoto} style={{ fontSize: '13px', fontWeight: 600, padding: '8px 16px', borderRadius: '7px', border: 'none', background: 'var(--accent-mint)', color: 'var(--c-0a0a0a)', cursor: 'pointer' }}>Capturează</button>
+              <button onClick={closeCamera} style={{ fontSize: '13px', fontWeight: 600, padding: '8px 16px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'transparent', color: 'var(--c-999999)', cursor: 'pointer' }}>Anulează</button>
+            </div>
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--c-666666)', marginTop: '3px' }}>PDF, JPG, PNG · comerciantul, suma, data și tipul se citesc automat</div>
-        </div>
-        <input ref={inputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={hiddenInputStyle} onChange={e => e.target.files?.length && uploadFiles(e.target.files)}/>
-        {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{error}</p>}
+        ) : (
+          <>
+            <div
+              onClick={() => inputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDrag(true) }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files) }}
+              style={{ border: `1.5px dashed ${drag ? 'var(--c-555555)' : 'var(--c-2a2a2a)'}`, borderRadius: '10px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--c-0d0d0d)' }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-888888)' }}>
+                {uploading ? 'AI citește bonul...' : '+ Adaugă bon fiscal'}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--c-666666)', marginTop: '3px' }}>PDF, JPG, PNG · comerciantul, suma, data și tipul se citesc automat</div>
+            </div>
+            <input ref={inputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={hiddenInputStyle} onChange={e => e.target.files?.length && uploadFiles(e.target.files)}/>
+            <button onClick={openCamera} style={{ marginTop: '10px', fontSize: '12px', fontWeight: 600, padding: '7px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', cursor: 'pointer' }}>📷 Fotografiază bon (camera laptop)</button>
+            {cameraError && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{cameraError}</p>}
+            {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{error}</p>}
+          </>
+        )}
       </div>
+
+      {notices.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {notices.map((n, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'light-dark(rgba(5,150,105,.1), rgba(110,231,176,.06))', border: '1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.2))', borderRadius: '8px' }}>
+              <span style={{ flex: 1, fontSize: '12px', color: 'var(--c-cccccc)' }}>↪ {n}</span>
+              <button onClick={() => setNotices(prev => prev.filter((_, j) => j !== i))} style={{ fontSize: '11px', color: 'var(--c-666666)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '4px' }}>

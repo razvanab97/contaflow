@@ -2,11 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { pdfPageCount, extractPageRange } from '@/lib/pdfBatch'
+import { CUI_ALTERNATIVE } from '@/lib/inbox-facturi'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
 function safeFilePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 70) || fallback
+}
+
+function norm(value: string | null | undefined) {
+  return String(value || '').replace(/^RO/i, '').replace(/\D/g, '')
+}
+
+type FirmaCandidat = { id: string; nume: string; cuiToate: string[] }
+
+// Firma pe care se incarca bonul e doar un punct de plecare - daca CUI-ul clientului citit pe bon
+// se potriveste cu O ALTA firma din sistem, bonul e atribuit automat acolo (la fel ca la Inbox
+// Facturi), ca sa nu ramana din greseala pe firma gresita doar pentru ca a fost incarcat de acolo.
+function gasesteFirmaDupaCui(candidati: FirmaCandidat[], cuiClient: string | null, firmaIncarcare: string) {
+  if (!cuiClient) return { firmaId: firmaIncarcare, schimbata: false }
+  const target = norm(cuiClient)
+  const match = candidati.find(f => f.cuiToate.includes(target))
+  if (!match) return { firmaId: firmaIncarcare, schimbata: false }
+  return { firmaId: match.id, firmaNume: match.nume, schimbata: match.id !== firmaIncarcare }
 }
 
 type ExtractieBon = {
@@ -75,8 +93,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ bonuri: data || [] })
 }
 
-async function saveBon(sb: ReturnType<typeof getServiceSupabase>, firmaId: string, bytes: Uint8Array, mediaType: string, originalExtension: string, pageSuffix: string) {
+async function saveBon(sb: ReturnType<typeof getServiceSupabase>, firmaIncarcare: string, candidati: FirmaCandidat[], bytes: Uint8Array, mediaType: string, originalExtension: string, pageSuffix: string) {
   const extracted = await analyzeBon(bytes, mediaType)
+  const { firmaId, firmaNume, schimbata } = gasesteFirmaDupaCui(candidati, extracted?.cuiClient || null, firmaIncarcare)
 
   const details = [extracted?.comerciant, extracted?.suma != null ? `${extracted.suma}RON` : null].filter(Boolean).join('_')
   const fileName = `${safeFilePart(details, 'bon')}${pageSuffix}_${Date.now()}.${originalExtension}`
@@ -101,7 +120,7 @@ async function saveBon(sb: ReturnType<typeof getServiceSupabase>, firmaId: strin
     await sb.storage.from('documente').remove([path])
     throw new Error(error.message)
   }
-  return data
+  return { ...data, firmaSchimbata: schimbata, firmaNume: schimbata ? firmaNume : null }
 }
 
 export async function POST(req: NextRequest) {
@@ -115,6 +134,15 @@ export async function POST(req: NextRequest) {
   const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
   const sb = getServiceSupabase()
 
+  const { data: firmeRows } = await sb.from('firme').select('id,slug,nume,cui').eq('activa', true)
+  const candidati: FirmaCandidat[] = (firmeRows || [])
+    .filter(f => f.slug !== 'proiect-ab-textile')
+    .map(f => ({
+      id: f.id,
+      nume: f.nume,
+      cuiToate: [f.cui, ...(CUI_ALTERNATIVE[f.slug] || [])].filter((v): v is string => !!v).map(norm).filter(Boolean),
+    }))
+
   try {
     if (file.type === 'application/pdf') {
       const pageCount = await pdfPageCount(Buffer.from(bytes))
@@ -122,12 +150,12 @@ export async function POST(req: NextRequest) {
         const bonuri = []
         for (let i = 1; i <= pageCount; i++) {
           const pagina = await extractPageRange(Buffer.from(bytes), i, i)
-          bonuri.push(await saveBon(sb, firmaId, new Uint8Array(pagina), file.type, extension, `_p${i}`))
+          bonuri.push(await saveBon(sb, firmaId, candidati, new Uint8Array(pagina), file.type, extension, `_p${i}`))
         }
         return NextResponse.json({ bonuri })
       }
     }
-    const bon = await saveBon(sb, firmaId, bytes, file.type, extension, '')
+    const bon = await saveBon(sb, firmaId, candidati, bytes, file.type, extension, '')
     return NextResponse.json({ bon })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Eroare upload' }, { status: 500 })

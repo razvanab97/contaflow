@@ -18,7 +18,8 @@ type FirmaCandidate = {
 
 // CUI-uri suplimentare, valide pentru aceeași firmă, pe lângă cel principal din firme.cui
 // (folosit doar la recunoașterea facturilor - firme.cui rămâne cel oficial pentru documente).
-const CUI_ALTERNATIVE: Record<string, string[]> = {
+// Exportat ca sa fie reutilizat si de alte fluxuri de recunoastere firma dupa CUI (ex. Bonuri).
+export const CUI_ALTERNATIVE: Record<string, string[]> = {
   abxhomes: ['51842895'],
 }
 
