@@ -17,10 +17,7 @@ export async function GET(req: NextRequest) {
 
   const sb = getServiceSupabase()
   const result = await computeVerification(sb, lunaId)
-  const randuri = [
-    ...result.discrepanteClient.map(d => ({ ...d, tip: 'Factura client' })),
-    ...result.discrepanteComisionAirbnb.map(d => ({ ...d, tip: 'Comision Airbnb' })),
-  ]
+  const randuri = result.discrepanteClient.map(d => ({ ...d, tip: 'Factura client' }))
   if (!randuri.length) return NextResponse.json({ error: 'Nu există discrepanțe de listat' }, { status: 404 })
 
   const pdf = await PDFDocument.create()

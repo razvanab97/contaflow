@@ -44,6 +44,21 @@ function gasesteCandidat<F extends { suma: number|null }>(rez: { cod_rezervare:s
   return exact ? { factura: exact, sumaCorecta: true } : { factura: candidati[0], sumaCorecta: false }
 }
 
+// Airbnb factureaza clientul cu suma BRUTA (inainte de comisionul retinut), iar borderoul arata
+// suma NETA primita de gazda - deci "factura - borderou" ar trebui sa fie exact comisionul Airbnb
+// al acelei rezervari. Daca se potriveste, discrepanta e explicata (nu e o eroare de facturare,
+// doar TVA/comision normal) si nu mai trebuie sa apara ca "problema" de rezolvat.
+function comisionExplicaDiferenta(
+  rez: { cod_rezervare:string; suma:number|null },
+  facturaClient: { suma:number|null },
+  comisionAirbnb: { cod_rezervare:string|null; suma:number|null }[],
+) {
+  const comision = comisionAirbnb.find(c => codesMatch(rez.cod_rezervare, c.cod_rezervare || ''))
+  if (!comision || comision.suma == null || rez.suma == null || facturaClient.suma == null) return null
+  const diferentaReala = facturaClient.suma - rez.suma
+  return { comision, explicat: Math.abs(diferentaReala - comision.suma) < 1 }
+}
+
 export async function computeVerification(sb: ReturnType<typeof getServiceSupabase>, lunaId: string) {
   const { data: allRez } = await sb.from('borderou_rezervari').select('*').eq('luna_id', lunaId)
   const { data: allFact } = await sb.from('stardesk_facturi').select('*').eq('luna_id', lunaId)
@@ -52,29 +67,34 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
   const rezervari = allRez || []
   const stardeskFacturi = allFact || []
   const comisionFacturi = allComision || []
+  const comisionAirbnb = comisionFacturi.filter(f => f.platforma === 'airbnb')
 
   const faraFacturaClient: typeof rezervari = []
   const discrepanteClient: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number] }[] = []
+  const discrepanteExplicateComision: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number]; comision:typeof comisionAirbnb[number] }[] = []
   for (const rez of rezervari) {
     if (rez.rezolvat_client) continue
     const candidat = gasesteCandidat(rez, stardeskFacturi, f => isStardeskCandidate(rez, f))
-    if (!candidat) faraFacturaClient.push(rez)
-    else if (!candidat.sumaCorecta) discrepanteClient.push({ rezervare: rez, factura: candidat.factura })
+    if (!candidat) { faraFacturaClient.push(rez); continue }
+    if (candidat.sumaCorecta) continue
+    const explicatie = rez.platforma === 'airbnb' ? comisionExplicaDiferenta(rez, candidat.factura, comisionAirbnb) : null
+    if (explicatie?.explicat) discrepanteExplicateComision.push({ rezervare: rez, factura: candidat.factura, comision: explicatie.comision })
+    else discrepanteClient.push({ rezervare: rez, factura: candidat.factura })
   }
 
   // Verificare inversă: facturi 5StarDesk care nu se potrivesc cu nicio rezervare din borderoul lunii
   // (rezervare lipsă din borderou, cod citit greșit, sau lună diferită)
   const facturiFaraRezervare = stardeskFacturi.filter(f => !rezervari.some(rez => isStardeskCandidate(rez, f)))
 
+  // Comisionul e doar o fractiune din suma rezervarii, nu aceeasi suma - deci aici verificam
+  // NUMAI daca exista o factura de comision pentru cod, fara sa comparam sume (comparatia de suma
+  // relevanta e deja facuta mai sus, ca parte din explicarea discrepantei facturii de client).
   const rezervariAirbnb = rezervari.filter(r => r.platforma === 'airbnb')
-  const comisionAirbnb = comisionFacturi.filter(f => f.platforma === 'airbnb')
   const faraComisionAirbnb: typeof rezervariAirbnb = []
-  const discrepanteComisionAirbnb: { rezervare:typeof rezervariAirbnb[number]; factura:typeof comisionAirbnb[number] }[] = []
   for (const rez of rezervariAirbnb) {
     if (rez.rezolvat_comision) continue
-    const candidat = gasesteCandidat(rez, comisionAirbnb, f => codesMatch(rez.cod_rezervare, f.cod_rezervare || ''))
-    if (!candidat) faraComisionAirbnb.push(rez)
-    else if (!candidat.sumaCorecta) discrepanteComisionAirbnb.push({ rezervare: rez, factura: candidat.factura })
+    const areComision = comisionAirbnb.some(f => codesMatch(rez.cod_rezervare, f.cod_rezervare || ''))
+    if (!areComision) faraComisionAirbnb.push(rez)
   }
 
   const rezervariBooking = rezervari.filter(r => r.platforma === 'booking')
@@ -86,9 +106,9 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
     totalFacturiComision: comisionFacturi.length,
     faraFacturaClient: faraFacturaClient.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
     discrepanteClient: discrepanteClient.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma })),
+    discrepanteExplicateComision: discrepanteExplicateComision.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, numarComision: d.comision.numar_factura, sumaComision: d.comision.suma })),
     facturiFaraRezervare: facturiFaraRezervare.map(f => ({ id: f.id, numarFactura: f.numar_factura, numeClient: f.nume_client, suma: f.suma, idRezervare: f.id_rezervare })),
     faraComisionAirbnb: faraComisionAirbnb.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
-    discrepanteComisionAirbnb: discrepanteComisionAirbnb.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma })),
     comisionBookingLipsa: rezervariBooking.length > 0 && !comisionBookingExista,
     totalRezervariBooking: rezervariBooking.length,
   }
@@ -102,5 +122,5 @@ export type VerificareResult = Awaited<ReturnType<typeof computeVerification>>
 export async function getStardeskDiscrepanteCount(lunaId: string): Promise<number> {
   const sb = getServiceSupabase()
   const result = await computeVerification(sb, lunaId)
-  return result.discrepanteClient.length + result.discrepanteComisionAirbnb.length
+  return result.discrepanteClient.length
 }

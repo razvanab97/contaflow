@@ -10,11 +10,12 @@ interface Props { firma: Firma; lunaId: string; tasks: TaskItem[]; checklistItem
 interface Nefacturata { id:string; codRezervare:string; numeOaspete:string; suma:number|null; platforma:string }
 interface FacturaOrfana { id:string; numarFactura:string; numeClient:string; suma:number|null; idRezervare:string }
 interface Discrepanta extends Nefacturata { numarFactura:string; sumaFactura:number|null }
+interface DiscrepantaExplicata extends Discrepanta { numarComision:string; sumaComision:number|null }
 interface VerificareResult {
   totalRezervari:number; totalFacturiClient:number; totalFacturiComision:number
-  faraFacturaClient:Nefacturata[]; discrepanteClient:Discrepanta[]
+  faraFacturaClient:Nefacturata[]; discrepanteClient:Discrepanta[]; discrepanteExplicateComision:DiscrepantaExplicata[]
   facturiFaraRezervare:FacturaOrfana[]
-  faraComisionAirbnb:Nefacturata[]; discrepanteComisionAirbnb:Discrepanta[]
+  faraComisionAirbnb:Nefacturata[]
   comisionBookingLipsa:boolean; totalRezervariBooking:number
 }
 
@@ -108,6 +109,24 @@ function ListaDiscrepante({ items, tip, onResolved }: { items: Discrepanta[]; ti
   )
 }
 
+// Diferenta dintre factura client si borderou e explicata exact de comisionul Airbnb al acelei
+// rezervari (factura = borderou + comision) - nu e o eroare de facturare, doar informativ.
+function ListaExplicate({ items }: { items: DiscrepantaExplicata[] }) {
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
+      {items.map(d => (
+        <div key={d.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
+          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background:'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))', color:'var(--accent-red)', flexShrink:0 }}>Airbnb</span>
+          <span style={{ flex:1, fontSize:'12px', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· factura {d.numarFactura || '—'}</span></span>
+          <span style={{ fontSize:'11px', color:'var(--c-777777)', flexShrink:0 }}>
+            {money(d.suma)} <span style={{ color:'var(--c-555555)' }}>+ comision</span> {money(d.sumaComision)} <span style={{ color:'var(--c-555555)' }}>=</span> {money(d.sumaFactura)} RON
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 type Categorie = 'client' | 'comision-airbnb' | 'comision-booking'
 
 function VerificaButon({ firma, checking, onClick }: { firma:Firma; checking:boolean; onClick:()=>void }) {
@@ -143,11 +162,11 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
     setChecking(null)
   }
 
-  function eliminaDinLista(id: string, field: 'faraFacturaClient'|'discrepanteClient'|'faraComisionAirbnb'|'discrepanteComisionAirbnb') {
+  function eliminaDinLista(id: string, field: 'faraFacturaClient'|'discrepanteClient'|'faraComisionAirbnb') {
     setResult(prev => prev ? { ...prev, [field]: prev[field].filter(n => n.id !== id) } : prev)
   }
 
-  const totalDiscrepante = (result?.discrepanteClient.length || 0) + (result?.discrepanteComisionAirbnb.length || 0)
+  const totalDiscrepante = result?.discrepanteClient.length || 0
 
   return (
     <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'12px', overflow:'hidden' }}>
@@ -196,6 +215,16 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
           </div>
         )}
 
+        {result && result.discrepanteExplicateComision.length > 0 && (
+          <div>
+            <div style={{ marginBottom:'8px' }}>
+              <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>✓ Diferențe explicate de comisionul Airbnb</span>
+            </div>
+            <p style={{ fontSize:'11px', color:'var(--c-666666)', marginTop:'-4px', marginBottom:'8px' }}>Factura clientului = suma din borderou + comisionul Airbnb al aceleiași rezervări — nu e o eroare, nu necesită acțiune.</p>
+            <ListaExplicate items={result.discrepanteExplicateComision}/>
+          </div>
+        )}
+
         <div>
           <div style={{ marginBottom:'8px' }}>
             <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>Facturi 5StarDesk fără rezervare în borderou</span>
@@ -215,16 +244,6 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
             ? <p style={{ fontSize:'12px', color:'var(--accent-mint)' }}>✓ Toate rezervările Airbnb au factură de comision asociată.</p>
             : <ListaLipsa items={result.faraComisionAirbnb} tip="comision" onResolved={id=>eliminaDinLista(id,'faraComisionAirbnb')}/>)}
         </div>
-
-        {result && result.discrepanteComisionAirbnb.length > 0 && (
-          <div>
-            <div style={{ marginBottom:'8px' }}>
-              <span style={{ fontSize:'11px', fontWeight:700, color:'#F5C96A', textTransform:'uppercase', letterSpacing:'.06em' }}>⚠ Discrepanțe de preț — comision Airbnb</span>
-            </div>
-            <p style={{ fontSize:'11px', color:'var(--c-666666)', marginTop:'-4px', marginBottom:'8px' }}>Factura de comision a fost găsită după codul de rezervare, dar suma nu corespunde cu cea din borderou.</p>
-            <ListaDiscrepante items={result.discrepanteComisionAirbnb} tip="comision" onResolved={id=>eliminaDinLista(id,'discrepanteComisionAirbnb')}/>
-          </div>
-        )}
 
         <div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
