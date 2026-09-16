@@ -154,7 +154,33 @@ async function processFile(fileName) {
   stableSizes.delete(fileName)
 }
 
+// Fisierele mutate chiar de noi in _incarcat incep mereu cu "{timestamp}_" (vezi moveTo).
+// Orice altceva ajuns acolo e pus de utilizator din greseala (ex. Finder a ramas deschis
+// in _incarcat cand a salvat un PDF nou) - _incarcat e arhiva "deja procesat", nu e
+// urmarita de watcher, deci fisierul ar ramane invizibil la nesfarsit fara asta. Il
+// recuperam automat inapoi in folderul urmarit, ca sa intre normal in coada.
+const OWN_PREFIX = /^\d{13}_/
+function recoverMisplacedFiles() {
+  let entries
+  try {
+    entries = fs.readdirSync(DONE_DIR, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    if (!entry.isFile() || entry.name.startsWith('.') || OWN_PREFIX.test(entry.name)) continue
+    const from = path.join(DONE_DIR, entry.name)
+    const to = path.join(WATCH_DIR, entry.name)
+    if (fs.existsSync(to)) continue // deja e un fisier cu acelasi nume in asteptare - nu suprascriem, il luam la urmatorul tick
+    try {
+      fs.renameSync(from, to)
+      log(`Fișier găsit rătăcit în _incarcat (pus acolo din greșeală), recuperat pentru procesare: ${entry.name}`)
+    } catch {}
+  }
+}
+
 async function tick() {
+  recoverMisplacedFiles()
   let entries
   try {
     entries = fs.readdirSync(WATCH_DIR, { withFileTypes: true })
