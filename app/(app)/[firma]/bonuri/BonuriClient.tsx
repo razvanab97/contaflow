@@ -27,7 +27,8 @@ function norm(v: string | null | undefined) {
 export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; firmaCui?: string | null }) {
   const [bonuri, setBonuri] = useState<Bon[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [uploadError, setUploadError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
@@ -42,10 +43,11 @@ export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; f
     fetch(`/api/bonuri?firmaId=${encodeURIComponent(firmaId)}`)
       .then(r => r.json())
       .then(data => {
-        if (data.error) { setError(data.error); setLoading(false); return }
+        if (data.error) { setLoadError(data.error); setLoading(false); return }
+        setLoadError('')
         setBonuri(data.bonuri || [])
         setLoading(false)
-      }).catch(() => { setError('Eroare la încărcare'); setLoading(false) })
+      }).catch(() => { setLoadError('Eroare la încărcare'); setLoading(false) })
   }
 
   useEffect(() => { load() }, [firmaId])
@@ -59,15 +61,26 @@ export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; f
   }, [stream])
 
   async function uploadFiles(files: FileList | File[]) {
-    setUploading(true); setError('')
+    setUploading(true); setUploadError('')
     const noiSchimbate: string[] = []
     for (const file of Array.from(files)) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('firmaId', firmaId)
-      const res = await fetch('/api/bonuri', { method: 'POST', body: fd })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error || 'Eroare upload'); break }
-      const d = await res.json().catch(() => ({}))
+      let res: Response
+      try {
+        res = await fetch('/api/bonuri', { method: 'POST', body: fd })
+      } catch {
+        setUploadError('Eroare de rețea la upload — verifică conexiunea și reîncearcă.')
+        break
+      }
+      const raw = await res.text()
+      let d: any = {}
+      try { d = raw ? JSON.parse(raw) : {} } catch { /* raspuns non-JSON, tratat mai jos */ }
+      if (!res.ok) {
+        setUploadError(d.error || `Eroare upload (status ${res.status})${raw ? `: ${raw.slice(0, 200)}` : ''}`)
+        break
+      }
       const rezultate = d.bonuri || (d.bon ? [d.bon] : [])
       for (const b of rezultate) {
         if (b.firmaSchimbata && b.firmaNume) noiSchimbate.push(`"${b.comerciant || b.fisier_nume}" a fost atribuit automat firmei ${b.firmaNume} (CUI de pe bon corespunde acelei firme, nu firmei curente)`)
@@ -125,7 +138,7 @@ export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; f
   }
 
   if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: '14px', padding: '32px 0' }}>Se încarcă...</div>
-  if (error && !bonuri.length) return <div style={{ color: 'var(--accent-red)', fontSize: '13px', padding: '24px 0' }}>{error}</div>
+  if (loadError && !bonuri.length) return <div style={{ color: 'var(--accent-red)', fontSize: '13px', padding: '24px 0' }}>{loadError}</div>
 
   const asteptare = bonuri.filter(b => b.status === 'asteptare')
   const asociate = bonuri.filter(b => b.status === 'asociata')
@@ -158,7 +171,7 @@ export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; f
             <input ref={inputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={hiddenInputStyle} onChange={e => e.target.files?.length && uploadFiles(e.target.files)}/>
             <button onClick={openCamera} style={{ marginTop: '10px', fontSize: '12px', fontWeight: 600, padding: '7px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', cursor: 'pointer' }}>📷 Fotografiază bon (camera laptop)</button>
             {cameraError && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{cameraError}</p>}
-            {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{error}</p>}
+            {uploadError && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{uploadError}</p>}
           </>
         )}
       </div>

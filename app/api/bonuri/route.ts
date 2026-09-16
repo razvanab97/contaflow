@@ -124,6 +124,7 @@ async function saveBon(sb: ReturnType<typeof getServiceSupabase>, firmaIncarcare
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const fd = await req.formData()
   const file = fd.get('file') as File | null
   const firmaId = String(fd.get('firmaId') || '')
@@ -134,7 +135,8 @@ export async function POST(req: NextRequest) {
   const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
   const sb = getServiceSupabase()
 
-  const { data: firmeRows } = await sb.from('firme').select('id,slug,nume,cui').eq('activa', true)
+  const { data: firmeRows, error: firmeError } = await sb.from('firme').select('id,slug,nume,cui').eq('activa', true)
+  if (firmeError) return NextResponse.json({ error: `Nu am putut citi lista firmelor: ${firmeError.message}` }, { status: 500 })
   const candidati: FirmaCandidat[] = (firmeRows || [])
     .filter(f => f.slug !== 'proiect-ab-textile')
     .map(f => ({
@@ -143,7 +145,6 @@ export async function POST(req: NextRequest) {
       cuiToate: [f.cui, ...(CUI_ALTERNATIVE[f.slug] || [])].filter((v): v is string => !!v).map(norm).filter(Boolean),
     }))
 
-  try {
     if (file.type === 'application/pdf') {
       const pageCount = await pdfPageCount(Buffer.from(bytes))
       if (pageCount > 1) {
