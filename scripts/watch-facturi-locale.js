@@ -53,6 +53,18 @@ function moveTo(dir, filePath, fileName) {
   return dest
 }
 
+// Fara asta, un singur apel Supabase care ramane agatat (retea proasta, wifi cazut la mijlocul
+// upload-ului) ar bloca la infinit tot watcher-ul - niciun fisier nou nu s-ar mai procesa
+// niciodata, fara nicio eroare vizibila in log, exact ca un watcher "mort" din exterior.
+const NETWORK_TIMEOUT_MS = 20000
+function withTimeout(promise, label) {
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Timeout (${NETWORK_TIMEOUT_MS / 1000}s) la ${label}`)), NETWORK_TIMEOUT_MS)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
 // Ținem minte dimensiunea fișierelor între două citiri, ca să nu procesăm un fișier
 // încă în curs de copiere (ex. drag&drop dintr-un Finder pe rețea).
 const stableSizes = new Map()
@@ -92,21 +104,37 @@ async function processFile(fileName) {
   const hash = crypto.createHash('sha256').update(bytes).digest('hex')
   const storagePath = `_watch-global/${hash.slice(0, 12)}_${safeName(fileName)}`
 
-  const { error: uploadError } = await sb.storage.from('documente').upload(storagePath, bytes, { contentType: mediaType, upsert: true })
+  let uploadError
+  try {
+    ;({ error: uploadError } = await withTimeout(
+      sb.storage.from('documente').upload(storagePath, bytes, { contentType: mediaType, upsert: true }),
+      'urcare storage'
+    ))
+  } catch (err) {
+    uploadError = err
+  }
   if (uploadError) {
     log(`Eroare la urcare, reîncerc mai târziu: ${fileName} (${uploadError.message})`)
     restoreToWatch()
     return
   }
 
-  const { data: inserted, error: insertError } = await sb.from('inbox_watch_files').insert({
-    fisier_path: storagePath,
-    fisier_nume: fileName,
-    fisier_tip: mediaType,
-    fisier_marime: bytes.length,
-    document_hash: hash,
-    status: 'pending',
-  }).select('id').single()
+  let inserted, insertError
+  try {
+    ;({ data: inserted, error: insertError } = await withTimeout(
+      sb.from('inbox_watch_files').insert({
+        fisier_path: storagePath,
+        fisier_nume: fileName,
+        fisier_tip: mediaType,
+        fisier_marime: bytes.length,
+        document_hash: hash,
+        status: 'pending',
+      }).select('id').single(),
+      'înregistrare bază de date'
+    ))
+  } catch (err) {
+    insertError = err
+  }
   const isDuplicate = !!insertError && /duplicate key|unique constraint/i.test(insertError.message || '')
   if (insertError && !isDuplicate) {
     log(`Eroare la înregistrare, reîncerc mai târziu: ${fileName} (${insertError.message})`)
@@ -164,9 +192,17 @@ log('Oprești cu Ctrl+C.')
 let stopped = false
 process.on('SIGINT', () => { stopped = true; log('Oprit.'); process.exit(0) })
 
+// Bataie de inima in log la fiecare ~2 minute - fara ea, un watcher blocat (ex. intr-un tick()
+// care nu se mai termina din alt motiv decat retea) arata identic in log cu unul care sta
+// linistit fara fisiere noi. Cu ea, o tacere neasteptata in log chiar inseamna ca s-a blocat.
+const HEARTBEAT_TICKS = Math.round(120000 / POLL_MS)
+let tickCount = 0
+
 ;(async function loop() {
   while (!stopped) {
     await tick()
+    tickCount++
+    if (tickCount % HEARTBEAT_TICKS === 0) log('(activ, aștept fișiere noi)')
     await new Promise(r => setTimeout(r, POLL_MS))
   }
 })()
