@@ -1,32 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
-// Cautare manuala in Inbox Facturi (local + Gmail), mai permisiva decat sugestia automata din
-// tranzactii/list (care cere suma exact identica) - pentru cazul in care sugestia automata nu a
-// gasit nimic si utilizatorul vrea sa se asigure ca nu exista totusi o factura potrivita, printre
-// documentele inca nelegate de nicio tranzactie. Returneaza cele mai apropiate candidate dupa suma,
-// oricat de mare ar fi diferenta, ca sa poata fi verificate vizual.
+type Sursa = 'local' | 'gmail' | 'oblio' | 'altele'
+
+// Sursa e scrisa ca text in furnizor ("... | Sursa: Gmail 1 (x@gmail.com)" / "Sursa: Folder local
+// (Personal Computer)" / "Sursa: Fișiere locale") - nu exista coloana dedicata, deci o deducem de
+// aici ca sa putem filtra pe categorii in UI.
+function detecteazaSursa(furnizor: string | null): Sursa {
+  const linie = (furnizor || '').split('|').find(p => p.trim().toLowerCase().startsWith('sursa:')) || ''
+  const v = linie.toLowerCase()
+  if (v.includes('gmail') || v.includes('icloud')) return 'gmail'
+  if (v.includes('folder local') || v.includes('fișiere locale') || v.includes('fisiere locale')) return 'local'
+  if (v.includes('oblio')) return 'oblio'
+  return 'altele'
+}
+
+function furnizorCurat(furnizor: string | null): string {
+  return (furnizor || '').split('|')[0]?.trim() || ''
+}
+
+// Cautare manuala in Inbox Facturi (local + Gmail + Oblio) - mai permisiva decat sugestia automata
+// din tranzactii/list (care cere suma exact identica), pentru cazul in care aceasta nu a gasit
+// nimic si vrem sa verificam manual printre toate documentele firmei inca nelegate de nicio
+// tranzactie: cautare dupa text (furnizor/nr. document), filtrare pe sursa, sortare dupa apropierea
+// de suma tranzactiei cand e data.
 export async function GET(req: NextRequest) {
   const firmaId = req.nextUrl.searchParams.get('firmaId')
-  const suma = Number(req.nextUrl.searchParams.get('suma'))
-  if (!firmaId || !Number.isFinite(suma)) return NextResponse.json({ error: 'firmaId sau suma lipsă' }, { status: 400 })
+  const sumaParam = req.nextUrl.searchParams.get('suma')
+  const suma = sumaParam !== null ? Number(sumaParam) : null
+  const q = (req.nextUrl.searchParams.get('q') || '').trim()
+  const sursaFiltru = req.nextUrl.searchParams.get('sursa') as Sursa | 'toate' | null
+  if (!firmaId) return NextResponse.json({ error: 'firmaId lipsă' }, { status: 400 })
 
   const sb = getServiceSupabase()
-  const { data: docs, error } = await sb.from('documente')
+  let query = sb.from('documente')
     .select('id,fisier_nume,furnizor,suma,data_document,numar_document,created_at')
     .eq('firma_id', firmaId)
     .eq('modul', 'inbox_facturi')
     .is('tranzactie_id', null)
     .order('created_at', { ascending: false })
-    .limit(300)
+    .limit(500)
+  if (q.length >= 2) query = query.or(`furnizor.ilike.%${q}%,numar_document.ilike.%${q}%,fisier_nume.ilike.%${q}%`)
+
+  const { data: docs, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const target = Math.abs(suma)
-  const candidates = (docs || [])
-    .filter(d => d.suma != null)
-    .map(d => ({ ...d, diferentaSuma: Math.abs(Number(d.suma) - target) }))
-    .sort((a, b) => a.diferentaSuma - b.diferentaSuma)
-    .slice(0, 8)
+  const target = suma !== null && Number.isFinite(suma) ? Math.abs(suma) : null
+  let candidates = (docs || []).map(d => ({
+    ...d,
+    furnizor: furnizorCurat(d.furnizor),
+    sursa: detecteazaSursa(d.furnizor),
+    diferentaSuma: target !== null && d.suma != null ? Math.abs(Number(d.suma) - target) : null,
+  }))
 
-  return NextResponse.json({ candidates })
+  const counts: Record<Sursa, number> = { local: 0, gmail: 0, oblio: 0, altele: 0 }
+  for (const c of candidates) counts[c.sursa]++
+
+  if (sursaFiltru && sursaFiltru !== 'toate') candidates = candidates.filter(c => c.sursa === sursaFiltru)
+  candidates.sort((a, b) => {
+    if (a.diferentaSuma !== null && b.diferentaSuma !== null) return a.diferentaSuma - b.diferentaSuma
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+
+  return NextResponse.json({ candidates: candidates.slice(0, 100), counts, total: docs?.length || 0 })
 }
