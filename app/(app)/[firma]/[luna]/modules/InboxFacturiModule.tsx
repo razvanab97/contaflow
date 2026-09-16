@@ -16,6 +16,15 @@ interface Doc {
   data_platii?: string | null
   tranzactie_id?: string | null
 }
+interface TxResult {
+  id: string
+  data_tranzactie: string
+  descriere: string
+  descriere_curatata: string | null
+  suma: number
+  valuta: string
+  document_id: string | null
+}
 interface ImportResult {
   duplicate: boolean
   skipped?: boolean
@@ -175,6 +184,13 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const [localDrag, setLocalDrag] = useState(false)
   const [localError, setLocalError] = useState('')
   const [localSyncing, setLocalSyncing] = useState(false)
+  const [linkOpenId, setLinkOpenId] = useState<string | null>(null)
+  const [linkQuery, setLinkQuery] = useState('')
+  const [linkResults, setLinkResults] = useState<TxResult[]>([])
+  const [linkSearching, setLinkSearching] = useState(false)
+  const [linkAssigning, setLinkAssigning] = useState<string | null>(null)
+  const [linkError, setLinkError] = useState('')
+  const linkDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const localFileRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
@@ -354,6 +370,41 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
 
   function togglePreview(id: string) {
     setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
+
+  function toggleLink(docId: string) {
+    setLinkOpenId(prev => prev === docId ? null : docId)
+    setLinkQuery('')
+    setLinkResults([])
+    setLinkError('')
+  }
+
+  function searchTx(q: string) {
+    setLinkQuery(q)
+    if (linkDebounce.current) clearTimeout(linkDebounce.current)
+    if (q.trim().length < 2) { setLinkResults([]); return }
+    linkDebounce.current = setTimeout(async () => {
+      setLinkSearching(true)
+      const res = await fetch(`/api/tranzactii/cauta?firmaId=${encodeURIComponent(firma.id)}&q=${encodeURIComponent(q.trim())}`)
+      const data = await res.json().catch(() => ({}))
+      setLinkResults(res.ok ? (data.tranzactii || []) : [])
+      setLinkSearching(false)
+    }, 300)
+  }
+
+  async function linkToTransaction(doc: Doc, tx: TxResult) {
+    setLinkAssigning(tx.id)
+    setLinkError('')
+    const res = await fetch('/api/inbox-facturi/asociaza', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ facturaId: doc.id, tranzactieId: tx.id }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setLinkAssigning(null)
+    if (!res.ok) { setLinkError(data.error || 'Asocierea a eșuat'); return }
+    setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, tranzactie_id: tx.id, platit: true } : d))
+    toggleLink(doc.id)
   }
 
   function sourceFor(title: string) {
@@ -636,11 +687,50 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
                         {doc.platit ? 'Plătită' : 'Setează plătit'}
                       </button>
                       {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'11px', fontWeight:600, color:open?'var(--c-dddddd)':'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
+                      {!doc.tranzactie_id && (
+                        <button onClick={() => toggleLink(doc.id)} style={{ fontSize:'11px', fontWeight:600, color:linkOpenId===doc.id?'var(--c-dddddd)':legibil(firma.culoare), background:'transparent', border:'none', cursor:'pointer' }}>
+                          {linkOpenId===doc.id ? 'Ascunde' : 'Leagă de tranzacție'}
+                        </button>
+                      )}
                       <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:700, color:legibil(firma.culoare), textDecoration:'none' }}>↓</a>
                       <button onClick={() => deleteDoc(doc)} style={{ fontSize:'11px', fontWeight:700, padding:'6px 9px', borderRadius:'7px', border:'1px solid rgba(239,68,68,.35)', background:'rgba(239,68,68,.06)', color:'var(--accent-red)', cursor:'pointer' }}>Șterge</button>
                     </div>
                     {open && kind === 'pdf' && <iframe src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} style={{ width:'100%', height:'65vh', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />}
                     {open && kind === 'image' && <img src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} alt={doc.fisier_nume} style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />}
+                    {linkOpenId === doc.id && (
+                      <div style={{ marginTop:'6px', padding:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-1e1e1e)', borderRadius:'8px' }}>
+                        <div style={{ fontSize:'10px', color:'var(--c-666666)', marginBottom:'8px' }}>Caută tranzacția din Extras de cont după descriere sau sumă (ex. „359.23”) — utilă când suma facturii nu se potrivește exact cu suma tranzacției (plată parțială).</div>
+                        <input
+                          autoFocus
+                          value={linkQuery}
+                          onChange={e => searchTx(e.target.value)}
+                          placeholder="Descriere sau sumă..."
+                          style={{ width:'100%', fontSize:'12px', background:'var(--c-161616)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-eeeeee)', outline:'none' }}
+                        />
+                        {linkSearching && <div style={{ fontSize:'11px', color:'var(--c-666666)', marginTop:'8px' }}>Caut...</div>}
+                        {!linkSearching && linkQuery.trim().length >= 2 && linkResults.length === 0 && (
+                          <div style={{ fontSize:'11px', color:'var(--c-666666)', marginTop:'8px' }}>Nicio tranzacție găsită.</div>
+                        )}
+                        {linkResults.length > 0 && (
+                          <div style={{ marginTop:'8px', display:'flex', flexDirection:'column', gap:'5px', maxHeight:'220px', overflow:'auto' }}>
+                            {linkResults.map(tx => (
+                              <div key={tx.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--c-161616)', border:'1px solid var(--c-222222)', borderRadius:'7px' }}>
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ fontSize:'11.5px', fontWeight:600, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tx.descriere_curatata || tx.descriere}</div>
+                                  <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'2px' }}>
+                                    {new Date(tx.data_tranzactie).toLocaleDateString('ro-RO')} · {Number(tx.suma).toFixed(2)} {tx.valuta}{tx.document_id ? ' · are deja document' : ''}
+                                  </div>
+                                </div>
+                                <button onClick={() => linkToTransaction(doc, tx)} disabled={linkAssigning === tx.id} style={{ fontSize:'11px', fontWeight:700, padding:'6px 10px', borderRadius:'7px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer', opacity:linkAssigning===tx.id?.6:1, flexShrink:0 }}>
+                                  {linkAssigning === tx.id ? '...' : 'Leagă'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {linkError && <div style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'8px' }}>{linkError}</div>}
+                      </div>
+                    )}
                   </div>
                 )
               })}
