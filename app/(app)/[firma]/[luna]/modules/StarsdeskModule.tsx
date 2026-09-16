@@ -147,13 +147,25 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
     setResult(prev => prev ? { ...prev, [field]: prev[field].filter(n => n.id !== id) } : prev)
   }
 
+  const totalDiscrepante = (result?.discrepanteClient.length || 0) + (result?.discrepanteComisionAirbnb.length || 0)
+
   return (
     <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'12px', overflow:'hidden' }}>
-      <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--c-1a1a1a)' }}>
-        <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>Rezervări nefacturate</div>
-        <div style={{ fontSize:'12px', color:'var(--c-888888)', marginTop:'2px' }}>
-          Verifică borderourile Airbnb + Booking, după cod rezervare și sumă, împotriva facturilor deja încărcate — pe fiecare categorie separat.
+      <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--c-1a1a1a)', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'12px', flexWrap:'wrap' }}>
+        <div>
+          <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>Rezervări nefacturate</div>
+          <div style={{ fontSize:'12px', color:'var(--c-888888)', marginTop:'2px' }}>
+            Verifică borderourile Airbnb + Booking, după cod rezervare și sumă, împotriva facturilor deja încărcate — pe fiecare categorie separat.
+          </div>
         </div>
+        {totalDiscrepante > 0 && (
+          <a
+            href={`/api/5stardesk/discrepante-pdf?lunaId=${encodeURIComponent(lunaId)}&firmaNume=${encodeURIComponent(firma.nume)}`}
+            style={{ flexShrink:0, fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:'1px solid #F5C96A', color:'#F5C96A', textDecoration:'none', whiteSpace:'nowrap' }}
+          >
+            ↓ Descarcă lista discrepanțe ({totalDiscrepante})
+          </a>
+        )}
       </div>
 
       <div style={{ padding:'16px 20px', display:'flex', flexDirection:'column', gap:'20px' }}>

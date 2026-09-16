@@ -4,6 +4,7 @@ import FirmaQuickInfo from '@/components/FirmaQuickInfo'
 import FacturiLocaleGlobal from '@/components/FacturiLocaleGlobal'
 import { dbSelect } from '@/lib/db'
 import { getRestanteCount } from '@/lib/queries'
+import { getStardeskDiscrepanteCount } from '@/lib/stardeskVerify'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 import { rgb, legibil, tint } from '@/lib/colors'
 import { accountingFullLabel, currentWorkMonthKey } from '@/lib/accounting-period'
@@ -49,6 +50,18 @@ export default async function Dashboard() {
   const totalRestante = restanteCounts.reduce((sum, n) => sum + n, 0)
   const firmeCuRestante = restanteCounts.filter(n => n > 0).length
 
+  // Discrepante de pret 5StarDesk (factura gasita, dar suma nu corespunde cu borderoul) - trebuie
+  // sesizate la timp, cat mai poate fi emisa o factura corectata, nu doar la o verificare manuala.
+  const discrepanteCounts = await Promise.all(firme.map((f: any) => {
+    const lunaData = luniMap[`${f.id}_${LUNA}`]
+    const are5stardesk = getFirmaModules(f.slug).some((m: any) => m.slug === '5stardesk')
+    return are5stardesk && lunaData ? getStardeskDiscrepanteCount(lunaData.id) : Promise.resolve(0)
+  }))
+  const discrepanteMap: Record<string, number> = {}
+  firme.forEach((f: any, i: number) => { discrepanteMap[f.id] = discrepanteCounts[i] })
+  const totalDiscrepante = discrepanteCounts.reduce((sum, n) => sum + n, 0)
+  const firmeCuDiscrepante = discrepanteCounts.filter(n => n > 0).length
+
   const ll = accountingFullLabel(LUNA)
 
   return (
@@ -66,6 +79,11 @@ export default async function Dashboard() {
             {totalRestante > 0 && (
               <span style={{ color: 'var(--danger)', fontWeight: 600 }}>
                 {' · '}{totalRestante} facturi restante în {firmeCuRestante} {firmeCuRestante === 1 ? 'firmă' : 'firme'}
+              </span>
+            )}
+            {totalDiscrepante > 0 && (
+              <span style={{ color: '#F5C96A', fontWeight: 600 }}>
+                {' · '}⚠ {totalDiscrepante} discrepanțe de preț 5StarDesk în {firmeCuDiscrepante} {firmeCuDiscrepante === 1 ? 'firmă' : 'firme'}
               </span>
             )}
           </p>
@@ -89,6 +107,7 @@ export default async function Dashboard() {
               : { bg: 'var(--surface-secondary)', c: 'var(--text-muted)' }
             const modules = getFirmaModules(f.slug)
             const restante = restanteMap[f.id] || 0
+            const discrepante = discrepanteMap[f.id] || 0
 
             return (
               <div key={f.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px 28px' }}>
@@ -116,6 +135,15 @@ export default async function Dashboard() {
                           borderRadius: '20px', padding: '2px 9px',
                         }}>
                           {restante} restante
+                        </span>
+                      )}
+                      {discrepante > 0 && (
+                        <span style={{
+                          fontSize: '11.5px', fontWeight: 600, color: '#F5C96A',
+                          background: 'light-dark(rgba(180,83,9,.12), rgba(245,201,106,.1))', border: '1px solid light-dark(rgba(180,83,9,.4), rgba(245,201,106,.4))',
+                          borderRadius: '20px', padding: '2px 9px',
+                        }}>
+                          ⚠ {discrepante} discrepanțe preț
                         </span>
                       )}
                     </div>
