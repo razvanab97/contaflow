@@ -13,6 +13,31 @@ function daysBetween(a: string, b: string) {
   return Math.abs(da - db) / MS_DAY
 }
 
+// Potriveste documentele deja importate in Inbox Facturi (local sau Gmail), dar inca nelegate de
+// nicio tranzactie, cu tranzactiile nedocumentate - dupa suma exacta, ca sugestie automata (nu
+// asociere directa), la fel ca la facturile Airbnb de mai jos.
+async function matchInboxFacturi(firmaId: string, txs: any[]) {
+  const dRes = await fetch(`${SB}/documente?firma_id=eq.${firmaId}&modul=eq.inbox_facturi&tranzactie_id=is.null&suma=not.is.null&select=id,fisier_nume,furnizor,suma,data_document,numar_document`, { headers: H })
+  if (!dRes.ok) return new Map<string, any>()
+  const docs: any[] = await dRes.json()
+  if (!docs?.length) return new Map<string, any>()
+
+  const used = new Set<string>()
+  const sugestii = new Map<string, any>()
+  for (const tx of txs) {
+    if (tx.document_id || tx.tip !== 'debit' || tx.suma == null) continue
+    let best: any = null
+    for (const d of docs) {
+      if (used.has(d.id) || d.suma == null) continue
+      if (Math.abs(Number(d.suma) - Number(tx.suma)) > 0.01) continue
+      best = d
+      break
+    }
+    if (best) { used.add(best.id); sugestii.set(tx.id, best) }
+  }
+  return sugestii
+}
+
 // Potriveste facturile adaugate in avans (luna trecuta) cu tranzactiile nedocumentate ale lunii curente,
 // dupa suma exacta si data la care a fost INCARCATA factura (nu data emisa pe factura) - se presupune
 // ca plata s-a facut in ziua incarcarii, iar tranzactia bancara poate aparea la 2-3 zile dupa - ca sugestie,
@@ -95,14 +120,17 @@ export async function GET(req: NextRequest) {
   }
 
   // Sugestii de asociere cu facturi adaugate in avans luna trecuta (dupa suma + data apropiata)
+  // sau deja importate in Inbox Facturi (local/Gmail), dar nelegate inca de nicio tranzactie.
   const lunaRes = await fetch(`${SB}/luni_contabile?id=eq.${lunaId}&select=firma_id`, { headers: H })
   const [lunaRow] = lunaRes.ok ? await lunaRes.json() : []
   const sugestii = lunaRow?.firma_id ? await matchFacturiAsteptate(lunaRow.firma_id, all) : new Map<string, any>()
+  const sugestiiInbox = lunaRow?.firma_id ? await matchInboxFacturi(lunaRow.firma_id, all) : new Map<string, any>()
 
   return NextResponse.json(all.map(tx => ({
     ...tx,
     documente: tx.document_id ? documentsById.get(tx.document_id) || null : null,
     documenteToate: allDocsByTx.get(tx.id) || [],
     sugestieFactura: sugestii.get(tx.id) || null,
+    sugestieInbox: sugestiiInbox.get(tx.id) || null,
   })))
 }

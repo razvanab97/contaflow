@@ -46,7 +46,9 @@ interface Tx {
   documente: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }|null
   documenteToate?: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }[]
   sugestieFactura?: { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_factura:string|null }|null
+  sugestieInbox?: { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_document:string|null }|null
 }
+interface InboxCandidat { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_document:string|null; diferentaSuma:number }
 interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 
@@ -790,6 +792,10 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   const addFileRef = useRef<HTMLInputElement>(null)
   const [sugestieBusy, setSugestieBusy] = useState(false)
   const [previewDocIds, setPreviewDocIds] = useState<Set<string>>(new Set())
+  const [inboxSearchBusy, setInboxSearchBusy] = useState(false)
+  const [inboxSearchDone, setInboxSearchDone] = useState(false)
+  const [inboxCandidati, setInboxCandidati] = useState<InboxCandidat[]>([])
+  const [inboxAssocId, setInboxAssocId] = useState('')
 
   function toggleDocPreview(id: string) {
     setPreviewDocIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
@@ -800,6 +806,32 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     setSugestieBusy(true)
     await fetch('/api/facturi-asteptate/asociaza', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ facturaId:tx.sugestieFactura.id, tranzactieId:tx.id }) })
     setSugestieBusy(false)
+    onUploadSuccess()
+  }
+
+  async function confirmSugestieInbox() {
+    if (!tx.sugestieInbox) return
+    setSugestieBusy(true)
+    await fetch('/api/inbox-facturi/asociaza', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ facturaId:tx.sugestieInbox.id, tranzactieId:tx.id }) })
+    setSugestieBusy(false)
+    onUploadSuccess()
+  }
+
+  // Cautare manuala in Inbox Facturi (local + Gmail) - mai permisiva decat sugestia automata de
+  // mai sus, pentru cazul in care aceasta nu a gasit nimic si vrem sa fim siguri ca nu exista
+  // totusi o factura potrivita printre cele deja importate, dar nelegate inca de nicio tranzactie.
+  async function searchInbox() {
+    setInboxSearchBusy(true); setInboxSearchDone(false)
+    const res = await fetch(`/api/inbox-facturi/cauta?firmaId=${encodeURIComponent(firmaId)}&suma=${encodeURIComponent(tx.suma)}`)
+    const data = await res.json().catch(() => ({}))
+    setInboxCandidati(res.ok ? (data.candidates || []) : [])
+    setInboxSearchBusy(false); setInboxSearchDone(true)
+  }
+
+  async function associateInboxCandidat(id: string) {
+    setInboxAssocId(id)
+    await fetch('/api/inbox-facturi/asociaza', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ facturaId:id, tranzactieId:tx.id }) })
+    setInboxAssocId('')
     onUploadSuccess()
   }
 
@@ -821,6 +853,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     setShowAddMore(false)
     setAddUrl('')
     setAddError('')
+    setInboxSearchBusy(false); setInboxSearchDone(false); setInboxCandidati([])
   }, [tx])
 
   async function addMoreUrl() {
@@ -1090,6 +1123,20 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                 </button>
               </div>
             )}
+            {!tx.sugestieFactura && tx.sugestieInbox && (
+              <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', padding:'12px 14px', marginBottom:'16px', background:'light-dark(rgba(5,150,105,.1), rgba(110,231,176,.06))', border:'1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.2))', borderRadius:'10px' }}>
+                <svg width="16" height="16" fill="none" stroke="var(--accent-mint)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0 }}><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                <div style={{ flex:1, minWidth:'180px' }}>
+                  <div style={{ fontSize:'12px', fontWeight:600, color:'var(--c-dddddd)' }}>Am găsit o factură în Inbox Facturi care se potrivește</div>
+                  <div style={{ fontSize:'11px', color:'var(--c-888888)', marginTop:'2px' }}>
+                    {[tx.sugestieInbox.furnizor, tx.sugestieInbox.suma != null ? `${tx.sugestieInbox.suma.toFixed(2)} RON` : null].filter(Boolean).join(' · ') || tx.sugestieInbox.fisier_nume}
+                  </div>
+                </div>
+                <button onClick={confirmSugestieInbox} disabled={sugestieBusy} style={{ fontSize:'12px', fontWeight:600, padding:'7px 14px', borderRadius:'7px', border:'none', background:'var(--accent-mint)', color:'var(--c-0a0a0a)', cursor: sugestieBusy ? 'wait' : 'pointer', opacity: sugestieBusy ? .6 : 1 }}>
+                  {sugestieBusy ? 'Se asociază...' : 'Asociază'}
+                </button>
+              </div>
+            )}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
               <h3 style={{ fontSize:'14px', fontWeight:700, color:'var(--c-ffffff)' }}>Asociază Document</h3>
               {editDoc && (
@@ -1123,6 +1170,34 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                   <input type="text" placeholder="Ex: 10243" value={numDoc} onChange={e=>setNumDoc(e.target.value)} style={INP}/>
                 </div>
               </div>
+            </div>
+
+            <div style={{ padding:'12px', marginBottom:'12px', background:'var(--c-171717)', border:'1px solid var(--c-282828)', borderRadius:'10px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+                <span style={{ fontSize:'11px', color:'var(--c-777777)' }}>Nicio sugestie automată? Verifică manual în Inbox Facturi.</span>
+                <button onClick={searchInbox} disabled={inboxSearchBusy} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare), background:'transparent', border:`1px solid ${culoare}`, borderRadius:'7px', padding:'5px 10px', cursor: inboxSearchBusy ? 'wait' : 'pointer', whiteSpace:'nowrap' }}>
+                  {inboxSearchBusy ? 'Caut...' : 'Caută în Inbox Facturi'}
+                </button>
+              </div>
+              {inboxSearchDone && (
+                inboxCandidati.length === 0 ? (
+                  <p style={{ fontSize:'11px', color:'var(--c-666666)', marginTop:'6px' }}>Nu am găsit nicio factură nealocată în Inbox Facturi apropiată ca sumă.</p>
+                ) : (
+                  <div style={{ display:'flex', flexDirection:'column', gap:'6px', marginTop:'8px' }}>
+                    {inboxCandidati.map(c => (
+                      <div key={c.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--c-0d0d0d)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px' }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:'11px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.furnizor || c.fisier_nume}</div>
+                          <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'2px' }}>{c.suma != null ? `${c.suma.toFixed(2)} RON` : 'sumă necunoscută'}{c.diferentaSuma > 0.01 ? ` · diferență ${c.diferentaSuma.toFixed(2)} RON față de tranzacție` : ''}</div>
+                        </div>
+                        <button onClick={()=>associateInboxCandidat(c.id)} disabled={!!inboxAssocId} style={{ fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:'none', background:'var(--accent-mint)', color:'var(--c-0a0a0a)', cursor: inboxAssocId ? 'wait' : 'pointer', opacity: inboxAssocId && inboxAssocId!==c.id ? .5 : 1, whiteSpace:'nowrap' }}>
+                          {inboxAssocId===c.id ? 'Se asociază...' : 'Asociază'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
             </div>
 
             <div style={{ padding:'12px', marginBottom:'12px', background:'var(--c-171717)', border:'1px solid var(--c-282828)', borderRadius:'10px' }}>
