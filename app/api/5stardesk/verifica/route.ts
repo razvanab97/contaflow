@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const lunaId = req.nextUrl.searchParams.get('lunaId')
-  if (!lunaId) return NextResponse.json({ totalRezervari: 0, totalFacturiClient: 0, totalFacturiComision: 0, faraFacturaClient: [], discrepanteClient: [], discrepanteExplicateComision: [], facturiFaraRezervare: [], faraComisionAirbnb: [], comisionBookingLipsa: false, totalRezervariBooking: 0 })
+  if (!lunaId) return NextResponse.json({ totalRezervari: 0, totalFacturiClient: 0, totalFacturiComision: 0, faraFacturaClient: [], discrepanteClient: [], discrepanteExplicateComision: [], facturateAlteLuni: [], facturiFaraRezervare: [], faraComisionAirbnb: [], comisionAlteLuni: [], comisionBookingLipsa: false, totalRezervariBooking: 0 })
   const sb = getServiceSupabase()
   return NextResponse.json(await computeVerification(sb, lunaId))
 }

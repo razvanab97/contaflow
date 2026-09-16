@@ -1,4 +1,5 @@
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { workMonthLabel } from '@/lib/accounting-period'
 
 function normalizeCode(v: string) { return String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '') }
 function normalizeName(v: string) {
@@ -69,13 +70,40 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
   const comisionFacturi = allComision || []
   const comisionAirbnb = comisionFacturi.filter(f => f.platforma === 'airbnb')
 
+  // O rezervare a acestei luni poate fi deja facturata intr-o alta luna contabila (facturata mai
+  // devreme/mai tarziu decat perioada borderoului) - cautam si acolo, pe toata firma, inainte sa o
+  // consideram "fara factura". La fel pentru comisionul Airbnb.
+  const firmaId: string | undefined = rezervari[0]?.firma_id
+  let stardeskFacturiAlteLuni: typeof stardeskFacturi = []
+  let comisionAirbnbAlteLuni: typeof comisionAirbnb = []
+  let lunaLabelById = new Map<string, string>()
+  if (firmaId) {
+    const [{ data: factAlteLuni }, { data: comisionAlteLuni }] = await Promise.all([
+      sb.from('stardesk_facturi').select('*').eq('firma_id', firmaId).neq('luna_id', lunaId),
+      sb.from('comision_facturi').select('*').eq('firma_id', firmaId).eq('platforma', 'airbnb').neq('luna_id', lunaId),
+    ])
+    stardeskFacturiAlteLuni = factAlteLuni || []
+    comisionAirbnbAlteLuni = comisionAlteLuni || []
+    const lunaIds = [...new Set([...stardeskFacturiAlteLuni, ...comisionAirbnbAlteLuni].map(f => f.luna_id))]
+    if (lunaIds.length) {
+      const { data: luniRows } = await sb.from('luni_contabile').select('id,luna').in('id', lunaIds)
+      lunaLabelById = new Map((luniRows || []).map(l => [l.id, workMonthLabel(String(l.luna).slice(0, 7))]))
+    }
+  }
+
   const faraFacturaClient: typeof rezervari = []
   const discrepanteClient: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number] }[] = []
   const discrepanteExplicateComision: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number]; comision:typeof comisionAirbnb[number] }[] = []
+  const facturateAlteLuni: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturiAlteLuni[number] }[] = []
   for (const rez of rezervari) {
     if (rez.rezolvat_client) continue
     const candidat = gasesteCandidat(rez, stardeskFacturi, f => isStardeskCandidate(rez, f))
-    if (!candidat) { faraFacturaClient.push(rez); continue }
+    if (!candidat) {
+      const altaLuna = stardeskFacturiAlteLuni.find(f => isStardeskCandidate(rez, f))
+      if (altaLuna) facturateAlteLuni.push({ rezervare: rez, factura: altaLuna })
+      else faraFacturaClient.push(rez)
+      continue
+    }
     if (candidat.sumaCorecta) continue
     const explicatie = rez.platforma === 'airbnb' ? comisionExplicaDiferenta(rez, candidat.factura, comisionAirbnb) : null
     if (explicatie?.explicat) discrepanteExplicateComision.push({ rezervare: rez, factura: candidat.factura, comision: explicatie.comision })
@@ -91,10 +119,13 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
   // relevanta e deja facuta mai sus, ca parte din explicarea discrepantei facturii de client).
   const rezervariAirbnb = rezervari.filter(r => r.platforma === 'airbnb')
   const faraComisionAirbnb: typeof rezervariAirbnb = []
+  const comisionAlteLuni: { rezervare:typeof rezervariAirbnb[number]; factura:typeof comisionAirbnbAlteLuni[number] }[] = []
   for (const rez of rezervariAirbnb) {
     if (rez.rezolvat_comision) continue
-    const areComision = comisionAirbnb.some(f => codesMatch(rez.cod_rezervare, f.cod_rezervare || ''))
-    if (!areComision) faraComisionAirbnb.push(rez)
+    if (comisionAirbnb.some(f => codesMatch(rez.cod_rezervare, f.cod_rezervare || ''))) continue
+    const altaLuna = comisionAirbnbAlteLuni.find(f => codesMatch(rez.cod_rezervare, f.cod_rezervare || ''))
+    if (altaLuna) comisionAlteLuni.push({ rezervare: rez, factura: altaLuna })
+    else faraComisionAirbnb.push(rez)
   }
 
   const rezervariBooking = rezervari.filter(r => r.platforma === 'booking')
@@ -107,8 +138,10 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
     faraFacturaClient: faraFacturaClient.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
     discrepanteClient: discrepanteClient.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma })),
     discrepanteExplicateComision: discrepanteExplicateComision.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, numarComision: d.comision.numar_factura, sumaComision: d.comision.suma })),
+    facturateAlteLuni: facturateAlteLuni.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, luna: lunaLabelById.get(d.factura.luna_id) || '?' })),
     facturiFaraRezervare: facturiFaraRezervare.map(f => ({ id: f.id, numarFactura: f.numar_factura, numeClient: f.nume_client, suma: f.suma, idRezervare: f.id_rezervare })),
     faraComisionAirbnb: faraComisionAirbnb.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
+    comisionAlteLuni: comisionAlteLuni.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, luna: lunaLabelById.get(d.factura.luna_id) || '?' })),
     comisionBookingLipsa: rezervariBooking.length > 0 && !comisionBookingExista,
     totalRezervariBooking: rezervariBooking.length,
   }

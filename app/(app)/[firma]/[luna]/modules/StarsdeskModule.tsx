@@ -11,11 +11,13 @@ interface Nefacturata { id:string; codRezervare:string; numeOaspete:string; suma
 interface FacturaOrfana { id:string; numarFactura:string; numeClient:string; suma:number|null; idRezervare:string }
 interface Discrepanta extends Nefacturata { numarFactura:string; sumaFactura:number|null }
 interface DiscrepantaExplicata extends Discrepanta { numarComision:string; sumaComision:number|null }
+interface FacturataAltaLuna extends Discrepanta { luna:string }
 interface VerificareResult {
   totalRezervari:number; totalFacturiClient:number; totalFacturiComision:number
   faraFacturaClient:Nefacturata[]; discrepanteClient:Discrepanta[]; discrepanteExplicateComision:DiscrepantaExplicata[]
+  facturateAlteLuni:FacturataAltaLuna[]
   facturiFaraRezervare:FacturaOrfana[]
-  faraComisionAirbnb:Nefacturata[]
+  faraComisionAirbnb:Nefacturata[]; comisionAlteLuni:FacturataAltaLuna[]
   comisionBookingLipsa:boolean; totalRezervariBooking:number
 }
 
@@ -23,12 +25,13 @@ function money(v: number|null) { return v == null ? '—' : new Intl.NumberForma
 
 function ListaLipsa({ items, tip, onResolved }: { items: Nefacturata[]; tip:'client'|'comision'; onResolved:(id:string)=>void }) {
   const [resolving, setResolving] = useState<string|null>(null)
+  const [note, setNote] = useState<Record<string,string>>({})
 
   async function marcheaza(id: string) {
     setResolving(id)
     const res = await fetch('/api/5stardesk/rezolva', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, tip, rezolvat: true }),
+      body: JSON.stringify({ id, tip, rezolvat: true, nota: note[id]?.trim() || null }),
     })
     if (res.ok) onResolved(id)
     setResolving(null)
@@ -37,13 +40,19 @@ function ListaLipsa({ items, tip, onResolved }: { items: Nefacturata[]; tip:'cli
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
       {items.map(n => (
-        <div key={n.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
+        <div key={n.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px', flexWrap:'wrap' }}>
           <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background: n.platforma==='airbnb' ? 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))' : 'light-dark(rgba(37,99,235,.25), rgba(96,165,250,.1))', color: n.platforma==='airbnb' ? 'var(--accent-red)' : 'var(--accent-blue)', flexShrink:0 }}>
             {n.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
           </span>
-          <span style={{ flex:1, fontSize:'12px', color:'var(--c-dddddd)' }}>{n.numeOaspete || '—'}</span>
+          <span style={{ flex:'1 1 80px', fontSize:'12px', color:'var(--c-dddddd)', minWidth:'80px' }}>{n.numeOaspete || '—'}</span>
           <span style={{ fontSize:'12px', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace' }}>{n.codRezervare}</span>
           <span style={{ fontSize:'11px', color:'var(--c-888888)', flexShrink:0 }}>{money(n.suma)} RON</span>
+          <input
+            value={note[n.id] || ''}
+            onChange={e => setNote(prev => ({ ...prev, [n.id]: e.target.value }))}
+            placeholder="Notă opțională (ex: luna viitoare, la jumătate)"
+            style={{ fontSize:'11px', width:'200px', flexShrink:0, background:'var(--c-0d0d0d)', border:'1px solid var(--c-2a2a2a)', borderRadius:'6px', padding:'5px 8px', color:'var(--c-cccccc)', outline:'none' }}
+          />
           <button
             onClick={() => marcheaza(n.id)}
             disabled={resolving === n.id}
@@ -121,6 +130,25 @@ function ListaExplicate({ items }: { items: DiscrepantaExplicata[] }) {
           <span style={{ fontSize:'11px', color:'var(--c-777777)', flexShrink:0 }}>
             {money(d.suma)} <span style={{ color:'var(--c-555555)' }}>+ comision</span> {money(d.sumaComision)} <span style={{ color:'var(--c-555555)' }}>=</span> {money(d.sumaFactura)} RON
           </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Rezervarea are deja factura, doar ca inregistrata sub o alta luna contabila a aceleiasi firme
+// (facturata mai devreme sau mai tarziu decat perioada borderoului) - informativ, nu mai trebuie
+// facturata din nou.
+function ListaAltaLuna({ items, tip }: { items: FacturataAltaLuna[]; tip:'client'|'comision' }) {
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
+      {items.map(d => (
+        <div key={d.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
+          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background: d.platforma==='airbnb' ? 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))' : 'light-dark(rgba(37,99,235,.25), rgba(96,165,250,.1))', color: d.platforma==='airbnb' ? 'var(--accent-red)' : 'var(--accent-blue)', flexShrink:0 }}>
+            {d.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
+          </span>
+          <span style={{ flex:1, fontSize:'12px', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· {tip === 'client' ? 'factura' : 'comision'} {d.numarFactura || '—'}</span></span>
+          <span style={{ fontSize:'11px', color:'var(--c-777777)', flexShrink:0 }}>ℹ facturat în <b style={{ color:'var(--c-aaaaaa)' }}>{d.luna}</b></span>
         </div>
       ))}
     </div>
@@ -205,6 +233,16 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
             : <ListaLipsa items={result.faraFacturaClient} tip="client" onResolved={id=>eliminaDinLista(id,'faraFacturaClient')}/>)}
         </div>
 
+        {result && result.facturateAlteLuni.length > 0 && (
+          <div>
+            <div style={{ marginBottom:'8px' }}>
+              <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>ℹ Facturate deja, în altă lună</span>
+            </div>
+            <p style={{ fontSize:'11px', color:'var(--c-666666)', marginTop:'-4px', marginBottom:'8px' }}>Rezervarea a fost deja facturată, doar că înregistrată sub o altă lună contabilă a firmei — nu mai trebuie facturată acum.</p>
+            <ListaAltaLuna items={result.facturateAlteLuni} tip="client"/>
+          </div>
+        )}
+
         {result && result.discrepanteClient.length > 0 && (
           <div>
             <div style={{ marginBottom:'8px' }}>
@@ -244,6 +282,15 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
             ? <p style={{ fontSize:'12px', color:'var(--accent-mint)' }}>✓ Toate rezervările Airbnb au factură de comision asociată.</p>
             : <ListaLipsa items={result.faraComisionAirbnb} tip="comision" onResolved={id=>eliminaDinLista(id,'faraComisionAirbnb')}/>)}
         </div>
+
+        {result && result.comisionAlteLuni.length > 0 && (
+          <div>
+            <div style={{ marginBottom:'8px' }}>
+              <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>ℹ Comision facturat deja, în altă lună</span>
+            </div>
+            <ListaAltaLuna items={result.comisionAlteLuni} tip="comision"/>
+          </div>
+        )}
 
         <div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
