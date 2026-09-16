@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { tint } from '@/lib/colors'
 
 export default function DocumentUpload({ mode, txId, firmaId, lunaId, tip, furnizor, numDoc, addFurnizor, addSuma, onSuccess, culoare, compact }: {
@@ -17,7 +17,20 @@ export default function DocumentUpload({ mode, txId, firmaId, lunaId, tip, furni
   const fileRef = useRef<HTMLInputElement>(null)
   const r = `${parseInt(culoare.slice(1,3),16)},${parseInt(culoare.slice(3,5),16)},${parseInt(culoare.slice(5,7),16)}`
 
-  async function upload(files: FileList) {
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraError, setCameraError] = useState('')
+  const [stream, setStream] = useState<MediaStream | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    if (videoRef.current && stream) videoRef.current.srcObject = stream
+  }, [stream])
+
+  useEffect(() => {
+    return () => { stream?.getTracks().forEach(t => t.stop()) }
+  }, [stream])
+
+  async function upload(files: FileList | File[]) {
     if (!files.length) return
     setUploading(true); setError('')
     const fd = new FormData()
@@ -35,6 +48,54 @@ export default function DocumentUpload({ mode, txId, firmaId, lunaId, tip, furni
     if (res.ok) { onSuccess(); return }
     const data = await res.json().catch(() => ({}))
     setError(data.error || 'Documentul nu a putut fi asociat')
+  }
+
+  async function openCamera() {
+    setCameraError('')
+    try {
+      // Fara constrangeri de rezolutie, browserul alege deseori 640x480 - prea putin ca sa se
+      // citeasca text mic tiparit de pe un document. "ideal" cere maximul disponibil, fara sa
+      // esueze daca webcamul nu il suporta.
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      })
+      setStream(s)
+      setCameraOpen(true)
+    } catch {
+      setCameraError('Nu am putut accesa camera — verifică permisiunile browserului.')
+    }
+  }
+
+  function closeCamera() {
+    stream?.getTracks().forEach(t => t.stop())
+    setStream(null)
+    setCameraOpen(false)
+  }
+
+  async function capturePhoto() {
+    const video = videoRef.current
+    if (!video || !video.videoWidth) return
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d')?.drawImage(video, 0, 0)
+    const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    closeCamera()
+    if (!blob) return
+    const file = new File([blob], `document_camera_${Date.now()}.jpg`, { type: 'image/jpeg' })
+    await upload([file])
+  }
+
+  if (cameraOpen) {
+    return (
+      <div style={{ display:'flex', flexDirection:'column', gap:'10px', alignItems:'center' }}>
+        <video ref={videoRef} autoPlay playsInline style={{ width:'100%', maxHeight:'50vh', borderRadius:'10px', background:'#000' }} />
+        <div style={{ display:'flex', gap:'10px' }}>
+          <button onClick={capturePhoto} style={{ fontSize:'13px', fontWeight:600, padding:'8px 16px', borderRadius:'7px', border:'none', background:culoare, color:'#fff', cursor:'pointer' }}>Capturează</button>
+          <button onClick={closeCamera} style={{ fontSize:'13px', fontWeight:600, padding:'8px 16px', borderRadius:'7px', border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer' }}>Anulează</button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -65,6 +126,12 @@ export default function DocumentUpload({ mode, txId, firmaId, lunaId, tip, furni
       <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" multiple
         style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }}
         onChange={e => { if (e.target.files?.length) upload(e.target.files); e.target.value = '' }} />
+      {!uploading && (
+        <button onClick={openCamera} style={{ marginTop:'8px', fontSize:'11px', fontWeight:600, padding:'7px 12px', borderRadius:'7px', border:'1px solid var(--border)', background:'var(--surface-secondary)', color:'var(--text-secondary)', cursor:'pointer', width:'100%' }}>
+          📷 Fotografiază document (camera laptop)
+        </button>
+      )}
+      {cameraError && <p style={{ fontSize:'11px', color:'var(--danger)', marginTop:'8px' }}>{cameraError}</p>}
       {error && <p style={{ fontSize:'11px', color:'var(--danger)', marginTop:'8px' }}>{error}</p>}
     </div>
   )
