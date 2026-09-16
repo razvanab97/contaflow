@@ -65,6 +65,32 @@ async function matchFacturiAsteptate(firmaId: string, txs: any[]) {
   return sugestii
 }
 
+// Potriveste bonurile fiscale adaugate in avans cu tranzactiile nedocumentate, dupa aceleasi
+// criterii ca facturile din facturi_asteptate (suma exacta + max 3 zile intre data incarcarii
+// bonului si tranzactie) - ca sugestie, nu asociere automata.
+async function matchBonuri(firmaId: string, txs: any[]) {
+  const bRes = await fetch(`${SB}/bonuri?firma_id=eq.${firmaId}&status=eq.asteptare&select=id,fisier_nume,comerciant,cui_client,suma,data_bon,tip,created_at`, { headers: H })
+  if (!bRes.ok) return new Map<string, any>()
+  const bonuri: any[] = await bRes.json()
+  if (!bonuri?.length) return new Map<string, any>()
+
+  const used = new Set<string>()
+  const sugestii = new Map<string, any>()
+  for (const tx of txs) {
+    if (tx.document_id || tx.tip !== 'debit' || tx.suma == null) continue
+    let best: any = null
+    for (const b of bonuri) {
+      if (used.has(b.id) || b.suma == null) continue
+      if (Math.abs(Number(b.suma) - Number(tx.suma)) > 0.01) continue
+      if (daysBetween(b.created_at, tx.data_tranzactie) > 3) continue
+      best = b
+      break
+    }
+    if (best) { used.add(best.id); sugestii.set(tx.id, best) }
+  }
+  return sugestii
+}
+
 export async function GET(req: NextRequest) {
   const lunaId = new URL(req.url).searchParams.get('lunaId')
   if (!lunaId) return NextResponse.json([], { status: 400 })
@@ -125,6 +151,7 @@ export async function GET(req: NextRequest) {
   const [lunaRow] = lunaRes.ok ? await lunaRes.json() : []
   const sugestii = lunaRow?.firma_id ? await matchFacturiAsteptate(lunaRow.firma_id, all) : new Map<string, any>()
   const sugestiiInbox = lunaRow?.firma_id ? await matchInboxFacturi(lunaRow.firma_id, all) : new Map<string, any>()
+  const sugestiiBon = lunaRow?.firma_id ? await matchBonuri(lunaRow.firma_id, all) : new Map<string, any>()
 
   return NextResponse.json(all.map(tx => ({
     ...tx,
@@ -132,5 +159,6 @@ export async function GET(req: NextRequest) {
     documenteToate: allDocsByTx.get(tx.id) || [],
     sugestieFactura: sugestii.get(tx.id) || null,
     sugestieInbox: sugestiiInbox.get(tx.id) || null,
+    sugestieBon: sugestiiBon.get(tx.id) || null,
   })))
 }

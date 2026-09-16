@@ -204,6 +204,17 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
             </svg>
             <span style={{ fontSize: '13px', fontWeight: pathname.endsWith('/facturi-de-asociat') ? 600 : 500, color: pathname.endsWith('/facturi-de-asociat') ? 'var(--accent-hover)' : 'var(--text-secondary)' }}>Facturi de asociat</span>
           </Link>
+          <Link href={`/${firmaAtiva}/bonuri`} style={{
+            display: 'flex', alignItems: 'center', gap: '9px',
+            padding: '7px 20px',
+            background: pathname.endsWith('/bonuri') ? 'var(--accent-soft)' : 'transparent',
+            borderLeft: pathname.endsWith('/bonuri') ? '3px solid var(--accent)' : '3px solid transparent',
+          }}>
+            <svg width="11" height="11" fill="none" stroke={pathname.endsWith('/bonuri') ? 'var(--accent-hover)' : 'var(--text-muted)'} strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z"/><path d="M9 7h6M9 11h6"/>
+            </svg>
+            <span style={{ fontSize: '13px', fontWeight: pathname.endsWith('/bonuri') ? 600 : 500, color: pathname.endsWith('/bonuri') ? 'var(--accent-hover)' : 'var(--text-secondary)' }}>Bonuri</span>
+          </Link>
         </>
       )}
 
