@@ -405,7 +405,7 @@ export async function importInboxDocument({
     firma_id: target?.id || firmaId,
     luna_id: targetLunaId,
     tranzactie_id: match?.tx.id || null,
-    modul: 'inbox_facturi',
+    modul: match ? 'extras' : 'inbox_facturi',
     tip_document: extracted?.tipDocument || 'factura',
     furnizor: meta,
     numar_document: extracted?.numarDocument || null,
