@@ -14,6 +14,13 @@ interface Props {
   firme: { id: string; nume: string }[]
 }
 
+function isPreviewable(nume: string): 'pdf' | 'image' | null {
+  const lower = nume.toLowerCase()
+  if (lower.endsWith('.pdf')) return 'pdf'
+  if (/\.(jpe?g|png)$/.test(lower)) return 'image'
+  return null
+}
+
 export default function FacturiLocaleGlobal({ firme }: Props) {
   const [files, setFiles] = useState<WatchFile[]>([])
   const [pendingCount, setPendingCount] = useState(0)
@@ -22,6 +29,11 @@ export default function FacturiLocaleGlobal({ firme }: Props) {
   const [rezultate, setRezultate] = useState<{ fisier:string; status:string; firma:string|null }[]>([])
   const [assignPick, setAssignPick] = useState<Record<string, string>>({})
   const [assignBusy, setAssignBusy] = useState<string | null>(null)
+  const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
+
+  function togglePreview(id: string) {
+    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
 
   const load = useCallback(async () => {
     const res = await fetch('/api/inbox-facturi/global')
@@ -96,23 +108,40 @@ export default function FacturiLocaleGlobal({ firme }: Props) {
 
       {needsAttention.length > 0 && (
         <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {needsAttention.map(file => (
-            <div key={file.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '8px 10px', borderRadius: '8px', background: 'var(--surface-secondary)', border: '1px solid var(--border)' }}>
-              <div style={{ flex: 1, minWidth: '160px', fontSize: '12px', color: 'var(--text-primary)' }}>
-                {file.fisier_nume}
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                  {file.status === 'nedetectat' ? '· firmă nedetectată' : `· eroare: ${file.error_message || ''}`}
-                </span>
+          {needsAttention.map(file => {
+            const kind = isPreviewable(file.fisier_nume)
+            const open = previewIds.has(file.id)
+            return (
+              <div key={file.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '8px 10px', borderRadius: '8px', background: 'var(--surface-secondary)', border: '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: '160px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                    {file.fisier_nume}
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                      {file.status === 'nedetectat' ? '· firmă nedetectată' : `· eroare: ${file.error_message || ''}`}
+                    </span>
+                  </div>
+                  {kind && (
+                    <button onClick={() => togglePreview(file.id)} style={{ fontSize: '11px', fontWeight: 700, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer' }}>
+                      {open ? 'Ascunde' : 'Vezi'}
+                    </button>
+                  )}
+                  <select value={assignPick[file.id] || ''} onChange={e => setAssignPick(prev => ({ ...prev, [file.id]: e.target.value }))} style={{ fontSize: '12px', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)' }}>
+                    <option value="">Alege firma...</option>
+                    {firme.map(f => <option key={f.id} value={f.id}>{f.nume}</option>)}
+                  </select>
+                  <button onClick={() => assign(file)} disabled={!assignPick[file.id] || assignBusy === file.id} style={{ fontSize: '11px', fontWeight: 700, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', opacity: (!assignPick[file.id] || assignBusy === file.id) ? .5 : 1 }}>
+                    {assignBusy === file.id ? '...' : 'Atribuie'}
+                  </button>
+                </div>
+                {open && kind === 'pdf' && (
+                  <iframe src={`/api/inbox-facturi/global/document?id=${encodeURIComponent(file.id)}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--border)', borderRadius: '8px', marginTop: '6px', background: '#fff' }} />
+                )}
+                {open && kind === 'image' && (
+                  <img src={`/api/inbox-facturi/global/document?id=${encodeURIComponent(file.id)}&preview=1`} alt={file.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--border)', borderRadius: '8px', marginTop: '6px', background: '#fff' }} />
+                )}
               </div>
-              <select value={assignPick[file.id] || ''} onChange={e => setAssignPick(prev => ({ ...prev, [file.id]: e.target.value }))} style={{ fontSize: '12px', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)' }}>
-                <option value="">Alege firma...</option>
-                {firme.map(f => <option key={f.id} value={f.id}>{f.nume}</option>)}
-              </select>
-              <button onClick={() => assign(file)} disabled={!assignPick[file.id] || assignBusy === file.id} style={{ fontSize: '11px', fontWeight: 700, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', opacity: (!assignPick[file.id] || assignBusy === file.id) ? .5 : 1 }}>
-                {assignBusy === file.id ? '...' : 'Atribuie'}
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
