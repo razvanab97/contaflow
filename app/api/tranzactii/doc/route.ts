@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { getServiceSupabase } from '@/lib/supabase/server'
+import { syncComandaNote } from '@/lib/comandaNote'
 
 const SB = 'https://aqlmuoaaipbanjdptleg.supabase.co'
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -99,6 +101,8 @@ export async function POST(req: NextRequest) {
     const furnizor = (fd.get('furnizor') as string) || ''
     const numDoc = (fd.get('numDoc') as string) || ''
     const mode = (fd.get('mode') as string) || 'replace'
+    const sumaField = fd.get('suma') as string | null
+    const sumaFactura = sumaField && !Number.isNaN(Number(sumaField)) ? Number(sumaField) : null
 
     if (!files.length || !txId || !firmaId || !lunaId)
       return NextResponse.json({ error: 'Date lipsă pentru asocierea documentului' }, { status: 400 })
@@ -144,7 +148,10 @@ export async function POST(req: NextRequest) {
       const documentBody = {
         firma_id: firmaId, luna_id: lunaId, tranzactie_id: txId,
         modul: 'extras', tip_document: tip, furnizor, numar_document: numDoc || orderRef,
-        suma: Math.abs(Number(tx.suma)),
+        // La atasare suplimentara (mode=add), fiecare factura poate acoperi doar o parte din
+        // suma tranzactiei - folosim suma introdusa pentru ea, nu suma intregii tranzactii,
+        // altfel notele/rapoartele ar aduna gresit de mai multe ori acelasi total.
+        suma: sumaFactura ?? Math.abs(Number(tx.suma)),
         data_document: tx.data_tranzactie,
         fisier_path: path, fisier_nume: renamedFile, fisier_tip: file.type,
         fisier_marime: buf.length, in_zip: true
@@ -193,6 +200,7 @@ export async function POST(req: NextRequest) {
       })
     }
     await markMatchingRestantePaid(firmaId, tx, furnizor, numDoc || orderRef)
+    await syncComandaNote(getServiceSupabase(), txId)
 
     return NextResponse.json({ ok: true, docId: documents[0]?.docId, filename: documents[0]?.filename, documents, count: documents.length })
   } catch (error) {

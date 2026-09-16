@@ -2,6 +2,7 @@ import { isIP } from 'node:net'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { syncComandaNote } from '@/lib/comandaNote'
 
 const ACCOUNTING_SECTIONS = new Set([
   'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
@@ -141,8 +142,9 @@ async function markMatchingRestantePaid(sb: ReturnType<typeof getServiceSupabase
 export async function POST(req: NextRequest) {
   const {
     url, firmaId, lunaId, section, supplier, description, reference, transactionId,
-    itemId, documentType = 'factura', mode = 'replace',
+    itemId, documentType = 'factura', mode = 'replace', suma: sumaInput,
   } = await req.json()
+  const sumaFactura = sumaInput !== undefined && sumaInput !== null && !Number.isNaN(Number(sumaInput)) ? Number(sumaInput) : null
   const isAccountingSection = ACCOUNTING_SECTIONS.has(section)
   if (!url || !firmaId || !lunaId || (!isAccountingSection && !itemId && !transactionId))
     return NextResponse.json({ error: 'Date lipsă sau destinație invalidă' }, { status: 400 })
@@ -211,7 +213,11 @@ export async function POST(req: NextRequest) {
     tip_document:effectiveDocumentType,
     furnizor:[supplier || genericExtractie?.furnizor, description && `Descriere: ${description}`, (reference || genericExtractie?.numarDocument) && `Referinta: ${reference || genericExtractie?.numarDocument}`, `Sursa: ${sourceName}`].filter(Boolean).join(' | '),
     numar_document: reference || genericExtractie?.numarDocument || null,
-    suma: transaction ? Math.abs(Number(transaction.suma)) : genericExtractie?.suma ?? null,
+    // La atasare suplimentara pe o tranzactie (mode=add), fiecare factura poate acoperi doar o
+    // parte din suma tranzactiei - folosim suma introdusa manual pentru ea daca exista, altfel
+    // suma extrasa de AI din document, si abia apoi (cazul normal, un singur document) suma
+    // intregii tranzactii.
+    suma: sumaFactura ?? genericExtractie?.suma ?? (transaction ? Math.abs(Number(transaction.suma)) : null),
     data_document: transaction?.data_tranzactie || genericExtractie?.dataDocument || null,
     cod_unitate_booking: genericExtractie?.codLocatie || null,
     fisier_path:path,
@@ -244,6 +250,7 @@ export async function POST(req: NextRequest) {
     const oldPath = oldDocument?.data?.fisier_path
     if (oldPath && oldPath !== path) await sb.storage.from('documente').remove([oldPath])
     await markMatchingRestantePaid(sb, firmaId, transaction, supplier, reference)
+    await syncComandaNote(sb, transactionId)
   }
 
   let airbnbLinkedId: string | null = null

@@ -786,6 +786,8 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
 
   const [showAddMore, setShowAddMore] = useState(false)
   const [addUrl, setAddUrl] = useState('')
+  const [addFurnizor, setAddFurnizor] = useState('')
+  const [addSuma, setAddSuma] = useState('')
   const [addBusy, setAddBusy] = useState(false)
   const [addError, setAddError] = useState('')
   const [addDrag, setAddDrag] = useState(false)
@@ -852,6 +854,8 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     setUploadError('')
     setShowAddMore(false)
     setAddUrl('')
+    setAddFurnizor('')
+    setAddSuma('')
     setAddError('')
     setInboxSearchBusy(false); setInboxSearchDone(false); setInboxCandidati([])
   }, [tx])
@@ -861,9 +865,10 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     setAddBusy(true); setAddError('')
     const res = await fetch('/api/chitante/import-url', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
       url:addUrl, firmaId, lunaId, transactionId:tx.id, documentType:'factura', mode:'add',
+      supplier:addFurnizor || undefined, suma:addSuma ? Number(addSuma) : undefined,
     }) })
     setAddBusy(false)
-    if (res.ok) { setAddUrl(''); onRefresh(); return }
+    if (res.ok) { setAddUrl(''); setAddFurnizor(''); setAddSuma(''); onRefresh(); return }
     setAddError((await res.json().catch(()=>({}))).error || 'Importul din link nu a reușit')
   }
 
@@ -875,9 +880,11 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
     fd.append('txId', tx.id)
     fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
     fd.append('tip', 'factura'); fd.append('mode', 'add')
+    if (addFurnizor) fd.append('furnizor', addFurnizor)
+    if (addSuma) fd.append('suma', addSuma)
     const res = await fetch('/api/tranzactii/doc', { method:'POST', body:fd })
     setAddBusy(false)
-    if (res.ok) { onRefresh(); return }
+    if (res.ok) { setAddFurnizor(''); setAddSuma(''); onRefresh(); return }
     setAddError((await res.json().catch(()=>({}))).error || 'Documentul nu a putut fi asociat')
   }
 
@@ -1074,6 +1081,10 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
             {showAddMore && (
               <div style={{ textAlign:'left', padding:'14px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-1e1e1e)', borderRadius:'10px' }}>
                 <div style={{ fontSize:'11px', color:'var(--c-666666)', marginBottom:'9px' }}>Adaugă una sau mai multe facturi pentru aceeași plată/comandă — link sau fișiere selectate împreună.</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'8px' }}>
+                  <input value={addFurnizor} onChange={e=>setAddFurnizor(e.target.value)} placeholder="Furnizor factură" style={INP}/>
+                  <input value={addSuma} onChange={e=>setAddSuma(e.target.value)} placeholder={`Suma acestei facturi (din ${tx.suma?.toFixed(2)} total)`} inputMode="decimal" style={INP}/>
+                </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'8px', marginBottom:'10px' }}>
                   <input value={addUrl} onChange={e=>setAddUrl(e.target.value)} placeholder="Lipește linkul facturii PDF" style={INP}/>
                   <button onClick={addMoreUrl} disabled={addBusy||!addUrl} style={{ ...BTN, background:culoare, color:'var(--c-ffffff)', opacity:(addBusy||!addUrl)?.5:1 }}>
