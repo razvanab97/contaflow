@@ -1,4 +1,5 @@
 import { isIP } from 'node:net'
+import dns from 'node:dns/promises'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
@@ -15,14 +16,55 @@ function safePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || fallback
 }
 
+function isPrivateIp(ip: string, version: 4 | 6) {
+  if (version === 4) {
+    return /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(ip) || /^172\.(1[6-9]|2\d|3[01])\./.test(ip)
+  }
+  return ip === '::1' || ip.startsWith('fc') || ip.startsWith('fd') || ip.startsWith('fe80:')
+}
+
 function isPrivateSource(source: URL) {
   const hostname = source.hostname.toLowerCase()
   if (hostname === 'localhost' || hostname.endsWith('.local')) return true
-  if (isIP(hostname) === 4) {
-    return /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(hostname) ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+  const v = isIP(hostname)
+  return v === 4 || v === 6 ? isPrivateIp(hostname, v) : false
+}
+
+// Un hostname public poate rezolva totusi catre o adresa privata/interna (DNS rebinding) - fara
+// aceasta verificare, isPrivateSource de mai sus (care testeaza doar IP-uri literale) ar lasa sa
+// treaca orice domeniu public care se rezolva la 127.0.0.1/169.254.169.254/etc.
+async function resolvesToPrivateAddress(hostname: string): Promise<boolean> {
+  if (isIP(hostname)) return false // deja verificat de isPrivateSource
+  try {
+    const records = await dns.lookup(hostname, { all: true, verbatim: true })
+    return records.some(r => isPrivateIp(r.address, r.family as 4 | 6))
+  } catch {
+    return false // lookup-ul esuat - fetch-ul urmator va da eroare oricum, nu blocam aici
   }
-  return isIP(hostname) === 6 && (hostname === '::1' || hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('fe80:'))
+}
+
+async function assertSafeUrl(source: URL) {
+  if (source.protocol !== 'https:' || isPrivateSource(source)) return false
+  return !(await resolvesToPrivateAddress(source.hostname))
+}
+
+// fetch({redirect:'follow'}) urmeaza redirect-uri HTTP fara sa re-valideze destinatia finala -
+// un server extern controlat de atacator poate raspunde initial cu un 30x catre o resursa interna
+// (SSRF prin redirect). Urmarim redirect-urile manual, revalidand fiecare hop cu assertSafeUrl().
+async function fetchPdfFollowingSafeRedirects(initial: URL, maxHops = 5): Promise<Response> {
+  let current = initial
+  for (let hop = 0; hop <= maxHops; hop++) {
+    if (!(await assertSafeUrl(current))) throw new Error('unsafe-url')
+    const response = await fetch(current, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(30_000),
+      headers: downloadHeaders(current),
+    })
+    const location = response.status >= 300 && response.status < 400 ? response.headers.get('location') : null
+    if (!location) return response
+    current = new URL(location, current)
+  }
+  throw new Error('too-many-redirects')
 }
 
 function downloadHeaders(source: URL) {
@@ -151,14 +193,15 @@ export async function POST(req: NextRequest) {
 
   let source: URL
   try { source = new URL(url) } catch { return NextResponse.json({ error: 'Link invalid' }, { status: 400 }) }
-  if (source.protocol !== 'https:' || isPrivateSource(source))
+  if (!(await assertSafeUrl(source)))
     return NextResponse.json({ error: 'Este acceptat doar un link HTTPS public către un PDF' }, { status: 400 })
 
-  const response = await fetch(source, {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(30_000),
-    headers: downloadHeaders(source),
-  })
+  let response: Response
+  try {
+    response = await fetchPdfFollowingSafeRedirects(source)
+  } catch {
+    return NextResponse.json({ error: 'Este acceptat doar un link HTTPS public către un PDF' }, { status: 400 })
+  }
   if (!response.ok) {
     const bookingLoginRequired = source.hostname.endsWith('booking.com') && response.status === 401
     return NextResponse.json({
