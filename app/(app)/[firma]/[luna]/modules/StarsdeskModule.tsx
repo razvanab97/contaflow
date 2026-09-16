@@ -9,7 +9,7 @@ interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string; tasks: TaskItem[]; checklistItems: ChecklistItem[] }
 interface Nefacturata { id:string; codRezervare:string; numeOaspete:string; suma:number|null; platforma:string }
 interface FacturaOrfana { id:string; numarFactura:string; numeClient:string; suma:number|null; idRezervare:string }
-interface Discrepanta extends Nefacturata { numarFactura:string; sumaFactura:number|null }
+interface Discrepanta extends Nefacturata { numarFactura:string; sumaFactura:number|null; mesaj:string }
 interface DiscrepantaExplicata extends Discrepanta { numarComision:string; sumaComision:number|null }
 interface FacturataAltaLuna extends Discrepanta { luna:string }
 interface VerificareResult {
@@ -99,19 +99,22 @@ function ListaDiscrepante({ items, tip, onResolved }: { items: Discrepanta[]; ti
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
       {items.map(d => (
-        <div key={d.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'light-dark(rgba(180,83,9,.08), rgba(245,201,106,.06))', border:'1px solid light-dark(rgba(180,83,9,.3), rgba(245,201,106,.2))', borderRadius:'7px' }}>
-          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background: d.platforma==='airbnb' ? 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))' : 'light-dark(rgba(37,99,235,.25), rgba(96,165,250,.1))', color: d.platforma==='airbnb' ? 'var(--accent-red)' : 'var(--accent-blue)', flexShrink:0 }}>
-            {d.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
-          </span>
-          <span style={{ flex:1, fontSize:'12px', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· factura {d.numarFactura || '—'}</span></span>
-          <span style={{ fontSize:'11px', color:'var(--c-888888)', flexShrink:0 }}>borderou {money(d.suma)} RON ≠ factură {money(d.sumaFactura)} RON</span>
-          <button
-            onClick={() => marcheaza(d.id)}
-            disabled={resolving === d.id}
-            style={{ fontSize:'11px', fontWeight:600, padding:'4px 10px', borderRadius:'6px', border:'1px solid light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))', background:'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color:'var(--accent-mint)', cursor:'pointer', flexShrink:0, opacity: resolving===d.id ? .5 : 1 }}
-          >
-            {resolving === d.id ? '...' : '✓ E în regulă'}
-          </button>
+        <div key={d.id} style={{ display:'flex', flexDirection:'column', gap:'4px', padding:'8px 12px', background:'light-dark(rgba(180,83,9,.08), rgba(245,201,106,.06))', border:'1px solid light-dark(rgba(180,83,9,.3), rgba(245,201,106,.2))', borderRadius:'7px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+            <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'5px', background: d.platforma==='airbnb' ? 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))' : 'light-dark(rgba(37,99,235,.25), rgba(96,165,250,.1))', color: d.platforma==='airbnb' ? 'var(--accent-red)' : 'var(--accent-blue)', flexShrink:0 }}>
+              {d.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
+            </span>
+            <span style={{ flex:1, fontSize:'12px', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· factura {d.numarFactura || '—'}</span></span>
+            <span style={{ fontSize:'11px', color:'var(--c-888888)', flexShrink:0 }}>borderou {money(d.suma)} RON ≠ factură {money(d.sumaFactura)} RON</span>
+            <button
+              onClick={() => marcheaza(d.id)}
+              disabled={resolving === d.id}
+              style={{ fontSize:'11px', fontWeight:600, padding:'4px 10px', borderRadius:'6px', border:'1px solid light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))', background:'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color:'var(--accent-mint)', cursor:'pointer', flexShrink:0, opacity: resolving===d.id ? .5 : 1 }}
+            >
+              {resolving === d.id ? '...' : '✓ E în regulă'}
+            </button>
+          </div>
+          <p style={{ fontSize:'10.5px', color:'#F5C96A', margin:0, paddingLeft:'2px' }}>ℹ {d.mesaj}</p>
         </div>
       ))}
     </div>

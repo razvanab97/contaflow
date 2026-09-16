@@ -6,6 +6,18 @@ import { computeVerification } from '@/lib/stardeskVerify'
 function money(v: number|null) { return v == null ? '-' : v.toFixed(2) }
 function safe(v: unknown) { return String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7E]/g, '') }
 
+function wrapText(text: string, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  for (const word of words) {
+    const last = lines.at(-1)
+    const candidate = last ? `${last} ${word}` : word
+    if (!last || font.widthOfTextAtSize(candidate, size) > maxWidth) lines.push(word)
+    else lines[lines.length - 1] = candidate
+  }
+  return lines
+}
+
 // Lista descarcabila cu toate discrepantele de pret (factura gasita, dar suma nu corespunde cu
 // borderoul) - ca sa poata fi lucrate metodic, in afara aplicatiei (trimise la 5StarDesk, folosite
 // ca checklist pentru facturi corectate etc.), nu doar vazute pe ecran.
@@ -45,7 +57,9 @@ export async function GET(req: NextRequest) {
   header()
   let totalDiferenta = 0
   for (const r of randuri) {
-    if (y < BOTTOM) { page = pdf.addPage([595, 842]); y = TOP; header() }
+    const mesajLines = wrapText(safe(r.mesaj), font, 7.5, R - L - 4)
+    const rowHeight = 14 + mesajLines.length * 10 + 4
+    if (y - rowHeight < BOTTOM) { page = pdf.addPage([595, 842]); y = TOP; header() }
     const diferenta = (r.sumaFactura ?? 0) - (r.suma ?? 0)
     totalDiferenta += diferenta
     const cells = [
@@ -59,6 +73,11 @@ export async function GET(req: NextRequest) {
     ]
     cells.forEach((c, i) => page.drawText(String(c), { x: COLS[i] + 2, y, size: 8, font, color: black }))
     y -= 14
+    for (const line of mesajLines) {
+      page.drawText(line, { x: L + 2, y, size: 7.5, font, color: rgb(0.4, 0.4, 0.4) })
+      y -= 10
+    }
+    y -= 4
   }
 
   y -= 6

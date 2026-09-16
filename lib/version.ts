@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 105, text: 'Fiecare discrepanță de preț 5StarDesk arată acum automat de ce nu s-a explicat: comisionul găsit + suma lui, sau "niciun comision găsit", sau "Booking nu are comision per rezervare" — atât pe ecran, cât și în lista PDF descărcabilă. Nu mai trebuie investigat manual fiecare caz' },
   { v: 104, text: 'La marcarea "Am facturat" (5StarDesk) poți adăuga acum o notă opțională (ex. "luna viitoare", "la jumătate"), salvată pe rezervare. Verificarea 5StarDesk e acum interconectată pe toate lunile firmei: o rezervare deja facturată într-o altă lună (sau cu comision deja facturat în altă lună) apare informativ cu luna respectivă, nu mai fals ca "fără factură"' },
   { v: 103, text: 'Confirmat: pentru Airbnb, "discrepanța de preț" 5StarDesk era aproape mereu normală — factura clientului = suma din borderou + comisionul Airbnb al aceleiași rezervări (verificat automat acum după cod). Din 28 de cazuri semnalate, doar 3 rămân probleme reale; restul apar informativ la "Diferențe explicate de comision", fără să mai ceară acțiune. Reparat și un bug: o secțiune veche compara greșit suma comisionului cu suma întregii rezervări' },
   { v: 102, text: 'Discrepanțele de preț 5StarDesk apar acum și pe Dashboard (total + pe fiecare firmă), ca să fie vizibile fără să intri în firmă, și pot fi descărcate ca listă PDF (sumă borderou, sumă factură, diferență, total general) — de lucrat pe ele sau de trimis mai departe' },

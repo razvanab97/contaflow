@@ -49,15 +49,35 @@ function gasesteCandidat<F extends { suma: number|null }>(rez: { cod_rezervare:s
 // suma NETA primita de gazda - deci "factura - borderou" ar trebui sa fie exact comisionul Airbnb
 // al acelei rezervari. Daca se potriveste, discrepanta e explicata (nu e o eroare de facturare,
 // doar TVA/comision normal) si nu mai trebuie sa apara ca "problema" de rezolvat.
-function comisionExplicaDiferenta(
-  rez: { cod_rezervare:string; suma:number|null },
+//
+// Cand NU se potriveste (sau nu exista deloc comision de verificat), construim un mesaj de
+// diagnostic - ca utilizatorul sa nu mai trebuiasca sa investigheze manual de fiecare data de ce
+// anume nu se explica diferenta (comision lipsa / comision gasit dar suma nu se potriveste /
+// platforma fara comision per rezervare).
+function comisionDiagnostic(
+  rez: { cod_rezervare:string; suma:number|null; platforma:string },
   facturaClient: { suma:number|null },
-  comisionAirbnb: { cod_rezervare:string|null; suma:number|null }[],
+  comisionAirbnb: { numar_factura:string|null; cod_rezervare:string|null; suma:number|null }[],
 ) {
+  if (rez.platforma !== 'airbnb') {
+    return { explicat: false, comision: null, mesaj: 'Booking nu emite comision per rezervare - diferența nu poate fi verificată automat, necesită verificare manuală.' }
+  }
+  const diferentaAsteptata = (facturaClient.suma != null && rez.suma != null) ? facturaClient.suma - rez.suma : null
   const comision = comisionAirbnb.find(c => codesMatch(rez.cod_rezervare, c.cod_rezervare || ''))
-  if (!comision || comision.suma == null || rez.suma == null || facturaClient.suma == null) return null
-  const diferentaReala = facturaClient.suma - rez.suma
-  return { comision, explicat: Math.abs(diferentaReala - comision.suma) < 1 }
+  if (!comision || comision.suma == null) {
+    return { explicat: false, comision: null, mesaj: 'Nicio factură de comision Airbnb găsită pentru acest cod de rezervare.' }
+  }
+  if (diferentaAsteptata == null) {
+    return { explicat: false, comision, mesaj: 'Sumă lipsă pe factura clientului sau pe borderou - diferența nu poate fi calculată.' }
+  }
+  const gap = diferentaAsteptata - comision.suma
+  const explicat = Math.abs(gap) < 1
+  return {
+    explicat, comision,
+    mesaj: explicat
+      ? 'Diferența e explicată de comisionul Airbnb.'
+      : `Comision găsit (${comision.numar_factura || 'fără număr'}): ${comision.suma.toFixed(2)} RON, dar diferența așteptată (factură minus borderou) e ${diferentaAsteptata.toFixed(2)} RON - diferență neexplicată de ${gap.toFixed(2)} RON.`,
+  }
 }
 
 export async function computeVerification(sb: ReturnType<typeof getServiceSupabase>, lunaId: string) {
@@ -92,7 +112,7 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
   }
 
   const faraFacturaClient: typeof rezervari = []
-  const discrepanteClient: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number] }[] = []
+  const discrepanteClient: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number]; mesaj:string }[] = []
   const discrepanteExplicateComision: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number]; comision:typeof comisionAirbnb[number] }[] = []
   const facturateAlteLuni: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturiAlteLuni[number] }[] = []
   for (const rez of rezervari) {
@@ -105,9 +125,9 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
       continue
     }
     if (candidat.sumaCorecta) continue
-    const explicatie = rez.platforma === 'airbnb' ? comisionExplicaDiferenta(rez, candidat.factura, comisionAirbnb) : null
-    if (explicatie?.explicat) discrepanteExplicateComision.push({ rezervare: rez, factura: candidat.factura, comision: explicatie.comision })
-    else discrepanteClient.push({ rezervare: rez, factura: candidat.factura })
+    const diagnostic = comisionDiagnostic(rez, candidat.factura, comisionAirbnb)
+    if (diagnostic.explicat && diagnostic.comision) discrepanteExplicateComision.push({ rezervare: rez, factura: candidat.factura, comision: diagnostic.comision })
+    else discrepanteClient.push({ rezervare: rez, factura: candidat.factura, mesaj: diagnostic.mesaj })
   }
 
   // Verificare inversă: facturi 5StarDesk care nu se potrivesc cu nicio rezervare din borderoul lunii
@@ -136,7 +156,7 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
     totalFacturiClient: stardeskFacturi.length,
     totalFacturiComision: comisionFacturi.length,
     faraFacturaClient: faraFacturaClient.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
-    discrepanteClient: discrepanteClient.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma })),
+    discrepanteClient: discrepanteClient.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, mesaj: d.mesaj })),
     discrepanteExplicateComision: discrepanteExplicateComision.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, numarComision: d.comision.numar_factura, sumaComision: d.comision.suma })),
     facturateAlteLuni: facturateAlteLuni.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, luna: lunaLabelById.get(d.factura.luna_id) || '?' })),
     facturiFaraRezervare: facturiFaraRezervare.map(f => ({ id: f.id, numarFactura: f.numar_factura, numeClient: f.nume_client, suma: f.suma, idRezervare: f.id_rezervare })),
