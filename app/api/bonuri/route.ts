@@ -87,7 +87,10 @@ export async function GET(req: NextRequest) {
     .from('bonuri')
     .select(SELECT_COLS)
     .eq('firma_id', firmaId)
-    .order('created_at', { ascending: false })
+    // Cronologic dupa data de pe bon (nu dupa cand a fost incarcat) - bonurile fara data citita
+    // (data_bon null) cad la final cu order-ul implicit Postgres (NULLS LAST pe ascending).
+    .order('data_bon', { ascending: true })
+    .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ bonuri: data || [] })

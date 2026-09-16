@@ -39,7 +39,7 @@ export default async function BonuriPage({ params }: { params: Promise<{ firma: 
         </p>
       </div>
 
-      <BonuriClient firmaId={firma.id} firmaCui={firma.cui} />
+      <BonuriClient firmaId={firma.id} firmaCui={firma.cui} firmaNume={firma.nume} />
     </main>
   )
 }

@@ -24,7 +24,7 @@ function norm(v: string | null | undefined) {
   return String(v || '').replace(/^RO/i, '').replace(/\D/g, '')
 }
 
-export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; firmaCui?: string | null }) {
+export default function BonuriClient({ firmaId, firmaCui, firmaNume }: { firmaId: string; firmaCui?: string | null; firmaNume: string }) {
   const [bonuri, setBonuri] = useState<Bon[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -225,6 +225,17 @@ export default function BonuriClient({ firmaId, firmaCui }: { firmaId: string; f
               <button onClick={() => setNotices(prev => prev.filter((_, j) => j !== i))} style={{ fontSize: '11px', color: 'var(--c-666666)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {bonuri.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <a
+            href={`/api/bonuri/pdf?firmaId=${encodeURIComponent(firmaId)}&firmaNume=${encodeURIComponent(firmaNume)}`}
+            style={{ fontSize: '12px', fontWeight: 600, padding: '8px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', textDecoration: 'none' }}
+          >
+            ↓ Descarcă toate bonurile ({bonuri.length}) - PDF
+          </a>
         </div>
       )}
 
