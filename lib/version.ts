@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 130, text: 'Bonuri: când CUI-ul de pe bon nu corespunde firmei curente (avertisment ⚠), apare acum un selector "Mută pe firma..." - corectează direct atribuirea, fără să mai treci prin ștergere+reîncărcare. Testat live pe un caz real' },
   { v: 129, text: 'Bonuri: o poză cu mai multe bonuri puse alăturat (ex. fotografiate împreună la final de lună) devine acum automat mai multe bonuri separate - fiecare detectat, decupat și citit independent, nu doar primul. Testat live: 3 bonuri într-o singură poză → 3 înregistrări separate, fiecare cu suma ei corectă' },
   { v: 128, text: 'Bonuri: lista e ordonată acum cronologic după data reală de pe bon (nu după data încărcării) + buton "Descarcă toate bonurile" - PDF cu toate bonurile firmei, în așteptare și asociate. Confirmat: bonurile deja asociate unei tranzacții ajung automat și în exportul general lunar, fără pas suplimentar' },
   { v: 127, text: 'Bonuri: camera laptopului cere acum rezoluție maximă (era limitată implicit la 640x480 pe multe webcam-uri, prea puțin pentru text mic tipărit) + fiecare poză (din cameră sau încărcată manual) se decupează automat - Claude identifică bonul de hârtie și elimină fundalul/masa din jur înainte de citirea datelor. Corectat live un bon real afectat (comerciant, CUI client, data citite greșit din poza brută la rezoluție joasă)' },
