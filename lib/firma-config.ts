@@ -5,6 +5,7 @@ export type ModuleSlug =
   | 'booking-facturi' | 'booking-borderou'
   | 'airbnb-facturi' | 'airbnb-borderou'
   | '5stardesk'
+  | 'bonuri'
   | 'impozite'
   | 'raport-lunar-proiect'
 
@@ -54,7 +55,7 @@ export interface FirmaConfigDef {
 // suprascrisă manual per-utilizator din "Setează ordinea", care rămâne neschimbată de asta).
 const COMUNE: ModuleSlug[] = [
   'inbox-facturi', 'facturi-restante', 'facturi-chitanta', 'dispozitie-plata',
-  'angajati', 'acte-contabile', 'extras', 'impozite', 'raport-lunar',
+  'angajati', 'acte-contabile', 'bonuri', 'extras', 'impozite', 'raport-lunar',
 ]
 
 export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
@@ -116,6 +117,14 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     description: 'Facturi preluate din email/Oblio și repartizate automat pe firmă',
     tasks: [
       { key: 'inbox_facturi.verificate', label: 'Facturi din inbox verificate' },
+    ],
+  },
+  bonuri: {
+    slug: 'bonuri',
+    label: 'Bonuri',
+    description: 'Bonuri fiscale (combustibil și altele) de asociat cu tranzacțiile din extras',
+    tasks: [
+      { key: 'bonuri.verificate', label: 'Bonuri verificate/atribuite' },
     ],
   },
   'raport-lunar': {

@@ -1,5 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import TaskSection, { TaskItem } from '../modules/TaskSection'
+import NextStepNav from '../NextStepNav'
 
 interface Bon {
   id: string; fisier_nume: string; fisier_tip: string | null
@@ -60,7 +62,13 @@ function bestGuessFirma(cuiClient: string | null, firmaCurentaId: string, firme:
   return apropiat ? apropiat.id : null
 }
 
-export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { firmaId: string; firmaCui?: string | null; firmaNume: string; firme: { id: string; nume: string; cui?: string | null }[] }) {
+interface Props {
+  firmaId: string; firmaSlug: string; firmaCui?: string | null; firmaNume: string; firme: { id: string; nume: string; cui?: string | null }[]
+  culoare: string; luna: string; lunaId: string; tasks: TaskItem[]
+  nextLabel: string | null; nextHref: string | null
+}
+
+export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, firme, culoare, luna, lunaId, tasks, nextLabel, nextHref }: Props) {
   const [bonuri, setBonuri] = useState<Bon[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -258,16 +266,18 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { 
   const altulSuma = altulBonuri.reduce((s, b) => s + (b.suma || 0), 0)
   const peLuna = new Map<string, { count: number; suma: number }>()
   for (const b of bonuri) {
-    const luna = (b.data_bon || b.created_at || '').slice(0, 7)
-    if (!luna) continue
-    const cur = peLuna.get(luna) || { count: 0, suma: 0 }
+    const lunaB = (b.data_bon || b.created_at || '').slice(0, 7)
+    if (!lunaB) continue
+    const cur = peLuna.get(lunaB) || { count: 0, suma: 0 }
     cur.count++; cur.suma += b.suma || 0
-    peLuna.set(luna, cur)
+    peLuna.set(lunaB, cur)
   }
   const luniSortate = [...peLuna.entries()].sort((a, b) => b[0].localeCompare(a[0]))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <TaskSection tasks={tasks} lunaId={lunaId} culoare={culoare}/>
+
       <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
         {cameraOpen ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
@@ -337,9 +347,9 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { 
           </div>
           {luniSortate.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {luniSortate.map(([luna, d]) => (
-                <div key={luna} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
-                  <span style={{ width: '80px', color: 'var(--c-999999)', flexShrink: 0 }}>{lunaLabel(luna)}</span>
+              {luniSortate.map(([l, d]) => (
+                <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+                  <span style={{ width: '80px', color: 'var(--c-999999)', flexShrink: 0 }}>{lunaLabel(l)}</span>
                   <span style={{ flex: 1, height: '5px', borderRadius: '3px', background: 'var(--c-1e1e1e)', overflow: 'hidden' }}>
                     <span style={{ display: 'block', height: '100%', width: `${totalSuma > 0 ? Math.max(3, (d.suma / totalSuma) * 100) : 0}%`, background: 'var(--accent-mint)' }} />
                   </span>
@@ -477,6 +487,8 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { 
           </div>
         </div>
       )}
+
+      <NextStepNav slug={firmaSlug} luna={luna} nextLabel={nextLabel} nextHref={nextHref} />
     </div>
   )
 }
