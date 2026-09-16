@@ -21,6 +21,8 @@ export default async function BonuriPage({ params }: { params: Promise<{ firma: 
   const firma = firmeRaw[0]
   if (!firma) notFound()
 
+  const toateFirmele = await dbSelect('firme', { eq: { activa: true }, order: 'nume' })
+
   const luna = getCurrentLuna()
 
   return (
@@ -39,7 +41,7 @@ export default async function BonuriPage({ params }: { params: Promise<{ firma: 
         </p>
       </div>
 
-      <BonuriClient firmaId={firma.id} firmaCui={firma.cui} firmaNume={firma.nume} />
+      <BonuriClient firmaId={firma.id} firmaCui={firma.cui} firmaNume={firma.nume} firme={toateFirmele.map((f: any) => ({ id: f.id, nume: f.nume }))} />
     </main>
   )
 }

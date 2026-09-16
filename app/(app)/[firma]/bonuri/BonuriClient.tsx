@@ -24,7 +24,7 @@ function norm(v: string | null | undefined) {
   return String(v || '').replace(/^RO/i, '').replace(/\D/g, '')
 }
 
-export default function BonuriClient({ firmaId, firmaCui, firmaNume }: { firmaId: string; firmaCui?: string | null; firmaNume: string }) {
+export default function BonuriClient({ firmaId, firmaCui, firmaNume, firme }: { firmaId: string; firmaCui?: string | null; firmaNume: string; firme: { id: string; nume: string }[] }) {
   const [bonuri, setBonuri] = useState<Bon[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -33,6 +33,9 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume }: { firmaId
   const [drag, setDrag] = useState(false)
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
   const [notices, setNotices] = useState<string[]>([])
+  const [movePick, setMovePick] = useState<Record<string, string>>({})
+  const [movingId, setMovingId] = useState<string | null>(null)
+  const [moveError, setMoveError] = useState('')
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [stream, setStream] = useState<MediaStream | null>(null)
@@ -185,6 +188,22 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume }: { firmaId
     await fetch('/api/bonuri', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...patch }) })
   }
 
+  // Muta manual un bon pe alta firma - pentru cazul in care CUI-ul citit pe bon apartine altei
+  // firme decat cea pe care a fost incarcat, dar auto-rutarea la upload nu l-a mutat (sau bonul
+  // a fost adaugat inainte ca CUI-ul sa fie completat corect).
+  async function moveBon(id: string) {
+    const targetFirmaId = movePick[id]
+    if (!targetFirmaId) return
+    setMovingId(id); setMoveError('')
+    const res = await fetch('/api/bonuri/muta', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, firmaId: targetFirmaId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setMovingId(null)
+    if (!res.ok) { setMoveError(data.error || 'Bonul nu a putut fi mutat'); return }
+    setBonuri(prev => prev.filter(b => b.id !== id)) // dispare din lista firmei curente, a ajuns pe cealalta
+  }
+
   function togglePreview(id: string) {
     setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }
@@ -297,6 +316,25 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume }: { firmaId
                       {cuiMatch === true && <span title="CUI corespunde firmei" style={{ fontSize: '11px', color: 'var(--accent-mint)' }}>✓</span>}
                       {cuiMatch === false && <span title="CUI diferit de firma curentă" style={{ fontSize: '11px', color: 'var(--accent-red)' }}>⚠</span>}
                     </div>
+                    {cuiMatch === false && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <select
+                          value={movePick[b.id] || ''}
+                          onChange={e => setMovePick(prev => ({ ...prev, [b.id]: e.target.value }))}
+                          style={{ width: '130px', fontSize: '11px', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '4px 6px', outline: 'none' }}
+                        >
+                          <option value="">Mută pe firma...</option>
+                          {firme.filter(f => f.id !== firmaId).map(f => <option key={f.id} value={f.id}>{f.nume}</option>)}
+                        </select>
+                        <button
+                          onClick={() => moveBon(b.id)}
+                          disabled={!movePick[b.id] || movingId === b.id}
+                          style={{ fontSize: '11px', fontWeight: 700, padding: '4px 9px', borderRadius: '6px', border: '1px solid var(--accent-red)', background: 'transparent', color: 'var(--accent-red)', cursor: 'pointer', opacity: (!movePick[b.id] || movingId === b.id) ? .5 : 1 }}
+                        >
+                          {movingId === b.id ? '...' : 'Mută'}
+                        </button>
+                      </div>
+                    )}
                     <input
                       type="number" step="0.01"
                       defaultValue={b.suma ?? ''}
@@ -330,6 +368,7 @@ export default function BonuriClient({ firmaId, firmaCui, firmaNume }: { firmaId
             })}
           </div>
         )}
+        {moveError && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '10px' }}>{moveError}</p>}
       </div>
 
       {asociate.length > 0 && (
