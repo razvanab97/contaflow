@@ -9,6 +9,7 @@ import ExtrasHeader from './components/ExtrasHeader'
 import ExtrasStats from './components/ExtrasStats'
 import ExtrasImportPanel from './components/ExtrasImportPanel'
 import ExtrasWorkspace from './components/ExtrasWorkspace'
+import NextStepNav from '../NextStepNav'
 
 const EXTRAS_UNLOCK_CODES: Record<string, string> = {
   'ab-homes-invest': '48867823',
@@ -18,8 +19,9 @@ const EXTRAS_UNLOCK_CODES: Record<string, string> = {
 type Filter = 'all'|'lipsa'|'ok'|'na'
 type FlowFilter = 'all'|'debit'|'credit'
 
-export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: initExtrase, slug, facturiTasks, extrasFinalizat: initFinalizat }: {
+export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: initExtrase, slug, facturiTasks, extrasFinalizat: initFinalizat, nextLabel, nextHref }: {
   firma: Firma; lunaId: string; luna: string; lunaLabel: string; extrase: Extras[]; slug: string; facturiTasks: TaskItem[]; extrasFinalizat: boolean
+  nextLabel?: string | null; nextHref?: string | null
 }) {
   const [pageTab, setPageTab] = useState<'extras'|'facturi'|'note'>('extras')
   const [finalizat, setFinalizat] = useState(initFinalizat)
@@ -309,6 +311,8 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           )}
         </>
       )}
+
+      <NextStepNav slug={slug} luna={luna} nextLabel={nextLabel || null} nextHref={nextHref || null} />
     </main>
   )
 }

@@ -44,9 +44,17 @@ export interface FirmaConfigDef {
   proprietari?: Proprietar[]
 }
 
+// Ordinea reflectă fluxul logic de lucru al unei luni de contabilitate, nu ordinea în care au
+// fost adăugate modulele în cod: întâi se adună documentele de venit (marketplace-urile, adăugate
+// separat per firmă, înaintea acestei liste comune) și de cheltuială (Inbox Facturi/restante/
+// chitanțe), apoi se emit dispozițiile de plată pe baza lor, apoi HR/acte (independente), abia
+// apoi Extras de cont (are nevoie ca documentele de mai sus să existe deja, ca să aibă ce asocia
+// pe tranzacții), apoi Impozite (calculate pe baza lunii deja complete) și, la final, Raportul
+// lunar - rezumatul, ultimul pas. Ordinea asta e și ordinea afișată în lista de module (poate fi
+// suprascrisă manual per-utilizator din "Setează ordinea", care rămâne neschimbată de asta).
 const COMUNE: ModuleSlug[] = [
-  'extras', 'angajati', 'acte-contabile', 'dispozitie-plata',
-  'facturi-chitanta', 'facturi-restante', 'inbox-facturi', 'raport-lunar', 'impozite',
+  'inbox-facturi', 'facturi-restante', 'facturi-chitanta', 'dispozitie-plata',
+  'angajati', 'acte-contabile', 'extras', 'impozite', 'raport-lunar',
 ]
 
 export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
@@ -205,7 +213,9 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
 export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
   'ab-homes-invest': {
     slug: 'ab-homes-invest',
-    module: [...COMUNE, 'emag', 'trendyol'],
+    // eMAG/Trendyol întâi - genereaza facturile de vânzare ale lunii, utile deja adunate până se
+    // ajunge la Extras de cont.
+    module: ['emag', 'trendyol', ...COMUNE],
     legal: {
       nrRegCom: 'J22/3035/2023',
       cif: 'RO48872594',
@@ -216,7 +226,9 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
   },
   abxhomes: {
     slug: 'abxhomes',
-    module: [...COMUNE, 'booking-facturi', 'airbnb-facturi', 'airbnb-borderou', '5stardesk'],
+    // 5StarDesk -> Airbnb -> Booking: ordinea platformelor de rezervare, fiecare genereaza
+    // facturile de vânzare ale lunii, utile deja adunate până se ajunge la Extras de cont.
+    module: ['5stardesk', 'airbnb-facturi', 'airbnb-borderou', 'booking-facturi', ...COMUNE],
     legal: {
       nrRegCom: 'J2025022705009',
       cif: '51540013',

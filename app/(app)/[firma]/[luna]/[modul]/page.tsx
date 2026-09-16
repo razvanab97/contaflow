@@ -5,6 +5,7 @@ import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getActiveFirme, getLuniContabile } from '@/lib/queries'
 import { getFirmaConfig, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
 import { accountingFullLabel, accountingPeriodLabel, accountingWorkLabel } from '@/lib/accounting-period'
+import NextStepNav from '../NextStepNav'
 
 // Fiecare modul e incarcat lazy (chunk separat) - pagina afiseaza mereu un singur modul, dar
 // fara asta toate cele 13 componente (unele mari, ex. EmagModule ~600 linii) ajungeau in bundle-ul
@@ -45,7 +46,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   const lunaData = luni.find((l: any) => l.firma_id === firma.id && l.luna?.startsWith(luna))
   if (!lunaData) notFound()
 
-  const [taskStariRaw, extrase, checklistItemsRaw, impoziteStari, proprietariRaw] = await Promise.all([
+  const [taskStariRaw, extrase, checklistItemsRaw, impoziteStari, proprietariRaw, moduleStariRaw] = await Promise.all([
     dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
     modulSlug === 'extras' ? dbSelect('extrase', { eq: { luna_id: lunaData.id } }) : Promise.resolve([]),
     ['emag', 'trendyol', 'booking-facturi', 'booking-borderou', 'airbnb-facturi', 'airbnb-borderou', '5stardesk'].includes(modulSlug)
@@ -53,6 +54,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       : Promise.resolve([]),
     modulSlug === 'impozite' ? dbSelect('impozite_stari', { eq: { luna_id: lunaData.id }, select: 'tip_key,suma,scadenta,platit' }) : Promise.resolve([]),
     modulSlug === 'dispozitie-plata' ? dbSelect('proprietari', { eq: { firma_id: firma.id }, order: 'ordine' }) : Promise.resolve([]),
+    dbSelect('module_stari', { eq: { luna_id: lunaData.id }, select: 'modul_slug,dezactivat' }),
   ])
 
   const taskMap: Record<string, boolean> = {}
@@ -94,6 +96,19 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
     const valid = MODUL_ALIASES[slug] || [slug]
     return checklistItemsRaw.filter((i: any) => valid.includes(i.checklist_templates?.modul || ''))
   }
+
+  // Pasul urmator in ordinea de lucru a firmei (vezi lib/firma-config.ts) - sare peste modulele
+  // dezactivate pentru luna asta ("Nu am acest modul"), ca sa nu ghideze utilizatorul spre un
+  // modul pe care l-a marcat explicit ca nu se aplica.
+  const dezactivateSet = new Set(moduleStariRaw.filter((m: any) => m.dezactivat).map((m: any) => m.modul_slug))
+  const ordineModule = firmaConfig.module
+  const curIdx = ordineModule.indexOf(modulSlug as ModuleSlug)
+  let nextSlug: ModuleSlug | null = null
+  for (let i = curIdx + 1; i < ordineModule.length; i++) {
+    if (!dezactivateSet.has(ordineModule[i])) { nextSlug = ordineModule[i]; break }
+  }
+  const nextDef = nextSlug ? MODULE_DEFS[nextSlug] : null
+  const nextHref = nextDef ? `/${slug}/${luna}/${nextDef.linkDirect || nextDef.slug}` : null
 
   function renderModule() {
     switch (modulSlug) {
@@ -158,6 +173,10 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
 
       {/* Module content */}
       {renderModule()}
+
+      {modulSlug !== 'raport-lunar-proiect' && (
+        <NextStepNav slug={slug} luna={luna} nextLabel={nextDef?.label || null} nextHref={nextHref} />
+      )}
     </main>
   )
 }
