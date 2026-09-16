@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 116, text: 'Inbox Facturi: documentele nelegate de nicio tranzacție au acum buton "Leagă de tranzacție" - căutare proprie (descriere sau sumă) pe tranzacțiile firmei, utilă când suma facturii nu se potrivește exact cu tranzacția (ex. plată parțială dintr-o notă de plată cu restanțe incluse)' },
   { v: 115, text: 'Fix critic: butonul "Atribuie" (Facturi din Personal Computer) eșua mereu, pentru orice firmă, cu un mesaj fals - "luna" era comparată greșit (LIKE pe o coloană de tip dată), deci rândul rămânea blocat la nesfârșit oricâte firme încercai. Reparat + dispare imediat din listă după atribuire. ABXHomes SRL e recunoscută acum și după al doilea CUI (RO51842895) - testat live cu 3 facturi reale rezolvate' },
   { v: 114, text: 'Facturi din Personal Computer: apare buton "Vezi" lângă fiecare fișier cu firmă nedetectată, cu previzualizare inline a PDF-ului/imaginii - înainte trebuia ales orbește firma doar după numele fișierului' },
   { v: 113, text: 'Fix: un PDF salvat direct în _incarcat (arhiva "deja procesat", ex. dacă fereastra Finder rămăsese deschisă acolo) rămânea invizibil la nesfârșit pentru watcher - "Sincronizează" arăta corect "nimic nou" pentru că, din perspectiva lui, chiar nu era nimic nou. Watcher-ul recunoaște acum fișierele rătăcite acolo și le recuperează automat pentru procesare. La prima rulare a găsit deja 8 facturi reale blocate de mai devreme' },
