@@ -97,7 +97,10 @@ function normalizeExtractedExtras(parsed: any, selectedValuta: string) {
   }
 }
 
-async function deleteExistingStatement(lunaId: string, valuta: string, iban: string, explicitExtrasId?: string | null) {
+// Doar rezolva ID-urile extrasului vechi de inlocuit - NU il sterge. Stergerea efectiva trebuie
+// sa aiba loc abia dupa ce extrasul nou + toate tranzactiile lui s-au inserat cu succes (vezi
+// saveStatement), ca sa nu ramanem fara date vechi SI fara cele noi daca insert-ul pica la mijloc.
+async function findExistingStatementIds(lunaId: string, valuta: string, iban: string, explicitExtrasId?: string | null): Promise<string[]> {
   // Fara extrasId explicit (ex. "+ Adaugă cont"), inlocuim doar extrasul aceluiasi CONT
   // (acelasi IBAN) - altfel un al doilea cont cu aceeasi moneda l-ar sterge pe primul.
   const ids = explicitExtrasId
@@ -105,7 +108,11 @@ async function deleteExistingStatement(lunaId: string, valuta: string, iban: str
     : iban
       ? (await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${encodeURIComponent(valuta)}&iban=eq.${encodeURIComponent(iban)}&select=id`)).map((extras: any) => extras.id)
       : []
-  for (const id of ids.filter(Boolean)) {
+  return ids.filter(Boolean)
+}
+
+async function deleteStatementIds(ids: string[]) {
+  for (const id of ids) {
     await sbDelete(`tranzactii?extras_id=eq.${id}`)
     await sbDelete(`extrase?id=eq.${id}`)
   }
@@ -131,7 +138,7 @@ async function saveStatement(params: {
   })
   if (!upRes.ok) throw new Error('Storage: ' + await upRes.text())
 
-  await deleteExistingStatement(lunaId, valuta, iban, replaceExtrasId)
+  const oldIds = await findExistingStatementIds(lunaId, valuta, iban, replaceExtrasId)
 
   const { ok: eOk, data: extras } = await sbPost('extrase', {
     firma_id: firmaId, luna_id: lunaId,
@@ -143,23 +150,36 @@ async function saveStatement(params: {
   if (!eOk || !extras?.id)
     throw new Error('DB extras: ' + JSON.stringify(extras))
 
-  for (let i = 0; i < tranzactii.length; i += 25) {
-    const batch = tranzactii.slice(i, i + 25).map((t: any) => ({
-      extras_id: extras.id, firma_id: firmaId,
-      data_tranzactie: t.data_tranzactie,
-      descriere: t.descriere || t.descriere_curatata || '',
-      descriere_curatata: t.descriere_curatata || t.descriere || '',
-      tip: t.tip, suma: Number(t.suma),
-      valuta: t.valuta || valuta,
-      referinta: t.referinta || null,
-      categorie: t.categorie || 'altele',
-    }))
-    const r = await fetch(`${SB}/rest/v1/tranzactii`, {
-      method: 'POST', headers: { ...SBH, 'Prefer': 'return=minimal' },
-      body: JSON.stringify(batch)
-    })
-    if (!r.ok) throw new Error(`Batch ${i}: ${await r.text()}`)
+  try {
+    for (let i = 0; i < tranzactii.length; i += 25) {
+      const batch = tranzactii.slice(i, i + 25).map((t: any) => ({
+        extras_id: extras.id, firma_id: firmaId,
+        data_tranzactie: t.data_tranzactie,
+        descriere: t.descriere || t.descriere_curatata || '',
+        descriere_curatata: t.descriere_curatata || t.descriere || '',
+        tip: t.tip, suma: Number(t.suma),
+        valuta: t.valuta || valuta,
+        referinta: t.referinta || null,
+        categorie: t.categorie || 'altele',
+      }))
+      const r = await fetch(`${SB}/rest/v1/tranzactii`, {
+        method: 'POST', headers: { ...SBH, 'Prefer': 'return=minimal' },
+        body: JSON.stringify(batch)
+      })
+      if (!r.ok) throw new Error(`Batch ${i}: ${await r.text()}`)
+    }
+  } catch (err) {
+    // Rollback: extrasul nou a fost creat dar tranzactiile nu s-au inserat complet - il stergem
+    // ca sa nu ramana un extras "fantoma" pe jumatate populat, fara sa afectam extrasul vechi
+    // (care e inca intact, pentru ca stergerea lui are loc abia mai jos, dupa acest bloc).
+    await sbDelete(`tranzactii?extras_id=eq.${extras.id}`)
+    await sbDelete(`extrase?id=eq.${extras.id}`)
+    throw err
   }
+
+  // Abia acum, dupa ce extrasul nou + toate tranzactiile s-au salvat cu succes, stergem extrasul
+  // vechi inlocuit - nu mai exista fereastra in care userul sa ramana fara date vechi SI noi.
+  await deleteStatementIds(oldIds)
 
   return { extrasId: extras.id, count: tranzactii.length, valuta }
 }

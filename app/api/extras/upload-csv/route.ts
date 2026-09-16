@@ -327,13 +327,13 @@ export async function POST(req: NextRequest) {
 
     for (const [valuta, valRows] of Object.entries(byValuta)) {
       const iban = parsedData.iban || null
-      // Inlocuieste extrasul existent doar daca e acelasi cont (acelasi IBAN) -
-      // altfel un al doilea cont cu aceeasi valuta (ex. RON) l-ar sterge pe primul.
+      // Rezolva ce extras vechi (acelasi cont/IBAN) trebuie inlocuit, dar NU il sterge inca -
+      // stergerea are loc abia dupa ce extrasul nou + toate tranzactiile lui s-au inserat cu
+      // succes (mai jos), ca sa nu ramanem fara date vechi SI fara cele noi daca insert-ul pica
+      // la mijloc. Altfel un al doilea cont cu aceeasi valuta (ex. RON) l-ar sterge pe primul.
       const old = iban
         ? await sbGet(`extrase?luna_id=eq.${lunaId}&valuta=eq.${valuta}&iban=eq.${encodeURIComponent(iban)}&select=id`)
         : []
-      for (const e of old) await sbDelete(`tranzactii?extras_id=eq.${e.id}`)
-      if (old.length > 0) await sbDelete(`extrase?id=in.(${old.map((e:any) => e.id).join(',')})`)
 
       const soldFinal = parsedData.sold_final !== undefined ? parsedData.sold_final : null
       const nrExtras = parsedData.numar_extras || null
@@ -383,6 +383,7 @@ export async function POST(req: NextRequest) {
         }
       })
 
+      let batchError: string | null = null
       for (let i = 0; i < txs.length; i += 25) {
         const r = await fetch(`${SB}/rest/v1/tranzactii`, {
           method: 'POST',
@@ -390,15 +391,39 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify(txs.slice(i, i + 25))
         })
         if (!r.ok) {
-          results.push({ valuta, error: `Batch ${i}: ${await r.text()}` })
+          batchError = `Batch ${i}: ${await r.text()}`
           break
         }
       }
 
+      if (batchError) {
+        // Rollback: extrasul nou a fost creat dar tranzactiile nu s-au inserat complet - il
+        // stergem ca sa nu ramana un extras "fantoma" pe jumatate populat, fara sa afectam
+        // extrasul vechi (inca intact, pentru ca nu l-am sters deloc inca).
+        await sbDelete(`tranzactii?extras_id=eq.${extras.id}`)
+        await sbDelete(`extrase?id=eq.${extras.id}`)
+        results.push({ valuta, error: batchError })
+        continue
+      }
+
+      // Abia acum, dupa ce extrasul nou + toate tranzactiile s-au salvat cu succes, stergem
+      // extrasul vechi inlocuit.
+      for (const e of old) await sbDelete(`tranzactii?extras_id=eq.${e.id}`)
+      if (old.length > 0) await sbDelete(`extrase?id=in.(${old.map((e:any) => e.id).join(',')})`)
+
       results.push({ valuta, count: txs.length, extrasId: extras.id })
     }
 
-    return NextResponse.json({ ok: true, results })
+    // "ok" reflecta rezultatul real - daca vreo moneda a picat (chiar daca altele au mers), clientul
+    // (UploadExtras.tsx) verifica doar `res.ok && d.ok`, fara sa inspecteze results[] individual -
+    // ok:true/200 fixe ar afisa mereu "Import reusit" chiar cand o moneda a picat silentios.
+    const failed = results.filter(r => r.error)
+    const hasError = failed.length > 0
+    return NextResponse.json({
+      ok: !hasError,
+      results,
+      error: hasError ? failed.map(r => `${r.valuta}: ${r.error}`).join(' | ') : undefined,
+    }, { status: hasError ? 500 : 200 })
 
   } catch (e: any) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
