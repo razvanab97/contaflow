@@ -28,13 +28,14 @@ export async function GET(req: NextRequest) {
   const firmaId = req.nextUrl.searchParams.get('firmaId')
   const sumaParam = req.nextUrl.searchParams.get('suma')
   const suma = sumaParam !== null ? Number(sumaParam) : null
+  const valutaTx = (req.nextUrl.searchParams.get('valutaTx') || 'RON').toUpperCase()
   const q = (req.nextUrl.searchParams.get('q') || '').trim()
   const sursaFiltru = req.nextUrl.searchParams.get('sursa') as Sursa | 'toate' | null
   if (!firmaId) return NextResponse.json({ error: 'firmaId lipsă' }, { status: 400 })
 
   const sb = getServiceSupabase()
   let query = sb.from('documente')
-    .select('id,fisier_nume,furnizor,suma,data_document,numar_document,created_at')
+    .select('id,fisier_nume,furnizor,suma,valuta,data_document,numar_document,created_at')
     .eq('firma_id', firmaId)
     .eq('modul', 'inbox_facturi')
     .is('tranzactie_id', null)
@@ -46,12 +47,21 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const target = suma !== null && Number.isFinite(suma) ? Math.abs(suma) : null
-  let candidates = (docs || []).map(d => ({
-    ...d,
-    furnizor: furnizorCurat(d.furnizor),
-    sursa: detecteazaSursa(d.furnizor),
-    diferentaSuma: target !== null && d.suma != null ? Math.abs(Number(d.suma) - target) : null,
-  }))
+  let candidates = (docs || []).map(d => {
+    const valuta = (d.valuta || 'RON').toUpperCase()
+    // Compararea directa a sumelor are sens doar daca sunt in aceeasi moneda - altfel o factura
+    // de 10 USD ar parea gresit "departe" de o tranzactie de 46 RON, cand de fapt e conversia
+    // exacta a aceleiasi sume, doar ca banca a convertit-o la plata cu cardul.
+    const monedaDiferita = target !== null && valuta !== valutaTx
+    return {
+      ...d,
+      valuta,
+      furnizor: furnizorCurat(d.furnizor),
+      sursa: detecteazaSursa(d.furnizor),
+      monedaDiferita,
+      diferentaSuma: target !== null && d.suma != null && !monedaDiferita ? Math.abs(Number(d.suma) - target) : null,
+    }
+  })
 
   const counts: Record<Sursa, number> = { local: 0, gmail: 0, oblio: 0, altele: 0 }
   for (const c of candidates) counts[c.sursa]++
@@ -59,6 +69,8 @@ export async function GET(req: NextRequest) {
   if (sursaFiltru && sursaFiltru !== 'toate') candidates = candidates.filter(c => c.sursa === sursaFiltru)
   candidates.sort((a, b) => {
     if (a.diferentaSuma !== null && b.diferentaSuma !== null) return a.diferentaSuma - b.diferentaSuma
+    if (a.diferentaSuma !== null) return -1
+    if (b.diferentaSuma !== null) return 1
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 

@@ -429,6 +429,7 @@ export async function importInboxDocument({
     furnizor: meta,
     numar_document: extracted?.numarDocument || null,
     suma: extracted?.suma ?? null,
+    valuta: extracted?.moneda || 'RON',
     data_document: extracted?.dataDocument || null,
     fisier_path: path,
     fisier_nume: fileName,

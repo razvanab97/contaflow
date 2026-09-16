@@ -49,7 +49,7 @@ interface Tx {
   sugestieInbox?: { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_document:string|null }|null
   sugestieBon?: { id:string; fisier_nume:string; comerciant:string|null; cui_client:string|null; suma:number|null; data_bon:string|null; tip:'combustibil'|'altul' }|null
 }
-interface InboxCandidat { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_document:string|null; diferentaSuma:number|null; sursa:'local'|'gmail'|'oblio'|'altele' }
+interface InboxCandidat { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; valuta:string; monedaDiferita:boolean; data_document:string|null; diferentaSuma:number|null; sursa:'local'|'gmail'|'oblio'|'altele' }
 const SURSA_LABEL: Record<'toate'|'local'|'gmail'|'oblio'|'altele', string> = { toate:'Toate', local:'Local', gmail:'Gmail', oblio:'e-Factură (Oblio)', altele:'Altele' }
 interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
@@ -853,7 +853,7 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
   // toate documentele firmei, nu doar cele mai apropiate ca suma - cu filtrare pe sursa si cautare text.
   async function searchInbox(sursa = inboxSursaFiltru, q = inboxQuery) {
     setInboxSearchBusy(true); setInboxSearchDone(false)
-    const params = new URLSearchParams({ firmaId, suma: String(tx.suma) })
+    const params = new URLSearchParams({ firmaId, suma: String(tx.suma), valutaTx: tx.valuta || 'RON' })
     if (sursa !== 'toate') params.set('sursa', sursa)
     if (q.trim()) params.set('q', q.trim())
     const res = await fetch(`/api/inbox-facturi/cauta?${params.toString()}`)
@@ -1281,7 +1281,8 @@ function WorkspaceCard({ tx, index, total, firmaId, lunaId, culoare, onPrev, onN
                             <div style={{ fontSize:'11px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.furnizor || c.fisier_nume}</div>
                             <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'2px' }}>
                               <span style={{ padding:'1px 6px', borderRadius:'20px', background:'var(--c-1e1e1e)', marginRight:'6px' }}>{SURSA_LABEL[c.sursa]}</span>
-                              {c.suma != null ? `${c.suma.toFixed(2)} RON` : 'sumă necunoscută'}{c.diferentaSuma !== null && c.diferentaSuma > 0.01 ? ` · diferență ${c.diferentaSuma.toFixed(2)} RON față de tranzacție` : ''}
+                              {c.suma != null ? `${c.suma.toFixed(2)} ${c.valuta}` : 'sumă necunoscută'}
+                              {c.monedaDiferita ? ` · monedă diferită de tranzacție (${tx.valuta}) - verifică manual` : c.diferentaSuma !== null && c.diferentaSuma > 0.01 ? ` · diferență ${c.diferentaSuma.toFixed(2)} ${c.valuta} față de tranzacție` : ''}
                             </div>
                           </div>
                           <button onClick={()=>associateInboxCandidat(c.id)} disabled={!!inboxAssocId} style={{ fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:'none', background:'var(--accent-mint)', color:'var(--c-0a0a0a)', cursor: inboxAssocId ? 'wait' : 'pointer', opacity: inboxAssocId && inboxAssocId!==c.id ? .5 : 1, whiteSpace:'nowrap' }}>
