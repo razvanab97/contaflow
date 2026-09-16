@@ -33,10 +33,11 @@ const sb = createClient(SUPABASE_URL, SERVICE_KEY)
 const WATCH_DIR = process.env.CONTAFLOW_WATCH_DIR || path.join(os.homedir(), 'Desktop', 'Facturi ContaFlow')
 const DONE_DIR = path.join(WATCH_DIR, '_incarcat')
 const ERROR_DIR = path.join(WATCH_DIR, '_erori')
+const STAGING_DIR = path.join(WATCH_DIR, '_procesare')
 const POLL_MS = 5000
 const MIME_BY_EXT = { '.pdf': 'application/pdf', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' }
 
-for (const dir of [WATCH_DIR, DONE_DIR, ERROR_DIR]) fs.mkdirSync(dir, { recursive: true })
+for (const dir of [WATCH_DIR, DONE_DIR, ERROR_DIR, STAGING_DIR]) fs.mkdirSync(dir, { recursive: true })
 
 function log(msg) {
   console.log(`[${new Date().toLocaleTimeString('ro-RO')}] ${msg}`)
@@ -67,34 +68,61 @@ async function processFile(fileName) {
     return
   }
 
-  const bytes = fs.readFileSync(filePath)
+  // Preluăm fișierul într-un folder privat de procesare ÎNAINTE de orice - dacă altceva
+  // atinge folderul urmărit între timp (alt watcher pornit din greșeală, sincronizare
+  // Google Drive/iCloud pe Desktop etc.), lucrăm deja pe propria copie și nu-l mai putem
+  // pierde. Dacă renameSync eșuează, altcineva l-a preluat deja - îl ignorăm la acest tick.
+  const stagingPath = path.join(STAGING_DIR, `${Date.now()}_${safeName(fileName)}`)
+  try {
+    fs.renameSync(filePath, stagingPath)
+  } catch {
+    stableSizes.delete(fileName)
+    return
+  }
+  const restoreToWatch = () => { try { fs.renameSync(stagingPath, filePath) } catch {} }
+
+  let bytes
+  try {
+    bytes = fs.readFileSync(stagingPath)
+  } catch (err) {
+    log(`Nu am putut citi fișierul preluat, îl pun înapoi: ${fileName} (${err.message})`)
+    restoreToWatch()
+    return
+  }
   const hash = crypto.createHash('sha256').update(bytes).digest('hex')
   const storagePath = `_watch-global/${hash.slice(0, 12)}_${safeName(fileName)}`
 
   const { error: uploadError } = await sb.storage.from('documente').upload(storagePath, bytes, { contentType: mediaType, upsert: true })
   if (uploadError) {
     log(`Eroare la urcare, reîncerc mai târziu: ${fileName} (${uploadError.message})`)
+    restoreToWatch()
     return
   }
 
-  const { error: insertError } = await sb.from('inbox_watch_files').insert({
+  const { data: inserted, error: insertError } = await sb.from('inbox_watch_files').insert({
     fisier_path: storagePath,
     fisier_nume: fileName,
     fisier_tip: mediaType,
     fisier_marime: bytes.length,
     document_hash: hash,
     status: 'pending',
-  })
-  if (insertError && !/duplicate key|unique constraint/i.test(insertError.message || '')) {
+  }).select('id').single()
+  const isDuplicate = !!insertError && /duplicate key|unique constraint/i.test(insertError.message || '')
+  if (insertError && !isDuplicate) {
     log(`Eroare la înregistrare, reîncerc mai târziu: ${fileName} (${insertError.message})`)
+    restoreToWatch()
     return
   }
-  if (insertError) {
-    log(`Deja în coadă (fișier identic urcat anterior): ${fileName}`)
-  } else {
-    log(`Urcat, în așteptare de sincronizare: ${fileName}`)
+  // Chiar fara eroare, ne asiguram ca randul chiar exista inainte sa consideram fisierul
+  // "in siguranta" - altfel un raspuns neasteptat de la Supabase ar putea muta fisierul
+  // in _incarcat fara nicio urma in baza de date.
+  if (!isDuplicate && !inserted?.id) {
+    log(`Înregistrare neconfirmată, reîncerc mai târziu: ${fileName}`)
+    restoreToWatch()
+    return
   }
-  moveTo(DONE_DIR, filePath, fileName)
+  log(isDuplicate ? `Deja în coadă (fișier identic urcat anterior): ${fileName}` : `Urcat, în așteptare de sincronizare: ${fileName}`)
+  moveTo(DONE_DIR, stagingPath, fileName)
   stableSizes.delete(fileName)
 }
 

@@ -445,9 +445,10 @@ export async function importInboxDocument({
 type SegmentDocument = { pageStart: number; pageEnd: number }
 
 // Peste acest numar de pagini merita verificat daca fisierul e de fapt un pachet cu mai multe
-// documente separate (ex. export in bloc ANAF SPV/Oblio) - facturile normale au rareori mai mult
-// de cateva pagini, deci sub prag nu cheltuim un apel AI suplimentar degeaba.
-const PRAG_PAGINI_VERIFICARE_PACHET = 4
+// documente separate (ex. export in bloc ANAF SPV/Oblio, sau cateva luni de facturi de la acelasi
+// furnizor trimise intr-un singur PDF, o pagina per factura) - un document normal are o pagina,
+// deci sub prag nu cheltuim un apel AI suplimentar degeaba.
+const PRAG_PAGINI_VERIFICARE_PACHET = 1
 
 // Verifica daca PDF-ul contine de fapt mai multe documente distincte, unul dupa altul, si daca da
 // intoarce paginile fiecaruia. Intoarce null daca e un singur document sau daca verificarea esueaza

@@ -19,6 +19,7 @@ export default function FacturiLocaleGlobal({ firme }: Props) {
   const [pendingCount, setPendingCount] = useState(0)
   const [syncBusy, setSyncBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [rezultate, setRezultate] = useState<{ fisier:string; status:string; firma:string|null }[]>([])
   const [assignPick, setAssignPick] = useState<Record<string, string>>({})
   const [assignBusy, setAssignBusy] = useState<string | null>(null)
 
@@ -33,11 +34,15 @@ export default function FacturiLocaleGlobal({ firme }: Props) {
   async function sync() {
     setSyncBusy(true)
     setMessage('')
+    setRezultate([])
     const res = await fetch('/api/inbox-facturi/global/sync', { method: 'POST' })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setMessage(data.error || 'Sincronizarea a eșuat')
-    else if (data.total === 0) setMessage('Nu era nimic de sincronizat.')
-    else setMessage(`${data.imported} importate, ${data.duplicate} duplicate, ${data.nedetectat} fără firmă detectată, ${data.eroare} erori.`)
+    else if (data.total === 0) setMessage('Nu era nimic nou de sincronizat - am verificat oricum.')
+    else {
+      setMessage(`${data.imported} importate, ${data.duplicate} duplicate, ${data.nedetectat} fără firmă detectată, ${data.eroare} erori.`)
+      setRezultate(Array.isArray(data.rezultate) ? data.rezultate : [])
+    }
     await load()
     setSyncBusy(false)
   }
@@ -68,12 +73,26 @@ export default function FacturiLocaleGlobal({ firme }: Props) {
             Pune fișiere în <code>~/Desktop/Facturi ContaFlow</code> (rulează <code>npm run watch:facturi</code>), apoi sincronizează aici — se repartizează automat pe firma potrivită.
           </div>
         </div>
-        <button onClick={sync} disabled={syncBusy || pendingCount === 0} style={{ fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', opacity: (syncBusy || pendingCount === 0) ? .5 : 1, flexShrink: 0 }}>
+        <button onClick={sync} disabled={syncBusy} title="Verifică din nou folderul local, chiar dacă nu arată nimic în așteptare" style={{ fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', opacity: syncBusy ? .5 : 1, flexShrink: 0 }}>
           {syncBusy ? 'Sincronizez...' : `Sincronizează${pendingCount ? ` (${pendingCount})` : ''}`}
         </button>
       </div>
 
       {message && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '12px' }}>{message}</div>}
+
+      {rezultate.length > 0 && (
+        <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {rezultate.map((r, i) => (
+            <div key={`${r.fisier}-${i}`} style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>{r.fisier}</span>
+              <span>→</span>
+              <span style={{ fontWeight: 700, color: r.status === 'imported' ? 'var(--accent-green, #4ade80)' : r.status === 'eroare' ? 'var(--accent-red, #f87171)' : 'var(--text-muted)' }}>
+                {r.firma ? r.firma : r.status === 'duplicat' ? 'deja existent' : r.status === 'nedetectat' ? 'firmă nedetectată' : 'eroare'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {needsAttention.length > 0 && (
         <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
