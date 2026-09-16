@@ -140,7 +140,7 @@ async function findMatchingTransaction(sb: SupabaseService, firmaId: string, ext
   if (!extracted?.suma) return null
   const { data } = await sb
     .from('tranzactii')
-    .select('id,firma_id,data_tranzactie,descriere,descriere_curatata,suma,valuta,referinta,document_id')
+    .select('id,firma_id,extras_id,data_tranzactie,descriere,descriere_curatata,suma,valuta,referinta,document_id')
     .eq('firma_id', firmaId)
     .is('document_id', null)
     .limit(250)
@@ -363,8 +363,17 @@ export async function importInboxDocument({
   if (existingByMetadata) {
     return { duplicate: true, doc: existingByMetadata, extracted, targetFirma: target?.nume || currentFirma?.nume || null, source: sourceLabel || null }
   }
+  const match = await findMatchingTransaction(sb, target?.id || firmaId, extracted)
   const docMonth = monthFromIso(extracted?.dataDocument) || luna
-  const targetLunaId = luniRows.find(l => l.firma_id === target?.id && l.luna?.startsWith(docMonth))?.id || target?.luna_id || lunaId
+  const dateBasedLunaId = luniRows.find(l => l.firma_id === target?.id && l.luna?.startsWith(docMonth))?.id || target?.luna_id || lunaId
+  // Cand documentul se asociaza automat cu o tranzactie existenta, trebuie filat sub luna
+  // contabila a extrasului acelei tranzactii (nu dupa data proprie a facturii) - altfel exportul
+  // grupat pe tranzactii (ZIP/PDF/"Descarca toate documentele") nu-l mai gaseste, pentru ca acelea
+  // filtreaza documentele dupa luna_id = luna de lucru curenta, nu dupa data facturii.
+  const matchExtras = match?.tx.extras_id
+    ? (await sb.from('extrase').select('luna_id').eq('id', match.tx.extras_id).single()).data
+    : null
+  const targetLunaId = matchExtras?.luna_id || dateBasedLunaId
   const extension = mediaType === 'application/pdf' ? 'pdf' : mediaType === 'image/png' ? 'png' : 'jpg'
   const status = detected ? extracted?.incredereFirma || 'sigur' : 'verifica_firma'
   const details = [
@@ -389,8 +398,6 @@ export async function importInboxDocument({
 
   const { error: storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType: mediaType })
   if (storageError) throw new Error(storageError.message)
-
-  const match = await findMatchingTransaction(sb, target?.id || firmaId, extracted)
 
   const meta = [
     extracted?.furnizor,
