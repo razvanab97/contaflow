@@ -102,10 +102,15 @@ export async function POST(req: NextRequest) {
     // Documente atașate pe tranzacții (facturi/chitanțe din Extras), în exact ordinea din Extras
     const extrasTxDocs = await getExtrasTxDocs(sb, lunaId)
 
-    // Documente din categorii — fără filtru in_zip (include doc-uri istorice + noi)
+    // Documente din categorii — fără filtru in_zip (include doc-uri istorice + noi).
+    // Exclus explicit tranzactie_id not null: acelea sunt deja incluse mai sus, prin getExtrasTxDocs()
+    // (ex. un document Inbox Facturi asociat cu o tranzactie isi schimba modul in 'extras', dar
+    // fisier_path ramane neschimbat sub /inbox-facturi/ - fara acest filtru ar ajunge in arhiva de
+    // doua ori, o data la 'extras' si o data la 'inbox-facturi').
     const { data: docs } = await sb.from('documente')
       .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor')
       .eq('luna_id', lunaId)
+      .is('tranzactie_id', null)
       .not('fisier_path', 'like', '%/tx/%')
       .not('fisier_path', 'like', '%/checklist/%')
       .not('fisier_path', 'like', '%/config/%')

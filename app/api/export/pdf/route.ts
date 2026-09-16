@@ -144,12 +144,17 @@ export async function POST(req: NextRequest) {
   // Categoria extras e stocată în tabelul extrase, nu în documente
   const isExtras = scope?.extras || scope?.section === 'extras'
 
-  // Documente din categorii (fără filtru in_zip — include doc-uri istorice + noi)
+  // Documente din categorii (fără filtru in_zip — include doc-uri istorice + noi).
+  // Exclus explicit tranzactie_id not null: acelea sunt deja incluse separat, prin getExtrasTxDocs()
+  // (ex. un document Inbox Facturi asociat cu o tranzactie isi schimba modul in 'extras', dar
+  // fisier_path ramane neschimbat sub /inbox-facturi/ - fara acest filtru ar aparea de doua ori
+  // in exportul complet, o data la 'extras' si o data la 'inbox-facturi').
   const { data: allDocs, error } = isExtras
     ? { data: [], error: null }
     : await sb.from('documente')
         .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor')
         .eq('luna_id', lunaId)
+        .is('tranzactie_id', null)
         .not('fisier_path', 'like', '%/tx/%')
         .not('fisier_path', 'like', '%/checklist/%')
         .not('fisier_path', 'like', '%/config/%')
