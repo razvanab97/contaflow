@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 138, text: 'Exporturile lunare păstrează Inbox Facturi doar intern, dar includ acum lista centralizată de Bonuri: în PDF apare secțiunea Bonuri cu lista bonurilor, iar în ZIP apare folderul Bonuri cu lista_bonuri.pdf.' },
   { v: 137, text: 'Exporturile PDF/ZIP nu mai includ Inbox Facturi ca documente de descărcat; inbox-ul rămâne zonă internă de lucru. eMAG păstrează avizul de plată nou ca aviz activ pe task, curăță avizele vechi care încurcau afișarea și face rollback dacă salvarea facturilor extrase eșuează.' },
   { v: 136, text: 'Audit documente/export: în PDF/ZIP fiecare extras bancar este urmat imediat de documentele tranzacțiilor din acel extras, documentele salvate sub /tx sunt încadrate corect la Extras de cont, iar eMAG afișează facturile încărcate fără aviz și le leagă automat când avizul/fisa lipsă este adăugat(ă)' },
   { v: 135, text: 'Bonuri nu mai e independent - e acum un modul propriu-zis al lunii, ca toate celelalte: intră în lista de module a firmei (poziționat logic înaintea lui Extras de cont, alături de celelalte surse de documente), are propriul task de bifat ("Bonuri verificate/atribuite") și primește "Pasul următor" ca oricare alt modul. Link-ul vechi din meniu (fără lună) a fost eliminat - se ajunge la Bonuri direct din lista de module a lunii curente; vechea adresă redirecționează automat spre luna curentă, ca link-urile salvate să nu se strice' },

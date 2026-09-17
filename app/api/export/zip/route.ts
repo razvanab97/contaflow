@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS, MODULE_DEFS } from '@/lib/firma-config'
 import { generateNotePdfBytes } from '@/lib/notePdf'
+import { generateBonuriPdfBytes } from '@/lib/bonuriPdf'
 import JSZip from 'jszip'
 
 export const maxDuration = 120
@@ -170,6 +171,15 @@ export async function POST(req: NextRequest) {
       if (!b) continue
       if (!sectionMap.has(section)) sectionMap.set(section, [])
       sectionMap.get(section)!.push({ name: doc.fisier_nume, data: await b.arrayBuffer(), fisier_path: doc.fisier_path, furnizor: doc.furnizor, created_at: doc.created_at })
+    }
+
+    if (firmaId && firmaNume && moduleOrder.includes('bonuri')) {
+      const bonuriBytes = await generateBonuriPdfBytes(firmaId, firmaNume)
+      if (bonuriBytes) {
+        if (!sectionMap.has('bonuri')) sectionMap.set('bonuri', [])
+        const data = bonuriBytes.buffer.slice(bonuriBytes.byteOffset, bonuriBytes.byteOffset + bonuriBytes.byteLength) as ArrayBuffer
+        sectionMap.get('bonuri')!.push({ name: 'lista_bonuri.pdf', data, fisier_path: '/bonuri/lista_bonuri.pdf' })
+      }
     }
 
     // eMAG: avizele împreună cu facturile lor proprii, în ordinea din task-uri

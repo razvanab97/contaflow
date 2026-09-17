@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS, MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
 import { generateNotePdfBytes } from '@/lib/notePdf'
+import { generateBonuriPdfBytes } from '@/lib/bonuriPdf'
 
 export const maxDuration = 120
 
@@ -145,9 +146,14 @@ async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: 
 }
 
 export async function POST(req: NextRequest) {
-  const { lunaId, title, scope, firmaSlug, firmaNume, lunaLabel, itemIds = [] } = await req.json()
+  const { firmaId, lunaId, title, scope, firmaSlug, firmaNume, lunaLabel, itemIds = [] } = await req.json()
   if (!lunaId) return NextResponse.json({ error: 'Luna contabilă lipsește' }, { status: 400 })
   const sb = getServiceSupabase()
+  let exportFirmaId = firmaId ? String(firmaId) : ''
+  if (!exportFirmaId) {
+    const { data: lunaRow } = await sb.from('luni_contabile').select('firma_id').eq('id', lunaId).single()
+    exportFirmaId = lunaRow?.firma_id || ''
+  }
 
   // Categoria extras e stocată în tabelul extrase, nu în documente
   const isExtras = scope?.extras || scope?.section === 'extras'
@@ -194,7 +200,7 @@ export async function POST(req: NextRequest) {
   if (!scope && firmaSlug) {
     const moduleOrder = FIRMA_CONFIGS[firmaSlug]?.module || []
 
-    type Entry = { path: string; name: string; type: string; bucket: 'documente' | 'extrase-pdf'; furnizor?: string|null; created_at?: string; data_document?: string|null }
+    type Entry = { path: string; name: string; type: string; bucket: 'documente' | 'extrase-pdf' | 'memory'; bytes?: Uint8Array; furnizor?: string|null; created_at?: string; data_document?: string|null }
     const sectionMap = new Map<string, Entry[]>()
     // Ordinea reala a evenimentului (data de pe document), nu data la care a fost incarcat in
     // sistem - un import in lot (multe facturi vechi adaugate intr-o singura sedinta) ar avea
@@ -239,6 +245,10 @@ export async function POST(req: NextRequest) {
       if (!sectionMap.has(section)) sectionMap.set(section, [])
       sectionMap.get(section)!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente', furnizor: doc.furnizor, created_at: doc.created_at, data_document: doc.data_document })
     }
+    if (exportFirmaId && firmaNume && moduleOrder.includes('bonuri')) {
+      const bonuriBytes = await generateBonuriPdfBytes(exportFirmaId, firmaNume)
+      if (bonuriBytes) sectionMap.set('bonuri', [{ path: '', name: 'lista_bonuri.pdf', type: 'application/pdf', bucket: 'memory', bytes: bonuriBytes }])
+    }
     // Emag: avizele impreuna cu facturile lor proprii, in ordinea din task-uri
     if (sectionMap.has('emag')) {
       sectionMap.set('emag', sortEmagDocs(sectionMap.get('emag')!.map(e => ({ ...e, fisier_path: e.path }))))
@@ -269,6 +279,10 @@ export async function POST(req: NextRequest) {
     for (const section of nonEmpty) {
       addSectionCover(merged, coverFont, sectionLabel(section))
       for (const entry of sectionMap.get(section) || []) {
+        if (entry.bucket === 'memory' && entry.bytes) {
+          await embedDoc(merged, Buffer.from(entry.bytes), entry.type, entry.name)
+          continue
+        }
         const { data } = await sb.storage.from(entry.bucket).download(entry.path)
         if (!data) continue
         await embedDoc(merged, Buffer.from(await data.arrayBuffer()), entry.type, entry.name)
