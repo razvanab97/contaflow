@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { FIRMA_CONFIGS } from '@/lib/firma-config'
 import { pdfPageCount, extractPageRange } from '@/lib/pdfBatch'
+import { isEonInvoice, keepOnlyFirstPage } from '@/lib/eonInvoice'
 
 type SupabaseService = ReturnType<typeof import('@/lib/supabase/server').getServiceSupabase>
 
@@ -294,7 +295,6 @@ export async function importInboxDocument({
   sourceLabel?: string | null
   requireDetectedFirm?: boolean
 }): Promise<InboxImportResult> {
-  const hash = crypto.createHash('sha256').update(bytes).digest('hex')
   if (isNonInvoiceName(originalName)) {
     return {
       duplicate: false,
@@ -328,7 +328,7 @@ export async function importInboxDocument({
       }
     })
 
-  const extracted = await analyzeInvoice(bytes, mediaType, candidates)
+  let extracted = await analyzeInvoice(bytes, mediaType, candidates)
   if (extracted && !extracted.esteFactura) {
     return {
       duplicate: false,
@@ -349,6 +349,10 @@ export async function importInboxDocument({
       extracted,
     }
   }
+  if (mediaType === 'application/pdf' && isEonInvoice(extracted?.furnizor) && await pdfPageCount(Buffer.from(bytes)) > 1) {
+    bytes = await keepOnlyFirstPage(Buffer.from(bytes))
+    extracted = await analyzeInvoice(bytes, mediaType, candidates)
+  }
   const byCui = candidates.find(f => f.cuiToate.some(c => norm(c) && norm(c) === norm(extracted?.firmaCui)))
   const bySlug = candidates.find(f => f.slug === extracted?.firmaSlug)
   const detected = extracted?.incredereFirma === 'sigur' ? (byCui || bySlug) : byCui || null
@@ -363,6 +367,7 @@ export async function importInboxDocument({
     }
   }
   const target = detected || candidates.find(f => f.id === firmaId) || candidates[0]
+  const hash = crypto.createHash('sha256').update(bytes).digest('hex')
   const fingerprint = invoiceFingerprint(target?.id || firmaId, extracted)
   const existingByHash = await findExistingByOptionalColumn(sb, 'document_hash', hash)
   if (existingByHash) {

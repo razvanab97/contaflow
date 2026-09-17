@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 140, text: 'Facturile E.ON se salvează fizic doar cu prima pagină peste tot unde intră ca facturi/documente (inclusiv Inbox Facturi și uploadurile de documente/Dispoziții), nu doar în ruta specială de Dispoziții de plată. Paginile suplimentare cu grafice/condiții nu mai ajung în storage/export.' },
   { v: 139, text: 'Export Extras de cont: dacă același PDF brut de extras este salvat pe două conturi/monede (ex. AB Homes Invest RON+EUR din același fișier bancar), PDF-ul brut apare o singură dată în descărcarea PDF/ZIP; documentele tranzacțiilor rămân toate, în ordine, sub Extras de cont.' },
   { v: 138, text: 'Exporturile lunare păstrează Inbox Facturi doar intern, dar includ acum lista centralizată de Bonuri: în PDF apare secțiunea Bonuri cu lista bonurilor, iar în ZIP apare folderul Bonuri cu lista_bonuri.pdf.' },
   { v: 137, text: 'Exporturile PDF/ZIP nu mai includ Inbox Facturi ca documente de descărcat; inbox-ul rămâne zonă internă de lucru. eMAG păstrează avizul de plată nou ca aviz activ pe task, curăță avizele vechi care încurcau afișarea și face rollback dacă salvarea facturilor extrase eșuează.' },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument } from 'pdf-lib'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { isEonInvoice, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 const ALLOWED_CSV_TYPES = new Set(['text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain', ''])
@@ -383,7 +384,12 @@ export async function POST(req: NextRequest) {
 
   // Numele fisierului trebuie sa spuna ce e documentul — preferam ce a citit AI-ul (furnizor + numar
   // document), completat cu ce ai scris tu manual; daca AI-ul n-a gasit nimic, ramane eticheta tipului
-  const effectiveSupplier = supplier || genericExtractie?.furnizor || ''
+  let effectiveSupplier = supplier || genericExtractie?.furnizor || ''
+  if (!isAirbnbCsv && file.type === 'application/pdf' && isEonInvoice(effectiveSupplier) && await pdfPageCount(Buffer.from(uploadBytes)) > 1) {
+    uploadBytes = await keepOnlyFirstPage(Buffer.from(uploadBytes))
+    genericExtractie = await analyzeGenericDoc(uploadBytes, file.type)
+    effectiveSupplier = supplier || genericExtractie?.furnizor || effectiveSupplier
+  }
   const details = [effectiveDocumentTypeLabel, genericExtractie?.furnizor, genericExtractie?.numarDocument, supplier, description, reference].filter(Boolean).join(' ')
   const fileName = `${safeFilePart(details, effectiveType)}_${Date.now()}.${extension}`
   const path = `${firmaId}/${lunaId}/${effectiveSection}/${fileName}`
