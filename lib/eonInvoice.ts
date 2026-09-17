@@ -9,6 +9,15 @@ export function isEonInvoice(supplier: string | null | undefined): boolean {
   return /\be\.?\s*-?\s*on\b/.test(normalized)
 }
 
+export function isEonApartment99(apartmentOrAddress: string | null | undefined): boolean {
+  const normalized = String(apartmentOrAddress || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+  const digitsOnly = normalized.replace(/\D/g, '')
+  return digitsOnly === '99' || /\b(ap|apt|apartament|apartment)\.?\s*99\b/.test(normalized)
+}
+
 // Reconstruiește fizic PDF-ul păstrând DOAR prima pagină - pentru facturile E.ON, ale căror
 // pagini 2+ (grafice de consum, condiții generale) nu trebuie salvate, trimise la AI sau afișate.
 // Nu doar "ignoră" paginile suplimentare - creează un document nou, validat, cu exact 1 pagină.

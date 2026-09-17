@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { FIRMA_CONFIGS } from '@/lib/firma-config'
 import { pdfPageCount, extractPageRange } from '@/lib/pdfBatch'
-import { isEonInvoice, keepOnlyFirstPage } from '@/lib/eonInvoice'
+import { isEonApartment99, isEonInvoice, keepOnlyFirstPage } from '@/lib/eonInvoice'
 
 type SupabaseService = ReturnType<typeof import('@/lib/supabase/server').getServiceSupabase>
 
@@ -34,6 +34,7 @@ type ExtractieInbox = {
   suma: number | null
   moneda: string | null
   dataDocument: string | null
+  locatie: string | null
   tipDocument: string | null
   motiv: string | null
 }
@@ -228,7 +229,7 @@ async function analyzeInvoice(bytes: Uint8Array, mediaType: string, candidates: 
         source,
         { type: 'text', text: `Acesta este un document contabil primit in inbox (factura, chitanta, invoice, e-Factura sau document similar). Identifica pentru care dintre firmele noastre este documentul, folosind mai ales CUI/CIF/cod fiscal si apoi numele firmei. O firma poate avea mai multe CUI-uri valide - lista completa e in "cuiValide"; orice CUI din acea lista gasit pe document conteaza ca potrivire sigura pentru firma respectiva. Firme disponibile: ${JSON.stringify(firme)}.
 Raspunde DOAR cu JSON:
-{"firmaSlug":"slug-ul firmei sau null","firmaCui":"CUI/CIF gasit pe document pentru firma noastra sau null","incredereFirma":"sigur|posibil|necunoscut","esteFactura":true,"furnizor":"emitent/furnizor sau null","numarDocument":"seria si numarul facturii/documentului sau null","suma":123.45,"moneda":"RON|EUR|HUF|BGN sau null","dataDocument":"AAAA-LL-ZZ sau null","tipDocument":"factura|chitanta|invoice|altul","motiv":"pe scurt de ce ai ales firma"}.
+{"firmaSlug":"slug-ul firmei sau null","firmaCui":"CUI/CIF gasit pe document pentru firma noastra sau null","incredereFirma":"sigur|posibil|necunoscut","esteFactura":true,"furnizor":"emitent/furnizor sau null","numarDocument":"seria si numarul facturii/documentului sau null","suma":123.45,"moneda":"RON|EUR|HUF|BGN sau null","dataDocument":"AAAA-LL-ZZ sau null","locatie":"apartamentul/adresa/locul de consum daca apare (ex: Ap. 99), altfel null","tipDocument":"factura|chitanta|invoice|altul","motiv":"pe scurt de ce ai ales firma"}.
 Nu inventa valori. Daca documentul contine mai multe firme, firma noastra este beneficiarul/cumparatorul, nu furnizorul.
 Accepta furnizori externi/straini (de exemplu ISO/Maxy/Verk/Jumbo/Anthropic/OpenAI), dar numai daca documentul indica una dintre firmele noastre ca beneficiar/cumparator, prin CUI/CIF, nume firma sau adresa. Daca documentul pare personal sau pentru alta entitate, seteaza firmaSlug si firmaCui null, incredereFirma necunoscut.
 Pentru Maxy si Verk accepta doar facturi reale cu numar/serie care incepe cu "FS"; proformele sau documentele cu alt prefix nu sunt utile si trebuie marcate cu "esteFactura":false.
@@ -249,6 +250,7 @@ Nu importa AWB-uri, etichete de transport, packing list, shipping documents sau 
       suma: typeof parsed.suma === 'number' ? parsed.suma : null,
       moneda: typeof parsed.moneda === 'string' ? parsed.moneda : null,
       dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
+      locatie: typeof parsed.locatie === 'string' ? parsed.locatie : null,
       tipDocument: typeof parsed.tipDocument === 'string' ? parsed.tipDocument : 'factura',
       motiv: typeof parsed.motiv === 'string' ? parsed.motiv : null,
     }
@@ -349,7 +351,7 @@ export async function importInboxDocument({
       extracted,
     }
   }
-  if (mediaType === 'application/pdf' && isEonInvoice(extracted?.furnizor) && await pdfPageCount(Buffer.from(bytes)) > 1) {
+  if (mediaType === 'application/pdf' && isEonInvoice(extracted?.furnizor) && !isEonApartment99(extracted?.locatie) && await pdfPageCount(Buffer.from(bytes)) > 1) {
     bytes = await keepOnlyFirstPage(Buffer.from(bytes))
     extracted = await analyzeInvoice(bytes, mediaType, candidates)
   }
