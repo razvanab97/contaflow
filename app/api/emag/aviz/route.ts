@@ -73,10 +73,11 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
 
   const { data: avize, error } = await sb.from('documente')
-    .select('id,furnizor,numar_document,fisier_nume,fisier_marime,created_at')
+    .select('id,furnizor,numar_document,fisier_nume,fisier_path,fisier_marime,created_at')
     .eq('luna_id', lunaId)
     .eq('modul', 'emag')
     .eq('tip_document', 'aviz_plata')
+    .order('created_at', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const documentIds = (avize || []).map(a => a.id)
@@ -200,7 +201,11 @@ export async function POST(req: NextRequest) {
         valoare: Number(inv.valoare) || 0,
       }))
       const { data: insertedRows, error: insError } = await sb.from('emag_avize_facturi').insert(rows).select('*')
-      if (insError) return NextResponse.json({ error: insError.message }, { status: 500 })
+      if (insError) {
+        await sb.from('documente').delete().eq('id', doc.id)
+        await sb.storage.from('documente').remove([path])
+        return NextResponse.json({ error: insError.message }, { status: 500 })
+      }
       const { data: existingDocs } = await sb.from('documente')
         .select('id,fisier_nume,numar_document')
         .eq('luna_id', lunaId)
@@ -218,6 +223,22 @@ export async function POST(req: NextRequest) {
         row.factura_document_id = match.id
       }
       inserted = (insertedRows || []).map(row => ({ ...row, valuta }))
+    }
+
+    const { data: olderAvize } = await sb.from('documente')
+      .select('id,fisier_path')
+      .eq('firma_id', firmaId)
+      .eq('luna_id', lunaId)
+      .eq('modul', 'emag')
+      .eq('tip_document', 'aviz_plata')
+      .eq('furnizor', taskKey)
+      .neq('id', doc.id)
+    const olderIds = (olderAvize || []).map(a => a.id)
+    if (olderIds.length) {
+      await sb.from('emag_avize_facturi').delete().in('document_id', olderIds)
+      await sb.from('documente').delete().in('id', olderIds)
+      const oldPaths = (olderAvize || []).map(a => a.fisier_path).filter(Boolean)
+      if (oldPaths.length) await sb.storage.from('documente').remove(oldPaths)
     }
 
     return NextResponse.json({ ok: true, documentId: doc.id, avizNumber, fisierNume: fileName, invoices: inserted })

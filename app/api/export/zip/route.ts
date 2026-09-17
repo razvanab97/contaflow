@@ -68,6 +68,7 @@ async function getExtrasTxDocs(sb: ReturnType<typeof getServiceSupabase>, lunaId
     .eq('luna_id', lunaId)
     .eq('modul', 'extras')
     .not('tranzactie_id', 'is', null)
+    .not('fisier_path', 'like', '%/inbox-facturi/%')
   if (!txDocs?.length) return []
   const txIds = [...new Set(txDocs.map(d => d.tranzactie_id).filter(Boolean))]
   const { data: txs } = await sb.from('tranzactii').select('id,extras_id,data_tranzactie').in('id', txIds)
@@ -118,6 +119,7 @@ export async function POST(req: NextRequest) {
       .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor')
       .eq('luna_id', lunaId)
       .is('tranzactie_id', null)
+      .not('fisier_path', 'like', '%/inbox-facturi/%')
       .not('fisier_path', 'like', '%/tx/%')
       .not('fisier_path', 'like', '%/checklist/%')
       .not('fisier_path', 'like', '%/config/%')
