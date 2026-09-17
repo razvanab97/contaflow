@@ -10,7 +10,8 @@ interface EmagDoc { id:string; fisier_nume:string; category:string; effect:'chel
 interface EmagSummary { bankReceipts:number; bankPayments:number; bankCashflow:number; emagExpenses:number; emagReductions:number; emagNetCost:number }
 interface OldDoc { id:string; fisier_nume:string; tip_document?:string }
 interface AvizFactura { id:string; categorie:string; id_document:string; serie_document:string; numar_cautare:string; data_document:string; valoare:number; valuta?:string; copiat:boolean; factura_document_id:string|null; factura_fisier_nume:string|null }
-interface AvizData { documentId:string; avizNumber:string; fisierNume:string; invoices:AvizFactura[] }
+interface OrphanEmagInvoice { id:string; task_key:string; numar_document:string|null; fisier_nume:string }
+interface AvizData { documentId:string|null; avizNumber:string; fisierNume:string; invoices:AvizFactura[]; orphanInvoices?:OrphanEmagInvoice[] }
 
 interface Props {
   firma: Firma
@@ -333,6 +334,8 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
   const r = rgb(culoare)
   const currency = avizCurrency(taskKey)
   const avizTotal = data?.invoices.reduce((sum, inv) => sum + (Number(inv.valoare) || 0), 0) || 0
+  const hasAviz = !!data?.documentId
+  const orphanInvoices = data?.orphanInvoices || []
 
   async function upload(file: File) {
     setUploading(true); setError('')
@@ -349,18 +352,18 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
   }
 
   async function removeAviz() {
-    if (!data || !confirm('Ștergi avizul și facturile extrase din el?')) return
+    if (!data?.documentId || !confirm('Ștergi avizul și facturile extrase din el?')) return
     const res = await fetch(`/api/emag/aviz?id=${encodeURIComponent(data.documentId)}`, { method:'DELETE' })
     if (res.ok) await onChange()
   }
 
   async function renameAvizNumber(numar_document: string) {
-    if (!data || !numar_document.trim() || numar_document === data.avizNumber) return
+    if (!data?.documentId || !numar_document.trim() || numar_document === data.avizNumber) return
     await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:data.documentId, numar_document }) })
     await onChange()
   }
   async function renameAvizFisier(fisier_nume: string) {
-    if (!data || !fisier_nume.trim() || fisier_nume === data.fisierNume) return
+    if (!data?.documentId || !fisier_nume.trim() || fisier_nume === data.fisierNume) return
     await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:data.documentId, fisier_nume }) })
     await onChange()
   }
@@ -368,12 +371,13 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
   return (
     <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius:'10px', overflow:'hidden', transition:'border-color .2s' }}>
       <button onClick={() => setOpen(v => !v)} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'14px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
-        <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: data ? 'var(--accent-mint)' : 'var(--c-2a2a2a)' }}/>
+        <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: hasAviz ? 'var(--accent-mint)' : orphanInvoices.length ? 'var(--accent)' : 'var(--c-2a2a2a)' }}/>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>{label}</div>
           {descriere && <div style={{ fontSize:'11px', color:'var(--c-777777)', marginTop:'2px' }}>{descriere}</div>}
         </div>
-        {data && <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', flexShrink:0 }}>{data.invoices.length} factur{data.invoices.length===1?'ă':'i'} · {moneyCurrency(avizTotal, currency)}</span>}
+        {hasAviz && <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', flexShrink:0 }}>{data!.invoices.length} factur{data!.invoices.length===1?'ă':'i'} · {moneyCurrency(avizTotal, currency)}</span>}
+        {!hasAviz && orphanInvoices.length > 0 && <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent)', flexShrink:0 }}>{orphanInvoices.length} factur{orphanInvoices.length===1?'ă':'i'} fără aviz</span>}
         <svg width="14" height="14" fill="none" stroke="var(--c-555555)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0, transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s' }}>
           <path d="M6 9l6 6 6-6"/>
         </svg>
@@ -381,7 +385,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
 
       {open && (
         <div style={{ padding:'0 18px 16px', borderTop:'1px solid var(--c-1a1a1a)' }}>
-          {data ? (
+          {hasAviz ? (
             <div style={{ padding:'12px 0 4px' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px', gap:'12px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:'6px', flex:1, minWidth:0 }}>
@@ -400,11 +404,11 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                 </div>
                 <div style={{ display:'flex', gap:'12px', alignItems:'center', flexShrink:0 }}>
                   <button onClick={() => setPreview(v => !v)} style={{ fontSize:'11px', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi aviz'}</button>
-                  <a href={`/api/emag/aviz/pdf?documentId=${encodeURIComponent(data.documentId)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓ PDF (aviz + facturi)</a>
+                  <a href={`/api/emag/aviz/pdf?documentId=${encodeURIComponent(data!.documentId!)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓ PDF (aviz + facturi)</a>
                   <button onClick={removeAviz} style={{ fontSize:'11px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
                 </div>
               </div>
-              {preview && <PreviewBox src={`/api/emag?docId=${encodeURIComponent(data.documentId)}&preview=1`} kind="pdf"/>}
+              {preview && <PreviewBox src={`/api/emag?docId=${encodeURIComponent(data!.documentId!)}&preview=1`} kind="pdf"/>}
               {data.invoices.length === 0 ? (
                 <p style={{ fontSize:'12px', color:'var(--c-666666)' }}>Nicio factură detectată în aviz.</p>
               ) : (
@@ -415,20 +419,44 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                 </div>
               )}
               {data.invoices.some(inv => !inv.factura_document_id) && (
-                <BulkUploadZone documentId={data.documentId} firmaId={firmaId} lunaId={lunaId} culoare={culoare} onChange={onChange}/>
+                <BulkUploadZone documentId={data!.documentId!} firmaId={firmaId} lunaId={lunaId} culoare={culoare} onChange={onChange}/>
+              )}
+              {orphanInvoices.length > 0 && (
+                <div style={{ marginTop:'10px', padding:'9px 10px', border:'1px solid var(--accent)', borderRadius:'8px', background:'light-dark(rgba(245,124,0,.16), rgba(245,158,11,.08))' }}>
+                  <div style={{ fontSize:'11px', fontWeight:700, color:'var(--accent)', marginBottom:'5px' }}>Facturi existente fără legătură cu avizul</div>
+                  {orphanInvoices.map(inv => (
+                    <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'11px', color:'var(--c-888888)', padding:'3px 0' }}>
+                      <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.numar_document || inv.fisier_nume}</span>
+                      <a href={`/api/emag?docId=${encodeURIComponent(inv.id)}`} style={{ color:legibil(culoare), textDecoration:'none' }}>↓</a>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           ) : (
-            <div
-              onClick={() => fileRef.current?.click()}
-              onDragOver={e => { e.preventDefault(); setDrag(true) }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]) }}
-              style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)', marginTop:'12px' }}
-            >
-              <p style={{ fontSize:'12px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
-                {uploading ? 'Se procesează avizul...' : '+ Adaugă aviz PDF'}
-              </p>
+            <div style={{ paddingTop:'12px' }}>
+              {orphanInvoices.length > 0 && (
+                <div style={{ marginBottom:'10px', padding:'9px 10px', border:'1px solid var(--accent)', borderRadius:'8px', background:'light-dark(rgba(245,124,0,.16), rgba(245,158,11,.08))' }}>
+                  <div style={{ fontSize:'11px', fontWeight:700, color:'var(--accent)', marginBottom:'5px' }}>Există facturi de comision, dar lipsește avizul/fisa de plată.</div>
+                  {orphanInvoices.map(inv => (
+                    <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'11px', color:'var(--c-888888)', padding:'3px 0' }}>
+                      <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.numar_document || inv.fisier_nume}</span>
+                      <a href={`/api/emag?docId=${encodeURIComponent(inv.id)}`} style={{ color:legibil(culoare), textDecoration:'none' }}>↓</a>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div
+                onClick={() => fileRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); setDrag(true) }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]) }}
+                style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)' }}
+              >
+                <p style={{ fontSize:'12px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
+                  {uploading ? 'Se procesează avizul...' : orphanInvoices.length ? '+ Adaugă avizul lipsă (se leagă automat)' : '+ Adaugă aviz PDF'}
+                </p>
+              </div>
             </div>
           )}
           <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files?.[0] && upload(e.target.files[0])}/>
@@ -496,13 +524,14 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
 
   const syncEmagTasks = useCallback((data: Record<string, AvizData>) => {
     for (const task of tasks) {
-      if (task.key.startsWith('emag.aviz_')) setTaskCompleted(task.key, !!data[task.key])
+      if (task.key.startsWith('emag.aviz_')) setTaskCompleted(task.key, !!data[task.key]?.documentId)
     }
 
     for (const market of ['ro', 'bg', 'hu']) {
       const avize = Object.entries(data)
         .filter(([key]) => key.startsWith(`emag.aviz_${market}_`))
         .map(([, value]) => value)
+        .filter(value => !!value.documentId)
       const invoices = avize.flatMap(aviz => aviz.invoices || [])
       const hasInvoices = invoices.length > 0
       const allInvoicesAttached = hasInvoices && invoices.every(inv => !!inv.factura_document_id)

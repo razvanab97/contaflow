@@ -10,6 +10,13 @@ interface ExtractedInvoice {
   valoare?: number
 }
 
+interface OrphanInvoice {
+  id: string
+  task_key: string
+  numar_document: string | null
+  fisier_nume: string
+}
+
 function currencyForTaskKey(taskKey?: string | null) {
   const key = String(taskKey || '').toLowerCase()
   if (key.includes('_bg')) return 'EUR'
@@ -19,6 +26,24 @@ function currencyForTaskKey(taskKey?: string | null) {
 
 function safePart(value: string, fallback: string) {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || fallback
+}
+
+function normalize(value: string) {
+  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+function taskKeyFromPath(path?: string | null) {
+  return String(path || '').split('/emag-facturi/')[1]?.split('/')[0] || ''
+}
+
+function invoiceMatches(numarCautare?: string | null, doc?: OrphanInvoice | null) {
+  const target = normalize(numarCautare || '')
+  if (!target || !doc) return false
+  const docNo = normalize(doc.numar_document || '')
+  const docName = normalize(doc.fisier_nume || '')
+  const trailing = normalize(String(numarCautare || '').match(/(\d+)$/)?.[1] || '')
+  return (!!docNo && (docNo === target || docNo.includes(target) || target.includes(docNo))) ||
+    (!!docName && (docName.includes(target) || (!!trailing && trailing.length >= 4 && docName.includes(trailing))))
 }
 
 async function analyzeAviz(bytes: Buffer) {
@@ -64,19 +89,53 @@ export async function GET(req: NextRequest) {
     ? await sb.from('documente').select('id,fisier_nume').in('id', facturaDocIds)
     : { data: [] }
   const facturaDocById = new Map((facturaDocs || []).map(d => [d.id, d.fisier_nume]))
+  const linkedFacturaIds = new Set(facturaDocIds)
+
+  const { data: emagFacturiDocs } = await sb.from('documente')
+    .select('id,fisier_path,fisier_nume,furnizor,numar_document')
+    .eq('luna_id', lunaId)
+    .eq('modul', 'emag')
+    .eq('tip_document', 'factura')
+    .like('fisier_path', '%/emag-facturi/%')
+
+  const orphanByTask: Record<string, OrphanInvoice[]> = {}
+  for (const doc of emagFacturiDocs || []) {
+    if (linkedFacturaIds.has(doc.id)) continue
+    const taskKey = doc.furnizor || taskKeyFromPath(doc.fisier_path)
+    if (!taskKey) continue
+    if (!orphanByTask[taskKey]) orphanByTask[taskKey] = []
+    orphanByTask[taskKey].push({
+      id: doc.id,
+      task_key: taskKey,
+      numar_document: doc.numar_document || null,
+      fisier_nume: doc.fisier_nume,
+    })
+  }
+
   const facturiEnriched = (facturi || []).map(f => ({
     ...f,
     valuta: currencyForTaskKey(f.task_key),
     factura_fisier_nume: f.factura_document_id ? facturaDocById.get(f.factura_document_id) || null : null,
   }))
 
-  const result: Record<string, { documentId:string; avizNumber:string; fisierNume:string; invoices:typeof facturiEnriched }> = {}
+  const result: Record<string, { documentId:string|null; avizNumber:string; fisierNume:string; invoices:typeof facturiEnriched; orphanInvoices?:OrphanInvoice[] }> = {}
   for (const a of avize || []) {
     result[a.furnizor || ''] = {
       documentId: a.id,
       avizNumber: a.numar_document || '',
       fisierNume: a.fisier_nume,
       invoices: facturiEnriched.filter(f => f.document_id === a.id),
+      orphanInvoices: orphanByTask[a.furnizor || ''] || [],
+    }
+  }
+  for (const [taskKey, orphanInvoices] of Object.entries(orphanByTask)) {
+    if (result[taskKey]) continue
+    result[taskKey] = {
+      documentId: null,
+      avizNumber: '',
+      fisierNume: '',
+      invoices: [],
+      orphanInvoices,
     }
   }
   return NextResponse.json(result)
@@ -142,6 +201,22 @@ export async function POST(req: NextRequest) {
       }))
       const { data: insertedRows, error: insError } = await sb.from('emag_avize_facturi').insert(rows).select('*')
       if (insError) return NextResponse.json({ error: insError.message }, { status: 500 })
+      const { data: existingDocs } = await sb.from('documente')
+        .select('id,fisier_nume,numar_document')
+        .eq('luna_id', lunaId)
+        .eq('modul', 'emag')
+        .eq('tip_document', 'factura')
+        .eq('furnizor', taskKey)
+        .like('fisier_path', `%/emag-facturi/${taskKey}/%`)
+
+      const usedDocs = new Set<string>()
+      for (const row of insertedRows || []) {
+        const match = (existingDocs || []).find(existingDoc => !usedDocs.has(existingDoc.id) && invoiceMatches(row.numar_cautare, { ...existingDoc, task_key: taskKey }))
+        if (!match) continue
+        usedDocs.add(match.id)
+        await sb.from('emag_avize_facturi').update({ factura_document_id: match.id }).eq('id', row.id)
+        row.factura_document_id = match.id
+      }
       inserted = (insertedRows || []).map(row => ({ ...row, valuta }))
     }
 

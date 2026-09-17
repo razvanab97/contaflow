@@ -13,11 +13,18 @@ function daysBetween(a: string, b: string) {
   return Math.abs(da - db) / MS_DAY
 }
 
-// Potriveste documentele deja importate in Inbox Facturi (local sau Gmail), dar inca nelegate de
-// nicio tranzactie, cu tranzactiile nedocumentate - dupa suma exacta, ca sugestie automata (nu
-// asociere directa), la fel ca la facturile Airbnb de mai jos.
+// Diferenta de suma acceptata intre document si tranzactie (comisioane bancare, rotunjiri de curs
+// etc. produc de obicei cateva zeci de bani diferenta) - sub acest prag sugestia automata tot apare,
+// doar ca nu mai e marcata "suma identica" (vezi sumaPotrivita in components/types.ts).
+const SUMA_TOLERANTA = 1
+
+// Potriveste documentele deja importate in Inbox Facturi (local, Gmail sau Oblio), dar inca nelegate
+// de nicio tranzactie, cu tranzactiile nedocumentate - dupa suma apropiata (+/- SUMA_TOLERANTA) si,
+// cand documentul are data, dupa apropierea de data tranzactiei - ca sugestie automata (nu asociere
+// directa), la fel ca la facturile Airbnb de mai jos. Alege mereu cea mai apropiata suma disponibila,
+// nu prima gasita, ca sa nu "fure" un document mai potrivit pentru o alta tranzactie.
 async function matchInboxFacturi(firmaId: string, txs: any[]) {
-  const dRes = await fetch(`${SB}/documente?firma_id=eq.${firmaId}&modul=eq.inbox_facturi&tranzactie_id=is.null&suma=not.is.null&select=id,fisier_nume,furnizor,suma,data_document,numar_document`, { headers: H })
+  const dRes = await fetch(`${SB}/documente?firma_id=eq.${firmaId}&modul=eq.inbox_facturi&tranzactie_id=is.null&suma=not.is.null&select=id,fisier_nume,furnizor,suma,valuta,data_document,numar_document`, { headers: H })
   if (!dRes.ok) return new Map<string, any>()
   const docs: any[] = await dRes.json()
   if (!docs?.length) return new Map<string, any>()
@@ -26,22 +33,34 @@ async function matchInboxFacturi(firmaId: string, txs: any[]) {
   const sugestii = new Map<string, any>()
   for (const tx of txs) {
     if (tx.document_id || tx.tip !== 'debit' || tx.suma == null) continue
+    const txValuta = (tx.valuta || 'RON').toUpperCase()
     let best: any = null
+    let bestDiff = Infinity
     for (const d of docs) {
       if (used.has(d.id) || d.suma == null) continue
-      if (Math.abs(Number(d.suma) - Number(tx.suma)) > 0.01) continue
-      best = d
-      break
+      if ((d.valuta || 'RON').toUpperCase() !== txValuta) continue
+      const diff = Math.abs(Number(d.suma) - Number(tx.suma))
+      if (diff > SUMA_TOLERANTA) continue
+      if (d.data_document && daysBetween(d.data_document, tx.data_tranzactie) > 60) continue
+      if (diff < bestDiff) { best = d; bestDiff = diff }
     }
     if (best) { used.add(best.id); sugestii.set(tx.id, best) }
   }
   return sugestii
 }
 
+// Data cea mai de incredere pentru apropierea de tranzactia bancara: data reala a documentului
+// (data_factura/data_bon) cand exista - de multe ori bonurile/facturile sunt fotografiate/incarcate
+// in lot, mult dupa cumparare (ex. mai multe bonuri de combustibil scanate intr-o singura sedinta la
+// sfarsit de luna), deci data incarcarii (created_at) nu mai are nicio legatura cu data platii. Cand
+// documentul nu are data proprie, ramanem pe created_at ca aproximare (comportamentul de dinainte).
+function dataReferintaDocument(dataDocument: string | null | undefined, createdAt: string): string {
+  return dataDocument || createdAt
+}
+
 // Potriveste facturile adaugate in avans (luna trecuta) cu tranzactiile nedocumentate ale lunii curente,
-// dupa suma exacta si data la care a fost INCARCATA factura (nu data emisa pe factura) - se presupune
-// ca plata s-a facut in ziua incarcarii, iar tranzactia bancara poate aparea la 2-3 zile dupa - ca sugestie,
-// nu asociere automata.
+// dupa suma apropiata (+/- SUMA_TOLERANTA) si apropierea de data platii (data facturii cand exista,
+// altfel data incarcarii) - ca sugestie, nu asociere automata. Alege cea mai apropiata suma, nu prima gasita.
 async function matchFacturiAsteptate(firmaId: string, txs: any[]) {
   const fRes = await fetch(`${SB}/facturi_asteptate?firma_id=eq.${firmaId}&status=eq.asteptare&select=id,fisier_nume,furnizor,suma,data_factura,created_at`, { headers: H })
   if (!fRes.ok) return new Map<string, any>()
@@ -52,13 +71,19 @@ async function matchFacturiAsteptate(firmaId: string, txs: any[]) {
   const sugestii = new Map<string, any>()
   for (const tx of txs) {
     if (tx.document_id || tx.tip !== 'debit' || tx.suma == null) continue
+    // facturi_asteptate nu are coloana valuta (presupune mereu RON) - o tranzactie in alta moneda
+    // nu poate fi comparata corect dupa suma bruta, asa ca o excludem din potrivire automata.
+    if ((tx.valuta || 'RON').toUpperCase() !== 'RON') continue
     let best: any = null
+    let bestDiff = Infinity
     for (const f of facturi) {
       if (used.has(f.id) || f.suma == null) continue
-      if (Math.abs(Number(f.suma) - Number(tx.suma)) > 0.01) continue
-      if (daysBetween(f.created_at, tx.data_tranzactie) > 3) continue
-      best = f
-      break
+      const diff = Math.abs(Number(f.suma) - Number(tx.suma))
+      if (diff > SUMA_TOLERANTA) continue
+      const referinta = dataReferintaDocument(f.data_factura, f.created_at)
+      const maxZile = f.data_factura ? 7 : 3
+      if (daysBetween(referinta, tx.data_tranzactie) > maxZile) continue
+      if (diff < bestDiff) { best = f; bestDiff = diff }
     }
     if (best) { used.add(best.id); sugestii.set(tx.id, best) }
   }
@@ -66,8 +91,8 @@ async function matchFacturiAsteptate(firmaId: string, txs: any[]) {
 }
 
 // Potriveste bonurile fiscale adaugate in avans cu tranzactiile nedocumentate, dupa aceleasi
-// criterii ca facturile din facturi_asteptate (suma exacta + max 3 zile intre data incarcarii
-// bonului si tranzactie) - ca sugestie, nu asociere automata.
+// criterii ca facturile din facturi_asteptate (suma apropiata + apropierea de data platii) - ca
+// sugestie, nu asociere automata. Alege cea mai apropiata suma.
 async function matchBonuri(firmaId: string, txs: any[]) {
   const bRes = await fetch(`${SB}/bonuri?firma_id=eq.${firmaId}&status=eq.asteptare&select=id,fisier_nume,comerciant,cui_client,suma,data_bon,tip,created_at`, { headers: H })
   if (!bRes.ok) return new Map<string, any>()
@@ -78,13 +103,18 @@ async function matchBonuri(firmaId: string, txs: any[]) {
   const sugestii = new Map<string, any>()
   for (const tx of txs) {
     if (tx.document_id || tx.tip !== 'debit' || tx.suma == null) continue
+    // bonuri nu are coloana valuta (presupune mereu RON) - vezi motivul de mai sus la facturi_asteptate.
+    if ((tx.valuta || 'RON').toUpperCase() !== 'RON') continue
     let best: any = null
+    let bestDiff = Infinity
     for (const b of bonuri) {
       if (used.has(b.id) || b.suma == null) continue
-      if (Math.abs(Number(b.suma) - Number(tx.suma)) > 0.01) continue
-      if (daysBetween(b.created_at, tx.data_tranzactie) > 3) continue
-      best = b
-      break
+      const diff = Math.abs(Number(b.suma) - Number(tx.suma))
+      if (diff > SUMA_TOLERANTA) continue
+      const referinta = dataReferintaDocument(b.data_bon, b.created_at)
+      const maxZile = b.data_bon ? 7 : 3
+      if (daysBetween(referinta, tx.data_tranzactie) > maxZile) continue
+      if (diff < bestDiff) { best = b; bestDiff = diff }
     }
     if (best) { used.add(best.id); sugestii.set(tx.id, best) }
   }

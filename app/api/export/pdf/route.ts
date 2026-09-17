@@ -50,7 +50,7 @@ function pathToSection(path: string): string {
   if (p.includes('/emag-calcul/') || p.includes('/emag-avize/') || p.includes('/emag-facturi/')) return 'emag'
   if (p.includes('/acte-contabile/')) return 'acte-contabile'
   if (p.includes('/angajati/')) return 'angajati'
-  if (p.includes('/extras/')) return 'extras'
+  if (p.includes('/tx/') || p.includes('/extras/')) return 'extras'
   return 'altele'
 }
 
@@ -100,12 +100,19 @@ async function getExtrasTxDocs(sb: ReturnType<typeof getServiceSupabase>, lunaId
     .not('tranzactie_id', 'is', null)
   if (!txDocs?.length) return []
   const txIds = [...new Set(txDocs.map(d => d.tranzactie_id).filter(Boolean))]
-  const { data: txs } = await sb.from('tranzactii').select('id,data_tranzactie').in('id', txIds)
-  const dateById = new Map((txs || []).map(t => [t.id, t.data_tranzactie]))
-  return txDocs.slice().sort((a, b) => {
-    const da = dateById.get(a.tranzactie_id) || ''
-    const db = dateById.get(b.tranzactie_id) || ''
-    return da < db ? -1 : da > db ? 1 : 0
+  const { data: txs } = await sb.from('tranzactii').select('id,extras_id,data_tranzactie').in('id', txIds)
+  const txById = new Map((txs || []).map(t => [t.id, t]))
+  return txDocs.map(doc => {
+    const tx = txById.get(doc.tranzactie_id)
+    return { ...doc, extras_id: tx?.extras_id || null, data_tranzactie: tx?.data_tranzactie || '' }
+  }).sort((a, b) => {
+    const ea = a.extras_id || ''
+    const eb = b.extras_id || ''
+    if (ea !== eb) return ea.localeCompare(eb)
+    const da = a.data_tranzactie || ''
+    const db = b.data_tranzactie || ''
+    if (da !== db) return da.localeCompare(db)
+    return String(a.fisier_nume || '').localeCompare(String(b.fisier_nume || ''))
   })
 }
 
@@ -152,7 +159,7 @@ export async function POST(req: NextRequest) {
   const { data: allDocs, error } = isExtras
     ? { data: [], error: null }
     : await sb.from('documente')
-        .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor')
+        .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor,data_document')
         .eq('luna_id', lunaId)
         .is('tranzactie_id', null)
         .not('fisier_path', 'like', '%/tx/%')
@@ -171,7 +178,7 @@ export async function POST(req: NextRequest) {
   // Extras bancare: la export complet, la scope.extras, sau când secțiunea e 'extras'
   const includeExtras = !scope || scope.extras || scope?.section === 'extras'
   const { data: statements } = includeExtras
-    ? await sb.from('extrase').select('pdf_path,pdf_nume').eq('luna_id', lunaId)
+    ? await sb.from('extrase').select('id,pdf_path,pdf_nume').eq('luna_id', lunaId)
     : { data: [] }
   const extrasTxDocs = includeExtras ? await getExtrasTxDocs(sb, lunaId) : []
 
@@ -185,30 +192,60 @@ export async function POST(req: NextRequest) {
   if (!scope && firmaSlug) {
     const moduleOrder = FIRMA_CONFIGS[firmaSlug]?.module || []
 
-    type Entry = { path: string; name: string; type: string; bucket: 'documente' | 'extrase-pdf'; furnizor?: string|null; created_at?: string }
+    type Entry = { path: string; name: string; type: string; bucket: 'documente' | 'extrase-pdf'; furnizor?: string|null; created_at?: string; data_document?: string|null }
     const sectionMap = new Map<string, Entry[]>()
+    // Ordinea reala a evenimentului (data de pe document), nu data la care a fost incarcat in
+    // sistem - un import in lot (multe facturi vechi adaugate intr-o singura sedinta) ar avea
+    // altfel created_at aproape identic pentru toate, deci ordinea ar fi practic intamplatoare
+    // in loc de cronologica. Foloseste created_at doar cand documentul chiar nu are data proprie.
+    function dataReferintaEntry(e: Entry): string {
+      return e.data_document || e.created_at || ''
+    }
 
     // Extras bancare
+    const txDocsByExtras = new Map<string, typeof extrasTxDocs>()
+    const txDocsWithoutStatement: typeof extrasTxDocs = []
+    for (const doc of extrasTxDocs) {
+      if (!doc.extras_id) { txDocsWithoutStatement.push(doc); continue }
+      if (!txDocsByExtras.has(doc.extras_id)) txDocsByExtras.set(doc.extras_id, [])
+      txDocsByExtras.get(doc.extras_id)!.push(doc)
+    }
     for (const s of statements || []) {
       if (!s.pdf_path) continue
       if (!sectionMap.has('extras')) sectionMap.set('extras', [])
       sectionMap.get('extras')!.push({ path: s.pdf_path, name: s.pdf_nume || 'extras.pdf', type: 'application/pdf', bucket: 'extrase-pdf' })
+      for (const doc of txDocsByExtras.get(s.id) || []) {
+        sectionMap.get('extras')!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente' })
+      }
     }
-    // Documente atașate pe tranzacții (facturi/chitanțe), în ordine cronologică, după extrasul brut
-    if (extrasTxDocs.length) {
+    // Documente atașate pe tranzacții fără extras brut disponibil (fallback rar)
+    const attachedToKnownStatements = new Set((statements || []).map(s => s.id))
+    for (const [extrasId, groupedDocs] of txDocsByExtras) {
+      if (attachedToKnownStatements.has(extrasId)) continue
       if (!sectionMap.has('extras')) sectionMap.set('extras', [])
-      for (const doc of extrasTxDocs)
+      for (const doc of groupedDocs)
+        sectionMap.get('extras')!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente' })
+    }
+    if (txDocsWithoutStatement.length) {
+      if (!sectionMap.has('extras')) sectionMap.set('extras', [])
+      for (const doc of txDocsWithoutStatement)
         sectionMap.get('extras')!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente' })
     }
     // Documente din categorii
     for (const doc of docs || []) {
       const section = pathToSection(doc.fisier_path)
       if (!sectionMap.has(section)) sectionMap.set(section, [])
-      sectionMap.get(section)!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente', furnizor: doc.furnizor, created_at: doc.created_at })
+      sectionMap.get(section)!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente', furnizor: doc.furnizor, created_at: doc.created_at, data_document: doc.data_document })
     }
     // Emag: avizele impreuna cu facturile lor proprii, in ordinea din task-uri
     if (sectionMap.has('emag')) {
       sectionMap.set('emag', sortEmagDocs(sectionMap.get('emag')!.map(e => ({ ...e, fisier_path: e.path }))))
+    }
+    // Restul sectiunilor (mai putin extras, care isi are deja ordinea cronologica proprie mai sus,
+    // si emag, sortat separat chiar deasupra) - ordonate dupa data reala a documentului.
+    for (const [section, entries] of sectionMap) {
+      if (section === 'extras' || section === 'emag') continue
+      entries.sort((a, b) => dataReferintaEntry(a).localeCompare(dataReferintaEntry(b)))
     }
 
     // Ordinea secțiunilor după modulele firmei
@@ -248,18 +285,36 @@ export async function POST(req: NextRequest) {
     // PDF per-secțiune (sau fără firmaSlug): pagină cu numele categoriei, apoi extras + documente secțiunii
     const label = scope?.section ? sectionLabel(scope.section) : isExtras ? sectionLabel('extras') : 'Documente'
     addSectionCover(merged, coverFont, label)
+    const txDocsByExtras = new Map<string, typeof extrasTxDocs>()
+    const txDocsWithoutStatement: typeof extrasTxDocs = []
+    for (const doc of extrasTxDocs) {
+      if (!doc.extras_id) { txDocsWithoutStatement.push(doc); continue }
+      if (!txDocsByExtras.has(doc.extras_id)) txDocsByExtras.set(doc.extras_id, [])
+      txDocsByExtras.get(doc.extras_id)!.push(doc)
+    }
     for (const s of statements || []) {
       if (!s.pdf_path) continue
       const { data } = await sb.storage.from('extrase-pdf').download(s.pdf_path)
-      if (!data) continue
-      await embedDoc(merged, Buffer.from(await data.arrayBuffer()), 'application/pdf', s.pdf_nume || 'extras.pdf')
+      if (data) await embedDoc(merged, Buffer.from(await data.arrayBuffer()), 'application/pdf', s.pdf_nume || 'extras.pdf')
+      for (const doc of txDocsByExtras.get(s.id) || []) {
+        const { data: docBytes } = await sb.storage.from('documente').download(doc.fisier_path)
+        if (!docBytes) continue
+        await embedDoc(merged, Buffer.from(await docBytes.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)
+      }
     }
-    for (const doc of extrasTxDocs) {
+    const attachedToKnownStatements = new Set((statements || []).map(s => s.id))
+    const remainingExtrasDocs = [
+      ...[...txDocsByExtras.entries()].filter(([extrasId]) => !attachedToKnownStatements.has(extrasId)).flatMap(([, value]) => value),
+      ...txDocsWithoutStatement,
+    ]
+    for (const doc of remainingExtrasDocs) {
       const { data } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!data) continue
       await embedDoc(merged, Buffer.from(await data.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)
     }
-    const orderedDocs = (scope?.section === 'emag' || scope?.section === 'emag-calcul') ? sortEmagDocs(docs || []) : (docs || [])
+    const orderedDocs = (scope?.section === 'emag' || scope?.section === 'emag-calcul')
+      ? sortEmagDocs(docs || [])
+      : (docs || []).slice().sort((a, b) => String(a.data_document || a.created_at || '').localeCompare(String(b.data_document || b.created_at || '')))
     for (const doc of orderedDocs) {
       const { data } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!data) continue

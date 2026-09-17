@@ -21,7 +21,7 @@ function pathToSection(path: string): string {
   if (p.includes('/emag-calcul/') || p.includes('/emag-avize/') || p.includes('/emag-facturi/')) return 'emag'
   if (p.includes('/acte-contabile/')) return 'acte-contabile'
   if (p.includes('/angajati/')) return 'angajati'
-  if (p.includes('/extras/')) return 'extras'
+  if (p.includes('/tx/') || p.includes('/extras/')) return 'extras'
   return 'altele'
 }
 
@@ -70,12 +70,19 @@ async function getExtrasTxDocs(sb: ReturnType<typeof getServiceSupabase>, lunaId
     .not('tranzactie_id', 'is', null)
   if (!txDocs?.length) return []
   const txIds = [...new Set(txDocs.map(d => d.tranzactie_id).filter(Boolean))]
-  const { data: txs } = await sb.from('tranzactii').select('id,data_tranzactie').in('id', txIds)
-  const dateById = new Map((txs || []).map(t => [t.id, t.data_tranzactie]))
-  return txDocs.slice().sort((a, b) => {
-    const da = dateById.get(a.tranzactie_id) || ''
-    const db = dateById.get(b.tranzactie_id) || ''
-    return da < db ? -1 : da > db ? 1 : 0
+  const { data: txs } = await sb.from('tranzactii').select('id,extras_id,data_tranzactie').in('id', txIds)
+  const txById = new Map((txs || []).map(t => [t.id, t]))
+  return txDocs.map(doc => {
+    const tx = txById.get(doc.tranzactie_id)
+    return { ...doc, extras_id: tx?.extras_id || null, data_tranzactie: tx?.data_tranzactie || '' }
+  }).sort((a, b) => {
+    const ea = a.extras_id || ''
+    const eb = b.extras_id || ''
+    if (ea !== eb) return ea.localeCompare(eb)
+    const da = a.data_tranzactie || ''
+    const db = b.data_tranzactie || ''
+    if (da !== db) return da.localeCompare(db)
+    return String(a.fisier_nume || '').localeCompare(String(b.fisier_nume || ''))
   })
 }
 
@@ -92,11 +99,11 @@ export async function POST(req: NextRequest) {
 
     // Extrase bancare — PDF-uri din bucket extrase-pdf
     const { data: extrase } = await sb.from('extrase').select('id,valuta,pdf_path,pdf_nume').eq('luna_id', lunaId)
-    const extraseFiles: { name: string; data: ArrayBuffer }[] = []
+    const extraseFiles: { id: string; name: string; data: ArrayBuffer }[] = []
     for (const e of extrase || []) {
       if (!e.pdf_path) continue
       const { data: b } = await sb.storage.from('extrase-pdf').download(e.pdf_path)
-      if (b) extraseFiles.push({ name: e.pdf_nume || `extras_${e.valuta}.pdf`, data: await b.arrayBuffer() })
+      if (b) extraseFiles.push({ id: e.id, name: e.pdf_nume || `extras_${e.valuta}.pdf`, data: await b.arrayBuffer() })
     }
 
     // Documente atașate pe tranzacții (facturi/chitanțe din Extras), în exact ordinea din Extras
@@ -123,10 +130,32 @@ export async function POST(req: NextRequest) {
     type Entry = { name: string; data?: ArrayBuffer; fisier_path: string; furnizor?: string | null; created_at?: string }
     const sectionMap = new Map<string, Entry[]>()
 
-    if (extraseFiles.length) sectionMap.set('extras', extraseFiles.map(f => ({ ...f, fisier_path: '/extras/' })))
-
-    // Documentele de pe tranzacții intră tot la secțiunea 'extras', după extrasul brut, în ordinea din Extras
+    if (extraseFiles.length) sectionMap.set('extras', [])
+    const txDocsByExtras = new Map<string, typeof extrasTxDocs>()
+    const txDocsWithoutStatement: typeof extrasTxDocs = []
     for (const doc of extrasTxDocs) {
+      if (!doc.extras_id) { txDocsWithoutStatement.push(doc); continue }
+      if (!txDocsByExtras.has(doc.extras_id)) txDocsByExtras.set(doc.extras_id, [])
+      txDocsByExtras.get(doc.extras_id)!.push(doc)
+    }
+
+    // Fiecare extras bancar este urmat imediat de documentele tranzacțiilor lui.
+    for (const e of extraseFiles) {
+      if (!sectionMap.has('extras')) sectionMap.set('extras', [])
+      sectionMap.get('extras')!.push({ name: e.name, data: e.data, fisier_path: '/extras/' })
+      for (const doc of txDocsByExtras.get(e.id) || []) {
+        const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
+        if (!b) continue
+        sectionMap.get('extras')!.push({ name: doc.fisier_nume, data: await b.arrayBuffer(), fisier_path: doc.fisier_path })
+      }
+    }
+
+    const attachedToKnownStatements = new Set(extraseFiles.map(e => e.id))
+    const remainingExtrasDocs = [
+      ...[...txDocsByExtras.entries()].filter(([extrasId]) => !attachedToKnownStatements.has(extrasId)).flatMap(([, value]) => value),
+      ...txDocsWithoutStatement,
+    ]
+    for (const doc of remainingExtrasDocs) {
       const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!b) continue
       if (!sectionMap.has('extras')) sectionMap.set('extras', [])

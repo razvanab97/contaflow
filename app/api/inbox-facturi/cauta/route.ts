@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
-type Sursa = 'local' | 'gmail' | 'oblio' | 'altele'
+type Sursa = 'local' | 'gmail' | 'oblio' | 'bonuri' | 'altele'
 
 // Sursa e scrisa ca text in furnizor ("... | Sursa: Gmail 1 (x@gmail.com)" / "Sursa: Folder local
 // (Personal Computer)" / "Sursa: Fișiere locale") - nu exista coloana dedicata, deci o deducem de
@@ -46,6 +46,19 @@ export async function GET(req: NextRequest) {
   const { data: docs, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Bonurile fiscale puse "in asteptare" (nu inca asociate niciunei tranzactii) - a 5-a sursa,
+  // ceruta explicit ca sa poata fi verificate manual aici cand sugestia automata din
+  // api/tranzactii/list nu gaseste nimic (bonuri nu are coloana valuta - presupune mereu RON).
+  let bonuriQuery = sb.from('bonuri')
+    .select('id,fisier_nume,comerciant,cui_client,suma,data_bon,created_at')
+    .eq('firma_id', firmaId)
+    .eq('status', 'asteptare')
+    .order('created_at', { ascending: false })
+    .limit(500)
+  if (q.length >= 2) bonuriQuery = bonuriQuery.or(`comerciant.ilike.%${q}%,cui_client.ilike.%${q}%,fisier_nume.ilike.%${q}%`)
+  const { data: bonuri, error: bonuriError } = await bonuriQuery
+  if (bonuriError) return NextResponse.json({ error: bonuriError.message }, { status: 500 })
+
   const target = suma !== null && Number.isFinite(suma) ? Math.abs(suma) : null
   let candidates = (docs || []).map(d => {
     const valuta = (d.valuta || 'RON').toUpperCase()
@@ -57,13 +70,31 @@ export async function GET(req: NextRequest) {
       ...d,
       valuta,
       furnizor: furnizorCurat(d.furnizor),
-      sursa: detecteazaSursa(d.furnizor),
+      sursa: detecteazaSursa(d.furnizor) as Sursa,
       monedaDiferita,
       diferentaSuma: target !== null && d.suma != null && !monedaDiferita ? Math.abs(Number(d.suma) - target) : null,
     }
   })
 
-  const counts: Record<Sursa, number> = { local: 0, gmail: 0, oblio: 0, altele: 0 }
+  candidates = candidates.concat((bonuri || []).map(b => {
+    const valuta = 'RON'
+    const monedaDiferita = target !== null && valuta !== valutaTx
+    return {
+      id: b.id,
+      fisier_nume: b.fisier_nume,
+      furnizor: b.comerciant || '',
+      suma: b.suma,
+      valuta,
+      data_document: b.data_bon,
+      numar_document: null,
+      created_at: b.created_at,
+      sursa: 'bonuri' as Sursa,
+      monedaDiferita,
+      diferentaSuma: target !== null && b.suma != null && !monedaDiferita ? Math.abs(Number(b.suma) - target) : null,
+    }
+  }))
+
+  const counts: Record<Sursa, number> = { local: 0, gmail: 0, oblio: 0, bonuri: 0, altele: 0 }
   for (const c of candidates) counts[c.sursa]++
 
   if (sursaFiltru && sursaFiltru !== 'toate') candidates = candidates.filter(c => c.sursa === sursaFiltru)
@@ -74,5 +105,5 @@ export async function GET(req: NextRequest) {
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 
-  return NextResponse.json({ candidates: candidates.slice(0, 100), counts, total: docs?.length || 0 })
+  return NextResponse.json({ candidates: candidates.slice(0, 100), counts, total: (docs?.length || 0) + (bonuri?.length || 0) })
 }

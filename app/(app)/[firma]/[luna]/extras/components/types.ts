@@ -11,9 +11,9 @@ export interface Tx {
   sugestieBon?: { id:string; fisier_nume:string; comerciant:string|null; cui_client:string|null; suma:number|null; data_bon:string|null; tip:'combustibil'|'altul'; created_at?:string }|null
 }
 
-export interface InboxCandidat { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; valuta:string; monedaDiferita:boolean; data_document:string|null; diferentaSuma:number|null; sursa:'local'|'gmail'|'oblio'|'altele' }
+export interface InboxCandidat { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; valuta:string; monedaDiferita:boolean; data_document:string|null; diferentaSuma:number|null; sursa:'local'|'gmail'|'oblio'|'bonuri'|'altele' }
 
-export const SURSA_LABEL: Record<'toate'|'local'|'gmail'|'oblio'|'altele', string> = { toate:'Toate', local:'Local', gmail:'Gmail', oblio:'e-Factură (Oblio)', altele:'Altele' }
+export const SURSA_LABEL: Record<'toate'|'local'|'gmail'|'oblio'|'bonuri'|'altele', string> = { toate:'Toate', local:'Local', gmail:'Gmail', oblio:'e-Factură (Oblio)', bonuri:'Bonuri', altele:'Altele' }
 
 export interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 
@@ -66,34 +66,48 @@ function daysBetween(a: string, b: string) {
   return Math.abs(da-db) / 86400000
 }
 
+// Suma sugestiei poate diferi putin de suma tranzactiei (pana la SUMA_TOLERANTA din
+// api/tranzactii/list) - afisam diferenta explicit in loc sa marcam mereu "suma identica",
+// ca sa nu induca in eroare cand nu e chiar exacta.
+function sumaLabel(sumaDoc: number | null, sumaTx: number): { text: string | null; exacta: boolean } {
+  if (sumaDoc == null) return { text: null, exacta: false }
+  const diff = Math.abs(sumaDoc - sumaTx)
+  const exacta = diff < 0.01
+  const text = exacta ? `${sumaDoc.toFixed(2)} RON` : `${sumaDoc.toFixed(2)} RON (diferență ${diff.toFixed(2)} RON)`
+  return { text, exacta }
+}
+
 export function getActiveSuggestion(tx: Tx): ActiveSuggestion | null {
   if (tx.sugestieFactura) {
     const s = tx.sugestieFactura
+    const suma = sumaLabel(s.suma, tx.suma)
     return {
       tip: 'factura', id: s.id,
       label: 'Am găsit o factură care se potrivește',
-      detaliu: [s.furnizor, s.suma != null ? `${s.suma.toFixed(2)} RON` : null].filter(Boolean).join(' · ') || s.fisier_nume,
-      sumaPotrivita: true,
+      detaliu: [s.furnizor, suma.text].filter(Boolean).join(' · ') || s.fisier_nume,
+      sumaPotrivita: suma.exacta,
       dataPotrivita: !!s.created_at && daysBetween(s.created_at, tx.data_tranzactie) <= 3,
     }
   }
   if (tx.sugestieBon) {
     const s = tx.sugestieBon
+    const suma = sumaLabel(s.suma, tx.suma)
     return {
       tip: 'bon', id: s.id,
       label: 'Am găsit un bon care se potrivește',
-      detaliu: [s.comerciant, s.suma != null ? `${s.suma.toFixed(2)} RON` : null].filter(Boolean).join(' · ') || s.fisier_nume,
-      sumaPotrivita: true,
+      detaliu: [s.comerciant, suma.text].filter(Boolean).join(' · ') || s.fisier_nume,
+      sumaPotrivita: suma.exacta,
       dataPotrivita: !!s.created_at && daysBetween(s.created_at, tx.data_tranzactie) <= 3,
     }
   }
   if (tx.sugestieInbox) {
     const s = tx.sugestieInbox
+    const suma = sumaLabel(s.suma, tx.suma)
     return {
       tip: 'inbox', id: s.id,
       label: 'Am găsit o factură în Inbox Facturi care se potrivește',
-      detaliu: [s.furnizor, s.suma != null ? `${s.suma.toFixed(2)} RON` : null].filter(Boolean).join(' · ') || s.fisier_nume,
-      sumaPotrivita: true,
+      detaliu: [s.furnizor, suma.text].filter(Boolean).join(' · ') || s.fisier_nume,
+      sumaPotrivita: suma.exacta,
       dataPotrivita: false,
     }
   }
