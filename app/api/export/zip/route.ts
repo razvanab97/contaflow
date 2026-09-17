@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS, MODULE_DEFS } from '@/lib/firma-config'
 import { generateNotePdfBytes } from '@/lib/notePdf'
@@ -6,6 +7,10 @@ import { generateBonuriPdfBytes } from '@/lib/bonuriPdf'
 import JSZip from 'jszip'
 
 export const maxDuration = 120
+
+function hashBytes(bytes: Buffer) {
+  return createHash('sha256').update(bytes).digest('hex')
+}
 
 function pathToSection(path: string): string {
   const p = String(path)
@@ -101,11 +106,19 @@ export async function POST(req: NextRequest) {
 
     // Extrase bancare — PDF-uri din bucket extrase-pdf
     const { data: extrase } = await sb.from('extrase').select('id,valuta,pdf_path,pdf_nume').eq('luna_id', lunaId)
-    const extraseFiles: { id: string; name: string; data: ArrayBuffer }[] = []
+    const extraseFiles: { id: string; name: string; data: ArrayBuffer; includePdf: boolean }[] = []
+    const seenStatementHashes = new Set<string>()
     for (const e of extrase || []) {
       if (!e.pdf_path) continue
       const { data: b } = await sb.storage.from('extrase-pdf').download(e.pdf_path)
-      if (b) extraseFiles.push({ id: e.id, name: e.pdf_nume || `extras_${e.valuta}.pdf`, data: await b.arrayBuffer() })
+      if (b) {
+        const buf = Buffer.from(await b.arrayBuffer())
+        const hash = hashBytes(buf)
+        const includePdf = !seenStatementHashes.has(hash)
+        seenStatementHashes.add(hash)
+        const data = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+        extraseFiles.push({ id: e.id, name: e.pdf_nume || `extras_${e.valuta}.pdf`, data, includePdf })
+      }
     }
 
     // Documente atașate pe tranzacții (facturi/chitanțe din Extras), în exact ordinea din Extras
@@ -145,7 +158,7 @@ export async function POST(req: NextRequest) {
     // Fiecare extras bancar este urmat imediat de documentele tranzacțiilor lui.
     for (const e of extraseFiles) {
       if (!sectionMap.has('extras')) sectionMap.set('extras', [])
-      sectionMap.get('extras')!.push({ name: e.name, data: e.data, fisier_path: '/extras/' })
+      if (e.includePdf) sectionMap.get('extras')!.push({ name: e.name, data: e.data, fisier_path: '/extras/' })
       for (const doc of txDocsByExtras.get(e.id) || []) {
         const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
         if (!b) continue

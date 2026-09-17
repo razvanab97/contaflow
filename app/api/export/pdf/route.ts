@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
+import { createHash } from 'crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS, MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
 import { generateNotePdfBytes } from '@/lib/notePdf'
@@ -18,6 +19,10 @@ const DIACRITICS: Record<string, string> = {
 function safeText(value: string) {
   const withDiacritics = value.replace(/[ăâîșşțţĂÂÎȘŞȚŢ]/g, ch => DIACRITICS[ch] || ch)
   return withDiacritics.replace(/[^\x20-\x7E]/g, '')
+}
+
+function hashBytes(bytes: Buffer) {
+  return createHash('sha256').update(bytes).digest('hex')
 }
 
 function sectionLabel(section: string): string {
@@ -211,6 +216,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Extras bancare
+    const seenStatementHashes = new Set<string>()
     const txDocsByExtras = new Map<string, typeof extrasTxDocs>()
     const txDocsWithoutStatement: typeof extrasTxDocs = []
     for (const doc of extrasTxDocs) {
@@ -221,7 +227,15 @@ export async function POST(req: NextRequest) {
     for (const s of statements || []) {
       if (!s.pdf_path) continue
       if (!sectionMap.has('extras')) sectionMap.set('extras', [])
-      sectionMap.get('extras')!.push({ path: s.pdf_path, name: s.pdf_nume || 'extras.pdf', type: 'application/pdf', bucket: 'extrase-pdf' })
+      const { data } = await sb.storage.from('extrase-pdf').download(s.pdf_path)
+      if (data) {
+        const bytes = Buffer.from(await data.arrayBuffer())
+        const hash = hashBytes(bytes)
+        if (!seenStatementHashes.has(hash)) {
+          seenStatementHashes.add(hash)
+          sectionMap.get('extras')!.push({ path: '', name: s.pdf_nume || 'extras.pdf', type: 'application/pdf', bucket: 'memory', bytes })
+        }
+      }
       for (const doc of txDocsByExtras.get(s.id) || []) {
         sectionMap.get('extras')!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente' })
       }
@@ -301,6 +315,7 @@ export async function POST(req: NextRequest) {
     // PDF per-secțiune (sau fără firmaSlug): pagină cu numele categoriei, apoi extras + documente secțiunii
     const label = scope?.section ? sectionLabel(scope.section) : isExtras ? sectionLabel('extras') : 'Documente'
     addSectionCover(merged, coverFont, label)
+    const seenStatementHashes = new Set<string>()
     const txDocsByExtras = new Map<string, typeof extrasTxDocs>()
     const txDocsWithoutStatement: typeof extrasTxDocs = []
     for (const doc of extrasTxDocs) {
@@ -311,7 +326,14 @@ export async function POST(req: NextRequest) {
     for (const s of statements || []) {
       if (!s.pdf_path) continue
       const { data } = await sb.storage.from('extrase-pdf').download(s.pdf_path)
-      if (data) await embedDoc(merged, Buffer.from(await data.arrayBuffer()), 'application/pdf', s.pdf_nume || 'extras.pdf')
+      if (data) {
+        const bytes = Buffer.from(await data.arrayBuffer())
+        const hash = hashBytes(bytes)
+        if (!seenStatementHashes.has(hash)) {
+          seenStatementHashes.add(hash)
+          await embedDoc(merged, bytes, 'application/pdf', s.pdf_nume || 'extras.pdf')
+        }
+      }
       for (const doc of txDocsByExtras.get(s.id) || []) {
         const { data: docBytes } = await sb.storage.from('documente').download(doc.fisier_path)
         if (!docBytes) continue
