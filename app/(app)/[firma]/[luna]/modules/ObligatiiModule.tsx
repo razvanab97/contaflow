@@ -2,11 +2,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { tint } from '@/lib/colors'
 import SincronizareProiectMail from './proiect-mail/SincronizareProiectMail'
+import ObligatieDocumente from './ObligatieDocumente'
 
 interface ObligatieRow {
+  id: string | null
   tipKey: string
   label: string
   destinatar: string | null
+  sursaInstructiuni: string | null
+  editabilLink: string | null
   scadenta: string | null
   trimis: boolean
 }
@@ -23,7 +27,7 @@ interface Sugestie {
 }
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
-interface Props { firma: Firma; lunaId: string }
+interface Props { firma: Firma; lunaId: string; luna: string }
 
 function zileRamase(scadenta: string | null): number | null {
   if (!scadenta) return null
@@ -38,11 +42,12 @@ function fmtData(s: string | null) {
   return d && m && y ? `${d}.${m}.${y}` : s
 }
 
-export default function ObligatiiModule({ firma, lunaId }: Props) {
+export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
   const [rows, setRows] = useState<ObligatieRow[] | null>(null)
   const [sugestii, setSugestii] = useState<Sugestie[]>([])
   const [saving, setSaving] = useState<string | null>(null)
   const [sugestieBusy, setSugestieBusy] = useState<string | null>(null)
+  const [tab, setTab] = useState<'checklist' | 'documente'>('checklist')
   const r = `${parseInt(firma.culoare.slice(1, 3), 16)},${parseInt(firma.culoare.slice(3, 5), 16)},${parseInt(firma.culoare.slice(5, 7), 16)}`
 
   const load = useCallback(() => {
@@ -99,6 +104,36 @@ export default function ObligatiiModule({ firma, lunaId }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <SincronizareProiectMail firmaId={firma.id} culoare={firma.culoare} onSynced={load} />
 
+      <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid var(--c-1e1e1e)' }}>
+        {(['checklist', 'documente'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '8px 8px 0 0',
+            border: 'none', borderBottom: tab === t ? `2px solid ${firma.culoare}` : '2px solid transparent',
+            background: 'transparent', color: tab === t ? firma.culoare : 'var(--c-777777)', cursor: 'pointer',
+          }}>
+            {t === 'checklist' ? 'Checklist' : 'Documente'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'documente' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {rows.map(row => (
+            <ObligatieDocumente
+              key={row.tipKey}
+              obligatieStareId={row.id}
+              label={row.label}
+              destinatar={row.destinatar}
+              sursaInstructiuni={row.sursaInstructiuni}
+              editabilLink={row.editabilLink}
+              firmaSlug={firma.slug}
+              luna={luna}
+              culoare={firma.culoare}
+            />
+          ))}
+        </div>
+      ) : (
+      <>
       {(restante > 0 || curand > 0) && (
         <div style={{ display: 'flex', gap: '12px' }}>
           {restante > 0 && (
@@ -209,6 +244,8 @@ export default function ObligatiiModule({ firma, lunaId }: Props) {
           })}
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }

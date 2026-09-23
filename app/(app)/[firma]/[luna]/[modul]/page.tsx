@@ -147,7 +147,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'raport-lunar-proiect':
         return <RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/>
       case 'obligatii-recurente':
-        return <ObligatiiModule firma={firmaForModule} lunaId={lunaData.id}/>
+        return <ObligatiiModule firma={firmaForModule} lunaId={lunaData.id} luna={luna}/>
       case 'achizitii':
         return <AchizitiiModule firma={firmaForModule} lunaId={lunaData.id}/>
       default:

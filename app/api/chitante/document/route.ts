@@ -7,7 +7,7 @@ const DELETABLE_SECTIONS = [
   'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
   'booking-facturi', 'booking-borderou',
   'airbnb-facturi', 'airbnb-borderou',
-  '5stardesk', 'trendyol', 'acte-contabile', 'angajati', 'achizitii',
+  '5stardesk', 'trendyol', 'acte-contabile', 'angajati', 'achizitii', 'obligatii',
 ]
 
 export async function GET(req: NextRequest) {

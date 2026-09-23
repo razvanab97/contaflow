@@ -26,5 +26,15 @@ export async function POST(req: NextRequest) {
   }
 
   await sb.from('obligatii_sugestii').update({ status: 'confirmata', updated_at: new Date().toISOString() }).eq('id', sugestieId)
+
+  // Alte mailuri pot confirma acelasi fapt (aceeasi obligatie, aceeasi luna, acelasi fel de
+  // sugestie) - odata aplicata starea, restul devin redundante, nu mai cer confirmare separata.
+  await sb.from('obligatii_sugestii')
+    .update({ status: 'confirmata', updated_at: new Date().toISOString() })
+    .eq('luna_id', sugestie.luna_id)
+    .eq('tip_key', sugestie.tip_key)
+    .eq('tip_sugestie', sugestie.tip_sugestie)
+    .eq('status', 'noua')
+
   return NextResponse.json({ ok: true })
 }

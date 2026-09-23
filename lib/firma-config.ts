@@ -20,6 +20,13 @@ export interface TaskDef {
   // pe fiecare luna in parte - vezi obligatii_stari.scadenta).
   destinatar?: string
   ziScadentaLunaUrmatoare?: number
+  // De unde vine efectiv documentul in fiecare luna (banca, Revisal, contabilitate etc.) - text fix,
+  // afisat direct in UI, ca sa nu mai fie nevoie sa se tina minte din experienta.
+  sursaInstructiuni?: string
+  // true doar pentru obligatia care e un sablon completat de noi (azi doar Raportul de proiect,
+  // care are deja propriul editor - vezi raport-lunar-proiect); restul sunt documente aduse de
+  // altundeva (banca, Revisal, contabilitate), nu editate in ContaFlow.
+  editabilLink?: string
 }
 
 export interface ModuleDef {
@@ -229,12 +236,20 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     label: 'Obligații recurente',
     description: 'Ce trebuie trimis lunar și către cine — scadențe estimate din istoricul de corespondență, ajustabile aici',
     tasks: [
-      { key: 'obligatie.salarii_op', label: 'Salarii + OP-uri + dovadă creditare', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 20 },
-      { key: 'obligatie.reges', label: 'Reges + stat + pontaj + centralizator contribuții', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 8 },
-      { key: 'obligatie.acte_contabile', label: 'Acte contabile (balanță + registru jurnal)', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 18 },
-      { key: 'obligatie.extras_cont', label: 'Extras de cont al perioadei', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 18 },
-      { key: 'obligatie.raport_proiect', label: 'Raport de proiect lunar', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 18 },
-      { key: 'obligatie.acte_orieda', label: 'Acte proiect pentru contabilitate', destinatar: 'Orieda Office', ziScadentaLunaUrmatoare: 15 },
+      { key: 'obligatie.salarii_op', label: 'Salarii + OP-uri + dovadă creditare', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 20,
+        sursaInstructiuni: 'Inițiezi plata salariilor + OP-uri din Internet Banking, apoi trimiți dovada creditării contului de grant + poza tranzacțiilor inițiate.' },
+      { key: 'obligatie.reges', label: 'Reges + stat + pontaj + centralizator contribuții', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 8,
+        sursaInstructiuni: 'Extras Reges din Revisal (export PDF), plus stat de plată + pontaj + centralizator contribuții — cerute de la contabilitate (Orieda), dacă nu le ai deja.' },
+      { key: 'obligatie.acte_contabile', label: 'Acte contabile (balanță + registru jurnal)', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 18,
+        sursaInstructiuni: 'Balanța de verificare și registrul jurnal ale lunii — se cer de la Orieda Office.' },
+      { key: 'obligatie.extras_cont', label: 'Extras de cont al perioadei', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 18,
+        sursaInstructiuni: 'Descarcă din Internet Banking (Banca Transilvania) → Extrase de cont, pentru intervalul lunii raportate.' },
+      { key: 'obligatie.raport_proiect', label: 'Raport de proiect lunar', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 18,
+        sursaInstructiuni: 'Se completează direct în modulul „Raport lunar" al proiectului — nu se încarcă manual aici.', editabilLink: 'raport-lunar-proiect' },
+      { key: 'obligatie.acte_orieda', label: 'Acte proiect pentru contabilitate', destinatar: 'Orieda Office', ziScadentaLunaUrmatoare: 15,
+        sursaInstructiuni: 'Trimiți către Orieda documentele lunii (facturi, extrase, acte) necesare pentru înregistrarea contabilă a proiectului.' },
+      { key: 'obligatie.rapoarte_ajofm', label: 'Rapoarte speciale', destinatar: 'AJOFM Iași', ziScadentaLunaUrmatoare: 15,
+        sursaInstructiuni: 'Rapoarte speciale depuse la AJOFM Iași (portal AJOFM sau email direct) — verifică cerințele curente, nu au un canal de mail fix urmărit automat.' },
     ],
   },
   achizitii: {

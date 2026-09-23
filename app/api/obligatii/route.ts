@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   const { data: existing, error } = await sb
     .from('obligatii_stari')
-    .select('tip_key,scadenta,trimis')
+    .select('id,tip_key,scadenta,trimis')
     .eq('luna_id', lunaId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -43,15 +43,18 @@ export async function GET(req: NextRequest) {
         scadenta: t.ziScadentaLunaUrmatoare != null ? scadentaImplicita(lunaRow.luna, t.ziScadentaLunaUrmatoare) : null,
         trimis: false,
       }))
-      const { data: inserted, error: seedError } = await sb.from('obligatii_stari').upsert(seed, { onConflict: 'luna_id,tip_key' }).select('tip_key,scadenta,trimis')
+      const { data: inserted, error: seedError } = await sb.from('obligatii_stari').upsert(seed, { onConflict: 'luna_id,tip_key' }).select('id,tip_key,scadenta,trimis')
       if (!seedError && inserted) for (const r of inserted) byKey.set(r.tip_key, r)
     }
   }
 
   const rows = tasks.map(t => ({
+    id: byKey.get(t.key)?.id ?? null,
     tipKey: t.key,
     label: t.label,
     destinatar: t.destinatar || null,
+    sursaInstructiuni: t.sursaInstructiuni || null,
+    editabilLink: t.editabilLink || null,
     scadenta: byKey.get(t.key)?.scadenta ?? null,
     trimis: byKey.get(t.key)?.trimis ?? false,
   }))

@@ -62,6 +62,19 @@ export async function POST(req: NextRequest) {
     const { data: luni } = await sb.from('luni_contabile').select('id,luna').eq('firma_id', firmaId).order('luna', { ascending: true })
     const { data: achizitiiRows } = await sb.from('proiect_achizitii').select('id,denumire,valoare,status').eq('firma_id', firmaId).order('created_at', { ascending: false }).limit(30)
 
+    // Evita gramada de bannere identice: multe mailuri diferite pot confirma acelasi fapt (ex. 6
+    // schimburi de mail pentru aceleasi salarii de august) - o singura sugestie "noua" per
+    // (luna, tip, fel de sugestie) e suficienta ca sa ceara confirmarea utilizatorului; restul
+    // mailurilor tot ajung in proiect_mail_processed, doar ca nu mai produc o sugestie separata.
+    const lunaIds = (luni || []).map(l => l.id)
+    const [{ data: stariExistente }, { data: sugestiiExistente }] = await Promise.all([
+      lunaIds.length ? sb.from('obligatii_stari').select('luna_id,tip_key,trimis').in('luna_id', lunaIds) : Promise.resolve({ data: [] as { luna_id: string; tip_key: string; trimis: boolean }[] }),
+      lunaIds.length ? sb.from('obligatii_sugestii').select('luna_id,tip_key,tip_sugestie').in('luna_id', lunaIds).eq('status', 'noua') : Promise.resolve({ data: [] as { luna_id: string; tip_key: string; tip_sugestie: string }[] }),
+    ])
+    const acoperit = new Set<string>()
+    for (const s of stariExistente || []) if (s.trimis) acoperit.add(`${s.luna_id}:${s.tip_key}:trimis`)
+    for (const s of sugestiiExistente || []) acoperit.add(`${s.luna_id}:${s.tip_key}:${s.tip_sugestie}`)
+
     const startedAt = Date.now()
     const timeIsUp = () => Date.now() - startedAt > TIME_BUDGET_MS
     let stoppedEarly = false
@@ -106,19 +119,22 @@ export async function POST(req: NextRequest) {
           || (luni || []).slice().reverse().find(l => new Date(l.luna) <= new Date(dataHeader || Date.now()))
         if (lunaRow) {
           const tipSugestie = obligatie.tipEveniment === 'scadenta_override' ? 'scadenta_override' : 'trimis'
-          const valoareData = tipSugestie === 'scadenta_override' ? obligatie.scadentaPropusa : (obligatie.dataTrimitere || dataHeader?.slice(0, 10) || null)
-          const { error: insertError } = await sb.from('obligatii_sugestii').upsert({
-            luna_id: lunaRow.id,
-            tip_key: obligatie.tipKey,
-            tip_sugestie: tipSugestie,
-            valoare_data: valoareData,
-            incredere: obligatie.incredere,
-            sursa_email_id: ref.id,
-            sursa_subiect: subiect,
-            sursa_data: dataHeader ? new Date(dataHeader).toISOString() : null,
-            sursa_rezumat: obligatie.motiv,
-          }, { onConflict: 'luna_id,tip_key,tip_sugestie,sursa_email_id', ignoreDuplicates: true })
-          if (!insertError) noiSugestiiObligatii += 1
+          const cheieAcoperire = `${lunaRow.id}:${obligatie.tipKey}:${tipSugestie}`
+          if (!acoperit.has(cheieAcoperire)) {
+            const valoareData = tipSugestie === 'scadenta_override' ? obligatie.scadentaPropusa : (obligatie.dataTrimitere || dataHeader?.slice(0, 10) || null)
+            const { error: insertError } = await sb.from('obligatii_sugestii').upsert({
+              luna_id: lunaRow.id,
+              tip_key: obligatie.tipKey,
+              tip_sugestie: tipSugestie,
+              valoare_data: valoareData,
+              incredere: obligatie.incredere,
+              sursa_email_id: ref.id,
+              sursa_subiect: subiect,
+              sursa_data: dataHeader ? new Date(dataHeader).toISOString() : null,
+              sursa_rezumat: obligatie.motiv,
+            }, { onConflict: 'luna_id,tip_key,tip_sugestie,sursa_email_id', ignoreDuplicates: true })
+            if (!insertError) { noiSugestiiObligatii += 1; acoperit.add(cheieAcoperire) }
+          }
         }
       }
     }
