@@ -36,9 +36,20 @@ export default function SincronizareProiectMail({ firmaId, culoare, onSynced }: 
       body: JSON.stringify({ firmaId }),
     })
     const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setSyncing(false); setError(data.error || 'Sincronizarea a eșuat'); return }
+
+    // Recupereaza si achizitiile deja clasificate in sincronizari anterioare (de dinainte sa
+    // existe achizitii_sugestii) - fara sa mai bata Gmail sau AI-ul o data in plus, vezi
+    // backfill-achizitii/route.ts.
+    const backfillRes = await fetch('/api/proiect-mail/backfill-achizitii', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firmaId }),
+    })
+    const backfillData = await backfillRes.json().catch(() => ({}))
+    const totalAchizitii = (data.noiSugestiiAchizitii ?? 0) + (backfillData.sugestiiNoi ?? 0)
+
     setSyncing(false)
-    if (!res.ok) { setError(data.error || 'Sincronizarea a eșuat'); return }
-    setMessage(`${data.messagesChecked} mailuri verificate, ${data.noiSugestiiObligatii} sugestii noi.${data.stoppedEarly ? ' M-am oprit la timp — apasă din nou pentru restul.' : ''}`)
+    setMessage(`${data.messagesChecked} mailuri verificate, ${data.noiSugestiiObligatii} sugestii obligații + ${totalAchizitii} sugestii achiziții.${data.stoppedEarly ? ' M-am oprit la timp — apasă din nou pentru restul.' : ''}`)
     await loadSource()
     onSynced?.()
   }

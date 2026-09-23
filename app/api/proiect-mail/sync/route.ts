@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
     const timeIsUp = () => Date.now() - startedAt > TIME_BUDGET_MS
     let stoppedEarly = false
     let noiSugestiiObligatii = 0
+    let noiSugestiiAchizitii = 0
     const processedIds: string[] = []
 
     for (const ref of toProcess) {
@@ -137,6 +138,29 @@ export async function POST(req: NextRequest) {
           }
         }
       }
+
+      // Achizitiile nu au nevoie de acelasi dedup ca obligatiile (unique(sursa_email_id) e deja
+      // per mail, nu se pot aduna bannere identice din mai multe mailuri) - sarim doar cazurile
+      // complet neclare, fara nicio denumire, ca sa nu umplem lista cu semnale fara valoare.
+      const achizitie = clasificare?.achizitie
+      if (achizitie && !(achizitie.actiune === 'neclar' && !achizitie.denumire)) {
+        const { error: achizInsertError } = await sb.from('achizitii_sugestii').upsert({
+          firma_id: firmaId,
+          luna_id: null,
+          achizitie_id: achizitie.achizitieIdPotrivit && (achizitiiRows || []).some(a => a.id === achizitie.achizitieIdPotrivit) ? achizitie.achizitieIdPotrivit : null,
+          actiune: achizitie.actiune,
+          denumire: achizitie.denumire,
+          valoare: achizitie.valoare,
+          sursa: achizitie.sursa,
+          status_propus: achizitie.statusPropus,
+          incredere: achizitie.incredere,
+          sursa_email_id: ref.id,
+          sursa_subiect: subiect,
+          sursa_data: dataHeader ? new Date(dataHeader).toISOString() : null,
+          sursa_rezumat: achizitie.motiv,
+        }, { onConflict: 'sursa_email_id', ignoreDuplicates: true })
+        if (!achizInsertError) noiSugestiiAchizitii += 1
+      }
     }
 
     await sb.from('inbox_surse_email').update({ status: 'activ', connection_error: null, last_sync_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', source.id)
@@ -144,6 +168,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       messagesChecked: toProcess.length,
       noiSugestiiObligatii,
+      noiSugestiiAchizitii,
       stoppedEarly,
     })
   } catch (err) {

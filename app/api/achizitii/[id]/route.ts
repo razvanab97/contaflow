@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
-
-const STATUSES = new Set(['oferta', 'nota_semnata', 'plata_initiata', 'dovada_trimisa', 'finalizat'])
+import { ACHIZITIE_STATUSES as STATUSES } from '@/lib/achizitii'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
