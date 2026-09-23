@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { MODULE_DEFS } from '@/lib/firma-config'
+import { applyObligatieState } from '@/lib/obligatii'
 
 // Scadenta implicita a unei obligatii: ziua N din luna URMATOARE perioadei raportate. Atentie:
 // luni_contabile.luna nu e perioada raportata, ci luna DE LUCRU - deja "luna urmatoare" perioadei
@@ -63,17 +64,10 @@ export async function POST(req: NextRequest) {
   if (!lunaId || !tipKey) return NextResponse.json({ error: 'lunaId/tipKey lipsesc' }, { status: 400 })
 
   const sb = getServiceSupabase()
-  const { error } = await sb.from('obligatii_stari').upsert(
-    { luna_id: lunaId, tip_key: tipKey, scadenta: scadenta ?? null, trimis: !!trimis, updated_at: new Date().toISOString() },
-    { onConflict: 'luna_id,tip_key' }
-  )
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const { error: taskErr } = await sb.from('task_stari').upsert(
-    { luna_id: lunaId, task_key: tipKey, completat: !!trimis, updated_at: new Date().toISOString() },
-    { onConflict: 'luna_id,task_key' }
-  )
-  if (taskErr) return NextResponse.json({ error: taskErr.message }, { status: 500 })
-
+  try {
+    await applyObligatieState(sb, lunaId, tipKey, { scadenta: scadenta ?? null, trimis: !!trimis })
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Eroare salvare' }, { status: 500 })
+  }
   return NextResponse.json({ ok: true })
 }
