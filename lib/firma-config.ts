@@ -8,11 +8,18 @@ export type ModuleSlug =
   | 'bonuri'
   | 'impozite'
   | 'raport-lunar-proiect'
+  | 'obligatii-recurente'
+  | 'achizitii'
 
 export interface TaskDef {
   key: string
   label: string
   descriere?: string
+  // Doar pentru obligatii-recurente: cui se trimite si in ce zi a lunii URMATOARE perioadei
+  // raportate e scadenta implicita (estimata din istoricul de corespondenta, ajustabila din UI
+  // pe fiecare luna in parte - vezi obligatii_stari.scadenta).
+  destinatar?: string
+  ziScadentaLunaUrmatoare?: number
 }
 
 export interface ModuleDef {
@@ -217,6 +224,25 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
       { key: 'raport_lunar_proiect.actualizat', label: 'Raport lunar actualizat' },
     ],
   },
+  'obligatii-recurente': {
+    slug: 'obligatii-recurente',
+    label: 'Obligații recurente',
+    description: 'Ce trebuie trimis lunar și către cine — scadențe estimate din istoricul de corespondență, ajustabile aici',
+    tasks: [
+      { key: 'obligatie.salarii_op', label: 'Salarii + OP-uri + dovadă creditare', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 20 },
+      { key: 'obligatie.reges', label: 'Reges + stat + pontaj + centralizator contribuții', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 8 },
+      { key: 'obligatie.acte_contabile', label: 'Acte contabile (balanță + registru jurnal)', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 18 },
+      { key: 'obligatie.extras_cont', label: 'Extras de cont al perioadei', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 18 },
+      { key: 'obligatie.raport_proiect', label: 'Raport de proiect lunar', destinatar: 'Prosocial', ziScadentaLunaUrmatoare: 18 },
+      { key: 'obligatie.acte_orieda', label: 'Acte proiect pentru contabilitate', destinatar: 'Orieda Office', ziScadentaLunaUrmatoare: 15 },
+    ],
+  },
+  achizitii: {
+    slug: 'achizitii',
+    label: 'Achiziții',
+    description: 'Aparate, materiale și servicii cumpărate din proiect — ofertă → notă semnată → plată → dovadă',
+    tasks: [],
+  },
 }
 
 export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
@@ -266,7 +292,7 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
     slug: 'proiect-ab-textile',
     // Nu e o firmă reală (fără CUI/ONRC) - e un proiect european derulat de AB Textile SRL,
     // cu propriile documente lunare de raportat, distincte de contabilitatea firmei.
-    module: ['raport-lunar-proiect'],
+    module: ['raport-lunar-proiect', 'obligatii-recurente', 'achizitii'],
     legal: {
       nrRegCom: '',
       cif: '',

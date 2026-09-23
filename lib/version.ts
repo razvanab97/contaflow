@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 142, text: 'PROIECT AB Textile: două module noi. "Obligații recurente" - ce trebuie trimis lunar către Prosocial/Orieda (Salarii+OP-uri, Reges, Acte contabile, Extras de cont, Raport de proiect), cu scadență calculată automat și panou "restanțe/urmează" - editabilă din UI dacă termenul real diferă. "Achiziții" - fiecare aparat/material cumpărat din proiect e urmărit pe etape (Ofertă → Notă semnată → Plată inițiată → Dovadă trimisă → Finalizat), cu documente separate per etapă, nu amestecate.' },
   { v: 141, text: 'Excepție E.ON: facturile pentru apartamentul 99 rămân complete, pentru că informațiile utile sunt și pe paginile următoare. Restul facturilor E.ON continuă să fie reduse la prima pagină.' },
   { v: 140, text: 'Facturile E.ON se salvează fizic doar cu prima pagină peste tot unde intră ca facturi/documente (inclusiv Inbox Facturi și uploadurile de documente/Dispoziții), nu doar în ruta specială de Dispoziții de plată. Paginile suplimentare cu grafice/condiții nu mai ajung în storage/export.' },
   { v: 139, text: 'Export Extras de cont: dacă același PDF brut de extras este salvat pe două conturi/monede (ex. AB Homes Invest RON+EUR din același fișier bancar), PDF-ul brut apare o singură dată în descărcarea PDF/ZIP; documentele tranzacțiilor rămân toate, în ordine, sub Extras de cont.' },
