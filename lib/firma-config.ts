@@ -226,7 +226,7 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
   'raport-lunar-proiect': {
     slug: 'raport-lunar-proiect',
     label: 'Raport lunar',
-    description: 'Documentul Word de raportare lunară pentru proiectul european — un singur fișier, actualizat în fiecare lună (nu se acumulează versiuni vechi)',
+    description: 'Formular Word precompletat, separat pentru fiecare lună, cu versiuni păstrate la fiecare generare',
     tasks: [
       { key: 'raport_lunar_proiect.actualizat', label: 'Raport lunar actualizat' },
     ],
@@ -248,8 +248,7 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
         sursaInstructiuni: 'Se completează direct în modulul „Raport lunar" al proiectului — nu se încarcă manual aici.', editabilLink: 'raport-lunar-proiect' },
       { key: 'obligatie.acte_orieda', label: 'Acte proiect pentru contabilitate', destinatar: 'Orieda Office', ziScadentaLunaUrmatoare: 15,
         sursaInstructiuni: 'Trimiți către Orieda documentele lunii (facturi, extrase, acte) necesare pentru înregistrarea contabilă a proiectului.' },
-      { key: 'obligatie.rapoarte_ajofm', label: 'Rapoarte speciale', destinatar: 'AJOFM Iași', ziScadentaLunaUrmatoare: 15,
-        sursaInstructiuni: 'Rapoarte speciale depuse la AJOFM Iași (portal AJOFM sau email direct) — verifică cerințele curente, nu au un canal de mail fix urmărit automat.' },
+
     ],
   },
   achizitii: {

@@ -1,4 +1,6 @@
 import { getServiceSupabase } from '@/lib/supabase/server'
+import {LEGACY_GROUPS} from '@/lib/proiect-workflow'
+import {readWorkflow,writeWorkflow,WorkflowError} from '@/lib/proiect-workflow-store'
 
 type Supabase = ReturnType<typeof getServiceSupabase>
 
@@ -22,4 +24,18 @@ export async function applyObligatieState(sb: Supabase, lunaId: string, tipKey: 
     { onConflict: 'luna_id,task_key' }
   )
   if (taskErr) throw new Error(taskErr.message)
+  const keys=LEGACY_GROUPS[tipKey]
+  if(!keys)return
+  const {data:month,error:monthError}=await sb.from('luni_contabile').select('firma_id').eq('id',lunaId).single()
+  if(monthError||!month)throw new Error('Luna nu a putut fi citită pentru sincronizarea rutinei')
+  const prefix=`${month.firma_id}/workflow/month-${lunaId}`
+  for(let attempt=0;attempt<3;attempt++){
+    const state=await readWorkflow(prefix)
+    if(!state.version)return
+    for(const key of keys){const row=state.tasks[key];if(!row)continue
+      if(patch.trimis!==undefined&&row.status!=='acceptat')row.status=patch.trimis?'trimis':'lipsa'
+      if(patch.scadenta!==undefined)row.due=patch.scadenta
+    }
+    try{await writeWorkflow(prefix,state,state.version);return}catch(e){if(!(e instanceof WorkflowError)||e.status!==409||attempt===2)throw e}
+  }
 }

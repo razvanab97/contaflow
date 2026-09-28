@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import InitLuna from './InitLuna'
+import ProiectWorkflow from '@/components/ProiectWorkflow'
 import ModuleGrid from './ModuleGrid'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getLuniContabile, getRestanteCount } from '@/lib/queries'
@@ -93,6 +94,8 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'24px', marginTop:'-12px' }}>
         <ExportButtons firmaId={firma.id} firmaNume={firma.nume} firmaSlug={firma.slug} lunaId={lunaData.id} lunaLabel={ll} culoare={firma.culoare}/>
       </div>
+
+      {slug === 'proiect-ab-textile' && <ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} compact />}
 
       {/* Module cards grid — cu reordonare */}
       <ModuleGrid

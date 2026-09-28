@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
         scadenta: t.ziScadentaLunaUrmatoare != null ? scadentaImplicita(lunaRow.luna, t.ziScadentaLunaUrmatoare) : null,
         trimis: false,
       }))
-      const { data: inserted, error: seedError } = await sb.from('obligatii_stari').upsert(seed, { onConflict: 'luna_id,tip_key' }).select('id,tip_key,scadenta,trimis')
+      const { data: inserted, error: seedError } = await sb.from('obligatii_stari').upsert(seed, { onConflict: 'luna_id,tip_key', ignoreDuplicates: true }).select('id,tip_key,scadenta,trimis')
       if (!seedError && inserted) for (const r of inserted) byKey.set(r.tip_key, r)
     }
   }

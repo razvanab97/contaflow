@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { tint } from '@/lib/colors'
 import SincronizareProiectMail from './proiect-mail/SincronizareProiectMail'
 import ObligatieDocumente from './ObligatieDocumente'
+import ProiectWorkflow from '@/components/ProiectWorkflow'
 
 interface ObligatieRow {
   id: string | null
@@ -47,7 +48,6 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
   const [sugestii, setSugestii] = useState<Sugestie[]>([])
   const [saving, setSaving] = useState<string | null>(null)
   const [sugestieBusy, setSugestieBusy] = useState<string | null>(null)
-  const [tab, setTab] = useState<'checklist' | 'documente'>('checklist')
   const r = `${parseInt(firma.culoare.slice(1, 3), 16)},${parseInt(firma.culoare.slice(3, 5), 16)},${parseInt(firma.culoare.slice(5, 7), 16)}`
 
   const load = useCallback(() => {
@@ -104,36 +104,11 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <SincronizareProiectMail firmaId={firma.id} culoare={firma.culoare} onSynced={load} />
 
-      <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid var(--c-1e1e1e)' }}>
-        {(['checklist', 'documente'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '8px 8px 0 0',
-            border: 'none', borderBottom: tab === t ? `2px solid ${firma.culoare}` : '2px solid transparent',
-            background: 'transparent', color: tab === t ? firma.culoare : 'var(--c-777777)', cursor: 'pointer',
-          }}>
-            {t === 'checklist' ? 'Checklist' : 'Documente'}
-          </button>
-        ))}
-      </div>
+      <ProiectWorkflow firmaId={firma.id} lunaId={lunaId} luna={luna} firmaSlug={firma.slug} />
 
-      {tab === 'documente' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {rows.map(row => (
-            <ObligatieDocumente
-              key={row.tipKey}
-              obligatieStareId={row.id}
-              label={row.label}
-              destinatar={row.destinatar}
-              sursaInstructiuni={row.sursaInstructiuni}
-              editabilLink={row.editabilLink}
-              firmaSlug={firma.slug}
-              luna={luna}
-              culoare={firma.culoare}
-            />
-          ))}
-        </div>
-      ) : (
-      <>
+      <details style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 18px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 650 }}>Checklist anterior și sugestii din email</summary>
+        <div style={{ display: 'grid', gap: '16px', marginTop: '14px' }}>
       {(restante > 0 || curand > 0) && (
         <div style={{ display: 'flex', gap: '12px' }}>
           {restante > 0 && (
@@ -244,8 +219,16 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
           })}
         </div>
       </div>
-      </>
-      )}
+        </div>
+      </details>
+      <details style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 18px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 650 }}>Documente anterioare</summary>
+        <div style={{ display: 'grid', gap: '10px', marginTop: '14px' }}>
+          {rows.map(row => <ObligatieDocumente key={row.tipKey} obligatieStareId={row.id} label={row.label}
+            destinatar={row.destinatar} sursaInstructiuni={row.sursaInstructiuni} editabilLink={row.editabilLink}
+            firmaSlug={firma.slug} luna={luna} culoare={firma.culoare} />)}
+        </div>
+      </details>
     </div>
   )
 }

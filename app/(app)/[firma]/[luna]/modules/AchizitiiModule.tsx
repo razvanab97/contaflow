@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
+import ProiectWorkflow from '@/components/ProiectWorkflow'
 import SincronizareProiectMail from './proiect-mail/SincronizareProiectMail'
 
 interface Achizitie {
@@ -238,6 +239,10 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
               )}
             </div>
 
+            <details style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 650, color: firma.culoare }}>Formulare achiziție: cerere ofertă, notă estimare, recepție</summary>
+              <div style={{ marginTop: 16 }}><ProiectWorkflow firmaId={firma.id} purchaseId={item.id} /></div>
+            </details>
             <AchizitieDocumente achizitieId={item.id} culoare={firma.culoare} etapaCuranta={item.status} />
 
             {sugestii.filter(s => s.achizitie_id === item.id).map(s => (

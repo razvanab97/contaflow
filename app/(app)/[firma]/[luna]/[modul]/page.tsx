@@ -23,6 +23,7 @@ const InboxFacturiModule = nextDynamic(() => import('../modules/InboxFacturiModu
 const ExtrasModule = nextDynamic(() => import('../modules/ExtrasModule'))
 const RaportLunarModule = nextDynamic(() => import('../modules/RaportLunarModule'))
 const ImpoziteModule = nextDynamic(() => import('../modules/ImpoziteModule'))
+const ProiectWorkflow = nextDynamic(() => import('@/components/ProiectWorkflow'))
 const RaportLunarProiectModule = nextDynamic(() => import('../modules/RaportLunarProiectModule'))
 const ObligatiiModule = nextDynamic(() => import('../modules/ObligatiiModule'))
 const AchizitiiModule = nextDynamic(() => import('../modules/AchizitiiModule'))
@@ -145,7 +146,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'impozite':
         return <ImpoziteModule firma={firmaForModule} lunaId={lunaData.id} tasks={modulDef.tasks} stari={impoziteStari}/>
       case 'raport-lunar-proiect':
-        return <RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/>
+        return <div style={{display:'grid',gap:20}}><ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} initialForm /><details><summary style={{cursor:'pointer',fontSize:13}}>Editor și document anterior (istoric)</summary><RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/></details></div>
       case 'obligatii-recurente':
         return <ObligatiiModule firma={firmaForModule} lunaId={lunaData.id} luna={luna}/>
       case 'achizitii':
