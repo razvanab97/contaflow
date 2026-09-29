@@ -135,11 +135,12 @@ export function parseTaxEmail(text:string):TaxDraft {
     for(let j=i+1;j<Math.min(lines.length,i+4);j++){
       if(/\b(?:CUI|CIF)\s*[:#-]?\s*(?:RO\s*)?\d{5,14}\b/i.test(lines[j])||/\d[\d .]*(?:,\d{1,2})?\s*(?:lei|ron)\b/i.test(lines[j]))break
       block+=' '+lines[j]
-      if(/\bRO\d{2}[A-Z0-9]{10,30}\b/i.test(lines[j]))break
+      if(/\bRO[0-9OIL]{2}[A-Z0-9]{10,30}\b/i.test(lines[j]))break
     }
-    const spaced=block.match(/\bRO\d{2}(?:\s+[A-Z0-9]{4}){4,7}\b/i)?.[0]
-    const compact=block.match(/\bRO[0-9O]{2}[A-Z0-9]{10,30}\b/i)?.[0]
-    const iban=normalizeIban(spaced||compact||'')
+    const spaced=block.match(/\bRO[0-9OIL]{2}(?:\s+[A-Z0-9]{4}){4,7}\b/i)?.[0]
+    const compact=block.match(/\bRO[0-9OIL]{2}[A-Z0-9]{10,30}\b/i)?.[0]
+    const rawIban=normalizeIban(spaced||compact||'')
+    const iban=rawIban?rawIban.slice(0,2)+rawIban.slice(2,4).replace(/O/g,'0').replace(/[IL]/g,'1')+rawIban.slice(4):''
     const tail=block.slice(block.indexOf(amountMatch[0])+amountMatch[0].length)
     const label=tail.split(/\b(?:in|în)\s+cont(?:ul)?\b|\bIBAN\b|\bRO\d{2}/i)[0].replace(/^[-:.,\s]+|[-:.,\s]+$/g,'').replace(/-\+/g,'+').slice(0,160)
     const recipient=block.match(/\bbeneficiar\s*[:\-]\s*([^,;]+)/i)?.[1]?.trim()||''
@@ -148,6 +149,7 @@ export function parseTaxEmail(text:string):TaxDraft {
     const qualifier=block.match(/\(([^)]{2,80})\)/)?.[1]?.trim()
     const payment={label:label||'Obligație neidentificată',amount,iban,fiscalId,recipient,description:[(label||block.slice(0,180))+(qualifier?' ('+qualifier+')':''),period?'luna '+period:''].filter(Boolean).join(' — '),due}
     payments.push(payment)
+    if(rawIban&&rawIban!==iban)warnings.push('Plata '+payments.length+': primele două cifre ale IBAN-ului au fost corectate din OCR ('+rawIban.slice(0,4)+' → '+iban.slice(0,4)+'). Compară cu emailul original.')
     if(!iban)warnings.push('Plata '+payments.length+': contul IBAN nu a fost citit.')
     else if(!validIban(iban))warnings.push('Plata '+payments.length+': IBAN-ul necesită verificare.')
     if(!fiscalId)warnings.push('Plata '+payments.length+': CUI/CIF nu a fost găsit.')

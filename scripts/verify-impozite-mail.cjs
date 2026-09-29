@@ -48,7 +48,20 @@ const swc=require(root+'/node_modules/next/dist/build/swc')
   assert.equal(textileOcr.payments[0].label,'BAS+BS')
   const investOcr=m.parseTaxEmail('AB HOMES INVEST SRL - OBLIGATII BUGET AUGUST 2026\nPentru ABHOMES INVEST SRL ( CUI 12345678) e de platit pentru luna AUGUST 2025:\n- 1.561 lei BAS in contul RO00TEST4095503XXXXXOOXX\n- 9 lei CAM in contul RO00TEST40920A470300XXXX\n- 61 lei TVA in contul ROLOTEST40920A100101XTVA')
   assert.equal(investOcr.payments.length,3)
-  assert(investOcr.warnings.some(x=>x.includes('nu a fost citit')))
+  assert(investOcr.payments.every(p=>p.iban.startsWith('RO')))
+  assert.equal(investOcr.payments[2].iban,'RO10TEST40920A100101XTVA')
+  assert(investOcr.warnings.some(x=>x.includes('corectate din OCR')))
+  assert(m.paymentIssues(investOcr.payments[2]).some(x=>x.includes('IBAN invalid')))
+  const panelSource=fs.readFileSync(root+'/app/(app)/[firma]/[luna]/modules/TaxMailPanel.tsx','utf8').replace("from '@/lib/impozite-mail'","from './impozite-mail.cjs'")
+  const panelCode=await swc.transform(panelSource,{filename:'TaxMailPanel.tsx',jsc:{parser:{syntax:'typescript',tsx:true},target:'es2022',transform:{react:{runtime:'automatic'}}},module:{type:'commonjs'}})
+  const panel={exports:{}}
+  new Function('require','module','exports',panelCode.code)((name)=>name==='./impozite-mail.cjs'?m:require(name),panel,panel.exports)
+  const React=require('react'),{renderToStaticMarkup}=require('react-dom/server')
+  const savedHtml=renderToStaticMarkup(React.createElement(panel.exports.PaymentSummary,{payment:{id:'test',sourceId:'test',label:'TVA',amount:61,iban:'RO10TEST40920A100101XTVA',fiscalId:'12345678',recipient:'',description:'TVA',due:null,paid:false},onCopy:()=>{},onEdit:()=>{},onPaid:()=>{},busy:false}))
+  assert.doesNotMatch(savedHtml,/<input\b/)
+  for(const label of ['IBAN','Sumă','CUI/CIF','Detalii'])assert(savedHtml.includes('aria-label="Copiază '+label+'"'))
+  assert(savedHtml.includes('Editează'))
+  assert(savedHtml.includes('RO10TEST40920A100101XTVA'))
   if(process.argv.includes('--storage')){
     process.loadEnvFile(root+'/.env.local')
     const storeSource=fs.readFileSync(root+'/lib/impozite-mail-store.ts','utf8')
@@ -73,5 +86,5 @@ const swc=require(root+'/node_modules/next/dist/build/swc')
       if(data?.length){const {error}=await sb.storage.from('documente').remove(data.map(x=>prefix+'/revisions/'+x.name));if(error)throw error}
     }
   }
-  console.log('PASS: sume românești, checksum IBAN, trei formate de email, firme și CUI-uri, perioade discordante.')
+  console.log('PASS: sume, IBAN-uri din toate cele trei plăți, corectare OCR semnalată și fișe salvate cu copiere/editare.')
 })().catch(e=>{console.error(e);process.exit(1)})
