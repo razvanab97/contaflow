@@ -23,7 +23,34 @@ export type TaxSource = {
 }
 export type TaxMailState = { version:number; updatedAt:string; sources:TaxSource[]; payments:TaxPayment[] }
 export type ExtractedPayment = Omit<TaxPayment,'id'|'sourceId'|'paid'>
-export type TaxDraft = { company:string; period:string; payments:ExtractedPayment[]; warnings:string[] }
+export type TaxDraft = { company:string; period:string; subjectPeriod:string; payments:ExtractedPayment[]; warnings:string[] }
+
+const months=['IANUARIE','FEBRUARIE','MARTIE','APRILIE','MAI','IUNIE','IULIE','AUGUST','SEPTEMBRIE','OCTOMBRIE','NOIEMBRIE','DECEMBRIE']
+const fold=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()
+export function sameTaxCompany(a:string,b:string):boolean {
+  const key=(value:string)=>fold(value).replace(/\bS\s*R\s*L\b/g,'').replace(/[^A-Z0-9]/g,'')
+  return !!key(a)&&key(a)===key(b)
+}
+export function taxPeriodKey(value:string):string {
+  const match=fold(value).match(/\b([A-Z]+)\s+(20\d{2})\b/)
+  const month=match?months.indexOf(match[1]):-1
+  return month<0?'':match![2]+'-'+String(month+1).padStart(2,'0')
+}
+export function expectedTaxPeriod(workMonth:string):string {
+  const match=workMonth.match(/^(20\d{2})-(0[1-9]|1[0-2])$/)
+  if(!match)return ''
+  const date=new Date(Date.UTC(Number(match[1]),Number(match[2])-2,1))
+  return months[date.getUTCMonth()]+' '+date.getUTCFullYear()
+}
+export function taxPeriodReview(draft:TaxDraft,workMonth:string):string[] {
+  const reasons:string[]=[]
+  const expected=expectedTaxPeriod(workMonth),body=taxPeriodKey(draft.period),subject=taxPeriodKey(draft.subjectPeriod)
+  if(!body)reasons.push('Perioada din corpul emailului lipsește sau nu poate fi citită.')
+  if(draft.subjectPeriod&&!subject)reasons.push('Perioada din subiectul emailului nu poate fi citită.')
+  if(body&&subject&&body!==subject)reasons.push('Subiectul indică '+draft.subjectPeriod+', iar corpul indică '+draft.period+'.')
+  if(expected&&body&&body!==taxPeriodKey(expected))reasons.push('Luna de lucru '+workMonth+' corespunde obligațiilor pentru '+expected+', dar corpul indică '+draft.period+'.')
+  return reasons
+}
 
 export const emptyTaxMailState=():TaxMailState=>({version:0,updatedAt:'',sources:[],payments:[]})
 export const normalizeIban=(value:unknown)=>String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'')
@@ -71,7 +98,7 @@ export function normalizeTaxDraft(value:unknown):TaxDraft {
       due:validDate(row.due),
     }
   }).filter(row=>row.label||row.amount!==null||row.iban)
-  return {company:clean(raw.company,160),period:clean(raw.period,100),payments,warnings:(Array.isArray(raw.warnings)?raw.warnings:[]).slice(0,12).map(x=>clean(x,300)).filter(Boolean)}
+  return {company:clean(raw.company,160),period:clean(raw.period,100),subjectPeriod:clean(raw.subjectPeriod,100),payments,warnings:(Array.isArray(raw.warnings)?raw.warnings:[]).slice(0,12).map(x=>clean(x,300)).filter(Boolean)}
 }
 export function paymentIssues(payment:ExtractedPayment):string[] {
   const issues:string[]=[]
@@ -88,8 +115,10 @@ export function paymentIssues(payment:ExtractedPayment):string[] {
 export function parseTaxEmail(text:string):TaxDraft {
   const source=text.replace(/\u00a0/g,' ').replace(/[–—]/g,'-').replace(/\s+-\s+(?=\d[\d .]*\s*(?:lei|ron))/gi,'\n- ')
   const lines=source.split(/\r?\n/).map(line=>line.replace(/\s+/g,' ').trim()).filter(Boolean)
-  const company=source.match(/Pentru\s+(.{2,100}?)\s+(?:e|este)\s+de\s+pl[ăa]tit/i)?.[1]?.trim()||source.match(/^\s*([A-Z0-9 &.-]+(?:SRL|S\.R\.L\.))\s*[-–]/im)?.[1]?.trim()||''
-  const period=source.match(/(?:pentru\s+)?luna\s+([A-Za-zĂÂÎȘȚăâîșț]+\s+20\d{2})/i)?.[1]?.trim()||''
+  const intro=source.match(/\b(?:Pentru|La)\s+(.{2,100}?)\s+(?:e|este)\s+de\s+pl[ăa]tit(?:[ăa])?\b/i)?.[1]?.trim()||''
+  const company=intro.replace(/\s*\(\s*(?:CUI|CIF)\s*(?:RO\s*)?\d{5,14}\s*\)\s*$/i,'').trim()||source.match(/^\s*([A-Z0-9 &.-]+(?:SRL|S\.R\.L\.))\s*[-–]/im)?.[1]?.trim()||''
+  const subjectPeriod=lines.find(line=>/\bOBLIGATI/i.test(fold(line)))?.match(/\b([A-Za-zĂÂÎȘȚăâîșț]+\s+20\d{2})\b/)?.[1]?.trim()||''
+  const period=source.match(/(?:pentru\s+)?luna\s+([A-Za-zĂÂÎȘȚăâîșț]+\s+20\d{2})/i)?.[1]?.trim()||subjectPeriod
   const payments:ExtractedPayment[]=[]
   const warnings:string[]=[]
   let fiscalId=''
@@ -112,16 +141,17 @@ export function parseTaxEmail(text:string):TaxDraft {
     const compact=block.match(/\bRO[0-9O]{2}[A-Z0-9]{10,30}\b/i)?.[0]
     const iban=normalizeIban(spaced||compact||'')
     const tail=block.slice(block.indexOf(amountMatch[0])+amountMatch[0].length)
-    const label=tail.split(/\b(?:in|în)\s+cont(?:ul)?\b|\bIBAN\b|\bRO\d{2}/i)[0].replace(/^[-:.,\s]+|[-:.,\s]+$/g,'').slice(0,160)
+    const label=tail.split(/\b(?:in|în)\s+cont(?:ul)?\b|\bIBAN\b|\bRO\d{2}/i)[0].replace(/^[-:.,\s]+|[-:.,\s]+$/g,'').replace(/-\+/g,'+').slice(0,160)
     const recipient=block.match(/\bbeneficiar\s*[:\-]\s*([^,;]+)/i)?.[1]?.trim()||''
     const dueMatch=block.match(/(?:scaden[țt][aă]?|p[aâ]n[aă]\s+la)\s*[:\-]?\s*(\d{1,2})[./-](\d{1,2})[./-](20\d{2})/i)
     const due=dueMatch?validDate(dueMatch[3]+'-'+dueMatch[2].padStart(2,'0')+'-'+dueMatch[1].padStart(2,'0')):null
-    const payment={label:label||'Obligație neidentificată',amount,iban,fiscalId,recipient,description:[label||block.slice(0,180),period?'luna '+period:''].filter(Boolean).join(' — '),due}
+    const qualifier=block.match(/\(([^)]{2,80})\)/)?.[1]?.trim()
+    const payment={label:label||'Obligație neidentificată',amount,iban,fiscalId,recipient,description:[(label||block.slice(0,180))+(qualifier?' ('+qualifier+')':''),period?'luna '+period:''].filter(Boolean).join(' — '),due}
     payments.push(payment)
     if(!iban)warnings.push('Plata '+payments.length+': contul IBAN nu a fost citit.')
     else if(!validIban(iban))warnings.push('Plata '+payments.length+': IBAN-ul necesită verificare.')
     if(!fiscalId)warnings.push('Plata '+payments.length+': CUI/CIF nu a fost găsit.')
   }
   if(!payments.length)warnings.push('Nu am identificat linii de plată. Verifică textul OCR sau lipește emailul integral.')
-  return {company,period,payments,warnings}
+  return {company,period,subjectPeriod,payments,warnings}
 }

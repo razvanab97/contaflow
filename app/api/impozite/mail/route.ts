@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash, randomUUID } from 'node:crypto'
-import { normalizeTaxDraft, normalizeIban, parseTaxAmount, type TaxPayment } from '@/lib/impozite-mail'
+import { normalizeTaxDraft, normalizeIban, parseTaxAmount, sameTaxCompany, taxPeriodReview, type TaxPayment } from '@/lib/impozite-mail'
 import { taxScope, readTaxMail, writeTaxMail, sameTaxOrigin, TaxMailError } from '@/lib/impozite-mail-store'
 
 function failure(error:unknown){
@@ -19,7 +19,7 @@ export async function POST(req:NextRequest){
     const input=isForm?await req.formData():await req.json()
     const get=(key:string)=>isForm?(input as FormData).get(key):(input as Record<string,unknown>)[key]
     const firmaId=String(get('firmaId')||''),lunaId=String(get('lunaId')||'')
-    const {sb,prefix}=await taxScope(firmaId,lunaId)
+    const {sb,prefix,firma,luna}=await taxScope(firmaId,lunaId)
     const state=await readTaxMail(prefix)
     const version=Number(get('version'))
     if(!Number.isInteger(version)||version!==state.version)throw new TaxMailError('Plățile au fost modificate între timp. Reîncarcă pagina.',409)
@@ -27,6 +27,8 @@ export async function POST(req:NextRequest){
     if(action==='import'){
       const draft=normalizeTaxDraft(JSON.parse(String(get('draft')||'{}')))
       if(!draft.payments.length||draft.payments.length>40)throw new TaxMailError('Nu există plăți de importat')
+      if(!sameTaxCompany(draft.company,firma.nume)&&get('confirmedCompany')!=='true')throw new TaxMailError('Confirmă firma înainte de import.')
+      if(taxPeriodReview(draft,luna.luna).length&&get('confirmedPeriod')!=='true')throw new TaxMailError('Confirmă perioada din email înainte de import.')
       const sourceText=String(get('text')||'').trim()
       const file=isForm&&get('file') instanceof File?get('file') as File:null
       if(sourceText.length>50000||file&&file.size>5*1024*1024)throw new TaxMailError('Sursa este prea mare')

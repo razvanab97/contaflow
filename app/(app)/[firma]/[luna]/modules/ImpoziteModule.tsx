@@ -13,9 +13,9 @@ export interface ImpozitStare {
 }
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
-interface Props { firma: Firma; lunaId: string; tasks: TaskDef[]; stari: ImpozitStare[] }
+interface Props { firma: Firma; lunaId: string; luna: string; tasks: TaskDef[]; stari: ImpozitStare[] }
 
-export default function ImpoziteModule({ firma, lunaId, tasks, stari }: Props) {
+export default function ImpoziteModule({ firma, lunaId, luna, tasks, stari }: Props) {
   const router = useRouter()
   const stariMap: Record<string, ImpozitStare> = {}
   for (const s of stari) stariMap[s.tip_key] = s
@@ -56,7 +56,7 @@ export default function ImpoziteModule({ firma, lunaId, tasks, stari }: Props) {
         </div>
       </div>
 
-      <TaxMailPanel firma={firma} lunaId={lunaId} onTotals={setImportTotals}/>
+      <TaxMailPanel firma={firma} lunaId={lunaId} luna={luna} onTotals={setImportTotals}/>
 
       <details open={importTotals.count ? undefined : true} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
         <summary style={{cursor:'pointer',fontSize:14,fontWeight:700,marginBottom:12}}>Categorii introduse manual{importTotals.count ? ' · evidență separată, fără dublare în total' : ''}</summary>

@@ -144,7 +144,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'raport-lunar':
         return <RaportLunarModule firma={firmaForModule} lunaId={lunaData.id}/>
       case 'impozite':
-        return <ImpoziteModule firma={firmaForModule} lunaId={lunaData.id} tasks={modulDef.tasks} stari={impoziteStari}/>
+        return <ImpoziteModule firma={firmaForModule} lunaId={lunaData.id} luna={luna} tasks={modulDef.tasks} stari={impoziteStari}/>
       case 'raport-lunar-proiect':
         return <div style={{display:'grid',gap:20}}><ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} initialForm /><details><summary style={{cursor:'pointer',fontSize:13}}>Editor și document anterior (istoric)</summary><RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/></details></div>
       case 'obligatii-recurente':

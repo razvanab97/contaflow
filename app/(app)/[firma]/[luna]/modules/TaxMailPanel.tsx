@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, type ClipboardEvent, type CSSProperties } from 'react'
-import { parseTaxEmail, paymentIssues, parseTaxAmount, normalizeIban, validIban, type TaxDraft, type TaxMailState, type TaxPayment, type ExtractedPayment } from '@/lib/impozite-mail'
+import { parseTaxEmail, paymentIssues, parseTaxAmount, normalizeIban, sameTaxCompany, taxPeriodReview, expectedTaxPeriod, type TaxDraft, type TaxMailState, type TaxPayment, type ExtractedPayment } from '@/lib/impozite-mail'
 
 type Totals={count:number;total:number;remaining:number}
 type Firma={id:string;nume:string;slug:string}
@@ -36,18 +36,18 @@ function PaymentEditor({payment,onChange,saved=false,onCopy}:{payment:ExtractedP
     </div>
   </div>
 }
-export default function TaxMailPanel({firma,lunaId,onTotals}:{firma:Firma;lunaId:string;onTotals:(totals:Totals)=>void}){
+export default function TaxMailPanel({firma,lunaId,luna,onTotals}:{firma:Firma;lunaId:string;luna:string;onTotals:(totals:Totals)=>void}){
   const [state,setState]=useState<TaxMailState|null>(null)
   const [text,setText]=useState(''),[file,setFile]=useState<File|null>(null),[draft,setDraft]=useState<TaxDraft|null>(null)
   const [busy,setBusy]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[dirty,setDirty]=useState(false)
-  const [preview,setPreview]=useState(''),[confirmedCompany,setConfirmedCompany]=useState(false)
+  const [preview,setPreview]=useState(''),[confirmedCompany,setConfirmedCompany]=useState(false),[confirmedPeriod,setConfirmedPeriod]=useState(false)
   async function load(){setError('');try{const data=await json(await fetch('/api/impozite/mail?firmaId='+encodeURIComponent(firma.id)+'&lunaId='+encodeURIComponent(lunaId),{cache:'no-store'}));setState(data.state);setDirty(false)}catch(e){setError(e instanceof Error?e.message:'Nu pot încărca plățile')}}
   useEffect(()=>{void load()},[firma.id,lunaId])
   useEffect(()=>{if(!state)return;onTotals({count:state.payments.length,total:state.payments.reduce((sum,p)=>sum+(p.amount||0),0),remaining:state.payments.reduce((sum,p)=>sum+(p.paid?0:p.amount||0),0)})},[state,onTotals])
   useEffect(()=>{if(!file){setPreview('');return}const url=URL.createObjectURL(file);setPreview(url);return()=>URL.revokeObjectURL(url)},[file])
   useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault()};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn)},[dirty])
   async function scan(image:File){
-    setError('');setNotice('');setDraft(null);setConfirmedCompany(false)
+    setError('');setNotice('');setDraft(null);setConfirmedCompany(false);setConfirmedPeriod(false)
     if(!['image/png','image/jpeg','image/webp'].includes(image.type)||image.size>5*1024*1024){setError('Acceptă PNG, JPG sau WebP de maximum 5 MB.');return}
     setFile(image);setBusy('Citesc local imaginea…')
     let worker:Awaited<ReturnType<typeof import('tesseract.js').createWorker>>|null=null
@@ -65,16 +65,16 @@ export default function TaxMailPanel({firma,lunaId,onTotals}:{firma:Firma;lunaId
     if(image){e.preventDefault();void scan(new File([image],'captura-email.png',{type:image.type}));return}
     if(e.target instanceof HTMLTextAreaElement)return
     const pasted=e.clipboardData.getData('text/plain')
-    if(pasted.trim()){e.preventDefault();setText(pasted);setFile(null);setDraft(null);setConfirmedCompany(false)}
+    if(pasted.trim()){e.preventDefault();setText(pasted);setFile(null);setDraft(null);setConfirmedCompany(false);setConfirmedPeriod(false)}
   }
-  function analyze(){const result=parseTaxEmail(text);setDraft(result);setConfirmedCompany(false);setError(result.payments.length?'':'Nu s-au identificat plăți. Corectează textul extras sau lipește emailul complet.');setNotice('')}
+  function analyze(){const result=parseTaxEmail(text);setDraft(result);setConfirmedCompany(false);setConfirmedPeriod(false);setError(result.payments.length?'':'Nu s-au identificat plăți. Corectează textul extras sau lipește emailul complet.');setNotice('')}
   function changeDraft(index:number,patch:Partial<ExtractedPayment>){setDraft(prev=>prev?{...prev,payments:prev.payments.map((p,i)=>i===index?{...p,...patch}:p)}:prev)}
   function changePayment(id:string,patch:Partial<TaxPayment>){setState(prev=>prev?{...prev,payments:prev.payments.map(p=>p.id===id?{...p,...patch}:p)}:prev);setDirty(true);setNotice('')}
   async function saveImport(){
     if(!state||!draft?.payments.length)return
     setBusy('Salvez plățile…');setError('')
     try{
-      const fd=new FormData();fd.set('firmaId',firma.id);fd.set('lunaId',lunaId);fd.set('version',String(state.version));fd.set('action','import');fd.set('draft',JSON.stringify(draft));fd.set('text',text);if(file)fd.set('file',file)
+      const fd=new FormData();fd.set('firmaId',firma.id);fd.set('lunaId',lunaId);fd.set('version',String(state.version));fd.set('action','import');fd.set('draft',JSON.stringify(draft));fd.set('text',text);fd.set('confirmedCompany',String(confirmedCompany));fd.set('confirmedPeriod',String(confirmedPeriod));if(file)fd.set('file',file)
       const data=await json(await fetch('/api/impozite/mail',{method:'POST',body:fd}))
       setState(data.state);setDraft(null);setText('');setFile(null);setDirty(false);setNotice('Plățile au fost salvate pentru verificare. Nu s-a inițiat nicio plată.')
     }catch(e){setError(e instanceof Error?e.message:'Salvarea a eșuat')}finally{setBusy('')}
@@ -90,7 +90,9 @@ export default function TaxMailPanel({firma,lunaId,onTotals}:{firma:Firma;lunaId
   async function copy(value:string){try{await navigator.clipboard.writeText(value);setNotice('Copiat în clipboard.')}catch{setError('Copierea nu este disponibilă în acest browser.')}}
   const sourceUrl=(id:string)=>'/api/impozite/source?firmaId='+encodeURIComponent(firma.id)+'&lunaId='+encodeURIComponent(lunaId)+'&sourceId='+encodeURIComponent(id)
   const paymentSource=(id:string)=>state?.sources.find(s=>s.id===id)
-  const companyNeedsConfirmation=!!draft&&(!draft.company||!draft.company.toLowerCase().includes(firma.nume.toLowerCase().replace(/\s+(srl|s\.r\.l\.).*$/i,'')))
+  const companyNeedsConfirmation=!!draft&&!sameTaxCompany(draft.company,firma.nume)
+  const periodReasons=draft?taxPeriodReview(draft,luna):[]
+  const periodNeedsConfirmation=periodReasons.length>0
   return <section style={{display:'grid',gap:14}} onPaste={paste}>
     <div style={card}>
       <h2 style={{fontSize:17,fontWeight:700,marginBottom:7}}>Importă emailul cu plățile către stat</h2>
@@ -108,11 +110,12 @@ export default function TaxMailPanel({firma,lunaId,onTotals}:{firma:Firma;lunaId
     {error&&<div role="alert" style={{...card,borderColor:'var(--accent-red)',color:'var(--accent-red)',fontSize:13}}>{error} <button style={btn} onClick={()=>void load()}>Reîncarcă plățile</button></div>}
     {notice&&<div role="status" style={{...small,color:'var(--accent-mint)'}}>{notice}</div>}
     {draft&&<div style={{...card,display:'grid',gap:12}}>
-      <div><h3 style={{fontSize:16,fontWeight:700}}>Revizuiește plățile detectate</h3><p style={small}>Email: {draft.company||'firma nedetectată'} · Perioada: {draft.period||'neidentificată'} · {draft.payments.length} plăți · {money(draft.payments.reduce((sum,p)=>sum+(p.amount||0),0))}</p></div>
+      <div><h3 style={{fontSize:16,fontWeight:700}}>Revizuiește plățile detectate</h3><p style={small}>Email: {draft.company||'firma nedetectată'} · Perioada din corp: {draft.period||'neidentificată'} · Perioada din subiect: {draft.subjectPeriod||'neidentificată'} · Luna așteptată: {expectedTaxPeriod(luna)} · {draft.payments.length} plăți · {money(draft.payments.reduce((sum,p)=>sum+(p.amount||0),0))}</p></div>
       {companyNeedsConfirmation&&<label style={{...small,color:'var(--accent-red)'}}><input type="checkbox" checked={confirmedCompany} onChange={e=>setConfirmedCompany(e.target.checked)}/> Firma din email lipsește sau pare diferită. Confirm că acest email aparține firmei {firma.nume}.</label>}
+      {periodNeedsConfirmation&&<div style={{...card,padding:12,borderColor:'var(--accent-red)'}}><strong style={{fontSize:13,color:'var(--accent-red)'}}>Verifică perioada înainte de salvare</strong>{periodReasons.map((reason,i)=><p key={i} style={{...small,marginTop:5,color:'var(--accent-red)'}}>{reason}</p>)}<label style={{...small,display:'block',marginTop:9,color:'var(--c-dddddd)'}}><input type="checkbox" checked={confirmedPeriod} onChange={e=>setConfirmedPeriod(e.target.checked)}/> Am verificat emailul și confirm importul în luna de lucru {luna} ({expectedTaxPeriod(luna)}).</label></div>}
       {draft.warnings.map((warning,i)=><p key={i} style={{...small,color:'var(--accent-red)'}}>{warning}</p>)}
       {draft.payments.map((payment,i)=><PaymentEditor key={i} payment={payment} onChange={patch=>changeDraft(i,patch)}/>)}
-      <div style={{display:'flex',gap:9,flexWrap:'wrap'}}><button style={btn} onClick={()=>setDraft(prev=>prev?{...prev,payments:[...prev.payments,blank()]}:prev)}>+ Adaugă o plată din email</button><button style={{...btn,background:'var(--accent)',color:'#fff'}} disabled={!!busy||!draft.payments.length||!state||dirty||companyNeedsConfirmation&&!confirmedCompany} onClick={()=>void saveImport()}>Salvează plățile revizuite</button></div>
+      <div style={{display:'flex',gap:9,flexWrap:'wrap'}}><button style={btn} onClick={()=>setDraft(prev=>prev?{...prev,payments:[...prev.payments,blank()]}:prev)}>+ Adaugă o plată din email</button><button style={{...btn,background:'var(--accent)',color:'#fff'}} disabled={!!busy||!draft.payments.length||!state||dirty||companyNeedsConfirmation&&!confirmedCompany||periodNeedsConfirmation&&!confirmedPeriod} onClick={()=>void saveImport()}>Salvează plățile revizuite</button></div>
     </div>}
     {state&&state.payments.length>0&&<div style={{...card,display:'grid',gap:14}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',alignItems:'center'}}><div><h3 style={{fontSize:16,fontWeight:700}}>Plăți de pregătit din email</h3><p style={small}>{state.payments.length} poziții · {money(state.payments.reduce((sum,p)=>sum+(p.paid?0:p.amount||0),0))} rămas de plătit. Marcajul „Plătit” se face doar după verificarea executării în bancă.</p></div><button style={{...btn,background:dirty?'var(--accent)':'var(--c-161616)',color:dirty?'#fff':'var(--c-999999)'}} disabled={!dirty||!!busy} onClick={()=>void saveChanges()}>Salvează modificările</button></div>
