@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TaskDef } from '@/lib/firma-config'
 import { tint } from '@/lib/colors'
+import TaxMailPanel from './TaxMailPanel'
 
 export interface ImpozitStare {
   tip_key: string
@@ -23,6 +24,7 @@ export default function ImpoziteModule({ firma, lunaId, tasks, stari }: Props) {
     Object.fromEntries(tasks.map(t => [t.key, stariMap[t.key] || { tip_key: t.key, suma: null, scadenta: null, platit: false }]))
   )
   const [saving, setSaving] = useState<string | null>(null)
+  const [importTotals, setImportTotals] = useState({count:0,total:0,remaining:0})
 
   async function save(tipKey: string, patch: Partial<ImpozitStare>) {
     const next = { ...rows[tipKey], ...patch }
@@ -37,24 +39,27 @@ export default function ImpoziteModule({ firma, lunaId, tasks, stari }: Props) {
     if (res.ok) router.refresh()
   }
 
-  const totalSume = tasks.reduce((sum, t) => sum + (rows[t.key]?.suma || 0), 0)
-  const totalRamas = tasks.reduce((sum, t) => sum + (rows[t.key]?.platit ? 0 : (rows[t.key]?.suma || 0)), 0)
+  const totalSume = importTotals.count ? importTotals.total : tasks.reduce((sum, t) => sum + (rows[t.key]?.suma || 0), 0)
+  const totalRamas = importTotals.count ? importTotals.remaining : tasks.reduce((sum, t) => sum + (rows[t.key]?.platit ? 0 : (rows[t.key]?.suma || 0)), 0)
   const r = parseInt(firma.culoare.slice(1,3),16) + ',' + parseInt(firma.culoare.slice(3,5),16) + ',' + parseInt(firma.culoare.slice(5,7),16)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '12px' }}>
         <div style={{ flex: 1, background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '6px' }}>Total impozite</div>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--c-ffffff)' }}>{totalSume.toLocaleString('ro-RO')} RON</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '6px' }}>{importTotals.count ? 'Total din emailurile importate' : 'Total impozite'}</div>
+          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--c-ffffff)' }}>{totalSume.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})} RON</div>
         </div>
         <div style={{ flex: 1, background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '6px' }}>Rămas de plătit</div>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: totalRamas > 0 ? '#F59E0B' : 'var(--accent-mint)' }}>{totalRamas.toLocaleString('ro-RO')} RON</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '6px' }}>{importTotals.count ? 'Rămas din emailurile importate' : 'Rămas de plătit'}</div>
+          <div style={{ fontSize: '22px', fontWeight: 700, color: totalRamas > 0 ? '#F59E0B' : 'var(--accent-mint)' }}>{totalRamas.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})} RON</div>
         </div>
       </div>
 
-      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+      <TaxMailPanel firma={firma} lunaId={lunaId} onTotals={setImportTotals}/>
+
+      <details open={importTotals.count ? undefined : true} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+        <summary style={{cursor:'pointer',fontSize:14,fontWeight:700,marginBottom:12}}>Categorii introduse manual{importTotals.count ? ' · evidență separată, fără dublare în total' : ''}</summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {tasks.map(task => {
             const row = rows[task.key]
@@ -112,7 +117,7 @@ export default function ImpoziteModule({ firma, lunaId, tasks, stari }: Props) {
             )
           })}
         </div>
-      </div>
+      </details>
     </div>
   )
 }

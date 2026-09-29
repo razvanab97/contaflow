@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 148, text: 'Plată impozite: import de email din text sau captură lipită/atașată, OCR local în browser, separare pe plăți cu sumă, CUI/CIF, IBAN, scop și scadență. Revizuire înainte de salvare, evidență pe firmă și lună, sursă păstrată și marcaj manual după executarea plății.' },
   { v: 147, text: 'AB TEXTILE: documentele pentru salarii și contribuții sunt într-o singură secțiune extensibilă: stat de plată, pontaj, extrase REGES, centralizator contribuții, creditarea grantului, extrase bancare, registru jurnal și confirmarea plății. Fiecare păstrează propriile fișiere, stări și termene.' },
   { v: 146, text: 'AB TEXTILE: rutină pe luni cu următorul pas, termene configurabile, documente și stări separate (pregătit, semnat, trimis, acceptat). Cinci formulare Word pe modelele proiectului, date permanente și versiuni păstrate. Achizițiile au cerere de ofertă, notă de estimare și recepție. Anexa 7 este exclusă; AJOFM apare anual în rutina nouă.' },
   { v: 145, text: 'Achiziții: primesc acum și ele sugestii din corespondența Gmail cu Prosocial, la fel ca Obligațiile - buton "Sincronizează din email" propune achiziții noi sau avansarea la etapa următoare, cu Confirmă/Respinge. Recuperate automat (fără re-scanare) 4 achiziții reale deja discutate în mail dar rămase neînregistrate: echipamente proiect și materiale iulie 2026 (~4174 RON).' },
