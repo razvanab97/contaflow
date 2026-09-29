@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 151, text: 'Plată impozite: butonul Salvează explică acum ce confirmare lipsește în loc să rămână inactiv; confirmările pentru firmă și perioadă sunt lângă buton. Verificarea perioadei funcționează și cu data completă a lunii din baza de date.' },
   { v: 150, text: 'Plată impozite: citește și IBAN-urile la care OCR confundă primele cifre cu litere (ROLO → RO10), cu avertisment de verificare. Plățile importate sunt afișate ca fișe fixe cu copiere pentru sumă, IBAN, CUI și detalii; fiecare fișă se poate modifica explicit prin Editează.' },
   { v: 149, text: 'Plată impozite: recunoaște emailurile Orieda pentru AB TEXTILE și AB HOMES INVEST, inclusiv CUI-ul din introducere, sumele BAS/BS, CAM și TVA și denumirea firmei fără spații. Afișează perioada din subiect, din corp și luna contabilă așteptată; diferențele cer confirmare explicită înainte de salvare.' },
   { v: 148, text: 'Plată impozite: import de email din text sau captură lipită/atașată, OCR local în browser, separare pe plăți cu sumă, CUI/CIF, IBAN, scop și scadență. Revizuire înainte de salvare, evidență pe firmă și lună, sursă păstrată și marcaj manual după executarea plății.' },

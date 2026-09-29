@@ -37,7 +37,7 @@ export function taxPeriodKey(value:string):string {
   return month<0?'':match![2]+'-'+String(month+1).padStart(2,'0')
 }
 export function expectedTaxPeriod(workMonth:string):string {
-  const match=workMonth.match(/^(20\d{2})-(0[1-9]|1[0-2])$/)
+  const match=workMonth.match(/^(20\d{2})-(0[1-9]|1[0-2])(?:-\d{2})?$/)
   if(!match)return ''
   const date=new Date(Date.UTC(Number(match[1]),Number(match[2])-2,1))
   return months[date.getUTCMonth()]+' '+date.getUTCFullYear()

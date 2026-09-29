@@ -94,7 +94,12 @@ export default function TaxMailPanel({firma,lunaId,luna,onTotals}:{firma:Firma;l
   function analyze(){const result=parseTaxEmail(text);setDraft(result);setConfirmedCompany(false);setConfirmedPeriod(false);setError(result.payments.length?'':'Nu s-au identificat plăți. Corectează textul extras sau lipește emailul complet.');setNotice('')}
   function changeDraft(index:number,patch:Partial<ExtractedPayment>){setDraft(prev=>prev?{...prev,payments:prev.payments.map((p,i)=>i===index?{...p,...patch}:p)}:prev)}
   async function saveImport(){
-    if(!state||!draft?.payments.length)return
+    if(!draft?.payments.length){setError('Nu există plăți de salvat. Analizează mai întâi emailul.');return}
+    if(!state){setError('Datele lunii nu s-au încărcat. Apasă „Reîncarcă plățile” și încearcă din nou.');return}
+    if(companyNeedsConfirmation&&!confirmedCompany||periodNeedsConfirmation&&!confirmedPeriod){
+      setError('Pentru salvare, bifează confirmarea '+(companyNeedsConfirmation&&!confirmedCompany?'firmei':'')+(companyNeedsConfirmation&&!confirmedCompany&&periodNeedsConfirmation&&!confirmedPeriod?' și a ':'')+(periodNeedsConfirmation&&!confirmedPeriod?'perioadei':'')+' de lângă buton.')
+      return
+    }
     setBusy('Salvez plățile…');setError('')
     try{
       const fd=new FormData();fd.set('firmaId',firma.id);fd.set('lunaId',lunaId);fd.set('version',String(state.version));fd.set('action','import');fd.set('draft',JSON.stringify(draft));fd.set('text',text);fd.set('confirmedCompany',String(confirmedCompany));fd.set('confirmedPeriod',String(confirmedPeriod));if(file)fd.set('file',file)
@@ -131,15 +136,16 @@ export default function TaxMailPanel({firma,lunaId,luna,onTotals}:{firma:Firma;l
       {file&&<p style={small}>Captura va fi păstrată ca sursă doar când confirmi importul.</p>}
       {preview&&<details style={{marginTop:10}}><summary style={{...small,cursor:'pointer'}}>Vezi captura pentru verificarea cifrelor</summary><img src={preview} alt={'Captura emailului '+file?.name} style={{maxWidth:'100%',maxHeight:700,objectFit:'contain',marginTop:8}}/></details>}
     </div>
-    {error&&<div role="alert" style={{...card,borderColor:'var(--accent-red)',color:'var(--accent-red)',fontSize:13}}>{error} <button style={btn} onClick={()=>void load()}>Reîncarcă plățile</button></div>}
+    {error&&!draft&&<div role="alert" style={{...card,borderColor:'var(--accent-red)',color:'var(--accent-red)',fontSize:13}}>{error} <button style={btn} onClick={()=>void load()}>Reîncarcă plățile</button></div>}
     {notice&&<div role="status" style={{...small,color:'var(--accent-mint)'}}>{notice}</div>}
     {draft&&<div style={{...card,display:'grid',gap:12}}>
       <div><h3 style={{fontSize:16,fontWeight:700}}>Revizuiește plățile detectate</h3><p style={small}>Email: {draft.company||'firma nedetectată'} · Perioada din corp: {draft.period||'neidentificată'} · Perioada din subiect: {draft.subjectPeriod||'neidentificată'} · Luna așteptată: {expectedTaxPeriod(luna)} · {draft.payments.length} plăți · {money(draft.payments.reduce((sum,p)=>sum+(p.amount||0),0))}</p></div>
-      {companyNeedsConfirmation&&<label style={{...small,color:'var(--accent-red)'}}><input type="checkbox" checked={confirmedCompany} onChange={e=>setConfirmedCompany(e.target.checked)}/> Firma din email lipsește sau pare diferită. Confirm că acest email aparține firmei {firma.nume}.</label>}
-      {periodNeedsConfirmation&&<div style={{...card,padding:12,borderColor:'var(--accent-red)'}}><strong style={{fontSize:13,color:'var(--accent-red)'}}>Verifică perioada înainte de salvare</strong>{periodReasons.map((reason,i)=><p key={i} style={{...small,marginTop:5,color:'var(--accent-red)'}}>{reason}</p>)}<label style={{...small,display:'block',marginTop:9,color:'var(--c-dddddd)'}}><input type="checkbox" checked={confirmedPeriod} onChange={e=>setConfirmedPeriod(e.target.checked)}/> Am verificat emailul și confirm importul în luna de lucru {luna} ({expectedTaxPeriod(luna)}).</label></div>}
       {draft.warnings.map((warning,i)=><p key={i} style={{...small,color:'var(--accent-red)'}}>{warning}</p>)}
       {draft.payments.map((payment,i)=><PaymentEditor key={i} payment={payment} onChange={patch=>changeDraft(i,patch)}/>)}
-      <div style={{display:'flex',gap:9,flexWrap:'wrap'}}><button style={btn} onClick={()=>setDraft(prev=>prev?{...prev,payments:[...prev.payments,blank()]}:prev)}>+ Adaugă o plată din email</button><button style={{...btn,background:'var(--accent)',color:'#fff'}} disabled={!!busy||!draft.payments.length||!state||!!editPayment||companyNeedsConfirmation&&!confirmedCompany||periodNeedsConfirmation&&!confirmedPeriod} onClick={()=>void saveImport()}>Salvează plățile revizuite</button></div>
+      {companyNeedsConfirmation&&<label style={{...small,color:'var(--accent-red)'}}><input type="checkbox" checked={confirmedCompany} onChange={e=>{setConfirmedCompany(e.target.checked);setError('')}}/> Firma din email lipsește sau pare diferită. Confirm că acest email aparține firmei {firma.nume}.</label>}
+      {periodNeedsConfirmation&&<div style={{...card,padding:12,borderColor:'var(--accent-red)'}}><strong style={{fontSize:13,color:'var(--accent-red)'}}>Verifică perioada înainte de salvare</strong>{periodReasons.map((reason,i)=><p key={i} style={{...small,marginTop:5,color:'var(--accent-red)'}}>{reason}</p>)}<label style={{...small,display:'block',marginTop:9,color:'var(--c-dddddd)'}}><input type="checkbox" checked={confirmedPeriod} onChange={e=>{setConfirmedPeriod(e.target.checked);setError('')}}/> Am verificat emailul și confirm importul în luna de lucru {luna} ({expectedTaxPeriod(luna)}).</label></div>}
+      <div style={{display:'flex',gap:9,flexWrap:'wrap'}}><button style={btn} onClick={()=>setDraft(prev=>prev?{...prev,payments:[...prev.payments,blank()]}:prev)}>+ Adaugă o plată din email</button><button style={{...btn,background:'var(--accent)',color:'#fff'}} disabled={!!busy||!draft.payments.length||!!editPayment} onClick={()=>void saveImport()}>Salvează plățile revizuite</button></div>
+      {error&&<p role="alert" style={{...small,color:'var(--accent-red)'}}>{error}</p>}
     </div>}
     {state&&state.payments.length>0&&<div style={{...card,display:'grid',gap:14}}>
       <div><h3 style={{fontSize:16,fontWeight:700}}>Plăți salvate din email</h3><p style={small}>{state.payments.length} poziții · {money(state.payments.reduce((sum,p)=>sum+(p.paid?0:p.amount||0),0))} rămas de plătit. Fiecare fișă rămâne fixă până alegi „Editează”.</p></div>
