@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import type { CurrencyFlow, PeriodException } from '@/lib/raport-lunar'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string }
@@ -23,6 +24,10 @@ const DANTE_CAT_LABELS: Record<string, string> = {
 
 function fmt(n: number) {
   return new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+}
+function lunaLabel(period:string){
+  const [year,month]=period.split('-').map(Number)
+  return new Intl.DateTimeFormat('ro-RO',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(year,month-1,1)))
 }
 
 function SectionLabel({ text }: { text: string }) {
@@ -49,6 +54,23 @@ function Card({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
+function FluxCard({valuta,flow}:{valuta:string;flow:CurrencyFlow}){
+  const transferIn=flow.incasari.by_categorie.transfer||0
+  const transferOut=flow.cheltuieli.by_categorie.transfer||0
+  return <Card>
+    <SectionLabel text={'Flux bancar · '+valuta}/>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:24}}>
+      {(['incasari','cheltuieli'] as const).map(side=><div key={side}>
+        <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:10}}>
+          <strong style={{fontSize:12,color:side==='incasari'?'var(--accent-mint)':'var(--accent-red)'}}>{side==='incasari'?'ÎNCASĂRI':'PLĂȚI'}</strong>
+          <strong style={{fontSize:14,color:side==='incasari'?'var(--accent-mint)':'var(--accent-red)',fontVariantNumeric:'tabular-nums'}}>{fmt(flow[side].total)}</strong>
+        </div>
+        {Object.entries(flow[side].by_categorie).sort(([,a],[,b])=>b-a).map(([cat,value])=><CatRow key={cat} label={CAT_LABELS[cat]||cat} value={value} color='var(--c-999999)' indent/>)}
+      </div>)}
+    </div>
+    {(transferIn>0||transferOut>0)&&<p style={{fontSize:12,color:'var(--c-777777)',marginTop:14}}>În totaluri sunt incluse transferuri: +{fmt(transferIn)} / −{fmt(transferOut)} {valuta}. Ele nu sunt automat venituri sau cheltuieli ale firmei.</p>}
+  </Card>
+}
 
 export default function RaportLunarModule({ firma, lunaId }: Props) {
   const [data, setData] = useState<any>(null)
@@ -67,100 +89,71 @@ export default function RaportLunarModule({ firma, lunaId }: Props) {
   if (!data) return null
 
   const { flux, emag, documente } = data
-  const ron = flux?.RON
-  const eur = flux?.EUR
+  const currencies=(Object.entries(flux||{}) as [string,CurrencyFlow][]).sort(([a],[b])=>a==='RON'?-1:b==='RON'?1:a==='EUR'?-1:b==='EUR'?1:a.localeCompare(b))
+  const control=data.control as {period:string;extrase:number;tranzactii:number;incluse:number;asteptate:number;inAfaraLunii:PeriodException[];invalide:number}
   const hasDante = emag?.danteNetCost > 0 || emag?.danteReductions > 0
   const hasOtherDocs = Object.entries(documente || {}).some(([k, v]) => k !== 'emag' && (v as number) > 0)
-
-  const netRon = ron?.net || 0
-  const netIsPositive = netRon >= 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* Summary */}
       <Card>
-        <div style={{ textAlign: 'center', padding: '12px 0' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-555555)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>
-            Sold net luna · RON
-          </div>
-          <div style={{ fontSize: '36px', fontWeight: 800, color: netIsPositive ? 'var(--accent-mint)' : 'var(--accent-red)', letterSpacing: '-1px', fontVariantNumeric: 'tabular-nums' }}>
-            {netIsPositive ? '+' : ''}{fmt(netRon)}
-          </div>
-          {ron && (
-            <div style={{ fontSize: '13px', color: 'var(--c-666666)', marginTop: '8px' }}>
-              <span style={{ color: 'var(--accent-mint)' }}>↑ {fmt(ron.incasari.total)}</span>
-              <span style={{ color: 'var(--c-444444)', margin: '0 10px' }}>—</span>
-              <span style={{ color: 'var(--accent-red)' }}>↓ {fmt(ron.cheltuieli.total)}</span>
-            </div>
-          )}
-          {eur && (
-            <div style={{ fontSize: '12px', color: 'var(--c-555555)', marginTop: '8px' }}>
-              EUR: {eur.net >= 0 ? '+' : ''}{fmt(eur.net)} &nbsp;·&nbsp; ↑{fmt(eur.incasari.total)} ↓{fmt(eur.cheltuieli.total)}
-            </div>
-          )}
+        <SectionLabel text={'Concluzia lunară · ' + lunaLabel(control.period)} />
+        <div style={{ fontSize: '13px', color: 'var(--c-888888)', marginBottom: '16px' }}>
+          {control.incluse} tranzacții bancare din {control.extrase} extrase, încadrate după data tranzacției.
         </div>
+        {currencies.length === 0
+          ? <div style={{ fontSize: '14px', color: 'var(--c-777777)' }}>Nu există încasări sau plăți bancare valide în această lună.</div>
+          : currencies.map(([valuta, flow]) => (
+            <div key={valuta} style={{ padding: '12px 0', borderTop: '1px solid var(--c-1e1e1e)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                <strong style={{ fontSize: '14px', color: 'var(--c-e0e0e0)' }}>{valuta}</strong>
+                <strong style={{ fontSize: '22px', fontVariantNumeric: 'tabular-nums', color: flow.net >= 0 ? 'var(--accent-mint)' : 'var(--accent-red)' }}>
+                  Flux net {flow.net >= 0 ? '+' : ''}{fmt(flow.net)} {valuta}
+                </strong>
+              </div>
+              <div style={{ fontSize: '12px', marginTop: '5px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--accent-mint)' }}>Încasări {fmt(flow.incasari.total)} {valuta}</span>
+                <span style={{ color: 'var(--accent-red)' }}>Plăți {fmt(flow.cheltuieli.total)} {valuta}</span>
+              </div>
+            </div>
+          ))}
+        <p style={{ fontSize: '12px', color: 'var(--c-777777)', lineHeight: '1.5', marginTop: '14px' }}>
+          Fluxul net este diferența dintre încasările și plățile din extrase. Nu reprezintă soldul final al conturilor sau profitul contabil. Totalurile pot include transferuri între conturi.
+        </p>
       </Card>
 
-      {/* Flux numerar RON */}
-      {ron && (
+      {control.asteptate !== control.tranzactii && (
         <Card>
-          <SectionLabel text="Flux numerar · RON" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-            {/* Intrări */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-mint)' }}>INTRĂRI</span>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent-mint)', fontVariantNumeric: 'tabular-nums' }}>{fmt(ron.incasari.total)}</span>
-              </div>
-              {Object.entries(ron.incasari.by_categorie as Record<string, number>)
-                .sort(([, a], [, b]) => b - a)
-                .map(([cat, val]) => (
-                  <CatRow key={cat} label={CAT_LABELS[cat] || cat} value={val as number} color='#9CA3AF' indent />
-                ))}
+          <SectionLabel text="Verificare extrase" />
+          <div style={{ fontSize: '13px', color: 'var(--accent-red)' }}>
+            Extrasele indică {control.asteptate} tranzacții, dar raportul a găsit {control.tranzactii}. Verifică importurile înainte de a folosi concluzia lunară.
+          </div>
+        </Card>
+      )}
+      {control.inAfaraLunii.length > 0 && (
+        <Card>
+          <SectionLabel text="Tranzacții din alte luni" />
+          <div style={{ fontSize: '12px', color: 'var(--c-888888)', lineHeight: '1.5', marginBottom: '8px' }}>
+            Aceste tranzacții se află în extrasele lunii de lucru, dar au altă dată. Sunt excluse din totalurile de mai sus; verifică încadrarea extraselor.
+          </div>
+          {control.inAfaraLunii.map((item, index) => (
+            <div key={index} style={{ fontSize: '12px', color: 'var(--c-bbbbbb)', padding: '5px 0' }}>
+              {item.luna} · {item.numar} {item.numar === 1 ? 'tranzacție' : 'tranzacții'} · {item.valuta}: încasări {fmt(item.incasari)}, plăți {fmt(item.plati)}
             </div>
-            {/* Ieșiri */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-red)' }}>IEȘIRI</span>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent-red)', fontVariantNumeric: 'tabular-nums' }}>{fmt(ron.cheltuieli.total)}</span>
-              </div>
-              {Object.entries(ron.cheltuieli.by_categorie as Record<string, number>)
-                .sort(([, a], [, b]) => b - a)
-                .map(([cat, val]) => (
-                  <CatRow key={cat} label={CAT_LABELS[cat] || cat} value={val as number} color='#9CA3AF' indent />
-                ))}
-            </div>
+          ))}
+        </Card>
+      )}
+      {control.invalide > 0 && (
+        <Card>
+          <SectionLabel text="Date de verificat" />
+          <div style={{ fontSize: '13px', color: 'var(--accent-red)' }}>
+            {control.invalide} tranzacții fără dată, tip sau sumă validă sunt excluse din calcul.
           </div>
         </Card>
       )}
 
-      {/* EUR flux (dacă există) */}
-      {eur && (
-        <Card>
-          <SectionLabel text="Flux numerar · EUR" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-mint)' }}>INTRĂRI</span>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent-mint)' }}>{fmt(eur.incasari.total)}</span>
-              </div>
-              {Object.entries(eur.incasari.by_categorie as Record<string, number>).sort(([,a],[,b]) => b-a).map(([cat, val]) => (
-                <CatRow key={cat} label={CAT_LABELS[cat] || cat} value={val} color='#9CA3AF' indent />
-              ))}
-            </div>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-red)' }}>IEȘIRI</span>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent-red)' }}>{fmt(eur.cheltuieli.total)}</span>
-              </div>
-              {Object.entries(eur.cheltuieli.by_categorie as Record<string, number>).sort(([,a],[,b]) => b-a).map(([cat, val]) => (
-                <CatRow key={cat} label={CAT_LABELS[cat] || cat} value={val} color='#9CA3AF' indent />
-              ))}
-            </div>
-          </div>
-        </Card>
-      )}
+      {currencies.map(([valuta, flow]) => <FluxCard key={valuta} valuta={valuta} flow={flow} />)}
 
       {/* eMAG Reconciliere */}
       {hasDante && (
@@ -201,7 +194,7 @@ export default function RaportLunarModule({ firma, lunaId }: Props) {
         </Card>
       )}
 
-      {!ron && !eur && (
+      {currencies.length === 0 && control.tranzactii === 0 && (
         <Card>
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
             <div style={{ fontSize: '13px', color: 'var(--c-555555)' }}>Nu există tranzacții bancare înregistrate pentru această lună.</div>

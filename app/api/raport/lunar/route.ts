@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { accountingMonth, calculateMonthlyFlow, collectPaged, type MonthlyTransaction } from '@/lib/raport-lunar'
 
 function emagMeta(doc: { furnizor?: string|null; fisier_path?: string|null }) {
   const src = String(doc.furnizor || '')
@@ -12,48 +13,38 @@ function emagMeta(doc: { furnizor?: string|null; fisier_path?: string|null }) {
 
 export async function GET(req: NextRequest) {
   const lunaId = req.nextUrl.searchParams.get('lunaId')
-  if (!lunaId) return NextResponse.json({ error: 'lunaId lipsește' }, { status: 400 })
+  if (!lunaId || !/^[a-f0-9-]{36}$/i.test(lunaId)) return NextResponse.json({ error: 'lunaId invalid' }, { status: 400 })
 
   const sb = getServiceSupabase()
-
-  const [{ data: extraseData }, { data: docsData }] = await Promise.all([
-    sb.from('extrase').select('id').eq('luna_id', lunaId),
-    sb.from('documente')
-      .select('fisier_path,furnizor,modul')
-      .eq('luna_id', lunaId)
-      .eq('modul', 'acte_contabile'),
-  ])
-
-  const extraseIds = (extraseData || []).map((e: any) => e.id)
-
-  const { data: txData } = extraseIds.length
-    ? await sb.from('tranzactii').select('tip,suma,valuta,categorie').in('extras_id', extraseIds)
-    : { data: [] }
-
-  // Flux numerar: group by valuta → credit/debit → categorie
-  type ByCat = Record<string, number>
-  interface FluxSide { total: number; by_categorie: ByCat }
-  const flux: Record<string, { incasari: FluxSide; cheltuieli: FluxSide; net: number }> = {}
-
-  for (const tx of (txData || [])) {
-    const v = String(tx.valuta || 'RON')
-    const suma = Number(tx.suma) || 0
-    const cat = String(tx.categorie || 'necategorizate')
-    if (!flux[v]) flux[v] = { incasari: { total: 0, by_categorie: {} }, cheltuieli: { total: 0, by_categorie: {} }, net: 0 }
-    if (tx.tip === 'credit') {
-      flux[v].incasari.total += suma
-      flux[v].incasari.by_categorie[cat] = (flux[v].incasari.by_categorie[cat] || 0) + suma
-    } else {
-      flux[v].cheltuieli.total += suma
-      flux[v].cheltuieli.by_categorie[cat] = (flux[v].cheltuieli.by_categorie[cat] || 0) + suma
+  try {
+    const { data: luna, error: lunaError } = await sb.from('luni_contabile').select('firma_id,luna').eq('id', lunaId).maybeSingle()
+    if (lunaError) throw lunaError
+    if (!luna) return NextResponse.json({ error: 'Luna nu există' }, { status: 404 })
+    const period = accountingMonth(luna.luna)
+    const [extraseData, docsData] = await Promise.all([
+      collectPaged(async (start, end) => {
+        const { data, error } = await sb.from('extrase').select('id,valuta,nr_tranzactii').eq('luna_id', lunaId).eq('firma_id', luna.firma_id).order('id').range(start, end)
+        return { data, error }
+      }),
+      collectPaged(async (start, end) => {
+        const { data, error } = await sb.from('documente').select('id,fisier_path,furnizor,modul').eq('luna_id', lunaId).eq('firma_id', luna.firma_id).eq('modul', 'acte_contabile').order('id').range(start, end)
+        return { data, error }
+      }),
+    ])
+    const currencyByExtras = new Map(extraseData.map(e => [e.id, e.valuta]))
+    const txData: MonthlyTransaction[] = []
+    for (let i = 0; i < extraseData.length; i += 50) {
+      const ids = extraseData.slice(i, i + 50).map(e => e.id)
+      const batch = await collectPaged(async (start, end) => {
+        const { data, error } = await sb.from('tranzactii').select('id,extras_id,data_tranzactie,tip,suma,valuta,categorie').eq('firma_id', luna.firma_id).in('extras_id', ids).order('id').range(start, end)
+        return { data, error }
+      })
+      txData.push(...batch.map(tx => ({ ...tx, valuta: tx.valuta || currencyByExtras.get(tx.extras_id) || null })))
     }
-  }
-  for (const v of Object.keys(flux)) {
-    flux[v].net = flux[v].incasari.total - flux[v].cheltuieli.total
-  }
+    const { flux, included, invalid, offPeriod } = calculateMonthlyFlow(txData, period)
 
   // eMAG Dante reconciliation
-  const emagDocs = (docsData || []).filter((d: any) => String(d.fisier_path).includes('/emag-calcul/'))
+  const emagDocs = docsData.filter(d => String(d.fisier_path).includes('/emag-calcul/'))
   let danteExpenses = 0, danteReductions = 0
   const danteCategories: Record<string, number> = {}
   for (const doc of emagDocs) {
@@ -67,8 +58,8 @@ export async function GET(req: NextRequest) {
   // Document counts by section
   const docCounts: Record<string, number> = {}
   const SECTIONS = ['facturi-chitanta', 'facturi-restante', 'trendyol', 'booking-facturi', 'booking-borderou', 'airbnb-facturi', 'airbnb-borderou', '5stardesk']
-  for (const doc of (docsData || [])) {
-    const path = String((doc as any).fisier_path || '')
+  for (const doc of docsData) {
+    const path = String(doc.fisier_path || '')
     if (path.includes('/emag-calcul/')) { docCounts['emag'] = (docCounts['emag'] || 0) + 1; continue }
     for (const sec of SECTIONS) {
       if (path.includes(`/${sec}/`)) { docCounts[sec] = (docCounts[sec] || 0) + 1; break }
@@ -77,6 +68,15 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     flux,
+    control: {
+      period,
+      extrase: extraseData.length,
+      tranzactii: txData.length,
+      incluse: included,
+      asteptate: extraseData.reduce((sum, e) => sum + (Number(e.nr_tranzactii) || 0), 0),
+      inAfaraLunii: offPeriod,
+      invalide: invalid,
+    },
     emag: {
       danteExpenses,
       danteReductions,
@@ -85,4 +85,7 @@ export async function GET(req: NextRequest) {
     },
     documente: docCounts,
   })
+  } catch (error) {
+    return NextResponse.json({ error: 'Nu pot calcula raportul lunar: ' + (error instanceof Error ? error.message : 'eroare necunoscută') }, { status: 503 })
+  }
 }

@@ -144,7 +144,7 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
   'raport-lunar': {
     slug: 'raport-lunar',
     label: 'Raport Lunar',
-    description: 'Analiză automată încasări, cheltuieli și sold net',
+    description: 'Analiză automată a încasărilor, plăților și fluxului net bancar',
     tasks: [],
   },
   impozite: {
