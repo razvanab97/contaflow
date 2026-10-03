@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Sparkline from '@/components/ui/Sparkline'
 import CountUp from '@/components/ui/CountUp'
 import type { FluxLunar } from '@/lib/flux-lunar'
+import { getFirmaModules } from '@/lib/firma-config'
 
 interface Punct { luna: string; label: string; incasari: number; plati: number; pct: number; initializata: boolean }
 
@@ -17,18 +18,22 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
   const [emagNet, setEmagNet] = useState<number | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [istoric, setIstoric] = useState<Punct[]>([])
+  // "Cost net eMAG" are sens doar la firmele cu modulul eMAG (azi doar AB Homes Invest).
+  const areEmag = getFirmaModules(firmaSlug).some(m => m.slug === 'emag')
 
   useEffect(() => {
     setLoaded(false)
     Promise.all([
       fetch(`/api/luna/flux?lunaId=${encodeURIComponent(lunaId)}`).then(r => r.ok ? r.json() : null).then(d => setFlux(d?.flux || null)).catch(() => {}),
-      fetch(`/api/emag?lunaId=${encodeURIComponent(lunaId)}`).then(r => r.ok ? r.json() : null).then(d => setEmagNet(typeof d?.summary?.emagNetCost === 'number' ? d.summary.emagNetCost : null)).catch(() => {}),
+      areEmag
+        ? fetch(`/api/emag?lunaId=${encodeURIComponent(lunaId)}`).then(r => r.ok ? r.json() : null).then(d => setEmagNet(typeof d?.summary?.emagNetCost === 'number' ? d.summary.emagNetCost : null)).catch(() => {})
+        : Promise.resolve(setEmagNet(null)),
     ]).finally(() => setLoaded(true))
     fetch(`/api/luna/istoric?firmaId=${encodeURIComponent(firmaId)}&firmaSlug=${encodeURIComponent(firmaSlug)}&luna=${encodeURIComponent(luna)}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (Array.isArray(data?.istoric)) setIstoric(data.istoric) })
       .catch(() => {})
-  }, [lunaId, firmaId, firmaSlug, luna])
+  }, [lunaId, firmaId, firmaSlug, luna, areEmag])
 
   if (!loaded) {
     return (
@@ -45,7 +50,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
   const monede = flux ? Object.entries(flux.peMoneda).sort(([a], [b]) => (a === 'RON' ? -1 : b === 'RON' ? 1 : a.localeCompare(b))) : []
   const multiMoneda = monede.length > 1
 
-  type Tile = { label: string; value: number; color: string; spark?: number[]; sparkColor?: string; rows?: { v: string; suma: number; curs?: number | null }[] }
+  type Tile = { label: string; value: number; color: string; spark?: number[]; sparkColor?: string; rows?: { v: string; suma: number; curs?: number | null }[]; detalii?: { label: string; suma: number; semn: '+' | '−' }[]; gol?: string; title?: string }
   const tiles: Tile[] = []
   if (flux) {
     const c = flux.consolidat
@@ -56,7 +61,21 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
       { label: 'Cashflow', value: c.net, color: c.net >= 0 ? 'var(--success)' : 'var(--danger)', spark: spark('cashflow'), sparkColor: 'var(--accent)', rows: rows(m => (m.incasari - m.schimbIn) - (m.plati - m.schimbOut)) },
     )
   }
-  if (emagNet != null) tiles.push({ label: 'Cost net eMAG', value: emagNet, color: 'var(--text-primary)' })
+  if (flux) {
+    // Imprumutul firmei de la asociat: intrari (imprumut primit) vs. iesiri (restituire + avans trezorerie).
+    const i = flux.consolidat.imprumut
+    tiles.push({
+      label: 'Împrumut firmă', value: i.net, color: 'var(--text-primary)',
+      title: 'Împrumuturi de la asociat: intrări = „împrumut societate”; ieșiri = „restituire împrumut” și „avans trezorerie”. Echivalent lei la cursul BNR; incluse și în Încasări/Plăți.',
+      detalii: i.numar ? [
+        { label: 'Primit', suma: i.primit, semn: '+' },
+        { label: 'Restituit', suma: i.restituire, semn: '−' },
+        { label: 'Avans trezorerie', suma: i.avansTrezorerie, semn: '−' },
+      ] : undefined,
+      gol: 'Nicio mișcare de împrumut luna aceasta',
+    })
+  }
+  if (areEmag && emagNet != null) tiles.push({ label: 'Cost net eMAG', value: emagNet, color: 'var(--text-primary)' })
 
   const schimburi = monede.filter(([, m]) => m.schimbIn || m.schimbOut)
 
@@ -64,7 +83,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
     <div style={{ marginBottom: '28px' }}>
       <div className="stat-grid stagger">
         {tiles.map(t => (
-          <div key={t.label} className="stat" title={t.rows ? `Toate conturile, total în lei la cursul BNR${range ? ` · tendință ${range}` : ''}` : 'Luna curentă'}>
+          <div key={t.label} className="stat" title={t.title || (t.rows ? `Toate conturile, total în lei la cursul BNR${range ? ` · tendință ${range}` : ''}` : 'Luna curentă')}>
             <div className="stat-label">{t.label}</div>
             <div className="stat-value num" style={{ color: t.color, fontSize: 'var(--fs-lg)' }} title={`${money(t.value)} lei`}>
               <CountUp value={t.value} decimals={2} /> <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>lei</span>
@@ -79,7 +98,19 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
                 ))}
               </div>
             )}
-            {t.spark && t.spark.length > 1
+            {t.detalii && (
+              <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                {t.detalii.map(d => (
+                  <div key={d.label} className="num" style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: 'var(--fs-xs)', color: d.suma ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+                    <span style={{ fontFamily: 'var(--font-inter)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{d.label}</span>
+                    <span style={{ whiteSpace: 'nowrap', color: d.suma ? (d.semn === '+' ? 'var(--success)' : 'var(--danger)') : undefined }}>{d.suma ? d.semn : ''}{money(d.suma)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {t.label === 'Împrumut firmă'
+              ? (!t.detalii && <div style={{ marginTop: '10px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{t.gol}</div>)
+              : t.spark && t.spark.length > 1
               ? <Sparkline values={t.spark} color={t.sparkColor} title={`${t.label} pe ultimele luni`} />
               : <div style={{ height: '28px', marginTop: '10px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'flex', alignItems: 'flex-end' }}>{t.rows ? 'fără istoric încă' : 'RON, luna curentă'}</div>}
           </div>
