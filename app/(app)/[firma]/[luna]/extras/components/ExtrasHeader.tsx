@@ -1,40 +1,48 @@
 'use client'
 import type { Extras } from './types'
+import PageHeader from '@/components/ui/PageHeader'
+import MonthNav from '@/components/ui/MonthNav'
+import Icon from '@/components/ui/Icon'
 
 export default function ExtrasHeader({
-  firmaNume, lunaLabel, culoare,
+  firmaNume, lunaLabel, culoare, slug, luna,
   pageTab, onPageTabChange,
   extrase, activeExtrasId, onSelectExtras, onOpenImport,
 }: {
-  firmaNume: string; lunaLabel: string; culoare: string
+  firmaNume: string; lunaLabel: string; culoare: string; slug: string; luna: string
   pageTab: 'extras'|'facturi'|'note'; onPageTabChange: (t: 'extras'|'facturi'|'note') => void
   extrase: Extras[]; activeExtrasId: string; onSelectExtras: (id: string) => void
   onOpenImport: () => void
 }) {
   return (
     <div style={{ marginBottom:'16px' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'2px' }}>
-        <div style={{ width:'9px', height:'9px', borderRadius:'50%', background:culoare }} />
-        <h1 style={{ fontSize:'19px', fontWeight:700, color:'var(--text-primary)' }}>Extras de cont</h1>
-      </div>
-      <p style={{ fontSize:'12.5px', color:'var(--text-secondary)', marginLeft:'17px', marginBottom:'14px' }}>{firmaNume} · {lunaLabel}</p>
+      <PageHeader
+        back={{ href: `/${slug}/${luna}`, label: 'Rezumatul lunii' }}
+        culoare={culoare}
+        title="Extras de cont"
+        description={`${firmaNume} · ${lunaLabel}`}
+        actions={<MonthNav slug={slug} luna={luna} suffix="/extras" />}
+      />
 
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'10px' }}>
-        <div className="glass-surface" style={{ display:'flex', padding:'3px', borderRadius:'10px', gap:'3px', width:'fit-content' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'10px', marginTop:'-8px' }}>
+        <div role="tablist" aria-label="Secțiuni extras" style={{ display:'flex', padding:'2px', borderRadius:'var(--r-md)', gap:'2px', background:'var(--surface-secondary)', border:'1px solid var(--border-subtle)', maxWidth:'100%', overflowX:'auto' }}>
           {([['extras','Extras de cont'],['facturi','Facturi + chitanță'],['note','Note']] as const).map(([t,l]) => (
-            <button key={t} onClick={() => onPageTabChange(t)} style={{ padding:'7px 16px', borderRadius:'7px', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, background:pageTab===t?culoare:'transparent', color:pageTab===t?'var(--c-ffffff)':'var(--text-secondary)' }}>{l}</button>
+            <button key={t} role="tab" aria-selected={pageTab===t} onClick={() => onPageTabChange(t)} style={{ height:'30px', padding:'0 14px', borderRadius:'var(--r-sm)', border:'none', fontSize:'var(--fs-md)', fontWeight: pageTab===t ? 600 : 500, whiteSpace:'nowrap', background:pageTab===t?'var(--surface)':'transparent', color:pageTab===t?'var(--text-primary)':'var(--text-secondary)', boxShadow: pageTab===t ? 'var(--shadow-sm)' : undefined }}>{l}</button>
           ))}
         </div>
 
         {pageTab === 'extras' && (
-          <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
-            {extrase.map(e => (
-              <button key={e.id} onClick={() => onSelectExtras(e.id)} style={{ padding:'7px 12px', borderRadius:'8px', border:`1px solid ${activeExtrasId===e.id?culoare:'var(--border)'}`, background:activeExtrasId===e.id?culoare:'var(--surface)', color:activeExtrasId===e.id?'var(--c-ffffff)':'var(--text-secondary)', cursor:'pointer', fontSize:'11.5px', fontWeight:700 }}>
-                {e.valuta}{e.iban ? ` ····${e.iban.slice(-6)}` : ''}
-              </button>
-            ))}
-            <button onClick={onOpenImport} style={{ padding:'7px 12px', borderRadius:'8px', border:`1px solid ${culoare}`, background:'transparent', color:culoare, cursor:'pointer', fontSize:'11.5px', fontWeight:700 }}>
-              ↑ Importă extras
+          <div style={{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' }}>
+            {extrase.map(e => {
+              const active = activeExtrasId===e.id
+              return (
+                <button key={e.id} onClick={() => onSelectExtras(e.id)} aria-pressed={active} className="btn btn-sm" style={{ fontWeight:600, borderColor: active ? 'var(--accent)' : undefined, background: active ? 'var(--accent-soft)' : undefined, color: active ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                  {e.valuta}{e.iban ? ` ····${e.iban.slice(-6)}` : ''}
+                </button>
+              )
+            })}
+            <button onClick={onOpenImport} className="btn btn-sm btn-primary">
+              <Icon name="download" size={14} style={{ transform:'rotate(180deg)' }} /> Importă extras
             </button>
           </div>
         )}

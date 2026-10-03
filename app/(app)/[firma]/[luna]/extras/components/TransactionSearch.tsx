@@ -19,7 +19,7 @@ export default function TransactionSearch({ value, onChange }: { value: string; 
       onChange={e => handleChange(e.target.value)}
       placeholder="Caută după furnizor, sumă, referință..."
       style={{
-        width:'100%', fontSize:'13px', padding:'9px 12px', borderRadius:'8px',
+        width:'100%', fontSize:'var(--fs-md)', padding:'9px 12px', borderRadius:'var(--r-md)',
         border:'1px solid var(--border)', background:'var(--surface)', color:'var(--text-primary)', outline:'none',
       }}
     />

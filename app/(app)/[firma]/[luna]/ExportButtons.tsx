@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { legibil } from '@/lib/colors'
+import Icon from '@/components/ui/Icon'
 
 interface Props {
   firmaId: string
@@ -36,12 +36,12 @@ export default function ExportButtons({ firmaId, firmaNume, firmaSlug, lunaId, l
   }
 
   return (
-    <div style={{ display:'flex', gap:'8px' }}>
-      <button onClick={downloadZip} disabled={zipBusy} style={{ fontSize:'12px', fontWeight:600, padding:'8px 14px', borderRadius:'8px', border:'1px solid var(--c-2a2a2a)', background:'var(--c-161616)', color:'var(--c-cccccc)', cursor:'pointer', opacity:zipBusy?.6:1 }}>
-        {zipBusy ? '...' : '↓ ZIP categorii'}
+    <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+      <button onClick={downloadZip} disabled={zipBusy} className="btn" title="Arhivă ZIP cu documentele lunii, pe categorii" style={{ opacity:zipBusy?.6:1, cursor: zipBusy ? 'wait' : undefined }}>
+        <Icon name="download" size={15} /> {zipBusy ? 'Se generează…' : 'ZIP categorii'}
       </button>
-      <button onClick={downloadPdf} disabled={pdfBusy} style={{ fontSize:'12px', fontWeight:600, padding:'8px 14px', borderRadius:'8px', border:`1px solid ${culoare}`, background:'transparent', color:legibil(culoare), cursor:'pointer', opacity:pdfBusy?.6:1 }}>
-        {pdfBusy ? '...' : '↓ PDF toate'}
+      <button onClick={downloadPdf} disabled={pdfBusy} className="btn btn-primary" title="Un singur PDF cu toate documentele lunii" style={{ opacity:pdfBusy?.6:1, cursor: pdfBusy ? 'wait' : undefined }}>
+        <Icon name="download" size={15} /> {pdfBusy ? 'Se generează…' : 'PDF toate'}
       </button>
     </div>
   )

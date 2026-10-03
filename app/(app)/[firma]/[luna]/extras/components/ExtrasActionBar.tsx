@@ -13,7 +13,7 @@ export default function ExtrasActionBar({
   associateBusy: boolean
   culoare: string
 }) {
-  const BTN: React.CSSProperties = { fontSize:'13px', fontWeight:600, padding:'10px 16px', borderRadius:'8px', border:'none', cursor:'pointer', transition:'all .15s' }
+  const BTN: React.CSSProperties = { fontSize:'var(--fs-md)', fontWeight:600, padding:'10px 16px', borderRadius:'var(--r-md)', border:'none', cursor:'pointer', transition:'all .15s' }
 
   return (
     <div className="glass-floating" style={{ display:'flex', alignItems:'center', gap:'10px', padding:'12px 16px', borderTop:'1px solid var(--border)', flexWrap:'wrap' }}>
@@ -21,7 +21,7 @@ export default function ExtrasActionBar({
         ← Anterioară
       </button>
 
-      <span style={{ fontSize:'12px', fontWeight:600, color:'var(--text-muted)', flex:1, textAlign:'center', minWidth:'80px' }}>
+      <span style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--text-muted)', flex:1, textAlign:'center', minWidth:'80px' }}>
         {index + 1} din {total}
       </span>
 

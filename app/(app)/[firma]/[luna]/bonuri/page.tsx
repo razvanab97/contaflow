@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
+import PageHeader from '@/components/ui/PageHeader'
+import MonthNav from '@/components/ui/MonthNav'
 import BonuriClient from './BonuriClient'
+import InitLuna from '../InitLuna'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getActiveFirme, getLuniContabile } from '@/lib/queries'
 import { getFirmaConfig, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
-import { accountingPeriodLabel, accountingWorkLabel } from '@/lib/accounting-period'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,7 @@ export default async function BonuriPage({ params }: { params: Promise<{ firma: 
   if (!firma) notFound()
 
   const lunaData = luni.find((l: any) => l.firma_id === firma.id && l.luna?.startsWith(luna))
-  if (!lunaData) notFound()
+  if (!lunaData) return <main className="page" style={{ display: 'flex', flexDirection: 'column' }}><InitLuna firma={firma} luna={luna} /></main>
 
   const [taskStariRaw, moduleStariRaw] = await Promise.all([
     dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
@@ -45,24 +46,16 @@ export default async function BonuriPage({ params }: { params: Promise<{ firma: 
   const nextDef = nextSlug ? MODULE_DEFS[nextSlug] : null
   const nextHref = nextDef ? `/${slug}/${luna}/${nextDef.linkDirect || nextDef.slug}` : null
 
-  const periodLabel = accountingPeriodLabel(luna)
-  const workLabel = accountingWorkLabel(luna)
 
   return (
-    <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1300px' }}>
-      <div style={{ marginBottom: '32px' }}>
-        <Link href={`/${slug}/${luna}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--c-888888)', marginBottom: '16px' }}>
-          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
-          {firma.nume.replace(' SRL', '')} · Contabilitate {periodLabel} ({workLabel})
-        </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: firma.culoare, flexShrink: 0 }} />
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--c-ffffff)', letterSpacing: '-0.5px' }}>Bonuri</h1>
-        </div>
-        <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--c-888888)', marginTop: '6px', marginLeft: '22px' }}>
-          {MODULE_DEFS.bonuri.description}
-        </p>
-      </div>
+    <main className="page animate-in">
+      <PageHeader
+        back={{ href: `/${slug}/${luna}`, label: 'Rezumatul lunii' }}
+        culoare={firma.culoare}
+        title="Bonuri"
+        description={MODULE_DEFS.bonuri.description}
+        actions={<MonthNav slug={slug} luna={luna} suffix="/bonuri" />}
+      />
 
       <BonuriClient
         firmaId={firma.id} firmaSlug={firma.slug} firmaCui={firma.cui} firmaNume={firma.nume}

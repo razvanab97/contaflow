@@ -46,20 +46,20 @@ export default function ImpoziteModule({ firma, lunaId, luna, tasks, stari }: Pr
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '12px' }}>
-        <div style={{ flex: 1, background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '6px' }}>{importTotals.count ? 'Total din emailurile importate' : 'Total impozite'}</div>
+        <div style={{ flex: 1, background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '6px' }}>{importTotals.count ? 'Total din emailurile importate' : 'Total impozite'}</div>
           <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--c-ffffff)' }}>{totalSume.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})} RON</div>
         </div>
-        <div style={{ flex: 1, background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '6px' }}>{importTotals.count ? 'Rămas din emailurile importate' : 'Rămas de plătit'}</div>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: totalRamas > 0 ? '#F59E0B' : 'var(--accent-mint)' }}>{totalRamas.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})} RON</div>
+        <div style={{ flex: 1, background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '6px' }}>{importTotals.count ? 'Rămas din emailurile importate' : 'Rămas de plătit'}</div>
+          <div style={{ fontSize: '22px', fontWeight: 700, color: totalRamas > 0 ? 'var(--warning)' : 'var(--success)' }}>{totalRamas.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})} RON</div>
         </div>
       </div>
 
       <TaxMailPanel firma={firma} lunaId={lunaId} luna={luna} onTotals={setImportTotals}/>
 
-      <details open={importTotals.count ? undefined : true} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
-        <summary style={{cursor:'pointer',fontSize:14,fontWeight:700,marginBottom:12}}>Categorii introduse manual{importTotals.count ? ' · evidență separată, fără dublare în total' : ''}</summary>
+      <details open={importTotals.count ? undefined : true} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
+        <summary style={{cursor:'pointer',fontSize:'var(--fs-base)',fontWeight:700,marginBottom:12}}>Categorii introduse manual{importTotals.count ? ' · evidență separată, fără dublare în total' : ''}</summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {tasks.map(task => {
             const row = rows[task.key]
@@ -67,7 +67,7 @@ export default function ImpoziteModule({ firma, lunaId, luna, tasks, stari }: Pr
             return (
               <div key={task.key} style={{
                 display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
-                padding: '12px', borderRadius: '10px',
+                padding: '12px', borderRadius: 'var(--r-md)',
                 background: row.platit ? `${tint(r,.06)}` : 'var(--c-161616)',
                 border: `1px solid ${row.platit ? `${tint(r,.25)}` : 'var(--c-262626)'}`,
                 opacity: isSaving ? 0.6 : 1,
@@ -76,7 +76,7 @@ export default function ImpoziteModule({ firma, lunaId, luna, tasks, stari }: Pr
                   onClick={() => save(task.key, { platit: !row.platit })}
                   disabled={isSaving}
                   style={{
-                    width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0, cursor: 'pointer',
+                    width: '22px', height: '22px', borderRadius: 'var(--r-sm)', flexShrink: 0, cursor: 'pointer',
                     background: row.platit ? `${tint(r,.15)}` : 'var(--c-1a1a1a)',
                     border: row.platit ? `1.5px solid ${tint(r,.5)}` : '1.5px solid var(--c-2a2a2a)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -89,7 +89,7 @@ export default function ImpoziteModule({ firma, lunaId, luna, tasks, stari }: Pr
                   )}
                 </button>
 
-                <span style={{ flex: '1 1 220px', fontSize: '13px', fontWeight: 500, color: row.platit ? 'var(--c-777777)' : 'var(--c-dddddd)', textDecoration: row.platit ? 'line-through' : 'none' }}>
+                <span style={{ flex: '1 1 220px', fontSize: 'var(--fs-md)', fontWeight: 500, color: row.platit ? 'var(--c-777777)' : 'var(--c-dddddd)', textDecoration: row.platit ? 'line-through' : 'none' }}>
                   {task.label}
                 </span>
 
@@ -99,8 +99,8 @@ export default function ImpoziteModule({ firma, lunaId, luna, tasks, stari }: Pr
                   defaultValue={row.suma ?? ''}
                   onBlur={e => save(task.key, { suma: e.target.value ? parseFloat(e.target.value) : null })}
                   style={{
-                    width: '120px', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px',
-                    padding: '6px 10px', fontSize: '13px', color: 'var(--c-ffffff)', outline: 'none',
+                    width: '120px', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)',
+                    padding: '6px 10px', fontSize: 'var(--fs-md)', color: 'var(--c-ffffff)', outline: 'none',
                   }}
                 />
 
@@ -109,8 +109,8 @@ export default function ImpoziteModule({ firma, lunaId, luna, tasks, stari }: Pr
                   defaultValue={row.scadenta ?? ''}
                   onChange={e => save(task.key, { scadenta: e.target.value || null })}
                   style={{
-                    background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px',
-                    padding: '6px 10px', fontSize: '13px', color: 'var(--c-cccccc)', outline: 'none',
+                    background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)',
+                    padding: '6px 10px', fontSize: 'var(--fs-md)', color: 'var(--c-cccccc)', outline: 'none',
                   }}
                 />
               </div>

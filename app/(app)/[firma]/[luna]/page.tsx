@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import InitLuna from './InitLuna'
 import ProiectWorkflow from '@/components/ProiectWorkflow'
 import ModuleGrid from './ModuleGrid'
@@ -9,12 +8,10 @@ import { getFirmaModules } from '@/lib/firma-config'
 import LunaSummary from './LunaSummary'
 import ExportButtons from './ExportButtons'
 import RecomandariLuna from '@/components/RecomandariLuna'
-import { accountingFullLabel, accountingPeriodLabel, accountingWorkLabel } from '@/lib/accounting-period'
+import { accountingFullLabel } from '@/lib/accounting-period'
+import MonthNav from '@/components/ui/MonthNav'
 
 export const dynamic = 'force-dynamic'
-
-function prevLuna(luna: string) { const d = new Date(luna+'-01'); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,7) }
-function nextLuna(luna: string) { const d = new Date(luna+'-01'); d.setMonth(d.getMonth()+1); return d.toISOString().slice(0,7) }
 
 export default async function HubPage({ params }: { params: Promise<{firma:string;luna:string}> }) {
   const { firma: slug, luna } = await params
@@ -26,7 +23,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
   if (!firma) notFound()
 
   const lunaData = luni.find((l: any) => l.firma_id === firma.id && l.luna?.startsWith(luna))
-  if (!lunaData) return <main style={{ flex: 1, padding: '44px 52px', display: 'flex' }}><InitLuna firma={firma} luna={luna} /></main>
+  if (!lunaData) return <main className="page" style={{ display: 'flex', flexDirection: 'column' }}><InitLuna firma={firma} luna={luna} /></main>
 
   const [taskStariRaw, moduleStariRaw, restanteCount] = await Promise.all([
     dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
@@ -45,59 +42,48 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
   const done = activeModules.reduce((sum, m) => sum + m.tasks.filter(t => taskMap[t.key]).length, 0)
   const pct = total > 0 ? Math.round((done/total)*100) : 0
   const ll = accountingFullLabel(luna)
-  const periodLabel = accountingPeriodLabel(luna)
-  const workLabel = accountingWorkLabel(luna)
+
+  const activeCount = activeModules.length
+  const modulesDone = activeModules.filter(m => m.tasks.length > 0 && m.tasks.every(t => taskMap[t.key])).length
 
   return (
-    <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1400px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px', marginBottom: '36px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: firma.culoare }}/>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.4px', lineHeight: 1.25 }}>
-              {firma.nume}
-            </h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '20px' }}>
-            <Link href={`/${slug}/${prevLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-            </Link>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.25 }}>
-              Contabilitate {periodLabel}
-              <span style={{ display: 'block', fontSize: '11px', fontWeight: 450, color: 'var(--text-muted)' }}>({workLabel})</span>
-            </span>
-            <Link href={`/${slug}/${nextLuna(luna)}`} style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-            </Link>
+    <main className="page animate-in">
+      <div className="page-header">
+        <div className="page-header-main">
+          <h1 className="page-title">
+            <span className="dot" style={{ background: firma.culoare, width: '10px', height: '10px' }} />
+            {firma.nume}
+          </h1>
+          <div style={{ marginTop: '12px' }}>
+            <MonthNav slug={slug} luna={luna} />
           </div>
         </div>
+        <div className="page-header-actions">
+          <ExportButtons firmaId={firma.id} firmaNume={firma.nume} firmaSlug={firma.slug} lunaId={lunaData.id} lunaLabel={ll} culoare={firma.culoare}/>
+        </div>
+      </div>
 
+      {/* Progresul lunii + concluzia financiara (apare cand exista date bancare) */}
+      <div className="stat-grid" style={{ marginBottom: '28px' }}>
+        <div className="stat" style={{ gridColumn: 'span 2' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px' }}>
+            <div className="stat-label">Progresul lunii</div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{modulesDone}/{activeCount} module gata</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+            <span className="stat-value" style={{ marginTop: 0, color: pct === 100 ? 'var(--success)' : 'var(--text-primary)' }}>{pct}%</span>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{done}/{total} task-uri</span>
+          </div>
+          <div className={`progress${pct === 100 ? ' is-done' : ''}`} style={{ marginTop: '12px' }}>
+            <span style={{ width: `${pct}%` }} />
+          </div>
+        </div>
         <LunaSummary lunaId={lunaData.id} culoare={firma.culoare} />
-
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '-1px', color: pct === 100 ? 'var(--success)' : 'var(--accent)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-            {pct}%
-          </div>
-          <div style={{ fontSize: '12.5px', fontWeight: 450, color: 'var(--text-muted)', marginTop: '4px' }}>
-            {done}/{total} task-uri
-          </div>
-        </div>
-      </div>
-
-      {/* Total progress bar */}
-      <div style={{ height: '3px', background: 'var(--border)', borderRadius: '2px', marginBottom: '36px' }}>
-        <div style={{ height: '3px', borderRadius: '2px', background: pct === 100 ? 'var(--success)' : 'var(--accent)', width: `${pct}%` }}/>
-      </div>
-
-      {/* Export buttons */}
-      <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'24px', marginTop:'-12px' }}>
-        <ExportButtons firmaId={firma.id} firmaNume={firma.nume} firmaSlug={firma.slug} lunaId={lunaData.id} lunaLabel={ll} culoare={firma.culoare}/>
       </div>
 
       {slug === 'proiect-ab-textile' && <ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} compact />}
 
-      {/* Module cards grid — cu reordonare */}
+      {/* Lista modulelor — cu reordonare */}
       <ModuleGrid
         modules={modules}
         firma={{ id: firma.id, slug: firma.slug, nume: firma.nume, culoare: firma.culoare }}

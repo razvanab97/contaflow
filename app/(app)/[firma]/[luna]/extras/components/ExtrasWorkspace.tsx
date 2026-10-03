@@ -53,8 +53,9 @@ export default function ExtrasWorkspace({
 
   if (!activeTx) {
     return (
-      <div style={{ padding:'60px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', textAlign:'center' }}>
-        <p style={{ fontSize:'14px', color:'var(--text-muted)' }}>Nicio tranzacție în această categorie.</p>
+      <div className="empty-state" style={{ padding:'48px 16px' }}>
+        <strong>Nicio tranzacție în această categorie</strong>
+        <span>Schimbă filtrul sau golește căutarea.</span>
       </div>
     )
   }
@@ -89,7 +90,7 @@ export default function ExtrasWorkspace({
   const detail = (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0, minWidth:0 }}>
       <div className="extras-mobile-back" style={{ display:'none' }}>
-        <button onClick={() => setMobileDetail(false)} style={{ fontSize:'12px', fontWeight:600, color:'var(--text-secondary)', background:'transparent', border:'none', cursor:'pointer', padding:'10px 0' }}>← Înapoi la listă</button>
+        <button onClick={() => setMobileDetail(false)} className="btn btn-ghost btn-sm" style={{ margin:'0 0 8px -8px' }}>← Înapoi la listă</button>
       </div>
       <div style={{ flex:1, minHeight:0 }}>
         <TransactionWorkspaceCard
@@ -120,7 +121,7 @@ export default function ExtrasWorkspace({
   )
 
   return (
-    <div className="extras-workspace-grid" style={{ display:'grid', gridTemplateColumns:'32% 68%', gridTemplateRows:'1fr', gap:'16px', height:'calc(100vh - 260px)', minHeight:'520px' }}>
+    <div className="extras-workspace-grid" style={{ display:'grid', gridTemplateColumns:'minmax(0,32fr) minmax(0,68fr)', gridTemplateRows:'1fr', gap:'16px', height:'calc(100vh - 280px)', minHeight:'520px' }}>
       <div className="extras-sidebar-col" style={{ display: mobileDetail ? 'none' : 'block', minWidth:0, minHeight:0 }}>{sidebar}</div>
       <div className="extras-detail-col" style={{ display: !mobileDetail ? 'none' : 'block', minWidth:0, minHeight:0 }}>{detail}</div>
       <style>{`
@@ -128,7 +129,7 @@ export default function ExtrasWorkspace({
           .extras-sidebar-col, .extras-detail-col { display: block !important; }
         }
         @media (max-width: 1024px) {
-          .extras-workspace-grid { grid-template-columns: 260px 1fr !important; }
+          .extras-workspace-grid { grid-template-columns: 260px minmax(0,1fr) !important; }
         }
         @media (max-width: 768px) {
           .extras-workspace-grid { grid-template-columns: 1fr !important; height: auto !important; min-height: 0 !important; }

@@ -78,28 +78,28 @@ export default function FacturiLocaleGlobal({ firme }: Props) {
   const needsAttention = files.filter(f => f.status === 'nedetectat' || f.status === 'eroare')
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px 24px', marginBottom: '28px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>Facturi din Personal Computer</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+    <div className="card card-pad">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-primary)' }}>Facturi din Personal Computer</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.5 }}>
             Pune fișiere în <code>~/Desktop/Facturi ContaFlow</code> (rulează <code>npm run watch:facturi</code>), apoi sincronizează aici — se repartizează automat pe firma potrivită.
           </div>
         </div>
-        <button onClick={sync} disabled={syncBusy} title="Verifică din nou folderul local, chiar dacă nu arată nimic în așteptare" style={{ fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', opacity: syncBusy ? .5 : 1, flexShrink: 0 }}>
+        <button onClick={sync} disabled={syncBusy} title="Verifică din nou folderul local, chiar dacă nu arată nimic în așteptare" className="btn btn-primary" style={{ flexShrink: 0, opacity: syncBusy ? .6 : 1 }}>
           {syncBusy ? 'Sincronizez...' : `Sincronizează${pendingCount ? ` (${pendingCount})` : ''}`}
         </button>
       </div>
 
-      {message && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '12px' }}>{message}</div>}
+      {message && <div role="status" style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '12px', padding: '8px 10px', background: 'var(--surface-secondary)', borderRadius: 'var(--r-md)' }}>{message}</div>}
 
       {rezultate.length > 0 && (
         <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {rezultate.map((r, i) => (
-            <div key={`${r.fisier}-${i}`} style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div key={`${r.fisier}-${i}`} style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <span style={{ color: 'var(--text-secondary)' }}>{r.fisier}</span>
               <span>→</span>
-              <span style={{ fontWeight: 700, color: r.status === 'imported' ? 'var(--accent-green, #4ade80)' : r.status === 'eroare' ? 'var(--accent-red, #f87171)' : 'var(--text-muted)' }}>
+              <span style={{ fontWeight: 700, color: r.status === 'imported' ? 'var(--success)' : r.status === 'eroare' ? 'var(--danger)' : 'var(--text-muted)' }}>
                 {r.firma ? r.firma : r.status === 'duplicat' ? 'deja existent' : r.status === 'nedetectat' ? 'firmă nedetectată' : 'eroare'}
               </span>
             </div>
@@ -114,31 +114,31 @@ export default function FacturiLocaleGlobal({ firme }: Props) {
             const open = previewIds.has(file.id)
             return (
               <div key={file.id}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '8px 10px', borderRadius: '8px', background: 'var(--surface-secondary)', border: '1px solid var(--border)' }}>
-                  <div style={{ flex: 1, minWidth: '160px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '8px 10px', borderRadius: 'var(--r-md)', background: 'var(--surface-secondary)', border: '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: '160px', fontSize: 'var(--fs-sm)', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
                     {file.fisier_nume}
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                    <span style={{ fontSize: 'var(--fs-xs)', color: file.status === 'eroare' ? 'var(--danger)' : 'var(--warning)', marginLeft: '6px' }}>
                       {file.status === 'nedetectat' ? '· firmă nedetectată' : `· eroare: ${file.error_message || ''}`}
                     </span>
                   </div>
                   {kind && (
-                    <button onClick={() => togglePreview(file.id)} style={{ fontSize: '11px', fontWeight: 700, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer' }}>
+                    <button onClick={() => togglePreview(file.id)} className="btn btn-sm btn-ghost" style={{ color: 'var(--accent)' }}>
                       {open ? 'Ascunde' : 'Vezi'}
                     </button>
                   )}
-                  <select value={assignPick[file.id] || ''} onChange={e => setAssignPick(prev => ({ ...prev, [file.id]: e.target.value }))} style={{ fontSize: '12px', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)' }}>
+                  <select value={assignPick[file.id] || ''} onChange={e => setAssignPick(prev => ({ ...prev, [file.id]: e.target.value }))} style={{ height: '28px', padding: '0 8px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--text-primary)' }}>
                     <option value="">Alege firma...</option>
                     {firme.map(f => <option key={f.id} value={f.id}>{f.nume}</option>)}
                   </select>
-                  <button onClick={() => assign(file)} disabled={!assignPick[file.id] || assignBusy === file.id} style={{ fontSize: '11px', fontWeight: 700, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', opacity: (!assignPick[file.id] || assignBusy === file.id) ? .5 : 1 }}>
+                  <button onClick={() => assign(file)} disabled={!assignPick[file.id] || assignBusy === file.id} className="btn btn-sm btn-primary" style={{ opacity: (!assignPick[file.id] || assignBusy === file.id) ? .5 : 1 }}>
                     {assignBusy === file.id ? '...' : 'Atribuie'}
                   </button>
                 </div>
                 {open && kind === 'pdf' && (
-                  <iframe src={`/api/inbox-facturi/global/document?id=${encodeURIComponent(file.id)}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--border)', borderRadius: '8px', marginTop: '6px', background: '#fff' }} />
+                  <iframe src={`/api/inbox-facturi/global/document?id=${encodeURIComponent(file.id)}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', marginTop: '6px', background: '#fff' }} />
                 )}
                 {open && kind === 'image' && (
-                  <img src={`/api/inbox-facturi/global/document?id=${encodeURIComponent(file.id)}&preview=1`} alt={file.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--border)', borderRadius: '8px', marginTop: '6px', background: '#fff' }} />
+                  <img src={`/api/inbox-facturi/global/document?id=${encodeURIComponent(file.id)}&preview=1`} alt={file.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', marginTop: '6px', background: '#fff' }} />
                 )}
               </div>
             )

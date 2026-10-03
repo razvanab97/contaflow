@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import CopyButton from '@/components/CopyButton'
-import { legibil, tint } from '@/lib/colors'
+import { tint } from '@/lib/colors'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 interface ChecklistItem { id:string; completat:boolean; checklist_templates?:{ titlu:string; descriere?:string; modul:string; ordine:number } }
@@ -43,8 +43,8 @@ function isPreviewable(tip: string | undefined, nume: string): 'pdf' | 'image' |
   return null
 }
 function PreviewBox({ src, kind }: { src: string; kind: 'pdf' | 'image' }) {
-  if (kind === 'pdf') return <iframe src={src} style={{ width:'100%', height:'65vh', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />
-  return <img src={src} alt="" style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />
+  if (kind === 'pdf') return <iframe src={src} style={{ width:'100%', height:'65vh', border:'1px solid var(--c-262626)', borderRadius:'var(--r-md)', marginTop:'6px', background:'var(--c-ffffff)' }} />
+  return <img src={src} alt="" style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', border:'1px solid var(--c-262626)', borderRadius:'var(--r-md)', marginTop:'6px', background:'var(--c-ffffff)' }} />
 }
 
 function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaId:string; firmaId:string; culoare:string }) {
@@ -99,19 +99,19 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
     await fetch('/api/documente/rename', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id, fisier_nume }) })
   }
 
-  const INP: React.CSSProperties = { fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'7px', padding:'8px 11px', color:'var(--c-bbbbbb)', outline:'none', width:'100%' }
+  const INP: React.CSSProperties = { fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-sm)', padding:'8px 11px', color:'var(--c-bbbbbb)', outline:'none', width:'100%' }
 
   return (
-    <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius:'10px', overflow:'hidden', transition:'border-color .2s' }}>
+    <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius:'var(--r-md)', overflow:'hidden', transition:'border-color .2s' }}>
       <button onClick={toggle} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'14px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
         {/* Status dot */}
-        <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: docs.length > 0 ? 'var(--accent-mint)' : item.completat ? culoare : 'var(--c-2a2a2a)' }}/>
+        <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: docs.length > 0 ? 'var(--success)' : item.completat ? culoare : 'var(--c-2a2a2a)' }}/>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>{t?.titlu}</div>
-          {t?.descriere && <div style={{ fontSize:'11px', color:'var(--c-777777)', marginTop:'2px' }}>{t.descriere}</div>}
+          <div style={{ fontSize:'var(--fs-md)', fontWeight:600, color:'var(--c-e0e0e0)' }}>{t?.titlu}</div>
+          {t?.descriere && <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', marginTop:'2px' }}>{t.descriere}</div>}
         </div>
         {docs.length > 0 && !loading && (
-          <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', flexShrink:0 }}>{docs.length} doc{docs.length>1?'umente':''}</span>
+          <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--success)', flexShrink:0 }}>{docs.length} doc{docs.length>1?'umente':''}</span>
         )}
         <svg width="14" height="14" fill="none" stroke="var(--c-555555)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0, transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s' }}>
           <path d="M6 9l6 6 6-6"/>
@@ -120,7 +120,7 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
 
       {open && (
         <div style={{ padding:'0 18px 16px', borderTop:'1px solid var(--c-1a1a1a)' }}>
-          {loading && <p style={{ fontSize:'12px', color:'var(--c-777777)', padding:'12px 0 4px' }}>Se încarcă...</p>}
+          {loading && <p style={{ fontSize:'var(--fs-sm)', color:'var(--c-777777)', padding:'12px 0 4px' }}>Se încarcă...</p>}
 
           {docs.length > 0 && (
             <div style={{ display:'flex', flexDirection:'column', gap:'5px', padding:'12px 0 10px' }}>
@@ -129,17 +129,17 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
                 const open = previewIds.has(doc.id)
                 return (
                   <div key={doc.id}>
-                    <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'var(--r-sm)' }}>
                       <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:culoare, flexShrink:0 }}/>
                       <input
                         defaultValue={doc.fisier_nume}
                         onBlur={e => renameDoc(doc.id, e.target.value.trim())}
-                        style={{ flex:1, minWidth:0, fontSize:'12px', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                        style={{ flex:1, minWidth:0, fontSize:'var(--fs-sm)', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
                       />
-                      {doc.tip_document && <span style={{ fontSize:'10px', color:'var(--c-666666)' }}>{doc.tip_document}</span>}
-                      {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'11px', fontWeight:600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
-                      <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓</a>
-                      <button onClick={() => deleteDoc(doc.id)} style={{ fontSize:'11px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
+                      {doc.tip_document && <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)' }}>{doc.tip_document}</span>}
+                      {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color: open ? 'var(--c-dddddd)' : 'var(--accent)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
+                      <a href={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--accent)' }}>↓</a>
+                      <button onClick={() => deleteDoc(doc.id)} style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
                     </div>
                     {open && kind && <PreviewBox src={`/api/checklist/docs?docId=${encodeURIComponent(doc.id)}&preview=1`} kind={kind}/>}
                   </div>
@@ -153,14 +153,14 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
             onDragOver={e => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}
             onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files.length && upload(e.dataTransfer.files) }}
-            style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '4px' : '12px' }}
+            style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'var(--r-md)', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '4px' : '12px' }}
           >
-            <p style={{ fontSize:'12px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
+            <p style={{ fontSize:'var(--fs-sm)', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
               {uploading ? 'Se încarcă...' : '+ Adaugă aviz PDF / JPG'}
             </p>
           </div>
           <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>
-          {error && <p style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'6px' }}>{error}</p>}
+          {error && <p style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', marginTop:'6px' }}>{error}</p>}
         </div>
       )}
     </div>
@@ -215,33 +215,33 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, currency, onChange }: {
 
   return (
     <div>
-      <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'7px', flexWrap:'wrap' }}>
-        <span style={{ flex:1, minWidth:'140px', fontSize:'12px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {moneyCurrency(inv.valoare, inv.valuta || currency)}</span>
+      <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'var(--r-sm)', flexWrap:'wrap' }}>
+        <span style={{ flex:1, minWidth:'140px', fontSize:'var(--fs-sm)', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.categorie} · {moneyCurrency(inv.valoare, inv.valuta || currency)}</span>
         <input
           defaultValue={inv.numar_cautare}
           onBlur={e => renameNumarCautare(e.target.value.trim())}
           title="Numărul de căutat — corectează dacă AI-ul l-a citit greșit"
-          style={{ width:'110px', fontSize:'13px', fontWeight:700, color:'var(--c-ffffff)', fontFamily:'monospace', background:'transparent', border:'none', outline:'none', padding:0 }}
+          style={{ width:'110px', fontSize:'var(--fs-md)', fontWeight:700, color:'var(--c-ffffff)', fontFamily:'monospace', background:'transparent', border:'none', outline:'none', padding:0 }}
         />
         <div style={{ position:'relative', display:'inline-flex' }}>
           <CopyButton value={inv.numar_cautare} onCopy={markCopied}/>
           {inv.copiat && (
-            <button onClick={unmarkCopied} title="Cod deja folosit — click pentru anulare" style={{ position:'absolute', top:'-6px', right:'-6px', width:'14px', height:'14px', borderRadius:'50%', background:'var(--accent-red)', border:'1px solid var(--c-0d0d0d)', color:'var(--c-ffffff)', fontSize:'9px', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', lineHeight:1, padding:0 }}>
+            <button onClick={unmarkCopied} title="Cod deja folosit — click pentru anulare" style={{ position:'absolute', top:'-6px', right:'-6px', width:'14px', height:'14px', borderRadius:'50%', background:'var(--danger)', border:'1px solid var(--c-0d0d0d)', color:'var(--c-ffffff)', fontSize:'var(--fs-xs)', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', lineHeight:1, padding:0 }}>
               ✕
             </button>
           )}
         </div>
         {inv.factura_document_id ? (
           <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-            <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)' }}>✓</span>
+            <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--success)' }}>✓</span>
             <input
               defaultValue={inv.factura_fisier_nume || ''}
               onBlur={e => renameFacturaFisier(e.target.value.trim())}
-              style={{ width:'130px', fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', background:'transparent', border:'none', outline:'none', padding:0 }}
+              style={{ width:'130px', fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--success)', background:'transparent', border:'none', outline:'none', padding:0 }}
             />
-            {kind && <button onClick={() => setPreview(v => !v)} style={{ fontSize:'11px', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi'}</button>}
-            <a href={`/api/emag?docId=${encodeURIComponent(inv.factura_document_id)}`} style={{ fontSize:'11px', color:'var(--accent-mint)' }}>↓</a>
-            <button onClick={removeFactura} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
+            {kind && <button onClick={() => setPreview(v => !v)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi'}</button>}
+            <a href={`/api/emag?docId=${encodeURIComponent(inv.factura_document_id)}`} style={{ fontSize:'var(--fs-xs)', color:'var(--accent)' }}>↓</a>
+            <button onClick={removeFactura} style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
           </div>
         ) : (
           <>
@@ -250,7 +250,7 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, currency, onChange }: {
               onDragOver={e => { e.preventDefault(); setDrag(true) }}
               onDragLeave={() => setDrag(false)}
               onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && uploadFactura(e.dataTransfer.files[0]) }}
-              style={{ fontSize:'11px', fontWeight:600, padding:'5px 10px', borderRadius:'6px', border:`1px dashed ${drag ? culoare : 'var(--c-333333)'}`, background: drag ? 'var(--overlay-hover)' : 'transparent', color:'var(--c-888888)', cursor:'pointer' }}
+              style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'5px 10px', borderRadius:'var(--r-sm)', border:`1px dashed ${drag ? culoare : 'var(--c-333333)'}`, background: drag ? 'var(--overlay-hover)' : 'transparent', color:'var(--c-888888)', cursor:'pointer' }}
             >
               {uploading ? '...' : '+ Factură'}
             </button>
@@ -293,9 +293,9 @@ function BulkUploadZone({ documentId, firmaId, lunaId, culoare, onChange }: {
         onDragOver={e => { e.preventDefault(); setDrag(true) }}
         onDragLeave={() => setDrag(false)}
         onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files.length && uploadBulk(e.dataTransfer.files) }}
-        style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'12px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)' }}
+        style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'var(--r-md)', padding:'12px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)' }}
       >
-        <p style={{ fontSize:'11px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
+        <p style={{ fontSize:'var(--fs-xs)', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
           {uploading ? 'Se asociază facturile...' : '+ Adaugă toate facturile deodată (se asociază automat)'}
         </p>
       </div>
@@ -303,15 +303,15 @@ function BulkUploadZone({ documentId, firmaId, lunaId, culoare, onChange }: {
       {result && (
         <div style={{ marginTop:'8px', display:'flex', flexDirection:'column', gap:'3px' }}>
           {result.matched.length > 0 && (
-            <span style={{ fontSize:'11px', color:'var(--accent-mint)' }}>✓ {result.matched.length} factur{result.matched.length===1?'ă asociată':'i asociate'} automat</span>
+            <span style={{ fontSize:'var(--fs-xs)', color:'var(--success)' }}>✓ {result.matched.length} factur{result.matched.length===1?'ă asociată':'i asociate'} automat</span>
           )}
           {result.unmatched.length > 0 && (
             <div>
-              <span style={{ fontSize:'11px', color:'var(--accent-red)', fontWeight:600 }}>
+              <span style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', fontWeight:600 }}>
                 {result.unmatched.length} nu s-a{result.unmatched.length===1?'':'u'}u putut asocia — încarcă-le manual pe rândul potrivit:
               </span>
               {result.unmatched.map(u => (
-                <div key={u.fileName} style={{ fontSize:'11px', color:'var(--c-888888)', marginTop:'2px' }}>· {u.fileName}</div>
+                <div key={u.fileName} style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', marginTop:'2px' }}>· {u.fileName}</div>
               ))}
             </div>
           )}
@@ -369,15 +369,15 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
   }
 
   return (
-    <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius:'10px', overflow:'hidden', transition:'border-color .2s' }}>
+    <div style={{ background:'var(--c-111111)', border:`1px solid ${open ? `${tint(r,.25)}` : 'var(--c-1e1e1e)'}`, borderRadius:'var(--r-md)', overflow:'hidden', transition:'border-color .2s' }}>
       <button onClick={() => setOpen(v => !v)} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'14px 18px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
-        <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: hasAviz ? 'var(--accent-mint)' : orphanInvoices.length ? 'var(--accent)' : 'var(--c-2a2a2a)' }}/>
+        <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: hasAviz ? 'var(--success)' : orphanInvoices.length ? 'var(--accent)' : 'var(--c-2a2a2a)' }}/>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>{label}</div>
-          {descriere && <div style={{ fontSize:'11px', color:'var(--c-777777)', marginTop:'2px' }}>{descriere}</div>}
+          <div style={{ fontSize:'var(--fs-md)', fontWeight:600, color:'var(--c-e0e0e0)' }}>{label}</div>
+          {descriere && <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', marginTop:'2px' }}>{descriere}</div>}
         </div>
-        {hasAviz && <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent-mint)', flexShrink:0 }}>{data!.invoices.length} factur{data!.invoices.length===1?'ă':'i'} · {moneyCurrency(avizTotal, currency)}</span>}
-        {!hasAviz && orphanInvoices.length > 0 && <span style={{ fontSize:'11px', fontWeight:600, color:'var(--accent)', flexShrink:0 }}>{orphanInvoices.length} factur{orphanInvoices.length===1?'ă':'i'} fără aviz</span>}
+        {hasAviz && <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--success)', flexShrink:0 }}>{data!.invoices.length} factur{data!.invoices.length===1?'ă':'i'} · {moneyCurrency(avizTotal, currency)}</span>}
+        {!hasAviz && orphanInvoices.length > 0 && <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--accent)', flexShrink:0 }}>{orphanInvoices.length} factur{orphanInvoices.length===1?'ă':'i'} fără aviz</span>}
         <svg width="14" height="14" fill="none" stroke="var(--c-555555)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0, transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s' }}>
           <path d="M6 9l6 6 6-6"/>
         </svg>
@@ -389,28 +389,28 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
             <div style={{ padding:'12px 0 4px' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px', gap:'12px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:'6px', flex:1, minWidth:0 }}>
-                  <span style={{ fontSize:'11px', color:'var(--c-888888)', flexShrink:0 }}>Aviz</span>
+                  <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', flexShrink:0 }}>Aviz</span>
                   <input
                     defaultValue={data.avizNumber}
                     onBlur={e => renameAvizNumber(e.target.value.trim())}
                     placeholder="nr. aviz"
-                    style={{ width:'70px', fontSize:'11px', fontWeight:600, color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                    style={{ width:'70px', fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
                   />
                   <input
                     defaultValue={data.fisierNume}
                     onBlur={e => renameAvizFisier(e.target.value.trim())}
-                    style={{ flex:1, minWidth:0, fontSize:'11px', color:'var(--c-888888)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                    style={{ flex:1, minWidth:0, fontSize:'var(--fs-xs)', color:'var(--c-888888)', background:'transparent', border:'none', outline:'none', padding:0 }}
                   />
                 </div>
                 <div style={{ display:'flex', gap:'12px', alignItems:'center', flexShrink:0 }}>
-                  <button onClick={() => setPreview(v => !v)} style={{ fontSize:'11px', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi aviz'}</button>
-                  <a href={`/api/emag/aviz/pdf?documentId=${encodeURIComponent(data!.documentId!)}`} style={{ fontSize:'11px', fontWeight:600, color:legibil(culoare) }}>↓ PDF (aviz + facturi)</a>
-                  <button onClick={removeAviz} style={{ fontSize:'11px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
+                  <button onClick={() => setPreview(v => !v)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi aviz'}</button>
+                  <a href={`/api/emag/aviz/pdf?documentId=${encodeURIComponent(data!.documentId!)}`} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--accent)' }}>↓ PDF (aviz + facturi)</a>
+                  <button onClick={removeAviz} style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
                 </div>
               </div>
               {preview && <PreviewBox src={`/api/emag?docId=${encodeURIComponent(data!.documentId!)}&preview=1`} kind="pdf"/>}
               {data.invoices.length === 0 ? (
-                <p style={{ fontSize:'12px', color:'var(--c-666666)' }}>Nicio factură detectată în aviz.</p>
+                <p style={{ fontSize:'var(--fs-sm)', color:'var(--c-666666)' }}>Nicio factură detectată în aviz.</p>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
                   {data.invoices.map(inv => (
@@ -422,12 +422,12 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                 <BulkUploadZone documentId={data!.documentId!} firmaId={firmaId} lunaId={lunaId} culoare={culoare} onChange={onChange}/>
               )}
               {orphanInvoices.length > 0 && (
-                <div style={{ marginTop:'10px', padding:'9px 10px', border:'1px solid var(--accent)', borderRadius:'8px', background:'light-dark(rgba(245,124,0,.16), rgba(245,158,11,.08))' }}>
-                  <div style={{ fontSize:'11px', fontWeight:700, color:'var(--accent)', marginBottom:'5px' }}>Facturi existente fără legătură cu avizul</div>
+                <div style={{ marginTop:'10px', padding:'9px 10px', border:'1px solid var(--accent)', borderRadius:'var(--r-md)', background:'light-dark(rgba(245,124,0,.16), rgba(245,158,11,.08))' }}>
+                  <div style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--accent)', marginBottom:'5px' }}>Facturi existente fără legătură cu avizul</div>
                   {orphanInvoices.map(inv => (
-                    <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'11px', color:'var(--c-888888)', padding:'3px 0' }}>
+                    <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'var(--fs-xs)', color:'var(--c-888888)', padding:'3px 0' }}>
                       <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.numar_document || inv.fisier_nume}</span>
-                      <a href={`/api/emag?docId=${encodeURIComponent(inv.id)}`} style={{ color:legibil(culoare), textDecoration:'none' }}>↓</a>
+                      <a href={`/api/emag?docId=${encodeURIComponent(inv.id)}`} style={{ color:'var(--accent)', textDecoration:'none' }}>↓</a>
                     </div>
                   ))}
                 </div>
@@ -436,12 +436,12 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
           ) : (
             <div style={{ paddingTop:'12px' }}>
               {orphanInvoices.length > 0 && (
-                <div style={{ marginBottom:'10px', padding:'9px 10px', border:'1px solid var(--accent)', borderRadius:'8px', background:'light-dark(rgba(245,124,0,.16), rgba(245,158,11,.08))' }}>
-                  <div style={{ fontSize:'11px', fontWeight:700, color:'var(--accent)', marginBottom:'5px' }}>Există facturi de comision, dar lipsește avizul/fisa de plată.</div>
+                <div style={{ marginBottom:'10px', padding:'9px 10px', border:'1px solid var(--accent)', borderRadius:'var(--r-md)', background:'light-dark(rgba(245,124,0,.16), rgba(245,158,11,.08))' }}>
+                  <div style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--accent)', marginBottom:'5px' }}>Există facturi de comision, dar lipsește avizul/fisa de plată.</div>
                   {orphanInvoices.map(inv => (
-                    <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'11px', color:'var(--c-888888)', padding:'3px 0' }}>
+                    <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'var(--fs-xs)', color:'var(--c-888888)', padding:'3px 0' }}>
                       <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.numar_document || inv.fisier_nume}</span>
-                      <a href={`/api/emag?docId=${encodeURIComponent(inv.id)}`} style={{ color:legibil(culoare), textDecoration:'none' }}>↓</a>
+                      <a href={`/api/emag?docId=${encodeURIComponent(inv.id)}`} style={{ color:'var(--accent)', textDecoration:'none' }}>↓</a>
                     </div>
                   ))}
                 </div>
@@ -451,16 +451,16 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                 onDragOver={e => { e.preventDefault(); setDrag(true) }}
                 onDragLeave={() => setDrag(false)}
                 onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]) }}
-                style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)' }}
+                style={{ border:`1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`, borderRadius:'var(--r-md)', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)' }}
               >
-                <p style={{ fontSize:'12px', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
+                <p style={{ fontSize:'var(--fs-sm)', color: uploading ? 'var(--c-777777)' : 'var(--c-888888)', fontWeight:600 }}>
                   {uploading ? 'Se procesează avizul...' : orphanInvoices.length ? '+ Adaugă avizul lipsă (se leagă automat)' : '+ Adaugă aviz PDF'}
                 </p>
               </div>
             </div>
           )}
           <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files?.[0] && upload(e.target.files[0])}/>
-          {error && <p style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'6px' }}>{error}</p>}
+          {error && <p style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', marginTop:'6px' }}>{error}</p>}
         </div>
       )}
     </div>
@@ -484,7 +484,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
   const fileRef = useRef<HTMLInputElement>(null)
   const taskStatusRef = useRef<Record<string, boolean>>({})
   const r = rgb(firma.culoare)
-  const INP: React.CSSProperties = { fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'9px 12px', color:'var(--c-bbbbbb)', outline:'none', width:'100%' }
+  const INP: React.CSSProperties = { fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'9px 12px', color:'var(--c-bbbbbb)', outline:'none', width:'100%' }
 
   useEffect(() => { setModuleTasks(tasks) }, [tasks])
   useEffect(() => {
@@ -598,10 +598,10 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
       {/* Avize de plată — încarcă PDF-ul, AI-ul extrage facturile de căutat + copy */}
       <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'2px' }}>
-          <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-666666)', textTransform:'uppercase', letterSpacing:'.1em' }}>
+          <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--c-666666)', textTransform:'uppercase', letterSpacing:'.1em' }}>
             Avize de plată
           </span>
-          <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'11px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer', opacity:pdfBusy?.6:1 }}>
+          <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'5px 13px', borderRadius:'var(--r-sm)', border:'1px solid var(--accent)', background:'transparent', color:'var(--accent)', cursor:'pointer', opacity:pdfBusy?.6:1 }}>
             {pdfBusy ? 'Se generează...' : 'Descarcă tot'}
           </button>
         </div>
@@ -614,10 +614,10 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
       {sortedItems.length > 0 && (
         <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'2px' }}>
-            <span style={{ fontSize:'11px', fontWeight:700, color:'var(--c-666666)', textTransform:'uppercase', letterSpacing:'.1em' }}>
+            <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--c-666666)', textTransform:'uppercase', letterSpacing:'.1em' }}>
               Avize de plată
             </span>
-            <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'11px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer', opacity:pdfBusy?.6:1 }}>
+            <button onClick={savePdf} disabled={pdfBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'5px 13px', borderRadius:'var(--r-sm)', border:'1px solid var(--accent)', background:'transparent', color:'var(--accent)', cursor:'pointer', opacity:pdfBusy?.6:1 }}>
               {pdfBusy ? 'Se generează...' : 'Salvează PDF'}
             </button>
           </div>
@@ -628,10 +628,10 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
       )}
 
       {/* Facturi Dante International */}
-      <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'12px', overflow:'hidden' }}>
+      <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
         <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--c-1a1a1a)' }}>
-          <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>Facturi Dante International</div>
-          <div style={{ fontSize:'12px', color:'var(--c-888888)', marginTop:'2px' }}>
+          <div style={{ fontSize:'var(--fs-md)', fontWeight:600, color:'var(--c-e0e0e0)' }}>Facturi Dante International</div>
+          <div style={{ fontSize:'var(--fs-sm)', color:'var(--c-888888)', marginTop:'2px' }}>
             {docs.length > 0
               ? `${docs.length} facturi · cost net ${money(summary?.emagNetCost || 0)} RON`
               : 'Adaugă facturi Dante prin PDF'}
@@ -644,18 +644,18 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
             const open = previewIds.has(doc.id)
             return (
               <div key={doc.id}>
-                <div style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'var(--c-161616)', borderRadius:'8px' }}>
-                  <strong style={{ flexShrink:0, fontSize:'12px', color: doc.effect==='reducere' ? 'var(--accent-mint)' : 'var(--accent-red)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', marginBottom:'5px', background:'var(--c-161616)', borderRadius:'var(--r-md)' }}>
+                  <strong style={{ flexShrink:0, fontSize:'var(--fs-sm)', color: doc.effect==='reducere' ? 'var(--success)' : 'var(--danger)' }}>
                     {doc.effect==='reducere' ? '−' : '+'}{money(doc.amount)} RON
                   </strong>
                   <input
                     defaultValue={doc.fisier_nume}
                     onBlur={e => renameDoc(doc.id, e.target.value.trim())}
-                    style={{ flex:1, minWidth:0, fontSize:'12px', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                    style={{ flex:1, minWidth:0, fontSize:'var(--fs-sm)', color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
                   />
-                  {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'11px', fontWeight:600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
-                  <a href={`/api/emag?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'10px', color:legibil(firma.culoare) }}>↓</a>
-                  <button onClick={() => removeDoc(doc.id)} style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
+                  {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color: open ? 'var(--c-dddddd)' : 'var(--accent)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
+                  <a href={`/api/emag?docId=${encodeURIComponent(doc.id)}`} style={{ fontSize:'var(--fs-xs)', color:'var(--accent)' }}>↓</a>
+                  <button onClick={() => removeDoc(doc.id)} style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
                 </div>
                 {open && kind && <PreviewBox src={`/api/emag?docId=${encodeURIComponent(doc.id)}&preview=1`} kind={kind}/>}
               </div>
@@ -667,22 +667,22 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
             onDragOver={e => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}
             onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files[0] && setFile(e.dataTransfer.files[0]) }}
-            style={{ border:`1.5px dashed ${drag ? firma.culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '10px' : '0' }}
+            style={{ border:`1.5px dashed ${drag ? firma.culoare : 'var(--c-252525)'}`, borderRadius:'var(--r-md)', padding:'14px', textAlign:'center', cursor:'pointer', background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)', marginTop: docs.length > 0 ? '10px' : '0' }}
           >
-            <p style={{ fontSize:'12px', color: file ? 'var(--c-cccccc)' : 'var(--c-888888)', fontWeight:600 }}>
+            <p style={{ fontSize:'var(--fs-sm)', color: file ? 'var(--c-cccccc)' : 'var(--c-888888)', fontWeight:600 }}>
               {file ? file.name : '+ Adaugă PDF factură Dante'}
             </p>
           </div>
           <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files?.[0] && setFile(e.target.files[0])}/>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginTop:'8px' }}>
+          <div className="stack-mobile" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginTop:'8px' }}>
             <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Suma RON (opțional, se detectează automat)" style={INP}/>
             <input value={invoiceNumber} onChange={e=>setInvoiceNumber(e.target.value)} placeholder="Nr. factură (opțional)" style={INP}/>
           </div>
-          <button onClick={addDoc} disabled={busy || !file} style={{ marginTop:'8px', width:'100%', padding:'9px', borderRadius:'8px', border:'none', background: busy || !file ? 'var(--c-1a1a1a)' : firma.culoare, color: busy || !file ? 'var(--c-555555)' : 'var(--c-ffffff)', fontSize:'12px', fontWeight:600, cursor: busy || !file ? 'not-allowed' : 'pointer' }}>
+          <button onClick={addDoc} disabled={busy || !file} style={{ marginTop:'8px', width:'100%', padding:'9px', borderRadius:'var(--r-md)', border:'none', background: busy || !file ? 'var(--c-1a1a1a)' : firma.culoare, color: busy || !file ? 'var(--c-555555)' : 'var(--c-ffffff)', fontSize:'var(--fs-sm)', fontWeight:600, cursor: busy || !file ? 'not-allowed' : 'pointer' }}>
             {busy ? 'Se importă...' : '+ Adaugă factură'}
           </button>
-          {error && <p style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'8px' }}>{error}</p>}
+          {error && <p style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', marginTop:'8px' }}>{error}</p>}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
-import { legibil, tint } from '@/lib/colors'
+import { tint } from '@/lib/colors'
 import CopyButton from '@/components/CopyButton'
 
 interface Extras { id: string; nr_tranzactii: number; nr_documentate: number; procesat_ai?: boolean; sold_final?: number; valuta?: string; pdf_path?: string | null; pdf_nume?: string | null }
@@ -68,43 +68,43 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
   const hasPdf = !!extras?.pdf_path
 
   return (
-    <div style={{ background: 'var(--c-161616)', border: `1px solid ${tint(r,.2)}`, borderRadius: '14px', padding: '20px' }}>
+    <div style={{ background: 'var(--c-161616)', border: `1px solid ${tint(r,.2)}`, borderRadius: 'var(--r-lg)', padding: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: extras?.nr_tranzactii ? 'var(--accent-green)' : 'var(--c-333333)' }} />
-        <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--c-ffffff)' }}>
+        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: extras?.nr_tranzactii ? 'var(--success)' : 'var(--c-333333)' }} />
+        <span style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--c-ffffff)' }}>
           {valuta === 'AUTO' ? 'Citire extras cu AI' : `Extras ${valuta}`}
           {extras?.id && extras.valuta && extras.valuta !== valuta ? ` (${extras.valuta})` : ''}
         </span>
         {extras?.nr_tranzactii ? (
-          <span style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: 'rgba(74,222,128,.15)', color: 'var(--accent-green)' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--r-full)', background: 'rgba(74,222,128,.15)', color: 'var(--success)' }}>
             {extras.nr_tranzactii} tx ✓
           </span>
         ) : (
-          <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--c-555555)' }}>neîncărcat</span>
+          <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', color: 'var(--c-555555)' }}>neîncărcat</span>
         )}
       </div>
 
       {valuta === 'AUTO' && (
-        <p style={{ margin: '0 0 14px', fontSize: '11px', lineHeight: 1.5, color: 'var(--c-777777)' }}>
+        <p style={{ margin: '0 0 14px', fontSize: 'var(--fs-xs)', lineHeight: 1.5, color: 'var(--c-777777)' }}>
           Încarcă extrasul PDF, iar AI identifică automat moneda și tranzacțiile.
         </p>
       )}
 
       {unlockCode && (
-        <div style={{ display:'flex', alignItems:'center', gap:'8px', margin:'0 0 14px', padding:'9px 11px', border:'1px solid var(--c-2a2a2a)', borderRadius:'9px', background:'var(--c-111111)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'8px', margin:'0 0 14px', padding:'9px 11px', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', background:'var(--c-111111)' }}>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:'10px', fontWeight:700, color:'var(--c-666666)', textTransform:'uppercase', letterSpacing:'.08em' }}>Cod deblocare PDF</div>
-            <div style={{ fontSize:'13px', fontWeight:700, color:'var(--c-ffffff)', fontFamily:'monospace', marginTop:'2px' }}>{unlockCode}</div>
+            <div style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--c-666666)', textTransform:'uppercase', letterSpacing:'.08em' }}>Cod deblocare PDF</div>
+            <div style={{ fontSize:'var(--fs-md)', fontWeight:700, color:'var(--c-ffffff)', fontFamily:'monospace', marginTop:'2px' }}>{unlockCode}</div>
           </div>
           <CopyButton value={unlockCode} />
         </div>
       )}
 
       {extras?.nr_tranzactii ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+        <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
           {[{ l: 'Tranzacții', v: extras.nr_tranzactii }, { l: 'Documentate', v: extras.nr_documentate }].map(s => (
-            <div key={s.l} style={{ background: 'var(--c-111111)', borderRadius: '9px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--c-555555)', marginBottom: '4px', textTransform: 'uppercase' as const }}>{s.l}</div>
+            <div key={s.l} style={{ background: 'var(--c-111111)', borderRadius: 'var(--r-md)', padding: '10px 12px' }}>
+              <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--c-555555)', marginBottom: '4px', textTransform: 'uppercase' as const }}>{s.l}</div>
               <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-ffffff)' }}>{s.v}</div>
             </div>
           ))}
@@ -114,18 +114,18 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
       {loading ? (
         <div style={{ textAlign: 'center', padding: '10px 0' }}>
           <div style={{ width: '18px', height: '18px', border: `2px solid ${culoare}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite', margin: '0 auto 8px' }} />
-          <p style={{ fontSize: '12px', color: 'var(--c-cccccc)' }}>{status}</p>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-cccccc)' }}>{status}</p>
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       ) : (
         <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
           <div style={{ display: 'flex', gap: '8px' }}>
             {valuta !== 'AUTO' && (
-              <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: '9px', border: 'none', background: culoare, color: 'var(--c-ffffff)', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent)', color: '#fff', fontSize: 'var(--fs-sm)', fontWeight: 700, cursor: 'pointer' }}>
                 ↑ Import CSV
               </button>
             )}
-            <button onClick={() => pdfRef.current?.click()} style={{ flex: valuta === 'AUTO' ? 1 : undefined, padding: '9px 14px', borderRadius: '9px', border: `1px solid ${tint(r,.3)}`, background: 'transparent', color: legibil(culoare), fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => pdfRef.current?.click()} style={{ flex: valuta === 'AUTO' ? 1 : undefined, padding: '9px 14px', borderRadius: 'var(--r-md)', border: `1px solid ${tint(r,.3)}`, background: 'transparent', color:'var(--accent)', fontSize: 'var(--fs-sm)', fontWeight: 600, cursor: 'pointer' }}>
               {valuta === 'AUTO' ? 'Alege PDF · AI detectează moneda' : 'PDF + citire AI'}
             </button>
           </div>
@@ -134,7 +134,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
               <button
                 onClick={() => savePdfRef.current?.click()}
                 disabled={savingPdf}
-                style={{ flex: 1, padding: '7px', borderRadius: '9px', border: `1px solid ${hasPdf ? 'rgba(74,222,128,.3)' : 'var(--c-2a2a2a)'}`, background: hasPdf ? 'rgba(74,222,128,.06)' : 'var(--c-111111)', color: hasPdf ? 'var(--accent-green)' : 'var(--c-666666)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                style={{ flex: 1, padding: '7px', borderRadius: 'var(--r-md)', border: `1px solid ${hasPdf ? 'rgba(74,222,128,.3)' : 'var(--c-2a2a2a)'}`, background: hasPdf ? 'rgba(74,222,128,.06)' : 'var(--c-111111)', color: hasPdf ? 'var(--accent)' : 'var(--c-666666)', fontSize: 'var(--fs-xs)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
                 {savingPdf ? 'Se salvează...' : hasPdf ? `📄 ${extras?.pdf_nume || 'PDF salvat'}` : '📎 Atașează PDF extras bancar'}
               </button>
@@ -142,7 +142,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
                 <a
                   href={`/api/extras/pdf-download?extrasId=${extrasId}`}
                   download={extras?.pdf_nume || 'extras.pdf'}
-                  style={{ padding: '7px 12px', borderRadius: '9px', border: '1px solid rgba(74,222,128,.3)', background: 'rgba(74,222,128,.06)', color: 'var(--accent-green)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', textDecoration: 'none' }}
+                  style={{ padding: '7px 12px', borderRadius: 'var(--r-md)', border: '1px solid rgba(74,222,128,.3)', background: 'rgba(74,222,128,.06)', color: 'var(--accent)', fontSize: 'var(--fs-xs)', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', textDecoration: 'none' }}
                 >
                   ↓
                 </a>
@@ -153,8 +153,8 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
       )}
 
       {err && (
-        <div style={{ marginTop: '10px', padding: '8px 12px', background: 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))', border: '1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))', borderRadius: '8px' }}>
-          <p style={{ fontSize: '11px', color: 'var(--accent-red)', wordBreak: 'break-all' as const }}>{err}</p>
+        <div style={{ marginTop: '10px', padding: '8px 12px', background: 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))', border: '1px solid light-dark(rgba(220,38,38,.45), rgba(248,113,113,.3))', borderRadius: 'var(--r-md)' }}>
+          <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', wordBreak: 'break-all' as const }}>{err}</p>
         </div>
       )}
 

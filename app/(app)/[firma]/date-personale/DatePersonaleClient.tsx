@@ -21,7 +21,7 @@ const FIELDS: { key: keyof FirmaDate; label: string }[] = [
 ]
 
 function inputStyle(): React.CSSProperties {
-  return { flex: 1, background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', color: 'var(--c-ffffff)', outline: 'none' }
+  return { flex: 1, background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '6px 10px', fontSize: 'var(--fs-md)', color: 'var(--c-ffffff)', outline: 'none' }
 }
 
 function isPreviewable(nume: string | null): 'pdf' | 'image' | null {
@@ -116,20 +116,20 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
     if (res.ok) load()
   }
 
-  if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: '14px', padding: '32px 0' }}>Se încarcă...</div>
-  if (error) return <div style={{ color: 'var(--accent-red)', fontSize: '13px', padding: '24px 0' }}>{error}</div>
+  if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: 'var(--fs-base)', padding: '32px 0' }}>Se încarcă...</div>
+  if (error) return <div style={{ color: 'var(--danger)', fontSize: 'var(--fs-md)', padding: '24px 0' }}>{error}</div>
   if (!firma) return null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Date firmă */}
-      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Date firmă</span>
+          <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Date firmă</span>
           {editing ? (
-            <button onClick={saveFirma} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Salvează</button>
+            <button onClick={saveFirma} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Salvează</button>
           ) : (
-            <button onClick={() => { setDraft(firma); setEditing(true) }} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--c-888888)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Editează</button>
+            <button onClick={() => { setDraft(firma); setEditing(true) }} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--c-888888)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Editează</button>
           )}
         </div>
 
@@ -138,11 +138,11 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
             const value = String((editing ? draft[key] : firma[key]) ?? '')
             return (
               <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ width: '120px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>{label}</span>
+                <span style={{ width: '120px', flexShrink: 0, fontSize: 'var(--fs-sm)', color: 'var(--c-888888)' }}>{label}</span>
                 {editing ? (
                   <input value={value} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))} style={inputStyle()} />
                 ) : (
-                  <span style={{ flex: 1, fontSize: '13px', color: value ? 'var(--c-dddddd)' : 'var(--c-555555)' }}>{value || '—'}</span>
+                  <span style={{ flex: 1, fontSize: 'var(--fs-md)', color: value ? 'var(--c-dddddd)' : 'var(--c-555555)' }}>{value || '—'}</span>
                 )}
                 {!editing && <CopyButton value={value} />}
               </div>
@@ -153,52 +153,52 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
         <div style={{ height: '1px', background: 'var(--c-1e1e1e)', margin: '16px 0' }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ width: '120px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>Certificat</span>
+          <span style={{ width: '120px', flexShrink: 0, fontSize: 'var(--fs-sm)', color: 'var(--c-888888)' }}>Certificat</span>
           {firma.certificat_path ? (
             <>
               <input
                 defaultValue={firma.certificat_nume ?? ''}
                 onBlur={e => renameCertificat(e.target.value.trim())}
-                style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                style={{ flex: 1, fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
               />
               {isPreviewable(firma.certificat_nume) && (
-                <button onClick={() => setPreviewCert(v => !v)} style={{ fontSize: '12px', fontWeight: 600, color: previewCert ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewCert ? 'Ascunde' : 'Vezi'}</button>
+                <button onClick={() => setPreviewCert(v => !v)} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: previewCert ? 'var(--c-dddddd)' : 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewCert ? 'Ascunde' : 'Vezi'}</button>
               )}
-              <a href={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
+              <a href={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
             </>
           ) : (
-            <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-555555)' }}>Niciun fișier încărcat</span>
+            <span style={{ flex: 1, fontSize: 'var(--fs-md)', color: 'var(--c-555555)' }}>Niciun fișier încărcat</span>
           )}
           <input ref={certInputRef} type="file" accept="application/pdf,image/*" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }}
             onChange={e => e.target.files?.[0] && uploadCertificat(e.target.files[0])} />
           <button onClick={() => certInputRef.current?.click()} disabled={savingCert} style={{
-            fontSize: '12px', fontWeight: 600, color: 'var(--c-888888)', background: 'var(--c-161616)', border: '1px solid var(--c-262626)',
-            borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
+            fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--c-888888)', background: 'var(--c-161616)', border: '1px solid var(--c-262626)',
+            borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
           }}>{savingCert ? '...' : (firma.certificat_path ? 'Înlocuiește' : 'Încarcă')}</button>
         </div>
         {previewCert && firma.certificat_path && (
           isPreviewable(firma.certificat_nume) === 'pdf' ? (
-            <iframe src={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-1e1e1e)', borderRadius: '8px', marginTop: '10px', background: 'var(--c-ffffff)' }} />
+            <iframe src={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-md)', marginTop: '10px', background: 'var(--c-ffffff)' }} />
           ) : (
-            <img src={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}&preview=1`} alt="Certificat" style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-1e1e1e)', borderRadius: '8px', marginTop: '10px', background: 'var(--c-ffffff)' }} />
+            <img src={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}&preview=1`} alt="Certificat" style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-md)', marginTop: '10px', background: 'var(--c-ffffff)' }} />
           )
         )}
       </div>
 
       {/* Proprietari */}
-      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Proprietari</span>
-          <button onClick={addProprietar} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>+ Adaugă proprietar</button>
+          <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Proprietari</span>
+          <button onClick={addProprietar} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>+ Adaugă proprietar</button>
         </div>
 
         {proprietari.length === 0 && (
-          <p style={{ fontSize: '13px', color: 'var(--c-555555)', padding: '8px 0' }}>Niciun proprietar adăugat încă.</p>
+          <p style={{ fontSize: 'var(--fs-md)', color: 'var(--c-555555)', padding: '8px 0' }}>Niciun proprietar adăugat încă.</p>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {proprietari.map(p => (
-            <div key={p.id} style={{ background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '10px', padding: '14px 16px' }}>
+            <div key={p.id} style={{ background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', padding: '14px 16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                 <input
                   defaultValue={p.nume}
@@ -207,12 +207,12 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                 />
                 <button onClick={() => deleteProprietar(p.id)} title="Șterge" style={{
                   width: '26px', height: '26px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)',
-                  borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '14px',
+                  borderRadius: 'var(--r-sm)', cursor: 'pointer', color: 'var(--danger)', fontSize: 'var(--fs-base)',
                 }}>×</button>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <span style={{ width: '90px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>Serie+Nr. CI</span>
+                <span style={{ width: '90px', flexShrink: 0, fontSize: 'var(--fs-sm)', color: 'var(--c-888888)' }}>Serie+Nr. CI</span>
                 <input
                   defaultValue={p.serie_ci ?? ''}
                   placeholder="Serie"
@@ -229,21 +229,21 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ width: '90px', flexShrink: 0, fontSize: '12px', color: 'var(--c-888888)' }}>Buletin</span>
+                <span style={{ width: '90px', flexShrink: 0, fontSize: 'var(--fs-sm)', color: 'var(--c-888888)' }}>Buletin</span>
                 {p.buletin_path ? (
                   <>
                     <input
                       defaultValue={p.buletin_nume ?? ''}
                       onBlur={e => e.target.value.trim() && e.target.value !== p.buletin_nume && updateProprietar(p.id, { buletin_nume: e.target.value.trim() })}
-                      style={{ flex: 1, fontSize: '13px', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                      style={{ flex: 1, fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
                     />
                     {isPreviewable(p.buletin_nume) && (
-                      <button onClick={() => toggleBuletinPreview(p.id)} style={{ fontSize: '12px', fontWeight: 600, color: previewBuletinIds.has(p.id) ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewBuletinIds.has(p.id) ? 'Ascunde' : 'Vezi'}</button>
+                      <button onClick={() => toggleBuletinPreview(p.id)} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: previewBuletinIds.has(p.id) ? 'var(--c-dddddd)' : 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewBuletinIds.has(p.id) ? 'Ascunde' : 'Vezi'}</button>
                     )}
-                    <a href={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
+                    <a href={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}`} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
                   </>
                 ) : (
-                  <span style={{ flex: 1, fontSize: '13px', color: 'var(--c-555555)' }}>Niciun fișier încărcat</span>
+                  <span style={{ flex: 1, fontSize: 'var(--fs-md)', color: 'var(--c-555555)' }}>Niciun fișier încărcat</span>
                 )}
                 <input
                   ref={el => { buletinInputRefs.current[p.id] = el }}
@@ -251,15 +251,15 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                   onChange={e => e.target.files?.[0] && uploadBuletin(p.id, e.target.files[0])}
                 />
                 <button onClick={() => buletinInputRefs.current[p.id]?.click()} style={{
-                  fontSize: '12px', fontWeight: 600, color: 'var(--c-888888)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-262626)',
-                  borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
+                  fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--c-888888)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-262626)',
+                  borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
                 }}>{p.buletin_path ? 'Înlocuiește' : 'Încarcă'}</button>
               </div>
               {previewBuletinIds.has(p.id) && p.buletin_path && (
                 isPreviewable(p.buletin_nume) === 'pdf' ? (
-                  <iframe src={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}&preview=1`} style={{ width: '100%', height: '60vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '10px', background: 'var(--c-ffffff)' }} />
+                  <iframe src={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}&preview=1`} style={{ width: '100%', height: '60vh', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', marginTop: '10px', background: 'var(--c-ffffff)' }} />
                 ) : (
-                  <img src={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}&preview=1`} alt="Buletin" style={{ width: '100%', maxHeight: '60vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '10px', background: 'var(--c-ffffff)' }} />
+                  <img src={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}&preview=1`} alt="Buletin" style={{ width: '100%', maxHeight: '60vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', marginTop: '10px', background: 'var(--c-ffffff)' }} />
                 )
               )}
             </div>

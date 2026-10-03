@@ -254,8 +254,8 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
 
       {docLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ height: '200px', borderRadius: '12px', background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)' }}/>
-          <div style={{ height: '120px', borderRadius: '12px', background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)' }}/>
+          <div style={{ height: '200px', borderRadius: 'var(--r-lg)', background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)' }}/>
+          <div style={{ height: '120px', borderRadius: 'var(--r-lg)', background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)' }}/>
         </div>
       ) : !doc ? (
         <ReportFiles doc={doc} culoare={firma.culoare} uploading={uploading} onUpload={handleUpload} onRemove={handleRemoveDoc}/>

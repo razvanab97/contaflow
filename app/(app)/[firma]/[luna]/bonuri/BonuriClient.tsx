@@ -251,8 +251,8 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
     setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }
 
-  if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: '14px', padding: '32px 0' }}>Se încarcă...</div>
-  if (loadError && !bonuri.length) return <div style={{ color: 'var(--accent-red)', fontSize: '13px', padding: '24px 0' }}>{loadError}</div>
+  if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: 'var(--fs-base)', padding: '32px 0' }}>Se încarcă...</div>
+  if (loadError && !bonuri.length) return <div style={{ color: 'var(--danger)', fontSize: 'var(--fs-md)', padding: '24px 0' }}>{loadError}</div>
 
   const asteptare = bonuri.filter(b => b.status === 'asteptare')
   const asociate = bonuri.filter(b => b.status === 'asociata')
@@ -278,13 +278,13 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={culoare}/>
 
-      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
         {cameraOpen ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
-            <video ref={videoRef} autoPlay playsInline style={{ width: '100%', maxHeight: '50vh', borderRadius: '10px', background: '#000' }} />
+            <video ref={videoRef} autoPlay playsInline style={{ width: '100%', maxHeight: '50vh', borderRadius: 'var(--r-md)', background: '#000' }} />
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={capturePhoto} style={{ fontSize: '13px', fontWeight: 600, padding: '8px 16px', borderRadius: '7px', border: 'none', background: 'var(--accent-mint)', color: 'var(--c-0a0a0a)', cursor: 'pointer' }}>Capturează</button>
-              <button onClick={closeCamera} style={{ fontSize: '13px', fontWeight: 600, padding: '8px 16px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'transparent', color: 'var(--c-999999)', cursor: 'pointer' }}>Anulează</button>
+              <button onClick={capturePhoto} style={{ fontSize: 'var(--fs-md)', fontWeight: 600, padding: '8px 16px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer' }}>Capturează</button>
+              <button onClick={closeCamera} style={{ fontSize: 'var(--fs-md)', fontWeight: 600, padding: '8px 16px', borderRadius: 'var(--r-sm)', border: '1px solid var(--c-2a2a2a)', background: 'transparent', color: 'var(--c-999999)', cursor: 'pointer' }}>Anulează</button>
             </div>
           </div>
         ) : (
@@ -294,17 +294,17 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
               onDragOver={e => { e.preventDefault(); setDrag(true) }}
               onDragLeave={() => setDrag(false)}
               onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files) }}
-              style={{ border: `1.5px dashed ${drag ? 'var(--c-555555)' : 'var(--c-2a2a2a)'}`, borderRadius: '10px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--c-0d0d0d)' }}
+              style={{ border: `1.5px dashed ${drag ? 'var(--c-555555)' : 'var(--c-2a2a2a)'}`, borderRadius: 'var(--r-md)', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--c-0d0d0d)' }}
             >
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-888888)' }}>
+              <div style={{ fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--c-888888)' }}>
                 {uploading ? 'Se decupează și se citesc bonurile...' : '+ Adaugă bon fiscal'}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--c-666666)', marginTop: '3px' }}>PDF, JPG, PNG · o poză poate avea mai multe bonuri alăturate, se decupează și se salvează automat separat, fără fundal - comerciantul, suma, data și tipul se citesc automat pentru fiecare</div>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', marginTop: '3px' }}>PDF, JPG, PNG · o poză poate avea mai multe bonuri alăturate, se decupează și se salvează automat separat, fără fundal - comerciantul, suma, data și tipul se citesc automat pentru fiecare</div>
             </div>
             <input ref={inputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={hiddenInputStyle} onChange={e => e.target.files?.length && uploadFiles(e.target.files)}/>
-            <button onClick={openCamera} style={{ marginTop: '10px', fontSize: '12px', fontWeight: 600, padding: '7px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', cursor: 'pointer' }}>📷 Fotografiază bon (camera laptop)</button>
-            {cameraError && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{cameraError}</p>}
-            {uploadError && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{uploadError}</p>}
+            <button onClick={openCamera} style={{ marginTop: '10px', fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '7px 14px', borderRadius: 'var(--r-sm)', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', cursor: 'pointer' }}>📷 Fotografiază bon (camera laptop)</button>
+            {cameraError && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', marginTop: '8px' }}>{cameraError}</p>}
+            {uploadError && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', marginTop: '8px' }}>{uploadError}</p>}
           </>
         )}
       </div>
@@ -312,46 +312,46 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
       {notices.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {notices.map((n, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'light-dark(rgba(5,150,105,.1), rgba(110,231,176,.06))', border: '1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.2))', borderRadius: '8px' }}>
-              <span style={{ flex: 1, fontSize: '12px', color: 'var(--c-cccccc)' }}>↪ {n}</span>
-              <button onClick={() => setNotices(prev => prev.filter((_, j) => j !== i))} style={{ fontSize: '11px', color: 'var(--c-666666)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'light-dark(rgba(5,150,105,.1), rgba(110,231,176,.06))', border: '1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.2))', borderRadius: 'var(--r-md)' }}>
+              <span style={{ flex: 1, fontSize: 'var(--fs-sm)', color: 'var(--c-cccccc)' }}>↪ {n}</span>
+              <button onClick={() => setNotices(prev => prev.filter((_, j) => j !== i))} style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
             </div>
           ))}
         </div>
       )}
 
       {bonuri.length > 0 && (
-        <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+        <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Calcul</div>
+            <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Calcul</div>
             <a
               href={`/api/bonuri/pdf?firmaId=${encodeURIComponent(firmaId)}&firmaNume=${encodeURIComponent(firmaNume)}`}
-              style={{ fontSize: '12px', fontWeight: 600, padding: '7px 12px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', textDecoration: 'none', flexShrink: 0 }}
+              style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '7px 12px', borderRadius: 'var(--r-sm)', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-cccccc)', textDecoration: 'none', flexShrink: 0 }}
             >
               ↓ PDF ({bonuri.length} bonuri)
             </a>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', marginBottom: luniSortate.length ? '18px' : 0 }}>
             <div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-eeeeee)' }}>{fmtRon(totalSuma)} <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--c-666666)' }}>RON total</span></div>
-              <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px' }}>{bonuri.length} bonuri · {asteptare.length} în așteptare · {asociate.length} asociate</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-eeeeee)' }}>{fmtRon(totalSuma)} <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--c-666666)' }}>RON total</span></div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', marginTop: '2px' }}>{bonuri.length} bonuri · {asteptare.length} în așteptare · {asociate.length} asociate</div>
             </div>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--c-cccccc)' }}>{fmtRon(combustibilSuma)} RON</div>
-              <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px' }}>Combustibil ({combustibilBonuri.length})</div>
+              <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--c-cccccc)' }}>{fmtRon(combustibilSuma)} RON</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', marginTop: '2px' }}>Combustibil ({combustibilBonuri.length})</div>
             </div>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--c-cccccc)' }}>{fmtRon(altulSuma)} RON</div>
-              <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px' }}>Altul ({altulBonuri.length})</div>
+              <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--c-cccccc)' }}>{fmtRon(altulSuma)} RON</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', marginTop: '2px' }}>Altul ({altulBonuri.length})</div>
             </div>
           </div>
           {luniSortate.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {luniSortate.map(([l, d]) => (
-                <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+                <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: 'var(--fs-sm)' }}>
                   <span style={{ width: '80px', color: 'var(--c-999999)', flexShrink: 0 }}>{lunaLabel(l)}</span>
                   <span style={{ flex: 1, height: '5px', borderRadius: '3px', background: 'var(--c-1e1e1e)', overflow: 'hidden' }}>
-                    <span style={{ display: 'block', height: '100%', width: `${totalSuma > 0 ? Math.max(3, (d.suma / totalSuma) * 100) : 0}%`, background: 'var(--accent-mint)' }} />
+                    <span style={{ display: 'block', height: '100%', width: `${totalSuma > 0 ? Math.max(3, (d.suma / totalSuma) * 100) : 0}%`, background: 'var(--success)' }} />
                   </span>
                   <span style={{ width: '110px', textAlign: 'right', color: 'var(--c-cccccc)', fontWeight: 600 }}>{fmtRon(d.suma)} RON</span>
                   <span style={{ width: '70px', textAlign: 'right', color: 'var(--c-666666)' }}>{d.count} buc.</span>
@@ -362,14 +362,14 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
         </div>
       )}
 
-      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '4px' }}>
+      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
+        <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '4px' }}>
           În așteptare ({asteptare.length})
         </div>
-        <p style={{ fontSize: '12px', color: 'var(--c-666666)', marginBottom: '14px' }}>Se sugerează automat la tranzacția potrivită din extras, după sumă și data la care ai încărcat bonul — max. 3 zile diferență față de tranzacția bancară.</p>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', marginBottom: '14px' }}>Se sugerează automat la tranzacția potrivită din extras, după sumă și data la care ai încărcat bonul — max. 3 zile diferență față de tranzacția bancară.</p>
 
         {asteptare.length === 0 ? (
-          <p style={{ fontSize: '13px', color: 'var(--c-555555)', padding: '4px 0' }}>Niciun bon în așteptare.</p>
+          <p style={{ fontSize: 'var(--fs-md)', color: 'var(--c-555555)', padding: '4px 0' }}>Niciun bon în așteptare.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {asteptare.map(b => {
@@ -383,16 +383,16 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
               const movePickValue = movePick[b.id] ?? ghicitFirmaId ?? ''
               return (
                 <div key={b.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '8px', padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', padding: '10px 12px' }}>
                     <input
                       defaultValue={b.fisier_nume}
                       onBlur={e => e.target.value.trim() && e.target.value !== b.fisier_nume && patchBon(b.id, { fisier_nume: e.target.value.trim() })}
-                      style={{ flex: '1 1 140px', minWidth: 0, fontSize: '12px', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                      style={{ flex: '1 1 140px', minWidth: 0, fontSize: 'var(--fs-sm)', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
                     />
                     <select
                       defaultValue={b.tip}
                       onChange={e => patchBon(b.id, { tip: e.target.value as Bon['tip'] })}
-                      style={{ width: '96px', fontSize: '12px', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '4px 6px', outline: 'none' }}
+                      style={{ width: '96px', fontSize: 'var(--fs-sm)', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '4px 6px', outline: 'none' }}
                     >
                       <option value="combustibil">Combustibil</option>
                       <option value="altul">Altul</option>
@@ -401,7 +401,7 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
                       defaultValue={b.comerciant || ''}
                       placeholder="comerciant"
                       onBlur={e => e.target.value.trim() !== (b.comerciant || '') && patchBon(b.id, { comerciant: e.target.value.trim() })}
-                      style={{ width: '130px', fontSize: '12px', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '4px 8px', outline: 'none' }}
+                      style={{ width: '130px', fontSize: 'var(--fs-sm)', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '4px 8px', outline: 'none' }}
                     />
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <input
@@ -409,17 +409,17 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
                         placeholder="CUI client"
                         title="CUI-ul firmei beneficiare, citit din câmpul Client C.U.I./C.I.F. de pe bon (când există)"
                         onBlur={e => e.target.value.trim() !== (b.cui_client || '') && patchBon(b.id, { cui_client: e.target.value.trim() })}
-                        style={{ width: '90px', fontSize: '12px', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '4px 8px', outline: 'none' }}
+                        style={{ width: '90px', fontSize: 'var(--fs-sm)', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '4px 8px', outline: 'none' }}
                       />
-                      {cuiMatch === true && <span title="CUI corespunde firmei" style={{ fontSize: '11px', color: 'var(--accent-mint)' }}>✓</span>}
-                      {cuiMatch === false && <span title="CUI diferit de firma curentă" style={{ fontSize: '11px', color: 'var(--accent-red)' }}>⚠</span>}
+                      {cuiMatch === true && <span title="CUI corespunde firmei" style={{ fontSize: 'var(--fs-xs)', color: 'var(--success)' }}>✓</span>}
+                      {cuiMatch === false && <span title="CUI diferit de firma curentă" style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)' }}>⚠</span>}
                     </div>
                     {cuiMatch === false && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} title={ghicitFirmaId ? 'CUI-ul aproape se potrivește cu această firmă (probabil o cifră citită greșit) - preselectată automat' : undefined}>
                         <select
                           value={movePickValue}
                           onChange={e => setMovePick(prev => ({ ...prev, [b.id]: e.target.value }))}
-                          style={{ width: '130px', fontSize: '11px', color: ghicitFirmaId && !movePick[b.id] ? 'var(--accent-mint)' : 'var(--c-cccccc)', fontWeight: ghicitFirmaId && !movePick[b.id] ? 700 : 400, background: 'var(--c-0d0d0d)', border: `1px solid ${ghicitFirmaId && !movePick[b.id] ? 'var(--accent-mint)' : 'var(--c-2a2a2a)'}`, borderRadius: '6px', padding: '4px 6px', outline: 'none' }}
+                          style={{ width: '130px', fontSize: 'var(--fs-xs)', color: ghicitFirmaId && !movePick[b.id] ? 'var(--success)' : 'var(--c-cccccc)', fontWeight: ghicitFirmaId && !movePick[b.id] ? 700 : 400, background: 'var(--c-0d0d0d)', border: `1px solid ${ghicitFirmaId && !movePick[b.id] ? 'var(--success)' : 'var(--c-2a2a2a)'}`, borderRadius: 'var(--r-sm)', padding: '4px 6px', outline: 'none' }}
                         >
                           <option value="">Mută pe firma...</option>
                           {firme.filter(f => f.id !== firmaId).map(f => <option key={f.id} value={f.id}>{f.nume}</option>)}
@@ -427,7 +427,7 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
                         <button
                           onClick={() => moveBon(b.id, movePickValue)}
                           disabled={!movePickValue || movingId === b.id}
-                          style={{ fontSize: '11px', fontWeight: 700, padding: '4px 9px', borderRadius: '6px', border: '1px solid var(--accent-red)', background: 'transparent', color: 'var(--accent-red)', cursor: 'pointer', opacity: (!movePickValue || movingId === b.id) ? .5 : 1 }}
+                          style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '4px 9px', borderRadius: 'var(--r-sm)', border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', opacity: (!movePickValue || movingId === b.id) ? .5 : 1 }}
                         >
                           {movingId === b.id ? '...' : 'Mută'}
                         </button>
@@ -438,50 +438,50 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
                       defaultValue={b.suma ?? ''}
                       placeholder="sumă"
                       onBlur={e => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== b.suma) patchBon(b.id, { suma: v }) }}
-                      style={{ width: '80px', fontSize: '12px', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '4px 8px', outline: 'none' }}
+                      style={{ width: '80px', fontSize: 'var(--fs-sm)', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '4px 8px', outline: 'none' }}
                     />
                     <input
                       type="date"
                       title="Data de pe bon — doar informativ, nu contează la asociere (se folosește data la care a fost încărcat)"
                       defaultValue={b.data_bon || ''}
                       onBlur={e => { const v = e.target.value || null; if (v !== b.data_bon) patchBon(b.id, { data_bon: v }) }}
-                      style={{ width: '130px', fontSize: '12px', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', padding: '4px 8px', outline: 'none' }}
+                      style={{ width: '130px', fontSize: 'var(--fs-sm)', color: 'var(--c-cccccc)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '4px 8px', outline: 'none' }}
                     />
                     {kind && (
-                      <button onClick={() => togglePreview(b.id)} style={{ fontSize: '11px', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                      <button onClick={() => togglePreview(b.id)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
                         {open ? 'Ascunde' : 'Vezi'}
                       </button>
                     )}
-                    <a href={`/api/bonuri/download?id=${b.id}`} style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>↓</a>
-                    <button onClick={() => deleteBon(b.id)} style={{ width: '22px', height: '22px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '12px', lineHeight: 1 }}>×</button>
+                    <a href={`/api/bonuri/download?id=${b.id}`} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>↓</a>
+                    <button onClick={() => deleteBon(b.id)} style={{ width: '22px', height: '22px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', cursor: 'pointer', color: 'var(--danger)', fontSize: 'var(--fs-sm)', lineHeight: 1 }}>×</button>
                   </div>
                   {open && kind === 'pdf' && (
-                    <iframe src={`/api/bonuri/download?id=${b.id}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', background: 'var(--c-ffffff)' }} />
+                    <iframe src={`/api/bonuri/download?id=${b.id}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', marginTop: '8px', background: 'var(--c-ffffff)' }} />
                   )}
                   {open && kind === 'image' && (
-                    <img src={`/api/bonuri/download?id=${b.id}&preview=1`} alt={b.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', background: 'var(--c-ffffff)' }} />
+                    <img src={`/api/bonuri/download?id=${b.id}&preview=1`} alt={b.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', marginTop: '8px', background: 'var(--c-ffffff)' }} />
                   )}
                 </div>
               )
             })}
           </div>
         )}
-        {moveError && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '10px' }}>{moveError}</p>}
+        {moveError && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', marginTop: '10px' }}>{moveError}</p>}
       </div>
 
       {asociate.length > 0 && (
-        <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '14px' }}>
+        <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '14px' }}>
             Deja asociate ({asociate.length})
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {asociate.map(b => (
-              <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-1a1a1a)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-mint)', flexShrink: 0 }}>✓</span>
-                <span style={{ flex: 1, fontSize: '12px', color: 'var(--c-777777)', textDecoration: 'line-through', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.comerciant || b.fisier_nume}</span>
-                {b.suma != null && <span style={{ fontSize: '11px', color: 'var(--c-666666)' }}>{b.suma.toFixed(2)} RON</span>}
-                {b.data_bon && <span style={{ fontSize: '11px', color: 'var(--c-666666)' }}>{fmtData(b.data_bon)}</span>}
-                <button onClick={() => deleteBon(b.id)} style={{ fontSize: '10px', color: 'var(--c-555555)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+              <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-1a1a1a)', borderRadius: 'var(--r-md)' }}>
+                <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--success)', flexShrink: 0 }}>✓</span>
+                <span style={{ flex: 1, fontSize: 'var(--fs-sm)', color: 'var(--c-777777)', textDecoration: 'line-through', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.comerciant || b.fisier_nume}</span>
+                {b.suma != null && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)' }}>{b.suma.toFixed(2)} RON</span>}
+                {b.data_bon && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)' }}>{fmtData(b.data_bon)}</span>}
+                <button onClick={() => deleteBon(b.id)} style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-555555)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
               </div>
             ))}
           </div>

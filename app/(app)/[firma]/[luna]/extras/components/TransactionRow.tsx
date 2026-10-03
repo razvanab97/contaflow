@@ -30,15 +30,15 @@ function TransactionRowImpl({ tx, isSelected, onClick }: { tx: Tx; isSelected: b
         cursor:'pointer', transition:'background .12s ease',
       }}
     >
-      <span style={{ fontSize:'11px', fontWeight:600, color:'var(--text-muted)', flexShrink:0, width:'40px' }}>{data}</span>
-      <span style={{ flex:1, minWidth:0, fontSize:'13px', fontWeight: tx.documente?.furnizor ? 600 : 500, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+      <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--text-muted)', flexShrink:0, width:'40px' }}>{data}</span>
+      <span style={{ flex:1, minWidth:0, fontSize:'var(--fs-md)', fontWeight: tx.documente?.furnizor ? 600 : 500, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
         {label}
       </span>
       <span style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'2px', flexShrink:0 }}>
-        <span style={{ fontSize:'13px', fontWeight:700, color:'var(--text-primary)' }}>
+        <span style={{ fontSize:'var(--fs-md)', fontWeight:700, color:'var(--text-primary)' }}>
           {tx.tip==='credit'?'+':'-'}{tx.suma.toFixed(2)} {tx.valuta}
         </span>
-        <span style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10px', fontWeight:600, color:STATUS_COLOR[status] }}>
+        <span style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'var(--fs-xs)', fontWeight:600, color:STATUS_COLOR[status] }}>
           <span style={{ width:'5px', height:'5px', borderRadius:'50%', background:STATUS_COLOR[status], flexShrink:0 }} />
           {STATUS_LABEL[status]}
         </span>

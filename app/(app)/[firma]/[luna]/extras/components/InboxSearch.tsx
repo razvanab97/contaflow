@@ -3,7 +3,7 @@ import { useRef, useState } from 'react'
 import type { InboxCandidat, Tx } from './types'
 import { SURSA_LABEL } from './types'
 
-const INP: React.CSSProperties = { fontSize:'12px', background:'var(--surface-secondary)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 12px', color:'var(--text-primary)', outline:'none', width:'100%' }
+const INP: React.CSSProperties = { fontSize:'var(--fs-sm)', background:'var(--surface-secondary)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'8px 12px', color:'var(--text-primary)', outline:'none', width:'100%' }
 
 const ASSOC_ENDPOINT: Record<InboxCandidat['sursa'], { url: string; idKey: string }> = {
   local: { url: '/api/inbox-facturi/asociaza', idKey: 'facturaId' },
@@ -75,24 +75,24 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
 
   if (!open) {
     return (
-      <button onClick={openAndSearch} style={{ fontSize:'12px', fontWeight:600, color:'var(--text-secondary)', background:'transparent', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 12px', cursor:'pointer', width:'100%', textAlign:'center' }}>
+      <button onClick={openAndSearch} style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--text-secondary)', background:'transparent', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'8px 12px', cursor:'pointer', width:'100%', textAlign:'center' }}>
         🔍 Caută în Inbox Facturi și Bonuri
       </button>
     )
   }
 
   return (
-    <div style={{ padding:'12px', background:'var(--surface-secondary)', border:'1px solid var(--border)', borderRadius:'10px' }}>
+    <div style={{ padding:'12px', background:'var(--surface-secondary)', border:'1px solid var(--border)', borderRadius:'var(--r-md)' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
-        <span style={{ fontSize:'11px', fontWeight:700, color:'var(--text-secondary)' }}>Inbox Facturi &amp; Bonuri</span>
-        <button onClick={() => setOpen(false)} style={{ fontSize:'11px', color:'var(--text-muted)', background:'transparent', border:'none', cursor:'pointer' }}>Ascunde</button>
+        <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--text-secondary)' }}>Inbox Facturi &amp; Bonuri</span>
+        <button onClick={() => setOpen(false)} style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)', background:'transparent', border:'none', cursor:'pointer' }}>Ascunde</button>
       </div>
 
       <div style={{ display:'flex', gap:'5px', flexWrap:'wrap', marginBottom:'8px' }}>
         {(['toate','local','gmail','oblio','bonuri','altele'] as const).map(s => {
           const n = s === 'toate' ? counts.local + counts.gmail + counts.oblio + counts.bonuri + counts.altele : counts[s]
           return (
-            <button key={s} onClick={() => setSursa(s)} style={{ fontSize:'10.5px', fontWeight:700, padding:'4px 9px', borderRadius:'999px', border:`1px solid ${sursaFiltru===s?'var(--purple)':'var(--border)'}`, background:sursaFiltru===s?'var(--purple-soft)':'transparent', color:sursaFiltru===s?'var(--purple)':'var(--text-secondary)', cursor:'pointer' }}>
+            <button key={s} onClick={() => setSursa(s)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'4px 9px', borderRadius:'var(--r-full)', border:`1px solid ${sursaFiltru===s?'var(--purple)':'var(--border)'}`, background:sursaFiltru===s?'var(--purple-soft)':'transparent', color:sursaFiltru===s?'var(--purple)':'var(--text-secondary)', cursor:'pointer' }}>
               {SURSA_LABEL[s]} ({n})
             </button>
           )
@@ -102,22 +102,22 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
       <input value={query} onChange={e => setQ(e.target.value)} placeholder="Caută după furnizor sau număr document..." style={{ ...INP, marginBottom:'8px' }} />
 
       {busy && !done ? (
-        <p style={{ fontSize:'11px', color:'var(--text-muted)' }}>Caut...</p>
+        <p style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)' }}>Caut...</p>
       ) : candidati.length === 0 ? (
-        <p style={{ fontSize:'11px', color:'var(--text-muted)' }}>Nicio factură sau bon nealocat nu corespunde filtrelor alese.</p>
+        <p style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)' }}>Nicio factură sau bon nealocat nu corespunde filtrelor alese.</p>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:'6px', maxHeight:'280px', overflowY:'auto' }}>
           {candidati.map(c => (
-            <div key={c.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'8px' }}>
+            <div key={c.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-md)' }}>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:'11px', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.furnizor || c.fisier_nume}</div>
-                <div style={{ fontSize:'10px', color:'var(--text-muted)', marginTop:'2px' }}>
-                  <span style={{ padding:'1px 6px', borderRadius:'20px', background:'var(--surface-secondary)', marginRight:'6px' }}>{SURSA_LABEL[c.sursa]}</span>
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.furnizor || c.fisier_nume}</div>
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)', marginTop:'2px' }}>
+                  <span style={{ padding:'1px 6px', borderRadius:'var(--r-full)', background:'var(--surface-secondary)', marginRight:'6px' }}>{SURSA_LABEL[c.sursa]}</span>
                   {c.suma != null ? `${c.suma.toFixed(2)} ${c.valuta}` : 'sumă necunoscută'}
                   {c.monedaDiferita ? ` · monedă diferită de tranzacție (${tx.valuta}) - verifică manual` : c.diferentaSuma !== null && c.diferentaSuma > 0.01 ? ` · diferență ${c.diferentaSuma.toFixed(2)} ${c.valuta}` : ''}
                 </div>
               </div>
-              <button onClick={() => associate(c)} disabled={!!assocId} style={{ fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:'none', background:'var(--success)', color:'var(--c-0a0a0a)', cursor: assocId ? 'wait' : 'pointer', opacity: assocId && assocId!==c.id ? .5 : 1, whiteSpace:'nowrap' }}>
+              <button onClick={() => associate(c)} disabled={!!assocId} style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'6px 12px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor: assocId ? 'wait' : 'pointer', opacity: assocId && assocId!==c.id ? .5 : 1, whiteSpace:'nowrap' }}>
                 {assocId===c.id ? '...' : 'Asociază'}
               </button>
             </div>

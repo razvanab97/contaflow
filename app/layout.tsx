@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import UpdateWidget from '@/components/UpdateWidget'
+import Toaster from '@/components/ui/Toaster'
 
 // Self-hostat de Next.js (fara cerere externa la Google Fonts in runtime) - subset
 // latin-ext e necesar pentru diacriticele romanesti (ă â î ș ț).
@@ -29,9 +30,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body style={{ background: 'var(--c-0a0a0a)', minHeight: '100vh' }}>
+        <a href="#continut" className="skip-link">Sari la conținut</a>
         {children}
         {/* Contor update — in layout-ul radacina, vizibil garantat pe orice pagina din aplicatie */}
         <UpdateWidget />
+        <Toaster />
       </body>
     </html>
   )

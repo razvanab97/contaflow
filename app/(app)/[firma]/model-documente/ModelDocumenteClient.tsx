@@ -133,19 +133,19 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
     setEditingNotite(e => ({ ...e, [sectiune]: false }))
   }
 
-  if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: '14px', padding: '32px 0' }}>Se încarcă...</div>
-  if (error) return <div style={{ color: 'var(--accent-red)', fontSize: '13px', padding: '24px 0' }}>{error}</div>
+  if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: 'var(--fs-base)', padding: '32px 0' }}>Se încarcă...</div>
+  if (error) return <div style={{ color: 'var(--danger)', fontSize: 'var(--fs-md)', padding: '24px 0' }}>{error}</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {SECTIUNI.map(s => {
         const docs = fisiere[s.key] || []
         return (
-          <div key={s.key} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+          <div key={s.key} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>{s.titlu}</span>
+              <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>{s.titlu}</span>
               <button onClick={() => inputRefs.current[s.key]?.click()} disabled={!!uploading[s.key]} style={{
-                fontSize: '12px', fontWeight: 600, color: 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer',
+                fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer',
               }}>{uploading[s.key] ? 'Se încarcă...' : '+ Adaugă fișier'}</button>
               <input
                 ref={el => { inputRefs.current[s.key] = el }}
@@ -153,10 +153,10 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
                 onChange={e => e.target.files?.length && uploadFiles(s.key, e.target.files)}
               />
             </div>
-            <p style={{ fontSize: '12px', color: 'var(--c-555555)', marginBottom: '14px' }}>{s.hint}</p>
+            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-555555)', marginBottom: '14px' }}>{s.hint}</p>
 
             {docs.length === 0 ? (
-              <p style={{ fontSize: '13px', color: 'var(--c-555555)', padding: '4px 0 8px' }}>Niciun fișier încărcat încă.</p>
+              <p style={{ fontSize: 'var(--fs-md)', color: 'var(--c-555555)', padding: '4px 0 8px' }}>Niciun fișier încărcat încă.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                 {docs.map(d => {
@@ -164,30 +164,30 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
                   const open = previewIds.has(d.id)
                   return (
                     <div key={d.id}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: '8px', padding: '8px 12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--c-161616)', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', padding: '8px 12px' }}>
                         <input
                           defaultValue={d.fisier_nume}
                           onBlur={e => e.target.value.trim() && e.target.value !== d.fisier_nume && renameFile(d.id, s.key, e.target.value.trim())}
-                          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '13px', color: 'var(--c-dddddd)', minWidth: 0 }}
+                          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', minWidth: 0 }}
                         />
-                        <span style={{ fontSize: '11px', color: 'var(--c-555555)', flexShrink: 0 }}>{fmtSize(d.fisier_marime)}</span>
+                        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-555555)', flexShrink: 0 }}>{fmtSize(d.fisier_marime)}</span>
                         {kind && (
                           <button onClick={() => togglePreview(d.id)} style={{
-                            fontSize: '12px', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)',
+                            fontSize: 'var(--fs-sm)', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent)',
                             background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0,
                           }}>{open ? 'Ascunde' : 'Previzualizează'}</button>
                         )}
-                        <a href={`/api/model-documente/download?id=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none', flexShrink: 0 }}>Descarcă</a>
+                        <a href={`/api/model-documente/download?id=${d.id}`} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none', flexShrink: 0 }}>Descarcă</a>
                         <button onClick={() => deleteFile(d.id, s.key)} title="Șterge" style={{
                           width: '24px', height: '24px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)',
-                          borderRadius: '6px', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '13px', lineHeight: 1,
+                          borderRadius: 'var(--r-sm)', cursor: 'pointer', color: 'var(--danger)', fontSize: 'var(--fs-md)', lineHeight: 1,
                         }}>×</button>
                       </div>
                       {open && kind === 'pdf' && (
-                        <iframe src={`/api/model-documente/download?id=${d.id}&preview=1`} style={{ width: '100%', height: '70vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', background: 'var(--c-ffffff)' }} />
+                        <iframe src={`/api/model-documente/download?id=${d.id}&preview=1`} style={{ width: '100%', height: '70vh', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', marginTop: '8px', background: 'var(--c-ffffff)' }} />
                       )}
                       {open && kind === 'image' && (
-                        <img src={`/api/model-documente/download?id=${d.id}&preview=1`} alt={d.fisier_nume} style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '8px', background: 'var(--c-ffffff)' }} />
+                        <img src={`/api/model-documente/download?id=${d.id}&preview=1`} alt={d.fisier_nume} style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', marginTop: '8px', background: 'var(--c-ffffff)' }} />
                       )}
                     </div>
                   )
@@ -201,7 +201,7 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
               const busy = !!savingNotite[s.key]
               return (
                 <div style={{ marginTop: docs.length === 0 ? '4px' : '14px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', display: 'block', marginBottom: '8px' }}>Notițe generale</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', display: 'block', marginBottom: '8px' }}>Notițe generale</span>
 
                   {isEditing ? (
                     <div>
@@ -211,16 +211,16 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
                         placeholder="Informații generale..."
                         rows={4}
                         autoFocus
-                        style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                        style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '10px 12px', fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
                       />
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                         <button onClick={() => saveNotiteAction(s.key)} disabled={busy} style={{
-                          fontSize: '12px', fontWeight: 600, padding: '6px 14px', borderRadius: '7px', border: 'none',
-                          background: 'var(--accent-mint)', color: 'var(--c-0a0a0a)', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1,
+                          fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '6px 14px', borderRadius: 'var(--r-sm)', border: 'none',
+                          background: 'var(--accent)', color: '#fff', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1,
                         }}>{busy ? 'Se salvează...' : 'Salvează'}</button>
                         {hasContent && (
                           <button onClick={() => cancelEditNotite(s.key)} disabled={busy} style={{
-                            fontSize: '12px', fontWeight: 600, padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)',
+                            fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '6px 14px', borderRadius: 'var(--r-sm)', border: '1px solid var(--c-2a2a2a)',
                             background: 'transparent', color: 'var(--c-888888)', cursor: 'pointer',
                           }}>Anulează</button>
                         )}
@@ -228,24 +228,24 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
                     </div>
                   ) : hasContent ? (
                     <div>
-                      <div style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--c-dddddd)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      <div style={{ width: '100%', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '10px 12px', fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                         {notite[s.key]}
                       </div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                         <button onClick={() => startEditNotite(s.key)} disabled={busy} style={{
-                          fontSize: '12px', fontWeight: 600, padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)',
-                          background: 'transparent', color: 'var(--accent-mint)', cursor: 'pointer',
+                          fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '6px 14px', borderRadius: 'var(--r-sm)', border: '1px solid var(--c-2a2a2a)',
+                          background: 'transparent', color: 'var(--accent)', cursor: 'pointer',
                         }}>Editează</button>
                         <button onClick={() => deleteNotiteAction(s.key)} disabled={busy} style={{
-                          fontSize: '12px', fontWeight: 600, padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)',
-                          background: 'transparent', color: 'var(--accent-red)', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1,
+                          fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '6px 14px', borderRadius: 'var(--r-sm)', border: '1px solid var(--c-2a2a2a)',
+                          background: 'transparent', color: 'var(--danger)', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1,
                         }}>{busy ? '...' : 'Șterge'}</button>
                       </div>
                     </div>
                   ) : (
                     <button onClick={() => startEditNotite(s.key)} style={{
-                      fontSize: '12px', fontWeight: 600, color: 'var(--accent-mint)', background: 'transparent', border: '1px dashed var(--c-2a2a2a)',
-                      borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', width: '100%', textAlign: 'left',
+                      fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)', background: 'transparent', border: '1px dashed var(--c-2a2a2a)',
+                      borderRadius: 'var(--r-md)', padding: '10px 12px', cursor: 'pointer', width: '100%', textAlign: 'left',
                     }}>+ Adaugă notiță</button>
                   )}
                 </div>

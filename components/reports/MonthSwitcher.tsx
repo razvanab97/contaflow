@@ -20,23 +20,23 @@ interface Props {
 // in viewport, deci click-ul chiar navigheaza instant, nu doar vizual.
 export default function MonthSwitcher({ slug, luna, lunaLabel, modulSlug, onBeforeNavigate }: Props) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', padding: '2px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)' }}>
       <Link
         href={`/${slug}/${prevLuna(luna)}/${modulSlug}`}
         prefetch
         onClick={() => onBeforeNavigate?.()}
         aria-label="Luna anterioară"
-        style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: '7px', color: 'var(--c-999999)' }}
+        className="btn btn-ghost btn-icon btn-sm"
       >
         <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
       </Link>
-      <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--c-cccccc)', minWidth: '110px', textAlign: 'center' }}>{lunaLabel}</span>
+      <span style={{ fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--text-primary)', minWidth: '110px', textAlign: 'center', padding: '0 6px' }}>{lunaLabel}</span>
       <Link
         href={`/${slug}/${nextLuna(luna)}/${modulSlug}`}
         prefetch
         onClick={() => onBeforeNavigate?.()}
         aria-label="Luna următoare"
-        style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: '7px', color: 'var(--c-999999)' }}
+        className="btn btn-ghost btn-icon btn-sm"
       >
         <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
       </Link>

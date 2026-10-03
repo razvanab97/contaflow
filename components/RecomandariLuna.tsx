@@ -56,34 +56,37 @@ export default function RecomandariLuna({ lunaId, firmaId, firmaSlug, firmaNume,
   if (loading) return null
 
   return (
-    <div style={{ marginTop: '28px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '22px 26px' }}>
+    <div className="card card-pad" style={{ marginTop: '28px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Recomandări pentru sistem</div>
-          <div style={{ fontSize: '13px', fontWeight: 450, color: 'var(--text-secondary)', marginTop: '2px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', minWidth: 0, flex: '1 1 280px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: 'var(--r-md)', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>
+          </div>
+          <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-primary)' }}>Recomandări pentru sistem</div>
+          <div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-secondary)', marginTop: '2px' }}>
             {recomandare ? `Generate ${formatData(recomandare.creat_la)}` : 'Ce ar putea reduce munca manuală pe viitor, pe baza lunii curente'}
+          </div>
           </div>
         </div>
         <button
           onClick={generate}
           disabled={generating}
-          style={{
-            fontSize: '12.5px', fontWeight: 600, padding: '7px 14px', borderRadius: '8px',
-            border: '1px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent-hover)',
-            cursor: generating ? 'wait' : 'pointer', opacity: generating ? .6 : 1, flexShrink: 0,
-          }}
+          className="btn"
+          style={{ cursor: generating ? 'wait' : undefined, opacity: generating ? .6 : 1, flexShrink: 0 }}
         >
           {generating ? 'Se analizează luna...' : recomandare ? '↻ Regenerează' : 'Generează recomandări'}
         </button>
       </div>
 
-      {error && <p style={{ fontSize: '12.5px', color: 'var(--danger)', marginTop: '12px' }}>{error}</p>}
+      {error && <p role="alert" style={{ fontSize: 'var(--fs-md)', color: 'var(--danger)', marginTop: '12px' }}>{error}</p>}
 
       {recomandare && !generating && (
         <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {recomandare.continut.split('\n').filter(l => l.trim()).map((line, i) => (
-            <div key={i} style={{ fontSize: '13px', fontWeight: 450, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
-              {line.replace(/^•\s*/, '')}
+            <div key={i} style={{ display: 'flex', gap: '10px', fontSize: 'var(--fs-md)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', marginTop: '8px', flexShrink: 0 }} />
+              <span>{line.replace(/^•\s*/, '')}</span>
             </div>
           ))}
         </div>

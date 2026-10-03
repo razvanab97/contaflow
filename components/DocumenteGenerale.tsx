@@ -66,25 +66,22 @@ export default function DocumenteGenerale() {
   }
 
   return (
-    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '16px', padding: '24px 28px', marginBottom: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <div>
-          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--c-efefef)', letterSpacing: '-0.2px' }}>Documente generale</div>
-          <div style={{ fontSize: '12px', color: 'var(--c-888888)', marginTop: '2px' }}>Fișiere care nu țin de o firmă anume</div>
+    <div className="card card-pad">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '14px' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-primary)' }}>Documente generale</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '4px' }}>Fișiere care nu țin de o firmă anume</div>
         </div>
         <input ref={inputRef} type="file" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
-        <button onClick={() => inputRef.current?.click()} disabled={uploading} style={{
-          fontSize: '12px', fontWeight: 600, color: 'var(--c-dddddd)', padding: '7px 16px', borderRadius: '8px',
-          border: '1px solid var(--c-2a2a2a)', background: 'var(--c-1a1a1a)', cursor: uploading ? 'not-allowed' : 'pointer',
-        }}>
+        <button onClick={() => inputRef.current?.click()} disabled={uploading} className="btn" style={{ flexShrink: 0 }}>
           {uploading ? 'Se încarcă...' : '+ Adaugă document'}
         </button>
       </div>
 
       {loading ? (
-        <div style={{ fontSize: '12px', color: 'var(--c-666666)' }}>Se încarcă...</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>{[0, 1].map(i => <div key={i} className="skeleton" style={{ height: '38px' }} />)}</div>
       ) : docs.length === 0 ? (
-        <div style={{ fontSize: '12px', color: 'var(--c-666666)' }}>Niciun document general încă</div>
+        <div className="empty-state" style={{ padding: '20px 16px' }}><strong>Niciun document general încă</strong><span style={{ fontSize: 'var(--fs-sm)' }}>Adaugă contracte, acte sau alte fișiere comune tuturor firmelor.</span></div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {docs.map(d => {
@@ -92,22 +89,23 @@ export default function DocumenteGenerale() {
             const open = previewIds.has(d.id)
             return (
               <div key={d.id}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: 'var(--c-161616)', border: '1px solid var(--c-222222)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 6px 6px 12px', borderRadius: 'var(--r-md)', background: 'var(--surface-secondary)', border: '1px solid var(--border)' }}>
                   <input
                     defaultValue={d.fisier_nume}
                     onBlur={e => handleRename(d.id, e.target.value.trim())}
-                    style={{ flex: 1, minWidth: 0, fontSize: '13px', color: 'var(--c-cccccc)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
+                    title="Click pentru a redenumi"
+                    style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-md)', color: 'var(--text-primary)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
                   />
-                  <span style={{ fontSize: '11px', color: 'var(--c-666666)', flexShrink: 0 }}>{formatSize(d.fisier_marime)}</span>
-                  {kind && <button onClick={() => togglePreview(d.id)} style={{ fontSize: '12px', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}>{open ? 'Ascunde' : 'Vezi'}</button>}
-                  <a href={`/api/documente-generale?download=${d.id}`} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-blue)', flexShrink: 0 }}>↓</a>
-                  <button onClick={() => handleDelete(d.id)} style={{ fontSize: '12px', color: 'var(--c-888888)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>{formatSize(d.fisier_marime)}</span>
+                  {kind && <button onClick={() => togglePreview(d.id)} className="btn btn-sm btn-ghost" style={{ color: open ? 'var(--text-primary)' : 'var(--accent)' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
+                  <a href={`/api/documente-generale?download=${d.id}`} className="btn btn-sm btn-ghost btn-icon" title="Descarcă" aria-label={`Descarcă ${d.fisier_nume}`}>↓</a>
+                  <button onClick={() => handleDelete(d.id)} className="btn btn-sm btn-ghost btn-icon" title="Șterge" aria-label={`Șterge ${d.fisier_nume}`}>✕</button>
                 </div>
                 {open && kind === 'pdf' && (
-                  <iframe src={`/api/documente-generale?download=${d.id}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-222222)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
+                  <iframe src={`/api/documente-generale?download=${d.id}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-222222)', borderRadius: 'var(--r-md)', marginTop: '6px', background: 'var(--c-ffffff)' }} />
                 )}
                 {open && kind === 'image' && (
-                  <img src={`/api/documente-generale?download=${d.id}&preview=1`} alt={d.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-222222)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
+                  <img src={`/api/documente-generale?download=${d.id}&preview=1`} alt={d.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-222222)', borderRadius: 'var(--r-md)', marginTop: '6px', background: 'var(--c-ffffff)' }} />
                 )}
               </div>
             )

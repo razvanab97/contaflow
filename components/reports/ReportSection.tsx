@@ -17,18 +17,18 @@ export default function ReportSection({ title, description, collapsible = true, 
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
       <div
         onClick={() => collapsible && setOpen(o => !o)}
         style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', cursor: collapsible ? 'pointer' : 'default', userSelect: 'none' }}
       >
-        <span style={{ color: 'var(--c-444444)', fontSize: '13px', flexShrink: 0 }}>⋮⋮</span>
+        <span style={{ color: 'var(--c-444444)', fontSize: 'var(--fs-md)', flexShrink: 0 }}>⋮⋮</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-e0e0e0)' }}>{title}</div>
-          {description && <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px' }}>{description}</div>}
+          <div style={{ fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--c-e0e0e0)' }}>{title}</div>
+          {description && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', marginTop: '2px' }}>{description}</div>}
         </div>
         {onDelete && (
-          <button onClick={e => { e.stopPropagation(); onDelete() }} title="Șterge" style={{ fontSize: '10px', fontWeight: 600, color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>
+          <button onClick={e => { e.stopPropagation(); onDelete() }} title="Șterge" style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>
             ✕
           </button>
         )}

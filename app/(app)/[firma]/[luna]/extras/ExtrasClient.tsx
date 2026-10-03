@@ -246,9 +246,9 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   }, [activeTxIndex, filtered, load])
 
   return (
-    <main style={{ flex:1, minWidth:0, padding:'32px 36px', background:'var(--app-bg)', overflowX:'hidden' }}>
+    <main className="page page-wide animate-in">
       <ExtrasHeader
-        firmaNume={firma.nume} lunaLabel={lunaLabel} culoare={c}
+        firmaNume={firma.nume} lunaLabel={lunaLabel} culoare={c} slug={slug} luna={luna}
         pageTab={pageTab} onPageTabChange={setPageTab}
         extrase={extrase} activeExtrasId={selectedExtras?.id || ''} onSelectExtras={selectExtras}
         onOpenImport={() => setImportOpen(true)}
@@ -284,19 +284,20 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           />
 
           {loading ? (
-            <div style={{ textAlign:'center', padding:'60px' }}>
-              <div style={{ width:'24px', height:'24px', border:`2px solid ${c}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin .8s linear infinite', margin:'0 auto 12px' }}/>
-              <p style={{ fontSize:'13px', color:'var(--text-secondary)' }}>Se încarcă tranzacțiile...</p>
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(0,2fr)', gap:'16px' }} aria-busy="true" aria-label="Se încarcă tranzacțiile">
+              <div className="skeleton" style={{ height:'480px', borderRadius:'var(--r-lg)' }}/>
+              <div className="skeleton" style={{ height:'480px', borderRadius:'var(--r-lg)' }}/>
             </div>
           ) : error ? (
-            <div style={{ padding:'24px', background:'var(--danger-soft)', border:'1px solid var(--danger)', borderRadius:'12px' }}>
-              <p style={{ fontSize:'13px', color:'var(--danger)' }}>Eroare: {error}</p>
-              <button onClick={()=>load()} style={{ marginTop:'10px', fontSize:'12px', padding:'6px 14px', borderRadius:'7px', border:'none', background:c, color:'var(--c-ffffff)', cursor:'pointer' }}>Reîncearcă</button>
+            <div role="alert" style={{ padding:'16px 20px', background:'var(--danger-soft)', border:'1px solid color-mix(in srgb, var(--danger) 40%, transparent)', borderRadius:'var(--r-lg)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', flexWrap:'wrap' }}>
+              <p style={{ fontSize:'var(--fs-md)', color:'var(--danger)' }}>Eroare: {error}</p>
+              <button onClick={()=>load()} className="btn btn-sm">Reîncearcă</button>
             </div>
           ) : scopedTxs.length === 0 ? (
-            <div style={{ padding:'40px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', textAlign:'center' }}>
-              <p style={{ fontSize:'13px', color:'var(--text-secondary)' }}>Importă un extras ca să vezi tranzacțiile aici.</p>
+            <div className="empty-state" style={{ padding:'48px 16px' }}>
+              <strong>Nicio tranzacție încă</strong>
+              <span>Importă un extras ca să vezi tranzacțiile aici.</span>
+              <button onClick={() => setImportOpen(true)} className="btn btn-primary btn-sm" style={{ marginTop:'8px' }}>Importă extras</button>
             </div>
           ) : (
             <ExtrasWorkspace

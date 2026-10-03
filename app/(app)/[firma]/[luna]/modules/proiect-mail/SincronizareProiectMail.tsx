@@ -59,21 +59,21 @@ export default function SincronizareProiectMail({ firmaId, culoare, onSynced }: 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
       {!connected ? (
-        <button onClick={connectGmail} style={{ fontSize: '11px', fontWeight: 700, padding: '7px 12px', borderRadius: '7px', border: 'none', background: culoare, color: '#fff', cursor: 'pointer' }}>
+        <button onClick={connectGmail} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 12px', borderRadius: 'var(--r-sm)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer' }}>
           Conectează Gmail (Prosocial/Orieda)
         </button>
       ) : (
         <>
-          <button onClick={sync} disabled={syncing} style={{ fontSize: '11px', fontWeight: 700, padding: '7px 12px', borderRadius: '7px', border: '1px solid rgba(74,222,128,.35)', background: 'rgba(74,222,128,.08)', color: 'var(--accent-green)', cursor: 'pointer', opacity: syncing ? .6 : 1 }}>
+          <button onClick={sync} disabled={syncing} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 12px', borderRadius: 'var(--r-sm)', border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)', background: 'var(--accent-soft)', color: 'var(--accent)', cursor: 'pointer', opacity: syncing ? .6 : 1 }}>
             {syncing ? 'Sincronizez...' : 'Sincronizează din email'}
           </button>
-          <span style={{ fontSize: '10px', color: 'var(--c-666666)' }}>
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)' }}>
             {connected.email}{connected.lastSyncAt ? ` · ultima sincronizare: ${new Date(connected.lastSyncAt).toLocaleString('ro-RO')}` : ''}
           </span>
         </>
       )}
-      {message && <span style={{ fontSize: '11px', color: 'var(--accent-green)' }}>{message}</span>}
-      {error && <span style={{ fontSize: '11px', color: 'var(--accent-red)' }}>{error}</span>}
+      {message && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--success)' }}>{message}</span>}
+      {error && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)' }}>{error}</span>}
     </div>
   )
 }

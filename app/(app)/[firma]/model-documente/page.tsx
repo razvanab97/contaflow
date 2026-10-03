@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
+import PageHeader from '@/components/ui/PageHeader'
 import { dbSelect } from '@/lib/db'
 import { getFirmaConfig } from '@/lib/firma-config'
 import ModelDocumenteClient from './ModelDocumenteClient'
@@ -24,20 +24,13 @@ export default async function ModelDocumentePage({ params }: { params: Promise<{
   const luna = getCurrentLuna()
 
   return (
-    <main style={{ flex: 1, padding: '44px 52px', maxWidth: '1200px' }}>
-      <div style={{ marginBottom: '32px' }}>
-        <Link href={`/${slug}/${luna}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--c-888888)', marginBottom: '16px' }}>
-          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
-          {firma.nume.replace(' SRL', '')}
-        </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: firma.culoare, flexShrink: 0 }} />
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--c-ffffff)', letterSpacing: '-0.5px' }}>Model documente</h1>
-        </div>
-        <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--c-888888)', marginTop: '6px', marginLeft: '22px' }}>
-          Șabloane la îndemână — nu țin de o lună anume · {firma.nume}
-        </p>
-      </div>
+    <main className="page page-narrow animate-in">
+      <PageHeader
+        back={{ href: `/${slug}/${luna}`, label: firma.nume.replace(' SRL', '') }}
+        culoare={firma.culoare}
+        title="Model documente"
+        description={`Șabloane la îndemână — nu țin de o lună anume · ${firma.nume}`}
+      />
 
       <ModelDocumenteClient firmaId={firma.id} />
     </main>

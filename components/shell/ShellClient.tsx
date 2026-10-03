@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar, { FirmaNav } from '@/components/Sidebar'
 import GlobalHeader from './GlobalHeader'
@@ -29,6 +29,8 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
   const [firmeNav, setFirmeNav] = useState(initialFirmeNav)
   const [restanteCount, setRestanteCount] = useState(0)
   const [moduleComplete, setModuleComplete] = useState<Record<string, boolean>>({})
+  const [menuOpen, setMenuOpen] = useState(false)
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
 
   const firmaAtivaObj = firmeNav.find(f => f.slug === firmaSlug)
   const firmaId = firmaAtivaObj?.id
@@ -51,10 +53,18 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
     return () => { cancelled = true }
   }, [lunaEfectiva, firmaId, firmaSlug, initialLuna])
 
+  // Blocheaza scroll-ul paginii cat timp sertarul de navigatie e deschis pe mobil.
+  useEffect(() => {
+    if (!menuOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [menuOpen])
+
   const modules = firmaSlug ? getFirmaModules(firmaSlug) : undefined
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--app-bg-image, none), var(--c-0a0a0a)', backgroundAttachment: 'fixed' }}>
+    <div className="app-shell">
       <Sidebar
         firme={firmeNav}
         lunaCurenta={lunaEfectiva}
@@ -63,12 +73,14 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
         moduleFirma={modules}
         restanteCount={restanteCount}
         moduleComplete={moduleComplete}
+        open={menuOpen}
+        onClose={closeMenu}
       />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {firmaAtivaObj && (
-          <GlobalHeader firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} />
-        )}
-        {children}
+      <div className="app-main">
+        <GlobalHeader firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} onMenu={() => setMenuOpen(true)} />
+        <div id="continut" tabIndex={-1} style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, outline: 'none' }}>
+          {children}
+        </div>
       </div>
     </div>
   )

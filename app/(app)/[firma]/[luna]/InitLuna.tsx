@@ -18,17 +18,17 @@ export default function InitLuna({ firma, luna }: { firma: {id:string;nume:strin
   }
 
   return (
-    <div style={{ minHeight:'70vh', width:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={{ textAlign:'center', maxWidth:'340px' }}>
-        <div style={{ width:'48px', height:'48px', borderRadius:'14px', margin:'0 auto 20px', background:tint(r,.15), display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ flex:1, minHeight:'60vh', width:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div className="card animate-in" style={{ textAlign:'center', maxWidth:'400px', width:'100%', padding:'32px 24px' }}>
+        <div style={{ width:'48px', height:'48px', borderRadius:'var(--r-lg)', margin:'0 auto 16px', background:tint(r,.15), display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div style={{ width:'14px', height:'14px', borderRadius:'50%', background:firma.culoare }}/>
         </div>
-        <h1 style={{ fontSize:'18px', fontWeight:600, color:'var(--c-ffffff)', marginBottom:'6px' }}>{firma.nume}</h1>
-        <p style={{ fontSize:'13px', color:'var(--c-777777)', marginBottom:'28px' }}>Contabilitate {periodLabel}<br/><span style={{ fontSize:'12px' }}>({workLabel}) — lună neîncepută</span></p>
-        <button onClick={init} disabled={loading} style={{ padding:'10px 24px', borderRadius:'9px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', fontSize:'13px', fontWeight:600, cursor:'pointer', opacity:loading?.6:1 }}>
-          {loading ? 'Se inițializează...' : `Începe contabilitatea ${periodLabel}`}
+        <h1 style={{ fontSize:'var(--fs-lg)', fontWeight:650, color:'var(--text-primary)', marginBottom:'6px' }}>{firma.nume}</h1>
+        <p style={{ fontSize:'var(--fs-md)', color:'var(--text-secondary)', marginBottom:'24px', lineHeight:1.55 }}>Contabilitate {periodLabel}<br/><span style={{ fontSize:'var(--fs-sm)', color:'var(--text-muted)' }}>({workLabel}) — lună neîncepută</span></p>
+        <button onClick={init} disabled={loading} className="btn btn-primary btn-lg" style={{ width:'100%', opacity:loading?.6:1, cursor: loading ? 'wait' : undefined }}>
+          {loading ? 'Se inițializează…' : `Începe contabilitatea ${periodLabel}`}
         </button>
-        <p style={{ fontSize:'11px', color:'var(--c-444444)', marginTop:'12px' }}>Se creează automat toate task-urile</p>
+        <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-muted)', marginTop:'12px' }}>Se creează automat toate task-urile lunii</p>
       </div>
     </div>
   )

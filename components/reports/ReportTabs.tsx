@@ -15,9 +15,9 @@ export default function ReportTabs({ active, onChange }: { active: ReportTab; on
           key={t.id}
           onClick={() => onChange(t.id)}
           style={{
-            fontSize: '13px', fontWeight: 600, padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer',
+            fontSize: 'var(--fs-md)', fontWeight: 600, padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer',
             color: active === t.id ? 'var(--c-eeeeee)' : 'var(--c-777777)',
-            borderBottom: active === t.id ? '2px solid var(--accent-mint)' : '2px solid transparent',
+            borderBottom: active === t.id ? '2px solid var(--accent)' : '2px solid transparent',
             marginBottom: '-1px',
           }}
         >

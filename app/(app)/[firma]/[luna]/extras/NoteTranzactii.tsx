@@ -68,8 +68,8 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
   return (
     <div>
       <div style={{ marginBottom: '28px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-ffffff)', marginBottom: '4px' }}>Note pe tranzacții</h2>
-        <p style={{ fontSize: '12px', color: 'var(--c-888888)' }}>Caută o tranzacție din extras și notează un status (ex: „Aștept factura”). Notele apar mai jos și pot fi exportate ca PDF scurt.</p>
+        <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--c-ffffff)', marginBottom: '4px' }}>Note pe tranzacții</h2>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-888888)' }}>Caută o tranzacție din extras și notează un status (ex: „Aștept factura”). Notele apar mai jos și pot fi exportate ca PDF scurt.</p>
       </div>
 
       {/* Search + pick */}
@@ -78,14 +78,14 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
           value={search}
           onChange={e => setDraft({ search: e.target.value, pickedId: null })}
           placeholder="Caută tranzacție după descriere sau sumă..."
-          style={{ width: '100%', maxWidth: '460px', padding: '10px 14px', borderRadius: '9px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-eeeeee)', fontSize: '13px', outline: 'none' }}
+          style={{ width: '100%', maxWidth: '460px', padding: '10px 14px', borderRadius: 'var(--r-md)', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-161616)', color: 'var(--c-eeeeee)', fontSize: 'var(--fs-md)', outline: 'none' }}
         />
         {results.length > 0 && !pickedId && (
-          <div style={{ marginTop: '8px', maxWidth: '460px', border: '1px solid var(--c-242424)', borderRadius: '9px', overflow: 'hidden' }}>
+          <div style={{ marginTop: '8px', maxWidth: '460px', border: '1px solid var(--c-242424)', borderRadius: 'var(--r-md)', overflow: 'hidden' }}>
             {results.map(t => (
-              <button key={t.id} onClick={() => setDraft({ pickedId: t.id, search: '' })} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', width: '100%', padding: '9px 12px', border: 'none', borderBottom: '1px solid var(--c-1e1e1e)', background: 'var(--c-141414)', color: 'var(--c-dddddd)', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}>
+              <button key={t.id} onClick={() => setDraft({ pickedId: t.id, search: '' })} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', width: '100%', padding: '9px 12px', border: 'none', borderBottom: '1px solid var(--c-1e1e1e)', background: 'var(--c-141414)', color: 'var(--c-dddddd)', fontSize: 'var(--fs-sm)', cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.data_tranzactie} · {t.descriere_curatata || t.descriere}</span>
-                <span style={{ fontWeight: 700, flexShrink: 0, color: t.tip === 'credit' ? 'var(--accent-green)' : 'var(--accent-red)' }}>{t.tip === 'credit' ? '+' : '-'}{Number(t.suma).toFixed(2)} {t.valuta}</span>
+                <span style={{ fontWeight: 700, flexShrink: 0, color: t.tip === 'credit' ? 'var(--success)' : 'var(--danger)' }}>{t.tip === 'credit' ? '+' : '-'}{Number(t.suma).toFixed(2)} {t.valuta}</span>
               </button>
             ))}
           </div>
@@ -93,17 +93,17 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
       </div>
 
       {picked && (
-        <div style={{ marginBottom: '24px', padding: '16px', background: 'var(--c-141414)', border: `1px solid ${culoare}55`, borderRadius: '12px', maxWidth: '520px' }}>
+        <div style={{ marginBottom: '24px', padding: '16px', background: 'var(--c-141414)', border: `1px solid ${culoare}55`, borderRadius: 'var(--r-lg)', maxWidth: '520px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
             <div>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-ffffff)' }}>{picked.descriere_curatata || picked.descriere}</p>
-              <p style={{ fontSize: '11px', color: 'var(--c-888888)', marginTop: '2px' }}>{picked.data_tranzactie} · {picked.tip === 'credit' ? '+' : '-'}{Number(picked.suma).toFixed(2)} {picked.valuta}</p>
+              <p style={{ fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--c-ffffff)' }}>{picked.descriere_curatata || picked.descriere}</p>
+              <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)', marginTop: '2px' }}>{picked.data_tranzactie} · {picked.tip === 'credit' ? '+' : '-'}{Number(picked.suma).toFixed(2)} {picked.valuta}</p>
             </div>
-            <button onClick={() => setDraft({ pickedId: null })} style={{ border: 'none', background: 'transparent', color: 'var(--c-666666)', cursor: 'pointer', fontSize: '13px' }}>✕</button>
+            <button onClick={() => setDraft({ pickedId: null })} style={{ border: 'none', background: 'transparent', color: 'var(--c-666666)', cursor: 'pointer', fontSize: 'var(--fs-md)' }}>✕</button>
           </div>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
             {QUICK_NOTES.map(n => (
-              <button key={n} onClick={() => saveNote(picked.id, n)} style={{ fontSize: '11px', fontWeight: 600, padding: '6px 11px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-1a1a1a)', color: 'var(--c-cccccc)', cursor: 'pointer' }}>{n}</button>
+              <button key={n} onClick={() => saveNote(picked.id, n)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '6px 11px', borderRadius: 'var(--r-sm)', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-1a1a1a)', color: 'var(--c-cccccc)', cursor: 'pointer' }}>{n}</button>
             ))}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -112,38 +112,38 @@ export default function NoteTranzactii({ txs, firmaNume, lunaId, lunaLabel, culo
               onChange={e => setDraft({ customText: e.target.value })}
               placeholder="Sau text personalizat..."
               onKeyDown={e => { if (e.key === 'Enter' && customText.trim()) saveNote(picked.id, customText.trim()) }}
-              style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-111111)', color: 'var(--c-eeeeee)', fontSize: '12px', outline: 'none' }}
+              style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--r-md)', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-111111)', color: 'var(--c-eeeeee)', fontSize: 'var(--fs-sm)', outline: 'none' }}
             />
-            <button disabled={!customText.trim()} onClick={() => customText.trim() && saveNote(picked.id, customText.trim())} style={{ fontSize: '12px', fontWeight: 700, padding: '8px 14px', borderRadius: '8px', border: 'none', background: customText.trim() ? culoare : 'var(--c-2a2a2a)', color: 'var(--c-ffffff)', cursor: customText.trim() ? 'pointer' : 'not-allowed' }}>Salvează</button>
+            <button disabled={!customText.trim()} onClick={() => customText.trim() && saveNote(picked.id, customText.trim())} style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, padding: '8px 14px', borderRadius: 'var(--r-md)', border: 'none', background: customText.trim() ? culoare : 'var(--c-2a2a2a)', color: 'var(--c-ffffff)', cursor: customText.trim() ? 'pointer' : 'not-allowed' }}>Salvează</button>
           </div>
         </div>
       )}
 
       {/* List of noted transactions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--c-dddddd)' }}>De urmărit ({noted.length})</h3>
+        <h3 style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--c-dddddd)' }}>De urmărit ({noted.length})</h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {downloadError && <span style={{ fontSize: '11px', color: 'var(--accent-red)' }}>{downloadError}</span>}
-          <button onClick={downloadPdf} disabled={downloading || noted.length === 0} style={{ fontSize: '11px', fontWeight: 700, padding: '7px 12px', borderRadius: '8px', border: `1px solid ${noted.length > 0 ? culoare : 'var(--c-2a2a2a)'}`, background: 'transparent', color: noted.length > 0 ? culoare : 'var(--c-555555)', cursor: noted.length > 0 ? 'pointer' : 'not-allowed', opacity: downloading ? .6 : 1 }}>
+          {downloadError && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)' }}>{downloadError}</span>}
+          <button onClick={downloadPdf} disabled={downloading || noted.length === 0} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 12px', borderRadius: 'var(--r-md)', border: `1px solid ${noted.length > 0 ? culoare : 'var(--c-2a2a2a)'}`, background: 'transparent', color: noted.length > 0 ? culoare : 'var(--c-555555)', cursor: noted.length > 0 ? 'pointer' : 'not-allowed', opacity: downloading ? .6 : 1 }}>
             {downloading ? 'Se generează PDF-ul...' : 'Descarcă PDF ↓'}
           </button>
         </div>
       </div>
 
       {noted.length === 0 ? (
-        <div style={{ padding: '32px', background: 'var(--c-141414)', border: '1px solid var(--c-242424)', borderRadius: '12px', textAlign: 'center' }}>
-          <p style={{ fontSize: '12px', color: 'var(--c-666666)' }}>Nicio tranzacție notată încă.</p>
+        <div style={{ padding: '32px', background: 'var(--c-141414)', border: '1px solid var(--c-242424)', borderRadius: 'var(--r-lg)', textAlign: 'center' }}>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)' }}>Nicio tranzacție notată încă.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {noted.map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 14px', background: 'var(--c-141414)', border: '1px solid var(--c-222222)', borderRadius: '10px' }}>
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 14px', background: 'var(--c-141414)', border: '1px solid var(--c-222222)', borderRadius: 'var(--r-md)' }}>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--c-dddddd)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.descriere_curatata || t.descriere}</p>
-                <p style={{ fontSize: '10.5px', color: 'var(--c-777777)', marginTop: '2px' }}>{t.data_tranzactie} · {t.tip === 'credit' ? '+' : '-'}{Number(t.suma).toFixed(2)} {t.valuta}</p>
+                <p style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--c-dddddd)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.descriere_curatata || t.descriere}</p>
+                <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)', marginTop: '2px' }}>{t.data_tranzactie} · {t.tip === 'credit' ? '+' : '-'}{Number(t.suma).toFixed(2)} {t.valuta}</p>
               </div>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#D8A657', background: 'rgba(216,166,87,.1)', padding: '4px 10px', borderRadius: '7px', flexShrink: 0, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.status_note}</span>
-              <button onClick={() => onSetStatusNote(t.id, null)} style={{ fontSize: '11px', fontWeight: 600, padding: '5px 9px', borderRadius: '7px', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-1a1a1a)', color: 'var(--c-666666)', cursor: 'pointer', flexShrink: 0 }}>Șterge</button>
+              <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: '#D8A657', background: 'rgba(216,166,87,.1)', padding: '4px 10px', borderRadius: 'var(--r-sm)', flexShrink: 0, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.status_note}</span>
+              <button onClick={() => onSetStatusNote(t.id, null)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '5px 9px', borderRadius: 'var(--r-sm)', border: '1px solid var(--c-2a2a2a)', background: 'var(--c-1a1a1a)', color: 'var(--c-666666)', cursor: 'pointer', flexShrink: 0 }}>Șterge</button>
             </div>
           ))}
         </div>

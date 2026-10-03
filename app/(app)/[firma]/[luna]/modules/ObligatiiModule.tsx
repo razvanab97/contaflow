@@ -90,7 +90,7 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
   }
 
   if (!rows) {
-    return <div style={{ padding: '24px', fontSize: '13px', color: 'var(--c-999999)' }}>Se încarcă...</div>
+    return <div style={{ padding: '24px', fontSize: 'var(--fs-md)', color: 'var(--c-999999)' }}>Se încarcă...</div>
   }
 
   const sorted = [...rows].sort((a, b) => {
@@ -106,27 +106,27 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
 
       <ProiectWorkflow firmaId={firma.id} lunaId={lunaId} luna={luna} firmaSlug={firma.slug} />
 
-      <details style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 18px' }}>
-        <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 650 }}>Checklist anterior și sugestii din email</summary>
+      <details style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '14px 18px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650 }}>Checklist anterior și sugestii din email</summary>
         <div style={{ display: 'grid', gap: '16px', marginTop: '14px' }}>
       {(restante > 0 || curand > 0) && (
         <div style={{ display: 'flex', gap: '12px' }}>
           {restante > 0 && (
-            <div style={{ flex: 1, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.35)', borderRadius: '12px', padding: '14px 18px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent-red)' }}>{restante}</div>
-              <div style={{ fontSize: '12px', color: 'var(--c-999999)' }}>{restante === 1 ? 'restanță' : 'restanțe'} — termen depășit</div>
+            <div style={{ flex: 1, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 'var(--r-lg)', padding: '14px 18px' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--danger)' }}>{restante}</div>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-999999)' }}>{restante === 1 ? 'restanță' : 'restanțe'} — termen depășit</div>
             </div>
           )}
           {curand > 0 && (
-            <div style={{ flex: 1, background: 'rgba(251,146,60,.08)', border: '1px solid rgba(251,146,60,.35)', borderRadius: '12px', padding: '14px 18px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#F59E0B' }}>{curand}</div>
-              <div style={{ fontSize: '12px', color: 'var(--c-999999)' }}>{curand === 1 ? 'urmează' : 'urmează'} în max. 5 zile</div>
+            <div style={{ flex: 1, background: 'rgba(251,146,60,.08)', border: '1px solid rgba(251,146,60,.35)', borderRadius: 'var(--r-lg)', padding: '14px 18px' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--warning)' }}>{curand}</div>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-999999)' }}>{curand === 1 ? 'urmează' : 'urmează'} în max. 5 zile</div>
             </div>
           )}
         </div>
       )}
 
-      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
+      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {sorted.map(row => {
             const zile = zileRamase(row.scadenta)
@@ -141,14 +141,14 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
               <div key={row.tipKey} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
-                  padding: '12px', borderRadius: '10px', background: bg, border: `1px solid ${border}`,
+                  padding: '12px', borderRadius: 'var(--r-md)', background: bg, border: `1px solid ${border}`,
                   opacity: isSaving ? 0.6 : 1,
                 }}>
                   <button
                     onClick={() => save(row.tipKey, { trimis: !row.trimis })}
                     disabled={isSaving}
                     style={{
-                      width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0, cursor: 'pointer',
+                      width: '22px', height: '22px', borderRadius: 'var(--r-sm)', flexShrink: 0, cursor: 'pointer',
                       background: row.trimis ? tint(r, .15) : 'var(--c-1a1a1a)',
                       border: row.trimis ? `1.5px solid ${tint(r, .5)}` : '1.5px solid var(--c-2a2a2a)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -162,16 +162,16 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
                   </button>
 
                   <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: row.trimis ? 'var(--c-777777)' : 'var(--c-dddddd)', textDecoration: row.trimis ? 'line-through' : 'none' }}>
+                    <div style={{ fontSize: 'var(--fs-md)', fontWeight: 500, color: row.trimis ? 'var(--c-777777)' : 'var(--c-dddddd)', textDecoration: row.trimis ? 'line-through' : 'none' }}>
                       {row.label}
                     </div>
                     {row.destinatar && (
-                      <div style={{ fontSize: '11px', color: 'var(--c-777777)', marginTop: '2px' }}>→ {row.destinatar}</div>
+                      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)', marginTop: '2px' }}>→ {row.destinatar}</div>
                     )}
                   </div>
 
                   {!row.trimis && zile !== null && (
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: overdue ? 'var(--accent-red)' : curandRow ? '#F59E0B' : 'var(--c-888888)', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: overdue ? 'var(--danger)' : curandRow ? 'var(--warning)' : 'var(--c-888888)', whiteSpace: 'nowrap' }}>
                       {overdue ? `întârziat ${Math.abs(zile)} zile` : zile === 0 ? 'astăzi' : `în ${zile} zile`}
                     </span>
                   )}
@@ -181,8 +181,8 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
                     defaultValue={row.scadenta ?? ''}
                     onChange={e => save(row.tipKey, { scadenta: e.target.value || null })}
                     style={{
-                      background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '6px',
-                      padding: '6px 10px', fontSize: '13px', color: 'var(--c-cccccc)', outline: 'none',
+                      background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)',
+                      padding: '6px 10px', fontSize: 'var(--fs-md)', color: 'var(--c-cccccc)', outline: 'none',
                     }}
                   />
                 </div>
@@ -193,23 +193,23 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
                   return (
                     <div key={s.id} style={{
                       display: 'flex', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap',
-                      padding: '10px 12px', marginLeft: '34px', borderRadius: '8px',
+                      padding: '10px 12px', marginLeft: '34px', borderRadius: 'var(--r-md)',
                       background: sigur ? 'rgba(74,222,128,.08)' : 'rgba(251,146,60,.08)',
                       border: `1px solid ${sigur ? 'rgba(74,222,128,.3)' : 'rgba(251,146,60,.3)'}`,
                       opacity: busy ? .6 : 1,
                     }}>
                       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: sigur ? 'var(--accent-green)' : '#F59E0B' }}>
+                        <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: sigur ? 'var(--success)' : 'var(--warning)' }}>
                           ✨ {s.tip_sugestie === 'scadenta_override' ? `Mail propune scadență ${fmtData(s.valoare_data)}` : 'Am găsit un mail care pare să confirme trimiterea'}
                         </div>
-                        {s.sursa_rezumat && <div style={{ fontSize: '11px', color: 'var(--c-999999)', marginTop: '3px' }}>{s.sursa_rezumat}</div>}
-                        <div style={{ fontSize: '10px', color: 'var(--c-666666)', marginTop: '3px' }}>
+                        {s.sursa_rezumat && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-999999)', marginTop: '3px' }}>{s.sursa_rezumat}</div>}
+                        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', marginTop: '3px' }}>
                           {s.sursa_subiect}{s.sursa_data ? ` · ${new Date(s.sursa_data).toLocaleDateString('ro-RO')}` : ''}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        <button onClick={() => confirmSugestie(s.id)} disabled={busy} style={{ fontSize: '11px', fontWeight: 700, padding: '6px 10px', borderRadius: '7px', border: 'none', background: 'var(--accent-green)', color: '#08210f', cursor: 'pointer' }}>Confirmă</button>
-                        <button onClick={() => respingeSugestie(s.id)} disabled={busy} style={{ fontSize: '11px', color: 'var(--c-888888)', background: 'transparent', border: '1px solid var(--c-2a2a2a)', borderRadius: '7px', padding: '6px 10px', cursor: 'pointer' }}>Respinge</button>
+                        <button onClick={() => confirmSugestie(s.id)} disabled={busy} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent)', color: '#08210f', cursor: 'pointer' }}>Confirmă</button>
+                        <button onClick={() => respingeSugestie(s.id)} disabled={busy} style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)', background: 'transparent', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer' }}>Respinge</button>
                       </div>
                     </div>
                   )
@@ -221,8 +221,8 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
       </div>
         </div>
       </details>
-      <details style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 18px' }}>
-        <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 650 }}>Documente anterioare</summary>
+      <details style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '14px 18px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650 }}>Documente anterioare</summary>
         <div style={{ display: 'grid', gap: '10px', marginTop: '14px' }}>
           {rows.map(row => <ObligatieDocumente key={row.tipKey} obligatieStareId={row.id} label={row.label}
             destinatar={row.destinatar} sursaInstructiuni={row.sursaInstructiuni} editabilLink={row.editabilLink}

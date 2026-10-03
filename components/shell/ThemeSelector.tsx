@@ -63,7 +63,7 @@ export default function ThemeSelector() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: '2px', padding: '3px', margin: '0 20px 14px', background: 'var(--c-141414)', border: '1px solid var(--border-subtle)', borderRadius: '9px' }}>
+    <div role="group" aria-label="Aspect" style={{ display: 'flex', gap: '2px', padding: '2px', background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-md)' }}>
       {OPTIONS.map(o => (
         <button
           key={o.key}
@@ -73,10 +73,10 @@ export default function ThemeSelector() {
           aria-pressed={pref === o.key}
           style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '6px 0', borderRadius: '6px', border: 'none', cursor: 'pointer',
-            background: pref === o.key ? 'var(--surface-elevated)' : 'transparent',
+            height: '26px', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+            background: pref === o.key ? 'var(--surface)' : 'transparent',
             color: pref === o.key ? 'var(--text-primary)' : 'var(--text-muted)',
-            transition: 'background-color .15s ease, color .15s ease',
+            boxShadow: pref === o.key ? 'var(--shadow-sm)' : undefined,
           }}
         >
           {o.icon}

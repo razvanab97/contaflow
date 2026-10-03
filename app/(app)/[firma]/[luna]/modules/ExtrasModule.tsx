@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import TaskSection, { TaskItem } from './TaskSection'
-import { legibil, tint } from '@/lib/colors'
+import { tint } from '@/lib/colors'
 
 interface Extras { id:string; valuta:string; nr_tranzactii:number; nr_documentate:number }
 interface Firma { id:string; slug:string; nume:string; culoare:string }
@@ -24,10 +24,10 @@ export default function ExtrasModule({ firma, lunaId, tasks, extrase, slug, luna
           {([
             ['Extrase', extrase.length.toString(), firma.culoare],
             ['Tranzacții', totalTx.toString(), 'var(--c-aaaaaa)'],
-            ['Documentate', `${docTx}/${totalTx}`, docTx===totalTx?'var(--accent-green)':firma.culoare],
+            ['Documentate', `${docTx}/${totalTx}`, docTx===totalTx?'var(--success)':firma.culoare],
           ] as [string,string,string][]).map(([label,value,color]) => (
-            <div key={label} style={{ padding:'14px', background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'10px' }}>
-              <div style={{ fontSize:'11px', fontWeight:500, color:'var(--c-777777)', marginBottom:'6px' }}>{label}</div>
+            <div key={label} style={{ padding:'14px', background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'var(--r-md)' }}>
+              <div style={{ fontSize:'var(--fs-xs)', fontWeight:500, color:'var(--c-777777)', marginBottom:'6px' }}>{label}</div>
               <div style={{ fontSize:'18px', fontWeight:700, color, letterSpacing:'-0.4px' }}>{value}</div>
             </div>
           ))}
@@ -36,17 +36,17 @@ export default function ExtrasModule({ firma, lunaId, tasks, extrase, slug, luna
 
       {/* Extras list */}
       {extrase.length > 0 && (
-        <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'12px', overflow:'hidden' }}>
+        <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
           <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--c-1a1a1a)' }}>
-            <div style={{ fontSize:'13px', fontWeight:600, color:'var(--c-e0e0e0)' }}>Extrase procesate</div>
+            <div style={{ fontSize:'var(--fs-md)', fontWeight:600, color:'var(--c-e0e0e0)' }}>Extrase procesate</div>
           </div>
           <div style={{ padding:'12px 20px', display:'flex', flexDirection:'column', gap:'8px' }}>
             {extrase.map(e => (
-              <div key={e.id} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'10px 14px', background:'var(--c-161616)', borderRadius:'8px' }}>
+              <div key={e.id} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'10px 14px', background:'var(--c-161616)', borderRadius:'var(--r-md)' }}>
                 <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:firma.culoare, flexShrink:0 }}/>
-                <span style={{ flex:1, fontSize:'13px', fontWeight:600, color:'var(--c-dddddd)' }}>{e.valuta}</span>
-                <span style={{ fontSize:'12px', color:'var(--c-666666)' }}>{e.nr_tranzactii} tranzacții</span>
-                <span style={{ fontSize:'12px', fontWeight:600, color:e.nr_documentate===e.nr_tranzactii?'var(--accent-green)':firma.culoare }}>
+                <span style={{ flex:1, fontSize:'var(--fs-md)', fontWeight:600, color:'var(--c-dddddd)' }}>{e.valuta}</span>
+                <span style={{ fontSize:'var(--fs-sm)', color:'var(--c-666666)' }}>{e.nr_tranzactii} tranzacții</span>
+                <span style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:e.nr_documentate===e.nr_tranzactii?'var(--success)':firma.culoare }}>
                   {e.nr_documentate}/{e.nr_tranzactii} documentate
                 </span>
               </div>
@@ -58,17 +58,17 @@ export default function ExtrasModule({ firma, lunaId, tasks, extrase, slug, luna
       {/* Link to extras page */}
       <Link href={`/${slug}/${luna}/extras`} style={{
         display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
-        padding:'14px', borderRadius:'12px',
+        padding:'14px', borderRadius:'var(--r-lg)',
         border:`1px solid ${tint(r,.3)}`,
         background:`${tint(r,.05)}`,
-        fontSize:'13px', fontWeight:600, color:legibil(firma.culoare),
+        fontSize:'var(--fs-md)', fontWeight:600, color:'var(--accent)',
       }}>
         <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Gestionează extrasele de cont →
       </Link>
 
       {extrase.length === 0 && (
-        <div style={{ padding:'32px', textAlign:'center', color:'var(--c-888888)', fontSize:'13px' }}>
+        <div style={{ padding:'32px', textAlign:'center', color:'var(--c-888888)', fontSize:'var(--fs-md)' }}>
           Niciun extras încărcat pentru luna aceasta.
         </div>
       )}

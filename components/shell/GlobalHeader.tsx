@@ -1,78 +1,132 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import type { FirmaNav } from '@/components/Sidebar'
+import DocumentSearch from '@/components/DocumentSearch'
+import Icon from '@/components/ui/Icon'
+import { MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
+import { accountingShortLabel } from '@/lib/accounting-period'
 
 interface Props {
   firme: FirmaNav[]
-  firmaAtiva: FirmaNav
+  firmaAtiva?: FirmaNav
   luna: string
   lunaInPath: boolean
+  onMenu: () => void
 }
 
-// Bara globala din capul zonei de continut: comutator de firma, cu prefetch, care pastreaza
-// luna curenta cand exista in URL. Randata o singura data de ShellClient, nu se remonteaza la
-// navigare intre module - doar link-urile se actualizeaza. Nu mai are propriul comutator de
-// luna: fiecare pagina de hub/modul il are deja pe al ei (vezi [luna]/page.tsx, MonthSwitcher),
-// dublarea lui aici doar producea doua selectoare de luna suprapuse pe ecran.
-export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath }: Props) {
+const PAGINI_FIRMA: Record<string, string> = {
+  'furnizori': 'Furnizori',
+  'date-personale': 'Date personale',
+  'model-documente': 'Model documente',
+  'facturi-de-asociat': 'Facturi de asociat',
+  'bonuri': 'Bonuri',
+}
+
+// Bara de sus a zonei de continut, prezenta pe ORICE pagina: meniu (mobil) + breadcrumb
+// contextual (Firma ▾ › Luna › Modul) + cautarea de documente a firmei active. Comutatorul de
+// firma pastreaza pagina curenta cand se poate (aceeasi luna/modul, sau aceeasi pagina de firma),
+// ca schimbarea firmei sa nu te scoata din contextul in care lucrai.
+export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMenu }: Props) {
   const [open, setOpen] = useState(false)
+  const pathname = usePathname()
+  const menuRef = useRef<HTMLDivElement>(null)
+  const parts = pathname.split('/').filter(Boolean)
+
+  useEffect(() => { setOpen(false) }, [pathname])
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [open])
+
+  // Unde duce comutatorul de firma: aceeasi luna (+ acelasi modul, daca noua firma il are),
+  // aceeasi pagina de firma (furnizori etc.), altfel rezumatul lunii curente.
+  function hrefPentruFirma(f: FirmaNav) {
+    if (lunaInPath) return `/${f.slug}/${luna}`
+    const sub = parts[1]
+    if (sub && PAGINI_FIRMA[sub] && sub !== 'bonuri') return `/${f.slug}/${sub}`
+    return `/${f.slug}/${luna}`
+  }
+
+  const modulSeg = lunaInPath ? parts[2] : undefined
+  const modulLabel = modulSeg ? (MODULE_DEFS[modulSeg as ModuleSlug]?.label || PAGINI_FIRMA[modulSeg] || modulSeg) : undefined
+  const paginaFirma = !lunaInPath && parts[1] ? PAGINI_FIRMA[parts[1]] : undefined
 
   return (
-    <header style={{
-      height: '52px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '14px',
-      padding: '0 28px', borderBottom: '1px solid var(--glass-surface-border)',
-      background: 'var(--glass-surface-bg)',
-      backdropFilter: 'var(--glass-surface-blur)', WebkitBackdropFilter: 'var(--glass-surface-blur)',
-    }}>
-      <div style={{ position: 'relative' }}>
-        <button
-          onClick={() => setOpen(o => !o)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
-            background: 'var(--surface-secondary)', border: '1px solid var(--border-strong)', borderRadius: '8px',
-            padding: '6px 10px 6px 12px',
-          }}
-        >
-          <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: firmaAtiva.culoare, flexShrink: 0 }} />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{firmaAtiva.nume.replace(' SRL', '')}</span>
-          <svg width="11" height="11" fill="none" stroke="var(--text-muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ marginLeft: '2px' }}>
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
+    <header className="app-header">
+      <button className="header-menu-btn btn btn-ghost btn-icon" onClick={onMenu} aria-label="Deschide meniul">
+        <Icon name="menu" size={18} />
+      </button>
 
-        {open && (
+      <nav className="crumbs" aria-label="Cale de navigare">
+        {!firmaAtiva ? (
+          <span className="crumb-current">{pathname === '/dashboard' ? 'Dashboard' : 'ContaFlow'}</span>
+        ) : (
           <>
-            <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
-            <div style={{
-              position: 'absolute', top: '38px', left: 0, zIndex: 61, minWidth: '210px',
-              background: 'var(--glass-elevated-bg)', border: '1px solid var(--glass-elevated-border)', borderRadius: '10px',
-              backdropFilter: 'var(--glass-elevated-blur)', WebkitBackdropFilter: 'var(--glass-elevated-blur)',
-              padding: '6px', boxShadow: 'var(--shadow-md)',
-            }}>
-              {firme.map(f => (
-                <Link
-                  key={f.id}
-                  href={lunaInPath ? `/${f.slug}/${luna}` : `/${f.slug}`}
-                  prefetch
-                  onClick={() => setOpen(false)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px',
-                    background: f.slug === firmaAtiva.slug ? 'var(--accent-soft)' : 'transparent',
-                  }}
-                >
-                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: f.culoare, flexShrink: 0 }} />
-                  <span style={{ flex: 1, fontSize: '13px', fontWeight: f.slug === firmaAtiva.slug ? 600 : 500, color: f.slug === firmaAtiva.slug ? 'var(--accent-hover)' : 'var(--text-secondary)' }}>
-                    {f.nume.replace(' SRL', '')}
-                  </span>
-                  <span style={{ fontSize: '11.5px', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: f.pct === 100 ? 'var(--success)' : f.pct > 0 ? 'var(--accent)' : 'var(--text-muted)' }}>{f.pct}%</span>
-                </Link>
-              ))}
+            <div ref={menuRef} style={{ position: 'relative', minWidth: 0 }}>
+              <button
+                onClick={() => setOpen(o => !o)}
+                aria-haspopup="menu"
+                aria-expanded={open}
+                className="btn btn-ghost"
+                style={{ height: '32px', padding: '0 8px', gap: '8px', color: 'var(--text-primary)', fontWeight: 600, maxWidth: '100%' }}
+              >
+                <span className="dot" style={{ background: firmaAtiva.culoare }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{firmaAtiva.nume.replace(' SRL', '')}</span>
+                <Icon name="chevronDown" size={14} style={{ color: 'var(--text-muted)' }} />
+              </button>
+
+              {open && (
+                <div className="menu popover-in" role="menu" style={{ top: '38px', left: 0, minWidth: '240px' }}>
+                  <div className="eyebrow" style={{ padding: '6px 10px 4px' }}>Schimbă firma</div>
+                  {firme.map(f => {
+                    const active = f.slug === firmaAtiva.slug
+                    return (
+                      <Link
+                        key={f.id}
+                        href={hrefPentruFirma(f)}
+                        prefetch
+                        role="menuitem"
+                        onClick={() => setOpen(false)}
+                        className={`menu-item${active ? ' is-active' : ''}`}
+                      >
+                        <span className="dot" style={{ background: f.culoare }} />
+                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nume.replace(' SRL', '')}</span>
+                        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: f.pct === 100 ? 'var(--success)' : f.pct > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{f.pct}%</span>
+                        {active && <Icon name="check" size={14} style={{ color: 'var(--accent)' }} />}
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
             </div>
+
+            {lunaInPath && (
+              <>
+                <Icon name="chevronRight" size={14} className="crumb-sep hide-mobile" />
+                {modulLabel ? (
+                  <Link href={`/${firmaAtiva.slug}/${luna}`} className="crumb-link hide-mobile">{accountingShortLabel(luna)}</Link>
+                ) : (
+                  <span className="crumb-current hide-mobile">{accountingShortLabel(luna)}</span>
+                )}
+              </>
+            )}
+            {(modulLabel || paginaFirma) && (
+              <>
+                <Icon name="chevronRight" size={14} className="crumb-sep" />
+                <span className="crumb-current">{modulLabel || paginaFirma}</span>
+              </>
+            )}
           </>
         )}
-      </div>
+      </nav>
 
+      {firmaAtiva && <DocumentSearch firmaId={firmaAtiva.id} culoare={firmaAtiva.culoare} />}
     </header>
   )
 }

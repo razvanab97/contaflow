@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { ModuleDef } from '@/lib/firma-config'
+import Icon, { MODULE_ICONS } from '@/components/ui/Icon'
 
 interface FirmaInfo { id: string; slug: string; nume: string; culoare: string }
 interface Props {
@@ -123,28 +124,29 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
   return (
     <div>
       {/* Toolbar */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px' }}>
-        <span style={{ fontSize:'12px', fontWeight:700, color: reordering ? 'var(--accent)' : 'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.08em', transition:'color .15s' }}>
-          {reordering ? 'Trage sau folosește săgețile' : 'Module lunare'}
-        </span>
+      <div className="section-title">
+        <h2 style={{ color: reordering ? 'var(--accent)' : undefined }}>
+          {reordering ? 'Trage rândurile sau folosește săgețile' : 'Module lunare'}
+        </h2>
         <div style={{ display:'flex', gap:'6px' }}>
           {reordering && (
-            <button onClick={resetOrder} style={{ fontSize:'12.5px', fontWeight:550, padding:'5px 11px', borderRadius:'7px', border:'1px solid var(--border-strong)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer' }}>
+            <button onClick={resetOrder} className="btn btn-sm btn-ghost">
               Reset ordine
             </button>
           )}
           <button
             onClick={() => setReordering(v => !v)}
-            style={{ fontSize:'12.5px', fontWeight:600, padding:'5px 13px', borderRadius:'7px', border: reordering ? '1px solid var(--accent)' : '1px solid var(--border-strong)', background: reordering ? 'var(--accent-soft)' : 'transparent', color: reordering ? 'var(--accent)' : 'var(--text-secondary)', cursor:'pointer', transition:'all .15s' }}
+            className={`btn btn-sm${reordering ? ' btn-primary' : ''}`}
+            aria-pressed={reordering}
           >
-            {reordering ? '✓ Gata' : '⠿ Setează ordinea'}
+            {reordering ? <><Icon name="check" size={14} /> Gata</> : <><Icon name="grip" size={14} /> Setează ordinea</>}
           </button>
         </div>
       </div>
 
       {/* REORDER MODE — list */}
       {reordering && (
-        <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+        <div className="module-list">
           {sorted.map((mod, idx) => {
             const modTasks = mod.tasks
             const modDone = modTasks.filter(t => taskMap[t.key]).length
@@ -153,34 +155,29 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
             return (
               <div
                 key={mod.slug}
-                className={isOver ? '' : 'module-row'}
+                className="module-item"
                 draggable
                 onDragStart={() => onDragStart(idx)}
                 onDragOver={e => onDragOver(e, idx)}
                 onDrop={onDrop}
                 onDragEnd={() => { dragIdx.current = null; setDragOver(null) }}
                 style={{
-                  display:'flex', alignItems:'center', gap:'12px',
-                  padding:'12px 16px',
-                  ...(isOver ? { background: 'var(--accent-soft)', border: '1px solid var(--accent)' } : {}),
-                  borderRadius:'10px',
-                  cursor:'grab',
-                  transition:'background .1s, border-color .1s',
-                  userSelect:'none',
+                  cursor:'grab', userSelect:'none', flexWrap:'nowrap',
+                  ...(isOver ? { background: 'var(--accent-soft)', boxShadow: 'inset 0 0 0 1px var(--accent)' } : {}),
                 }}
               >
-                <div style={{ color:'var(--text-muted)', fontSize:'16px', lineHeight:1, flexShrink:0, cursor:'grab' }}>⠿</div>
-                <div style={{ width:'20px', fontSize:'11.5px', fontWeight:700, color:'var(--text-muted)', flexShrink:0, textAlign:'center' }}>
+                <span style={{ color:'var(--text-muted)', display:'inline-flex', flexShrink:0 }}><Icon name="grip" /></span>
+                <span style={{ width:'20px', fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--text-muted)', flexShrink:0, textAlign:'center' }}>
                   {idx + 1}
+                </span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:'var(--fs-base)', fontWeight:600, color:'var(--text-primary)' }}>{mod.label}</div>
+                  <div style={{ fontSize:'var(--fs-sm)', color:'var(--text-secondary)', marginTop:'1px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{mod.description}</div>
                 </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:'14px', fontWeight:600, color:'var(--text-primary)' }}>{mod.label}</div>
-                  <div style={{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'1px' }}>{mod.description}</div>
-                </div>
-                <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: isComplete ? 'var(--success)' : modDone > 0 ? 'var(--warning)' : 'var(--border-strong)' }}/>
-                <div style={{ display:'flex', flexDirection:'column', gap:'2px', flexShrink:0 }}>
-                  <button onClick={() => moveUp(idx)} disabled={idx === 0} style={{ width:'22px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center', background:'transparent', border:'1px solid var(--border-strong)', borderRadius:'4px', cursor: idx===0?'not-allowed':'pointer', color: idx===0?'var(--border-strong)':'var(--text-secondary)', fontSize:'10px' }}>▲</button>
-                  <button onClick={() => moveDown(idx)} disabled={idx === sorted.length-1} style={{ width:'22px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center', background:'transparent', border:'1px solid var(--border-strong)', borderRadius:'4px', cursor: idx===sorted.length-1?'not-allowed':'pointer', color: idx===sorted.length-1?'var(--border-strong)':'var(--text-secondary)', fontSize:'10px' }}>▼</button>
+                <span className="dot" style={{ background: isComplete ? 'var(--success)' : modDone > 0 ? 'var(--warning)' : 'var(--border-strong)' }}/>
+                <div style={{ display:'flex', gap:'4px', flexShrink:0 }}>
+                  <button onClick={() => moveUp(idx)} disabled={idx === 0} aria-label={`Mută ${mod.label} mai sus`} className="btn btn-sm btn-icon" style={{ opacity: idx===0 ? .4 : 1 }}><Icon name="chevronLeft" size={14} style={{ transform:'rotate(90deg)' }} /></button>
+                  <button onClick={() => moveDown(idx)} disabled={idx === sorted.length-1} aria-label={`Mută ${mod.label} mai jos`} className="btn btn-sm btn-icon" style={{ opacity: idx===sorted.length-1 ? .4 : 1 }}><Icon name="chevronRight" size={14} style={{ transform:'rotate(90deg)' }} /></button>
                 </div>
               </div>
             )
@@ -188,9 +185,9 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
         </div>
       )}
 
-      {/* NORMAL MODE — compact rows */}
+      {/* NORMAL MODE — lista compacta */}
       {!reordering && (
-        <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+        <div className="module-list">
           {sorted.map(mod => {
             const modTasks = mod.tasks
             const modDone = modTasks.filter(t => taskMap[t.key]).length
@@ -201,13 +198,12 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
             const isDeactivated = dezactivate.includes(mod.slug)
 
             const statusLabel = isDeactivated ? 'Dezactivat' : isComplete ? 'Gata' : isStarted ? 'În lucru' : 'Neînceput'
-            const statusStyle = isDeactivated
-              ? { bg:'var(--surface-secondary)', c:'var(--text-muted)', border:'var(--border)' }
-              : isComplete
-              ? { bg:'var(--success-soft)', c:'var(--success)', border:'color-mix(in srgb, var(--success) 40%, transparent)' }
-              : isStarted
-              ? { bg:'var(--warning-soft)', c:'var(--warning)', border:'color-mix(in srgb, var(--warning) 40%, transparent)' }
-              : { bg:'var(--surface-secondary)', c:'var(--text-muted)', border:'var(--border)' }
+            const statusClass = isDeactivated ? 'badge' : isComplete ? 'badge badge-success' : isStarted ? 'badge badge-warning' : 'badge'
+            const iconTone = isDeactivated
+              ? { bg: 'var(--surface-secondary)', c: 'var(--text-muted)' }
+              : isComplete ? { bg: 'var(--success-soft)', c: 'var(--success)' }
+              : isStarted ? { bg: 'var(--warning-soft)', c: 'var(--warning)' }
+              : { bg: 'var(--surface-secondary)', c: 'var(--text-secondary)' }
 
             const href = mod.linkDirect
               ? `/${slug}/${luna}/${mod.linkDirect}`
@@ -219,84 +215,73 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
             return (
               <div
                 key={mod.slug}
-                className="module-row"
+                className={`module-item${isDeactivated ? ' is-off' : ''}`}
                 onClick={() => router.push(href)}
-                style={{
-                  borderRadius:'12px',
-                  padding:'12px 16px', cursor:'pointer',
-                  display:'flex', flexDirection:'column', gap:'8px',
-                  opacity: isDeactivated ? .5 : 1,
-                }}
               >
-                <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                  <div style={{ width:'6px', height:'6px', borderRadius:'50%', flexShrink:0, background: isComplete ? 'var(--success)' : isStarted ? 'var(--warning)' : 'var(--border-strong)' }}/>
-                  <span style={{ fontSize:'14px', fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.1px', flexShrink:0 }}>{mod.label}</span>
-                  <span style={{ fontSize:'13px', fontWeight:450, color:'var(--text-secondary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, minWidth:0 }}>{mod.description}</span>
-                  <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
-                    <span style={{ fontSize:'11.5px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', background:statusStyle.bg, color:statusStyle.c, border:`1px solid ${statusStyle.border}` }}>
-                      {statusLabel}
-                    </span>
+                <div style={{ width:'34px', height:'34px', borderRadius:'var(--r-md)', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', background: iconTone.bg, color: iconTone.c }}>
+                  {isComplete && !isDeactivated ? <Icon name="check" strokeWidth={2.25} /> : <Icon name={MODULE_ICONS[mod.slug] || 'fileText'} />}
+                </div>
+
+                <div style={{ flex:'1 1 260px', minWidth:0 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
+                    <Link href={href} onClick={e => e.stopPropagation()} style={{ fontSize:'var(--fs-base)', fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.01em' }}>
+                      {mod.label}
+                    </Link>
+                    <span className={statusClass}>{statusLabel}</span>
                     {mod.slug === 'facturi-restante' && !!restanteCount && (
-                      <span style={{ fontSize:'11.5px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', background:'var(--danger-soft)', color:'var(--danger)', border:'1px solid color-mix(in srgb, var(--danger) 40%, transparent)' }}>
-                        {restanteCount} neachitate
+                      <span className="badge badge-danger">{restanteCount} neachitate</span>
+                    )}
+                    {modTotal > 0 && (
+                      <span style={{ display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'var(--fs-xs)', color:'var(--text-muted)' }}>
+                        <span className={`progress${isComplete ? ' is-done' : ''}`} style={{ display:'inline-block', width:'40px', height:'3px' }}><span style={{ width:`${modPct}%` }}/></span>
+                        {modDone}/{modTotal}
                       </span>
                     )}
                   </div>
+                  <div style={{ fontSize:'var(--fs-sm)', color:'var(--text-secondary)', marginTop:'2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{mod.description}</div>
+                  {modTotal > 0 && (
+                    <div className="task-chips">
+                      {modTasks.map(t => (
+                        <span key={t.key} className={`task-chip${taskMap[t.key] ? ' is-done' : ''}`}>
+                          {taskMap[t.key] ? (
+                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }} aria-label="bifat"><path d="M2 6l3 3 5-5" stroke="var(--success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          ) : (
+                            <span style={{ width:'9px', height:'9px', borderRadius:'50%', border:'1.5px solid var(--border-strong)', flexShrink:0 }}/>
+                          )}
+                          {t.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div style={{ display:'flex', alignItems:'center', gap:'14px', flexWrap:'wrap' }}>
-                  {modTotal > 0 && (
-                    <>
-                      <span style={{ fontSize:'11.5px', fontWeight:500, color:'var(--text-muted)', flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{modDone}/{modTotal}</span>
-                      <div style={{ width:'44px', height:'3px', background:'var(--border)', borderRadius:'2px', flexShrink:0 }}>
-                        <div style={{ height:'3px', borderRadius:'2px', background: isComplete ? 'var(--success)' : 'var(--accent)', width:`${modPct}%` }}/>
-                      </div>
-                      <div style={{ display:'flex', gap:'12px', flexWrap:'wrap' }}>
-                        {modTasks.map(t => (
-                          <div key={t.key} style={{ display:'flex', alignItems:'center', gap:'5px' }}>
-                            {taskMap[t.key] ? (
-                              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}><path d="M2 6l3 3 5-5" stroke="var(--success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            ) : (
-                              <div style={{ width:'9px', height:'9px', borderRadius:'50%', border:'1.5px solid var(--border-strong)', flexShrink:0 }}/>
-                            )}
-                            <span style={{ fontSize:'12px', fontWeight:500, color: taskMap[t.key] ? 'var(--text-muted)' : 'var(--text-secondary)', textDecoration: taskMap[t.key] ? 'line-through' : 'none' }}>
-                              {t.label}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  <div style={{ display:'flex', alignItems:'center', gap:'10px', marginLeft:'auto', flexShrink:0 }}>
-                    <button
-                      onClick={e => toggleModul(e, mod.slug, !isDeactivated)}
-                      disabled={isToggling}
-                      title={isDeactivated ? 'Reactivează modulul' : 'Nu am acest modul luna asta'}
-                      style={{ fontSize:'11.5px', fontWeight:550, padding:'3px 9px', borderRadius:'20px', border:'1px solid var(--border)', background:'transparent', color:'var(--text-muted)', cursor: isToggling ? 'wait' : 'pointer', opacity: isToggling ? .5 : 1 }}
-                    >
-                      {isDeactivated ? '↺ Activează' : '⊘ Nu am' }
-                    </button>
-                    <button
-                      onClick={e => downloadSectionPdf(e, mod.slug, mod.label)}
-                      disabled={isBusy}
-                      style={{
-                        fontSize:'12.5px', fontWeight:600, padding:'4px 10px', borderRadius:'7px',
-                        border:'1px solid var(--border-strong)', background: 'var(--surface-secondary)',
-                        color: 'var(--text-secondary)', cursor: isBusy ? 'wait' : 'pointer',
-                        opacity: isBusy ? .6 : 1,
-                      }}
-                    >
-                      {isBusy ? '...' : '↓ PDF'}
-                    </button>
-                    <Link
-                      href={href}
-                      onClick={e => e.stopPropagation()}
-                      className="link-accent"
-                      style={{ fontSize:'12.5px', fontWeight:600, color:'var(--accent)', whiteSpace:'nowrap' }}
-                    >
-                      Deschide →
-                    </Link>
-                  </div>
+                <div className="module-item-actions">
+                  <button
+                    onClick={e => toggleModul(e, mod.slug, !isDeactivated)}
+                    disabled={isToggling}
+                    title={isDeactivated ? 'Reactivează modulul' : 'Nu am acest modul luna asta'}
+                    className={`btn btn-sm btn-ghost${isDeactivated ? '' : ' reveal-on-hover'}`}
+                    style={{ cursor: isToggling ? 'wait' : undefined, opacity: isToggling ? .5 : undefined }}
+                  >
+                    {isDeactivated ? <><Icon name="undo" size={14} /> Activează</> : <><Icon name="ban" size={14} /> Nu am</>}
+                  </button>
+                  <button
+                    onClick={e => downloadSectionPdf(e, mod.slug, mod.label)}
+                    disabled={isBusy}
+                    title={`Descarcă PDF cu documentele din ${mod.label}`}
+                    className="btn btn-sm"
+                    style={{ cursor: isBusy ? 'wait' : undefined, opacity: isBusy ? .6 : 1 }}
+                  >
+                    <Icon name="download" size={14} /> {isBusy ? '…' : 'PDF'}
+                  </button>
+                  <Link
+                    href={href}
+                    onClick={e => e.stopPropagation()}
+                    className="btn btn-sm btn-ghost grow-mobile"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    Deschide <Icon name="chevronRight" size={14} />
+                  </Link>
                 </div>
               </div>
             )

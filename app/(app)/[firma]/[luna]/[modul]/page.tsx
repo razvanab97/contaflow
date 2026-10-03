@@ -1,11 +1,13 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
+import PageHeader from '@/components/ui/PageHeader'
+import MonthNav from '@/components/ui/MonthNav'
 import nextDynamic from 'next/dynamic'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getActiveFirme, getLuniContabile } from '@/lib/queries'
 import { getFirmaConfig, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
-import { accountingFullLabel, accountingPeriodLabel, accountingWorkLabel } from '@/lib/accounting-period'
+import { accountingFullLabel } from '@/lib/accounting-period'
 import NextStepNav from '../NextStepNav'
+import InitLuna from '../InitLuna'
 
 // Fiecare modul e incarcat lazy (chunk separat) - pagina afiseaza mereu un singur modul, dar
 // fara asta toate cele 13 componente (unele mari, ex. EmagModule ~600 linii) ajungeau in bundle-ul
@@ -47,7 +49,8 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   if (!firma) notFound()
 
   const lunaData = luni.find((l: any) => l.firma_id === firma.id && l.luna?.startsWith(luna))
-  if (!lunaData) notFound()
+  // Luna neinitializata (ex. ajuns aici din comutatorul de luna): ecranul de start al lunii, nu 404.
+  if (!lunaData) return <main className="page" style={{ display: 'flex', flexDirection: 'column' }}><InitLuna firma={firma} luna={luna} /></main>
 
   const [taskStariRaw, extrase, checklistItemsRaw, impoziteStari, proprietariRaw, moduleStariRaw] = await Promise.all([
     dbSelect('task_stari', { eq: { luna_id: lunaData.id }, select: 'task_key,completat' }),
@@ -69,8 +72,6 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   const tasks = [...modulDef.tasks, ...extraTaskDefs].map(t => ({ ...t, completat: taskMap[t.key] ?? false }))
 
   const ll = accountingFullLabel(luna)
-  const periodLabel = accountingPeriodLabel(luna)
-  const workLabel = accountingWorkLabel(luna)
 
   const firmaForModule = {
     id: firma.id, slug: firma.slug, nume: firma.nume, culoare: firma.culoare,
@@ -146,7 +147,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'impozite':
         return <ImpoziteModule firma={firmaForModule} lunaId={lunaData.id} luna={luna} tasks={modulDef.tasks} stari={impoziteStari}/>
       case 'raport-lunar-proiect':
-        return <div style={{display:'grid',gap:20}}><ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} initialForm /><details><summary style={{cursor:'pointer',fontSize:13}}>Editor și document anterior (istoric)</summary><RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/></details></div>
+        return <div style={{display:'grid',gap:20}}><ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} initialForm /><details className="card card-pad"><summary style={{fontSize:'var(--fs-md)',fontWeight:600,color:'var(--text-secondary)'}}>Editor și document anterior (istoric)</summary><RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/></details></div>
       case 'obligatii-recurente':
         return <ObligatiiModule firma={firmaForModule} lunaId={lunaData.id} luna={luna}/>
       case 'achizitii':
@@ -157,26 +158,16 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   }
 
   return (
-    <main style={{ flex:1, padding:'44px 52px', maxWidth: modulSlug === 'raport-lunar-proiect' ? '1500px' : '1300px' }}>
-      {/* Header - ReportWorkspace isi construieste propriul header (breadcrumb + titlu + schimbator
-          de luna), ca sa nu aparem cu doua titluri suprapuse pentru documentul-workspace */}
-      {modulSlug !== 'raport-lunar-proiect' && (
-      <div style={{ marginBottom:'32px' }}>
-        <Link href={`/${slug}/${luna}`} style={{ display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'var(--c-888888)', marginBottom:'16px' }}>
-          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          {firma.nume.replace(' SRL','')} · Contabilitate {periodLabel} ({workLabel})
-        </Link>
-        <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
-          <div style={{ width:'10px', height:'10px', borderRadius:'50%', background:firma.culoare, flexShrink:0 }}/>
-          <h1 style={{ fontSize:'24px', fontWeight:700, color:'var(--c-ffffff)', letterSpacing:'-0.5px' }}>
-            {modulDef.label}
-          </h1>
-        </div>
-        <p style={{ fontSize:'14px', fontWeight:500, color:'var(--c-888888)', marginTop:'6px', marginLeft:'22px' }}>
-          {modulDef.description}
-        </p>
-      </div>
-      )}
+    <main className={`page animate-in${modulSlug === 'raport-lunar-proiect' ? ' page-wide' : ''}`}>
+      {/* Antet comun pentru toate modulele. La raport-lunar-proiect, editorul vechi (ReportWorkspace,
+          cu propriul antet) e acum pliat in "istoric", deci pagina are nevoie de acest titlu. */}
+      <PageHeader
+        back={{ href: `/${slug}/${luna}`, label: 'Rezumatul lunii' }}
+        culoare={firma.culoare}
+        title={modulDef.label}
+        description={modulDef.description}
+        actions={<MonthNav slug={slug} luna={luna} suffix={`/${modulSlug}`} />}
+      />
 
       {/* Module content */}
       {renderModule()}

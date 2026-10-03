@@ -17,28 +17,22 @@ export default function LunaSummary({ lunaId, culoare }: { lunaId: string; culoa
 
   if (!summary) return null
 
+  // Tile-uri in grila .stat-grid a parintelui (hub) - "Concluzia lunară" din extrasele bancare.
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'10px' }}>
-      <div style={{ fontSize:'12px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.08em' }}>
-        Concluzia lunară
-      </div>
-      <div style={{ display:'flex', gap:'24px', flexWrap:'wrap', justifyContent:'center' }}>
-        {([
-          ['Încasări', summary.bankReceipts, 'var(--success)'],
-          ['Plăți', summary.bankPayments, 'var(--danger)'],
-          ['Cashflow', summary.bankCashflow, summary.bankCashflow >= 0 ? 'var(--success)' : 'var(--danger)'],
-          ['Cost net eMAG', summary.emagNetCost, 'var(--accent)'],
-        ] as [string, number, string][]).map(([label, value, color]) => (
-          <div key={label} style={{ textAlign:'center' }}>
-            <div style={{ fontSize:'20px', fontWeight:700, color, letterSpacing:'-0.5px', lineHeight:1, fontVariantNumeric:'tabular-nums' }}>
-              {money(value as number)}
-            </div>
-            <div style={{ fontSize:'12px', fontWeight:600, color:'var(--text-secondary)', marginTop:'4px', textTransform:'uppercase', letterSpacing:'.08em' }}>
-              {label}
-            </div>
+    <>
+      {([
+        ['Încasări', summary.bankReceipts, 'var(--success)'],
+        ['Plăți', summary.bankPayments, 'var(--danger)'],
+        ['Cashflow', summary.bankCashflow, summary.bankCashflow >= 0 ? 'var(--success)' : 'var(--danger)'],
+        ['Cost net eMAG', summary.emagNetCost, 'var(--text-primary)'],
+      ] as [string, number, string][]).map(([label, value, color]) => (
+        <div key={label} className="stat animate-in" title="Concluzia lunară, din extrasele bancare">
+          <div className="stat-label">{label}</div>
+          <div className="stat-value" style={{ color, fontSize: 'var(--fs-lg)' }} title={money(value as number)}>
+            {money(value as number)}
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+      ))}
+    </>
   )
 }

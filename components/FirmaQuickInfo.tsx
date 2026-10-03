@@ -26,9 +26,9 @@ const FIELDS: { key: 'cui' | 'nrRegCom' | 'adresa' | 'judet' | 'tara'; label: st
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <span title={label} style={{ width: '96px', flexShrink: 0, fontSize: '11px', color: 'var(--c-777777)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-      <span title={value} style={{ flex: 1, minWidth: 0, fontSize: '12px', color: value ? 'var(--c-cccccc)' : 'var(--c-555555)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '—'}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '28px' }}>
+      <span title={label} style={{ width: '104px', flexShrink: 0, fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <span title={value} style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-md)', color: value ? 'var(--text-primary)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '—'}</span>
       {value && <CopyButton value={value} />}
     </div>
   )
@@ -39,18 +39,18 @@ export default function FirmaQuickInfo({ cui, nrRegCom, adresa, judet, tara, pro
 
   return (
     <div>
-      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--c-888888)', marginBottom: '10px' }}>
+      <div className="eyebrow" style={{ marginBottom: '8px' }}>
         Date firmă
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-1e1e1e)', borderRadius: '8px', padding: '12px 14px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'var(--surface-sunken)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-md)', padding: '8px 8px 8px 12px' }}>
         {FIELDS.map(({ key, label }) => (
           <Row key={key} label={label} value={values[key] || ''} />
         ))}
 
         {proprietari.length > 0 && (
           <>
-            <div style={{ height: '1px', background: 'var(--c-1e1e1e)', margin: '3px 0' }} />
+            <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
             {proprietari.map(p => (
               <Row key={p.id} label={p.nume} value={`${p.serie_ci ?? ''} ${p.numar_ci ?? ''}`.trim()} />
             ))}

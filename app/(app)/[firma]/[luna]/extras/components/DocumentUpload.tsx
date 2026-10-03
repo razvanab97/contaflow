@@ -89,10 +89,10 @@ export default function DocumentUpload({ mode, txId, firmaId, lunaId, tip, furni
   if (cameraOpen) {
     return (
       <div style={{ display:'flex', flexDirection:'column', gap:'10px', alignItems:'center' }}>
-        <video ref={videoRef} autoPlay playsInline style={{ width:'100%', maxHeight:'50vh', borderRadius:'10px', background:'#000' }} />
+        <video ref={videoRef} autoPlay playsInline style={{ width:'100%', maxHeight:'50vh', borderRadius:'var(--r-md)', background:'#000' }} />
         <div style={{ display:'flex', gap:'10px' }}>
-          <button onClick={capturePhoto} style={{ fontSize:'13px', fontWeight:600, padding:'8px 16px', borderRadius:'7px', border:'none', background:culoare, color:'#fff', cursor:'pointer' }}>Capturează</button>
-          <button onClick={closeCamera} style={{ fontSize:'13px', fontWeight:600, padding:'8px 16px', borderRadius:'7px', border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer' }}>Anulează</button>
+          <button onClick={capturePhoto} style={{ fontSize:'var(--fs-md)', fontWeight:600, padding:'8px 16px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer' }}>Capturează</button>
+          <button onClick={closeCamera} style={{ fontSize:'var(--fs-md)', fontWeight:600, padding:'8px 16px', borderRadius:'var(--r-sm)', border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer' }}>Anulează</button>
         </div>
       </div>
     )
@@ -106,20 +106,20 @@ export default function DocumentUpload({ mode, txId, firmaId, lunaId, tip, furni
         onDragLeave={() => setDrag(false)}
         onDrop={e => { e.preventDefault(); setDrag(false); e.dataTransfer.files.length && upload(e.dataTransfer.files) }}
         style={{
-          border:`1.5px dashed ${drag ? culoare : 'var(--border)'}`, borderRadius:'10px',
+          border:`1.5px dashed ${drag ? culoare : 'var(--border)'}`, borderRadius:'var(--r-md)',
           padding: compact ? '14px' : '24px', textAlign:'center', cursor:'pointer',
           background: drag ? tint(r,.06) : 'var(--surface-secondary)', transition:'all .15s',
         }}
       >
         {uploading ? (
-          <p style={{ fontSize:'12px', color:'var(--text-muted)' }}>Se încarcă...</p>
+          <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-muted)' }}>Se încarcă...</p>
         ) : compact ? (
-          <p style={{ fontSize:'12px', fontWeight:600, color:'var(--text-secondary)' }}>sau adaugă fișiere</p>
+          <p style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--text-secondary)' }}>sau adaugă fișiere</p>
         ) : (
           <div>
             <svg width="18" height="18" fill="none" stroke={culoare} strokeWidth="2.5" viewBox="0 0 24 24" style={{ margin:'0 auto 8px' }}><path d="M12 4v16m8-8H4"/></svg>
-            <p style={{ fontSize:'12px', fontWeight:600, color:'var(--text-secondary)', marginBottom:'4px' }}>Încarcă document (PDF / JPG / PNG)</p>
-            <p style={{ fontSize:'10px', color:'var(--text-muted)' }}>drag &amp; drop sau click — poți selecta mai multe fișiere</p>
+            <p style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--text-secondary)', marginBottom:'4px' }}>Încarcă document (PDF / JPG / PNG)</p>
+            <p style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)' }}>drag &amp; drop sau click — poți selecta mai multe fișiere</p>
           </div>
         )}
       </div>
@@ -127,12 +127,12 @@ export default function DocumentUpload({ mode, txId, firmaId, lunaId, tip, furni
         style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }}
         onChange={e => { if (e.target.files?.length) upload(e.target.files); e.target.value = '' }} />
       {!uploading && (
-        <button onClick={openCamera} style={{ marginTop:'8px', fontSize:'11px', fontWeight:600, padding:'7px 12px', borderRadius:'7px', border:'1px solid var(--border)', background:'var(--surface-secondary)', color:'var(--text-secondary)', cursor:'pointer', width:'100%' }}>
+        <button onClick={openCamera} style={{ marginTop:'8px', fontSize:'var(--fs-xs)', fontWeight:600, padding:'7px 12px', borderRadius:'var(--r-sm)', border:'1px solid var(--border)', background:'var(--surface-secondary)', color:'var(--text-secondary)', cursor:'pointer', width:'100%' }}>
           📷 Fotografiază document (camera laptop)
         </button>
       )}
-      {cameraError && <p style={{ fontSize:'11px', color:'var(--danger)', marginTop:'8px' }}>{cameraError}</p>}
-      {error && <p style={{ fontSize:'11px', color:'var(--danger)', marginTop:'8px' }}>{error}</p>}
+      {cameraError && <p style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', marginTop:'8px' }}>{cameraError}</p>}
+      {error && <p style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', marginTop:'8px' }}>{error}</p>}
     </div>
   )
 }

@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { tint } from '@/lib/colors'
 
 export interface TaskItem {
   key: string
@@ -53,55 +52,58 @@ export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: P
 
   const done = items.filter(t => t.completat).length
   const total = items.length
-  const r = parseInt(culoare.slice(1,3),16) + ',' + parseInt(culoare.slice(3,5),16) + ',' + parseInt(culoare.slice(5,7),16)
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
 
+  // Checklist-ul modulului: bife mari (tinta usoara pe mobil), progres vizibil, stare "complet"
+  // integrata in antet in loc de un bloc separat sub lista.
   return (
-    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px', marginBottom: '20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em' }}>
-          Task-uri modul
-        </span>
-        <span style={{ fontSize: '12px', fontWeight: 600, color: done === total ? 'var(--accent-mint)' : culoare }}>
-          {done}/{total}
+    <div className="card" style={{ padding: '16px 16px 10px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+        <span className="eyebrow" style={{ flexShrink: 0 }}>Task-uri modul</span>
+        <div className={`progress${done === total ? ' is-done' : ''}`} style={{ flex: 1, maxWidth: '160px' }}><span style={{ width: `${pct}%` }} /></div>
+        <span style={{ marginLeft: 'auto', flexShrink: 0 }} className={done === total ? 'badge badge-success' : 'badge'}>
+          {done === total ? `✓ Modul complet · ${done}/${total}` : `${done}/${total}`}
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div role="list" style={{ display: 'flex', flexDirection: 'column' }}>
         {items.map(task => (
           <button
             key={task.key}
+            role="listitem"
+            aria-pressed={task.completat}
             onClick={() => toggle(task.key)}
             disabled={loading === task.key}
             style={{
               display: 'flex', alignItems: 'flex-start', gap: '12px',
-              background: 'transparent', border: 'none', cursor: 'pointer',
-              padding: '6px 0', textAlign: 'left', width: '100%',
+              background: 'transparent', border: 'none',
+              padding: '8px 8px', margin: '0 -8px', borderRadius: 'var(--r-md)', textAlign: 'left', width: 'calc(100% + 16px)',
               opacity: loading === task.key ? 0.5 : 1,
             }}
           >
             <div style={{
-              width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
-              background: task.completat ? tint(r, .12) : 'var(--c-1a1a1a)',
-              border: task.completat ? `1.5px solid ${tint(r, .4)}` : '1.5px solid var(--c-2a2a2a)',
+              width: '18px', height: '18px', borderRadius: 'var(--r-xs)', flexShrink: 0, marginTop: '1px',
+              background: task.completat ? 'var(--success)' : 'var(--surface)',
+              border: task.completat ? '1.5px solid var(--success)' : '1.5px solid var(--border-hover)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all .15s',
+              transition: 'background-color .15s, border-color .15s',
             }}>
               {task.completat && (
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                  <path d="M2 6l3 3 5-5" stroke={culoare} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <path d="M2 6l3 3 5-5" stroke="var(--surface)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               )}
             </div>
             <div style={{ minWidth: 0 }}>
               <span style={{
-                fontSize: '13px', fontWeight: 500,
-                color: task.completat ? 'var(--c-777777)' : 'var(--c-cccccc)',
+                fontSize: 'var(--fs-md)', fontWeight: 500,
+                color: task.completat ? 'var(--text-muted)' : 'var(--text-primary)',
                 textDecoration: task.completat ? 'line-through' : 'none',
               }}>
                 {task.label}
               </span>
               {task.descriere && (
-                <div style={{ fontSize: '11px', color: 'var(--c-666666)', marginTop: '2px', lineHeight: 1.4 }}>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.45 }}>
                   {task.descriere}
                 </div>
               )}
@@ -109,12 +111,6 @@ export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: P
           </button>
         ))}
       </div>
-
-      {done === total && (
-        <div style={{ marginTop: '14px', padding: '8px 12px', background: 'light-dark(rgba(5,150,105,.125), rgba(110,231,176,.05))', borderRadius: '8px', border: '1px solid light-dark(rgba(5,150,105,.3), rgba(110,231,176,.12))' }}>
-          <span style={{ fontSize: '12px', color: 'var(--accent-mint)', fontWeight: 500 }}>✓ Modul complet</span>
-        </div>
-      )}
     </div>
   )
 }

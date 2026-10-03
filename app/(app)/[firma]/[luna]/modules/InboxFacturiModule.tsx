@@ -541,43 +541,43 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
           const job = latestJobFor(source?.id)
           const jobRunning = (job?.status === 'queued' || job?.status === 'running') && !isJobStale(job)
           return (
-          <div key={sourceDef.key} style={{ background:'var(--c-111111)', border:`1px solid ${active ? 'rgba(74,222,128,.25)' : 'var(--c-222222)'}`, borderRadius:'12px', padding:'14px 16px' }}>
+          <div key={sourceDef.key} style={{ background:'var(--c-111111)', border:`1px solid ${active ? 'rgba(74,222,128,.25)' : 'var(--c-222222)'}`, borderRadius:'var(--r-lg)', padding:'14px 16px' }}>
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
               <div>
-                <div style={{ fontSize:'13px', fontWeight:700, color:'var(--c-eeeeee)', marginBottom:'4px' }}>{sourceDef.title}</div>
-                <div style={{ fontSize:'11px', color:'var(--c-888888)', lineHeight:1.45 }}>{sourceDef.desc}</div>
+                <div style={{ fontSize:'var(--fs-md)', fontWeight:700, color:'var(--c-eeeeee)', marginBottom:'4px' }}>{sourceDef.title}</div>
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', lineHeight:1.45 }}>{sourceDef.desc}</div>
               </div>
-              <div style={{ flexShrink:0, display:'inline-flex', padding:'4px 8px', borderRadius:'999px', background:active?'rgba(74,222,128,.12)':'var(--c-171717)', color:active?'var(--accent-green)':'var(--c-777777)', fontSize:'10px', fontWeight:700 }}>
+              <div style={{ flexShrink:0, display:'inline-flex', padding:'4px 8px', borderRadius:'var(--r-full)', background:active?'rgba(74,222,128,.12)':'var(--c-171717)', color:active?'var(--success)':'var(--c-777777)', fontSize:'var(--fs-xs)', fontWeight:700 }}>
                 {!sourcesLoaded ? '...' : active ? 'configurat' : 'neconectat'}
               </div>
             </div>
-            {source?.email && <div style={{ marginTop:'9px', fontSize:'11px', color:'var(--c-aaaaaa)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{source.email}</div>}
-            <div style={{ marginTop:'9px', fontSize:'10px', color:'var(--c-666666)', lineHeight:1.45 }}>{sourceDef.hint}</div>
-            {source?.last_sync_at && <div style={{ marginTop:'5px', fontSize:'10px', color:'var(--c-666666)' }}>Ultima conectare: {new Date(source.last_sync_at).toLocaleString('ro-RO')}</div>}
-            {job && <div style={{ marginTop:'5px', fontSize:'10px', color:job.status === 'error' ? 'var(--accent-red)' : jobRunning ? legibil(firma.culoare) : 'var(--c-666666)' }}>{jobText(job)}</div>}
+            {source?.email && <div style={{ marginTop:'9px', fontSize:'var(--fs-xs)', color:'var(--c-aaaaaa)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{source.email}</div>}
+            <div style={{ marginTop:'9px', fontSize:'var(--fs-xs)', color:'var(--c-666666)', lineHeight:1.45 }}>{sourceDef.hint}</div>
+            {source?.last_sync_at && <div style={{ marginTop:'5px', fontSize:'var(--fs-xs)', color:'var(--c-666666)' }}>Ultima conectare: {new Date(source.last_sync_at).toLocaleString('ro-RO')}</div>}
+            {job && <div style={{ marginTop:'5px', fontSize:'var(--fs-xs)', color:job.status === 'error' ? 'var(--danger)' : jobRunning ? legibil(firma.culoare) : 'var(--c-666666)' }}>{jobText(job)}</div>}
             {editing ? (
               <div style={{ marginTop:'10px', display:'flex', flexDirection:'column', gap:'8px' }}>
-                <input value={sourceEmail} onChange={e => setSourceEmail(e.target.value)} placeholder={sourceDef.placeholder} style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
-                {sourceDef.provider === 'oblio' && <input type="password" value={sourceSecret} onChange={e => setSourceSecret(e.target.value)} placeholder="Token API din Oblio → Setări → Date Cont" style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>}
+                <input value={sourceEmail} onChange={e => setSourceEmail(e.target.value)} placeholder={sourceDef.placeholder} style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
+                {sourceDef.provider === 'oblio' && <input type="password" value={sourceSecret} onChange={e => setSourceSecret(e.target.value)} placeholder="Token API din Oblio → Setări → Date Cont" style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>}
                 <div style={{ display:'flex', gap:'7px' }}>
-                  <button onClick={() => sourceDef.provider === 'oblio' ? connectOblio() : saveSource(sourceDef)} disabled={sourceBusy} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', cursor:'pointer', opacity:sourceBusy?.6:1 }}>{sourceDef.provider === 'oblio' ? 'Testează și salvează' : 'Salvează'}</button>
-                  <button onClick={() => { setEditingSource(null); setSourceSecret('') }} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-888888)', cursor:'pointer' }}>Anulează</button>
+                  <button onClick={() => sourceDef.provider === 'oblio' ? connectOblio() : saveSource(sourceDef)} disabled={sourceBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer', opacity:sourceBusy?.6:1 }}>{sourceDef.provider === 'oblio' ? 'Testează și salvează' : 'Salvează'}</button>
+                  <button onClick={() => { setEditingSource(null); setSourceSecret('') }} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-888888)', cursor:'pointer' }}>Anulează</button>
                 </div>
-                {sourceError && <div style={{ fontSize:'10px', color:'var(--accent-red)' }}>{sourceError}</div>}
+                {sourceError && <div style={{ fontSize:'var(--fs-xs)', color:'var(--danger)' }}>{sourceError}</div>}
               </div>
             ) : (
               <div style={{ marginTop:'10px', display:'flex', flexWrap:'wrap', gap:'7px' }}>
                 {sourceDef.provider === 'gmail' && (
-                  <button onClick={() => connectGmail(sourceDef)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'none', background:firma.culoare, color:'var(--c-ffffff)', cursor:'pointer' }}>
+                  <button onClick={() => connectGmail(sourceDef)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer' }}>
                     {active ? 'Reconectează Google' : 'Conectează Google'}
                   </button>
                 )}
                 {sourceDef.provider === 'gmail' && source?.id && active && (
-                  <button onClick={() => syncGmail(source)} disabled={syncingSourceId === source.id || jobRunning} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid rgba(74,222,128,.35)', background:'rgba(74,222,128,.08)', color:'var(--accent-green)', cursor:'pointer', opacity:(syncingSourceId === source.id || jobRunning) ? .65 : 1 }}>
+                  <button onClick={() => syncGmail(source)} disabled={syncingSourceId === source.id || jobRunning} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'1px solid color-mix(in srgb, var(--accent) 40%, transparent)', background:'var(--accent-soft)', color:'var(--accent)', cursor:'pointer', opacity:(syncingSourceId === source.id || jobRunning) ? .65 : 1 }}>
                     {jobRunning ? 'Rulează...' : syncingSourceId === source.id ? 'Pornește...' : 'Sincronizează'}
                   </button>
                 )}
-                <button onClick={() => startEditSource(sourceDef.title)} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:`1px solid ${active ? 'rgba(74,222,128,.35)' : firma.culoare}`, background:'transparent', color:active?'var(--accent-green)':legibil(firma.culoare), cursor:'pointer' }}>
+                <button onClick={() => startEditSource(sourceDef.title)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:`1px solid ${active ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : firma.culoare}`, background:'transparent', color:active?'var(--accent)':legibil(firma.culoare), cursor:'pointer' }}>
                   {active ? 'Configurează' : sourceDef.provider === 'gmail' ? 'Email manual' : 'Conectează'}
                 </button>
               </div>
@@ -585,27 +585,27 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
           </div>
         )})}
 
-        <div style={{ background:'var(--c-111111)', border:'1px solid rgba(74,222,128,.25)', borderRadius:'12px', padding:'14px 16px' }}>
+        <div style={{ background:'var(--c-111111)', border:'1px solid rgba(74,222,128,.25)', borderRadius:'var(--r-lg)', padding:'14px 16px' }}>
           <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'10px' }}>
             <div>
-              <div style={{ fontSize:'13px', fontWeight:700, color:'var(--c-eeeeee)', marginBottom:'4px' }}>Fișiere locale</div>
-              <div style={{ fontSize:'11px', color:'var(--c-888888)', lineHeight:1.45 }}>Încărcate manual de pe calculator, separat de sursele de mai sus</div>
+              <div style={{ fontSize:'var(--fs-md)', fontWeight:700, color:'var(--c-eeeeee)', marginBottom:'4px' }}>Fișiere locale</div>
+              <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', lineHeight:1.45 }}>Încărcate manual de pe calculator, separat de sursele de mai sus</div>
             </div>
-            <div style={{ flexShrink:0, display:'inline-flex', padding:'4px 8px', borderRadius:'999px', background:localFiles.length ? 'rgba(251,146,60,.12)' : 'rgba(74,222,128,.12)', color:localFiles.length ? '#f97316' : 'var(--accent-green)', fontSize:'10px', fontWeight:700 }}>
+            <div style={{ flexShrink:0, display:'inline-flex', padding:'4px 8px', borderRadius:'var(--r-full)', background:localFiles.length ? 'rgba(251,146,60,.12)' : 'rgba(74,222,128,.12)', color:localFiles.length ? 'var(--warning)' : 'var(--success)', fontSize:'var(--fs-xs)', fontWeight:700 }}>
               {localFiles.length ? `${localFiles.length} de sincronizat` : 'gata'}
             </div>
           </div>
-          <div style={{ marginTop:'9px', fontSize:'10px', color:'var(--c-666666)', lineHeight:1.45 }}>Fișierele stau aici până apeși „Sincronizează”; abia atunci ajung în listă mai jos.</div>
-          {localSource?.last_sync_at && <div style={{ marginTop:'5px', fontSize:'10px', color:'var(--c-666666)' }}>Ultima sincronizare: {new Date(localSource.last_sync_at).toLocaleString('ro-RO')}</div>}
-          {localJob && <div style={{ marginTop:'5px', fontSize:'10px', color:localJob.status === 'error' ? 'var(--accent-red)' : localJobRunning ? legibil(firma.culoare) : 'var(--c-666666)' }}>{jobText(localJob)}</div>}
+          <div style={{ marginTop:'9px', fontSize:'var(--fs-xs)', color:'var(--c-666666)', lineHeight:1.45 }}>Fișierele stau aici până apeși „Sincronizează”; abia atunci ajung în listă mai jos.</div>
+          {localSource?.last_sync_at && <div style={{ marginTop:'5px', fontSize:'var(--fs-xs)', color:'var(--c-666666)' }}>Ultima sincronizare: {new Date(localSource.last_sync_at).toLocaleString('ro-RO')}</div>}
+          {localJob && <div style={{ marginTop:'5px', fontSize:'var(--fs-xs)', color:localJob.status === 'error' ? 'var(--danger)' : localJobRunning ? legibil(firma.culoare) : 'var(--c-666666)' }}>{jobText(localJob)}</div>}
 
           {localFiles.length > 0 && (
             <div style={{ marginTop:'10px', display:'flex', flexDirection:'column', gap:'5px', maxHeight:'140px', overflow:'auto' }}>
               {localFiles.map(f => (
-                <div key={f.id} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'6px 8px', background:'var(--c-161616)', borderRadius:'7px' }}>
-                  <div style={{ flex:1, minWidth:0, fontSize:'11px', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={f.error_message || undefined}>{f.fisier_nume}</div>
-                  {f.status === 'eroare' && <span style={{ fontSize:'9px', color:'var(--accent-red)', flexShrink:0 }}>eroare</span>}
-                  <button onClick={() => removeLocalFile(f.id)} style={{ fontSize:'11px', color:'var(--c-888888)', background:'transparent', border:'none', cursor:'pointer', flexShrink:0 }}>✕</button>
+                <div key={f.id} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'6px 8px', background:'var(--c-161616)', borderRadius:'var(--r-sm)' }}>
+                  <div style={{ flex:1, minWidth:0, fontSize:'var(--fs-xs)', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={f.error_message || undefined}>{f.fisier_nume}</div>
+                  {f.status === 'eroare' && <span style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', flexShrink:0 }}>eroare</span>}
+                  <button onClick={() => removeLocalFile(f.id)} style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', background:'transparent', border:'none', cursor:'pointer', flexShrink:0 }}>✕</button>
                 </div>
               ))}
             </div>
@@ -617,37 +617,37 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
               onDragOver={e => { e.preventDefault(); setLocalDrag(true) }}
               onDragLeave={() => setLocalDrag(false)}
               onDrop={e => { e.preventDefault(); setLocalDrag(false); if (e.dataTransfer.files.length) uploadLocal(e.dataTransfer.files) }}
-              style={{ flex:1, minWidth:'140px', border:`1.5px dashed ${localDrag ? firma.culoare : 'var(--c-252525)'}`, borderRadius:'8px', padding:'9px', textAlign:'center', cursor:'pointer', fontSize:'11px', fontWeight:700, color:'var(--c-888888)', background:localDrag ? tint(r,.06) : 'transparent' }}
+              style={{ flex:1, minWidth:'140px', border:`1.5px dashed ${localDrag ? firma.culoare : 'var(--c-252525)'}`, borderRadius:'var(--r-md)', padding:'9px', textAlign:'center', cursor:'pointer', fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--c-888888)', background:localDrag ? tint(r,.06) : 'transparent' }}
             >
               {localBusy ? 'Se încarcă...' : '+ Adaugă fișiere'}
             </div>
             <input ref={localFileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { if (e.target.files) uploadLocal(e.target.files); e.target.value='' }}/>
             {localSource?.id && (
-              <button onClick={() => syncLocal(localSource)} disabled={localSyncing || localJobRunning || localFiles.length === 0} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'7px', border:'1px solid rgba(74,222,128,.35)', background:'rgba(74,222,128,.08)', color:'var(--accent-green)', cursor:'pointer', opacity:(localSyncing || localJobRunning || localFiles.length === 0) ? .5 : 1 }}>
+              <button onClick={() => syncLocal(localSource)} disabled={localSyncing || localJobRunning || localFiles.length === 0} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'1px solid color-mix(in srgb, var(--accent) 40%, transparent)', background:'var(--accent-soft)', color:'var(--accent)', cursor:'pointer', opacity:(localSyncing || localJobRunning || localFiles.length === 0) ? .5 : 1 }}>
                 {localJobRunning ? 'Rulează...' : localSyncing ? 'Pornește...' : `Sincronizează${localFiles.length ? ` (${localFiles.length})` : ''}`}
               </button>
             )}
           </div>
-          {localError && <div style={{ marginTop:'8px', fontSize:'10px', color:'var(--accent-red)' }}>{localError}</div>}
+          {localError && <div style={{ marginTop:'8px', fontSize:'var(--fs-xs)', color:'var(--danger)' }}>{localError}</div>}
         </div>
       </div>
 
-      <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'14px', overflow:'hidden' }}>
+      <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
         <div style={{ padding:'18px 22px', borderBottom:'1px solid var(--c-1a1a1a)' }}>
-          <div style={{ fontSize:'14px', fontWeight:700, color:'var(--c-ffffff)', marginBottom:'4px' }}>Inbox Facturi pentru {firma.nume}</div>
-          <div style={{ fontSize:'12px', color:'var(--c-888888)', lineHeight:1.45 }}>
+          <div style={{ fontSize:'var(--fs-base)', fontWeight:700, color:'var(--c-ffffff)', marginBottom:'4px' }}>Inbox Facturi pentru {firma.nume}</div>
+          <div style={{ fontSize:'var(--fs-sm)', color:'var(--c-888888)', lineHeight:1.45 }}>
             Încarcă facturi primite pe email/Oblio. AI-ul detectează firma după CIF/nume, verifică duplicatele și salvează documentul la firma potrivită.
           </div>
           <div style={{ marginTop:'14px', display:'flex', flexWrap:'wrap', alignItems:'end', gap:'10px' }}>
-            <label style={{ display:'flex', flexDirection:'column', gap:'4px', fontSize:'10px', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--c-777777)' }}>
+            <label style={{ display:'flex', flexDirection:'column', gap:'4px', fontSize:'var(--fs-xs)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--c-777777)' }}>
               Sincronizează de la
-              <input type="date" value={syncStartDate} onChange={e => setSyncStartDate(e.target.value)} style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
+              <input type="date" value={syncStartDate} onChange={e => setSyncStartDate(e.target.value)} style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
             </label>
-            <label style={{ display:'flex', flexDirection:'column', gap:'4px', fontSize:'10px', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--c-777777)' }}>
+            <label style={{ display:'flex', flexDirection:'column', gap:'4px', fontSize:'var(--fs-xs)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--c-777777)' }}>
               Până la
-              <input type="date" value={syncEndDate} onChange={e => setSyncEndDate(e.target.value)} style={{ fontSize:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
+              <input type="date" value={syncEndDate} onChange={e => setSyncEndDate(e.target.value)} style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
             </label>
-            <div style={{ fontSize:'11px', color:'var(--c-777777)', lineHeight:1.45, paddingBottom:'8px' }}>
+            <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', lineHeight:1.45, paddingBottom:'8px' }}>
               Intervalul se aplică la butonul „Sincronizează” de pe Gmail 1/Gmail 2.
             </div>
           </div>
@@ -657,11 +657,11 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
           {loaded && docs.length > 0 && (
             <div style={{ display:'flex', flexDirection:'column', gap:'7px', marginBottom:'16px' }}>
               <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between', gap:'10px', marginBottom:'4px' }}>
-                <button onClick={toggleAllDocs} style={{ fontSize:'11px', fontWeight:700, padding:'7px 10px', borderRadius:'8px', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-aaaaaa)', cursor:'pointer' }}>
+                <button onClick={toggleAllDocs} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-md)', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-aaaaaa)', cursor:'pointer' }}>
                   {selectedDocIds.size === docs.length ? 'Deselectează toate' : 'Selectează toate'}
                 </button>
                 {selectedDocIds.size > 0 && (
-                  <button onClick={deleteSelectedDocs} disabled={deleteBusy} style={{ fontSize:'11px', fontWeight:800, padding:'7px 10px', borderRadius:'8px', border:'1px solid rgba(239,68,68,.35)', background:'rgba(239,68,68,.08)', color:'var(--accent-red)', cursor:'pointer', opacity:deleteBusy ? .65 : 1 }}>
+                  <button onClick={deleteSelectedDocs} disabled={deleteBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:800, padding:'7px 10px', borderRadius:'var(--r-md)', border:'1px solid rgba(239,68,68,.35)', background:'rgba(239,68,68,.08)', color:'var(--danger)', cursor:'pointer', opacity:deleteBusy ? .65 : 1 }}>
                     Șterge selectate ({selectedDocIds.size})
                   </button>
                 )}
@@ -672,63 +672,63 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
                 const selected = selectedDocIds.has(doc.id)
                 return (
                   <div key={doc.id}>
-                    <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'10px 12px', background:'var(--c-161616)', border:'1px solid var(--c-222222)', borderRadius:'9px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'10px', padding:'10px 12px', background:'var(--c-161616)', border:'1px solid var(--c-222222)', borderRadius:'var(--r-md)' }}>
                       <input type="checkbox" checked={selected} onChange={() => toggleSelectedDoc(doc.id)} style={{ width:15, height:15, accentColor:firma.culoare, cursor:'pointer' }}/>
-                      <div style={{ width:8, height:8, borderRadius:'50%', background:doc.platit ? 'var(--accent-green)' : firma.culoare, flexShrink:0 }}/>
+                      <div style={{ width:8, height:8, borderRadius:'50%', background:doc.platit ? 'var(--success)' : firma.culoare, flexShrink:0 }}/>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:'12px', fontWeight:700, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</div>
-                        <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'3px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        <div style={{ fontSize:'var(--fs-sm)', fontWeight:700, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</div>
+                        <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', marginTop:'3px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                           {[doc.numar_document && `nr. ${doc.numar_document}`, doc.suma != null && `${doc.suma.toFixed(2)}`, doc.data_document].filter(Boolean).join(' · ') || doc.furnizor || 'fără detalii extrase'}
                           {doc.tranzactie_id ? ' · legată de tranzacție' : ''}
                           {doc.platit ? ` · plătită${doc.data_platii ? ` ${doc.data_platii}` : ''}` : ' · neplătită'}
                         </div>
                       </div>
-                      <button onClick={() => togglePaid(doc)} style={{ fontSize:'11px', fontWeight:700, padding:'6px 9px', borderRadius:'7px', border:`1px solid ${doc.platit ? 'rgba(74,222,128,.35)' : 'rgba(251,146,60,.35)'}`, background:doc.platit?'rgba(74,222,128,.08)':'rgba(251,146,60,.08)', color:doc.platit?'var(--accent-green)':legibil(firma.culoare), cursor:'pointer' }}>
+                      <button onClick={() => togglePaid(doc)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'6px 9px', borderRadius:'var(--r-sm)', border:`1px solid ${doc.platit ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'rgba(251,146,60,.35)'}`, background:doc.platit?'var(--accent-soft)':'rgba(251,146,60,.08)', color:doc.platit?'var(--accent)':legibil(firma.culoare), cursor:'pointer' }}>
                         {doc.platit ? 'Plătită' : 'Setează plătit'}
                       </button>
-                      {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'11px', fontWeight:600, color:open?'var(--c-dddddd)':'var(--accent-mint)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
+                      {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:open?'var(--c-dddddd)':'var(--accent)', background:'transparent', border:'none', cursor:'pointer' }}>{open ? 'Ascunde' : 'Vezi'}</button>}
                       {!doc.tranzactie_id && (
-                        <button onClick={() => toggleLink(doc.id)} style={{ fontSize:'11px', fontWeight:600, color:linkOpenId===doc.id?'var(--c-dddddd)':legibil(firma.culoare), background:'transparent', border:'none', cursor:'pointer' }}>
+                        <button onClick={() => toggleLink(doc.id)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:linkOpenId===doc.id?'var(--c-dddddd)':legibil(firma.culoare), background:'transparent', border:'none', cursor:'pointer' }}>
                           {linkOpenId===doc.id ? 'Ascunde' : 'Leagă de tranzacție'}
                         </button>
                       )}
-                      <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'11px', fontWeight:700, color:legibil(firma.culoare), textDecoration:'none' }}>↓</a>
-                      <button onClick={() => deleteDoc(doc)} style={{ fontSize:'11px', fontWeight:700, padding:'6px 9px', borderRadius:'7px', border:'1px solid rgba(239,68,68,.35)', background:'rgba(239,68,68,.06)', color:'var(--accent-red)', cursor:'pointer' }}>Șterge</button>
+                      <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--accent)', textDecoration:'none' }}>↓</a>
+                      <button onClick={() => deleteDoc(doc)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'6px 9px', borderRadius:'var(--r-sm)', border:'1px solid rgba(239,68,68,.35)', background:'rgba(239,68,68,.06)', color:'var(--danger)', cursor:'pointer' }}>Șterge</button>
                     </div>
-                    {open && kind === 'pdf' && <iframe src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} style={{ width:'100%', height:'65vh', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />}
-                    {open && kind === 'image' && <img src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} alt={doc.fisier_nume} style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', border:'1px solid var(--c-262626)', borderRadius:'8px', marginTop:'6px', background:'var(--c-ffffff)' }} />}
+                    {open && kind === 'pdf' && <iframe src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} style={{ width:'100%', height:'65vh', border:'1px solid var(--c-262626)', borderRadius:'var(--r-md)', marginTop:'6px', background:'var(--c-ffffff)' }} />}
+                    {open && kind === 'image' && <img src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} alt={doc.fisier_nume} style={{ width:'100%', maxHeight:'65vh', objectFit:'contain', border:'1px solid var(--c-262626)', borderRadius:'var(--r-md)', marginTop:'6px', background:'var(--c-ffffff)' }} />}
                     {linkOpenId === doc.id && (
-                      <div style={{ marginTop:'6px', padding:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-1e1e1e)', borderRadius:'8px' }}>
-                        <div style={{ fontSize:'10px', color:'var(--c-666666)', marginBottom:'8px' }}>Caută tranzacția din Extras de cont după descriere sau sumă (ex. „359.23”) — utilă când suma facturii nu se potrivește exact cu suma tranzacției (plată parțială).</div>
+                      <div style={{ marginTop:'6px', padding:'12px', background:'var(--c-0f0f0f)', border:'1px solid var(--c-1e1e1e)', borderRadius:'var(--r-md)' }}>
+                        <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)', marginBottom:'8px' }}>Caută tranzacția din Extras de cont după descriere sau sumă (ex. „359.23”) — utilă când suma facturii nu se potrivește exact cu suma tranzacției (plată parțială).</div>
                         <input
                           autoFocus
                           value={linkQuery}
                           onChange={e => searchTx(e.target.value)}
                           placeholder="Descriere sau sumă..."
-                          style={{ width:'100%', fontSize:'12px', background:'var(--c-161616)', border:'1px solid var(--c-2a2a2a)', borderRadius:'8px', padding:'8px 10px', color:'var(--c-eeeeee)', outline:'none' }}
+                          style={{ width:'100%', fontSize:'var(--fs-sm)', background:'var(--c-161616)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-eeeeee)', outline:'none' }}
                         />
-                        {linkSearching && <div style={{ fontSize:'11px', color:'var(--c-666666)', marginTop:'8px' }}>Caut...</div>}
+                        {linkSearching && <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)', marginTop:'8px' }}>Caut...</div>}
                         {!linkSearching && linkQuery.trim().length >= 2 && linkResults.length === 0 && (
-                          <div style={{ fontSize:'11px', color:'var(--c-666666)', marginTop:'8px' }}>Nicio tranzacție găsită.</div>
+                          <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)', marginTop:'8px' }}>Nicio tranzacție găsită.</div>
                         )}
                         {linkResults.length > 0 && (
                           <div style={{ marginTop:'8px', display:'flex', flexDirection:'column', gap:'5px', maxHeight:'220px', overflow:'auto' }}>
                             {linkResults.map(tx => (
-                              <div key={tx.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--c-161616)', border:'1px solid var(--c-222222)', borderRadius:'7px' }}>
+                              <div key={tx.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--c-161616)', border:'1px solid var(--c-222222)', borderRadius:'var(--r-sm)' }}>
                                 <div style={{ flex:1, minWidth:0 }}>
-                                  <div style={{ fontSize:'11.5px', fontWeight:600, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tx.descriere_curatata || tx.descriere}</div>
-                                  <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'2px' }}>
+                                  <div style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tx.descriere_curatata || tx.descriere}</div>
+                                  <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', marginTop:'2px' }}>
                                     {new Date(tx.data_tranzactie).toLocaleDateString('ro-RO')} · {Number(tx.suma).toFixed(2)} {tx.valuta}{tx.document_id ? ' · are deja document' : ''}
                                   </div>
                                 </div>
-                                <button onClick={() => linkToTransaction(doc, tx)} disabled={linkAssigning === tx.id} style={{ fontSize:'11px', fontWeight:700, padding:'6px 10px', borderRadius:'7px', border:`1px solid ${firma.culoare}`, background:'transparent', color:legibil(firma.culoare), cursor:'pointer', opacity:linkAssigning===tx.id?.6:1, flexShrink:0 }}>
+                                <button onClick={() => linkToTransaction(doc, tx)} disabled={linkAssigning === tx.id} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'6px 10px', borderRadius:'var(--r-sm)', border:'1px solid var(--accent)', background:'transparent', color:'var(--accent)', cursor:'pointer', opacity:linkAssigning===tx.id?.6:1, flexShrink:0 }}>
                                   {linkAssigning === tx.id ? '...' : 'Leagă'}
                                 </button>
                               </div>
                             ))}
                           </div>
                         )}
-                        {linkError && <div style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'8px' }}>{linkError}</div>}
+                        {linkError && <div style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', marginTop:'8px' }}>{linkError}</div>}
                       </div>
                     )}
                   </div>
@@ -736,7 +736,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
               })}
             </div>
           )}
-          {!loaded && <div style={{ fontSize:'12px', color:'var(--c-888888)', marginBottom:'12px' }}>Se încarcă...</div>}
+          {!loaded && <div style={{ fontSize:'var(--fs-sm)', color:'var(--c-888888)', marginBottom:'12px' }}>Se încarcă...</div>}
 
           <div
             onClick={() => fileRef.current?.click()}
@@ -745,7 +745,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
             onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) upload(e.dataTransfer.files) }}
             style={{
               border:`1.5px dashed ${drag ? firma.culoare : 'var(--c-252525)'}`,
-              borderRadius:'12px',
+              borderRadius:'var(--r-lg)',
               padding:'26px',
               textAlign:'center',
               cursor:'pointer',
@@ -754,36 +754,36 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
             }}
           >
             <div style={{ fontSize:'22px', color:firma.culoare, lineHeight:1, marginBottom:'8px' }}>+</div>
-            <div style={{ fontSize:'13px', fontWeight:700, color:'var(--c-777777)', marginBottom:'4px' }}>{busy ? 'Se analizează și se repartizează...' : 'Adaugă facturi din email / Oblio'}</div>
-            <div style={{ fontSize:'11px', color:'var(--c-888888)' }}>Poți selecta mai multe PDF/JPG/PNG deodată</div>
+            <div style={{ fontSize:'var(--fs-md)', fontWeight:700, color:'var(--c-777777)', marginBottom:'4px' }}>{busy ? 'Se analizează și se repartizează...' : 'Adaugă facturi din email / Oblio'}</div>
+            <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)' }}>Poți selecta mai multe PDF/JPG/PNG deodată</div>
           </div>
           <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { if (e.target.files) upload(e.target.files); e.target.value='' }}/>
 
           {liveJob && (
-            <div style={{ marginTop:'14px', padding:'12px', borderRadius:'10px', border:`1px solid ${liveRunning ? 'rgba(59,130,246,.25)' : 'var(--c-222222)'}`, background:liveRunning ? 'rgba(59,130,246,.06)' : 'var(--c-0f0f0f)' }}>
+            <div style={{ marginTop:'14px', padding:'12px', borderRadius:'var(--r-md)', border:`1px solid ${liveRunning ? 'rgba(59,130,246,.25)' : 'var(--c-222222)'}`, background:liveRunning ? 'rgba(59,130,246,.06)' : 'var(--c-0f0f0f)' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', marginBottom:'8px' }}>
                 <div>
-                  <div style={{ fontSize:'12px', fontWeight:800, color:'var(--c-dddddd)' }}>
+                  <div style={{ fontSize:'var(--fs-sm)', fontWeight:800, color:'var(--c-dddddd)' }}>
                     Ce citește sincronizarea{liveSource ? ` · ${liveSource.eticheta}${liveSource.email ? ` (${liveSource.email})` : ''}` : ''}
                   </div>
-                  <div style={{ fontSize:'10px', color:'var(--c-888888)', marginTop:'3px' }}>
+                  <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', marginTop:'3px' }}>
                     Status: {liveJob.status} · {liveJob.result?.messagesChecked ?? liveJob.messages_checked ?? 0} emailuri · {liveJob.result?.pdfsFound ?? liveJob.pdfs_found ?? 0} PDF-uri · {liveJob.since_date || liveJob.result?.since || syncStartDate}{(liveJob.result?.until || syncEndDate) ? ` → ${liveJob.result?.until || syncEndDate}` : ' → azi'}
                   </div>
                 </div>
-                <span style={{ fontSize:'10px', fontWeight:800, padding:'4px 8px', borderRadius:'999px', background:liveRunning ? 'rgba(59,130,246,.12)' : 'var(--c-161616)', color:liveRunning ? 'var(--accent-blue)' : 'var(--c-777777)' }}>
+                <span style={{ fontSize:'var(--fs-xs)', fontWeight:800, padding:'4px 8px', borderRadius:'var(--r-full)', background:liveRunning ? 'rgba(59,130,246,.12)' : 'var(--c-161616)', color:liveRunning ? 'var(--accent-blue)' : 'var(--c-777777)' }}>
                   {liveRunning ? 'live' : 'ultimul sync'}
                 </span>
               </div>
               {liveActivity.length === 0 ? (
-                <div style={{ fontSize:'11px', color:'var(--c-888888)' }}>Jurnalul apare aici imediat ce pornești sincronizarea Gmail.</div>
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)' }}>Jurnalul apare aici imediat ce pornești sincronizarea Gmail.</div>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:'6px', maxHeight:'260px', overflow:'auto' }}>
                   {[...liveActivity].reverse().map((row, idx) => (
-                    <div key={`${row.time}-${idx}`} style={{ display:'flex', gap:'8px', alignItems:'flex-start', padding:'8px 10px', borderRadius:'8px', border:'1px solid rgba(59,130,246,.16)', background:'var(--c-111111)' }}>
-                      <div style={{ width:8, height:8, borderRadius:'50%', background:row.status === 'importat' ? 'var(--accent-green)' : row.status === 'duplicat' ? '#f97316' : row.status === 'sarit' || row.status === 'eroare' ? 'var(--accent-red)' : 'var(--accent-blue)', marginTop:'4px', flexShrink:0 }}/>
+                    <div key={`${row.time}-${idx}`} style={{ display:'flex', gap:'8px', alignItems:'flex-start', padding:'8px 10px', borderRadius:'var(--r-md)', border:'1px solid rgba(59,130,246,.16)', background:'var(--c-111111)' }}>
+                      <div style={{ width:8, height:8, borderRadius:'50%', background:row.status === 'importat' ? 'var(--success)' : row.status === 'duplicat' ? 'var(--warning)' : row.status === 'sarit' || row.status === 'eroare' ? 'var(--danger)' : 'var(--accent-blue)', marginTop:'4px', flexShrink:0 }}/>
                       <div style={{ minWidth:0, flex:1 }}>
-                        <div style={{ fontSize:'11px', fontWeight:750, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{row.text}</div>
-                        <div style={{ fontSize:'10px', color:'var(--c-777777)', marginTop:'2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        <div style={{ fontSize:'var(--fs-xs)', fontWeight:750, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{row.text}</div>
+                        <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', marginTop:'2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                           {new Date(row.time).toLocaleTimeString('ro-RO')} {row.detail ? `· ${row.detail}` : ''}
                         </div>
                       </div>
@@ -796,16 +796,16 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
 
           {results.length > 0 && (
             <div style={{ marginTop:'14px', display:'flex', flexDirection:'column', gap:'6px' }}>
-              {syncMessage && <div style={{ padding:'9px 11px', borderRadius:'8px', background:'rgba(59,130,246,.08)', border:'1px solid rgba(59,130,246,.2)', fontSize:'11px', color:'var(--c-aaaaaa)' }}>{syncMessage}</div>}
+              {syncMessage && <div style={{ padding:'9px 11px', borderRadius:'var(--r-md)', background:'rgba(59,130,246,.08)', border:'1px solid rgba(59,130,246,.2)', fontSize:'var(--fs-xs)', color:'var(--c-aaaaaa)' }}>{syncMessage}</div>}
               {results.map((res, idx) => (
-                <div key={idx} style={{ padding:'9px 11px', borderRadius:'8px', background:res.skipped?'rgba(148,163,184,.08)':res.duplicate?'rgba(251,146,60,.08)':'rgba(74,222,128,.08)', border:`1px solid ${res.skipped?'rgba(148,163,184,.22)':res.duplicate?'rgba(251,146,60,.25)':'rgba(74,222,128,.2)'}`, fontSize:'11px', color:'var(--c-aaaaaa)' }}>
+                <div key={idx} style={{ padding:'9px 11px', borderRadius:'var(--r-md)', background:res.skipped?'rgba(148,163,184,.08)':res.duplicate?'rgba(251,146,60,.08)':'rgba(74,222,128,.08)', border:`1px solid ${res.skipped?'rgba(148,163,184,.22)':res.duplicate?'rgba(251,146,60,.25)':'rgba(74,222,128,.2)'}`, fontSize:'var(--fs-xs)', color:'var(--c-aaaaaa)' }}>
                   {res.skipped ? 'Sărit' : res.duplicate ? 'Duplicat detectat' : 'Importat'} · {res.targetFirma || 'firmă necunoscută'} · {res.extracted?.incredereFirma || 'verifică'}{res.extracted?.furnizor ? ` · ${res.extracted.furnizor}` : ''}{res.skipReason ? ` · ${res.skipReason}` : ''}{res.source ? ` · ${res.source}` : ''}
                 </div>
               ))}
             </div>
           )}
-          {syncMessage && results.length === 0 && <div style={{ marginTop:'14px', padding:'9px 11px', borderRadius:'8px', background:'rgba(59,130,246,.08)', border:'1px solid rgba(59,130,246,.2)', fontSize:'11px', color:'var(--c-aaaaaa)' }}>{syncMessage}</div>}
-          {error && <p style={{ fontSize:'11px', color:'var(--accent-red)', marginTop:'10px' }}>{error}</p>}
+          {syncMessage && results.length === 0 && <div style={{ marginTop:'14px', padding:'9px 11px', borderRadius:'var(--r-md)', background:'rgba(59,130,246,.08)', border:'1px solid rgba(59,130,246,.2)', fontSize:'var(--fs-xs)', color:'var(--c-aaaaaa)' }}>{syncMessage}</div>}
+          {error && <p style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', marginTop:'10px' }}>{error}</p>}
         </div>
       </div>
     </div>

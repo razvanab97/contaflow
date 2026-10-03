@@ -32,12 +32,12 @@ function EditableLabel({ value, onCommit }: { value: string; onCommit: (v: strin
         autoFocus value={draft} onChange={e => setDraft(e.target.value)}
         onBlur={() => { setEditing(false); if (draft.trim() && draft !== value) onCommit(draft.trim()) }}
         onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
-        style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-999999)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '5px', padding: '2px 6px', outline: 'none' }}
+        style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--c-999999)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '2px 6px', outline: 'none' }}
       />
     )
   }
   return (
-    <button onClick={() => { setDraft(value); setEditing(true) }} title="Redenumește" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-999999)', background: 'transparent', border: 'none', cursor: 'text', padding: 0, textAlign: 'left' }}>
+    <button onClick={() => { setDraft(value); setEditing(true) }} title="Redenumește" style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--c-999999)', background: 'transparent', border: 'none', cursor: 'text', padding: 0, textAlign: 'left' }}>
       {value}
     </button>
   )
@@ -52,14 +52,14 @@ export default function ReportEditor({
 }: Props) {
   if (!sablonConfigurat) {
     return (
-      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '20px 22px' }}>
-        <p style={{ fontSize: '12px', color: 'var(--c-666666)', marginBottom: '14px', lineHeight: 1.6 }}>
+      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '20px 22px' }}>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', marginBottom: '14px', lineHeight: 1.6 }}>
           Detectez automat, în documentul din stânga, secțiunile care se schimbă lunar — o singură dată, apoi le completezi de aici, fără să mai deschizi Word.
         </p>
-        <button onClick={onConfigure} disabled={configuring} style={{ fontSize: '12px', fontWeight: 600, padding: '9px 16px', borderRadius: '8px', border: 'none', background: 'var(--accent-mint)', color: 'var(--c-0a0a0a)', cursor: 'pointer', opacity: configuring ? .6 : 1 }}>
+        <button onClick={onConfigure} disabled={configuring} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '9px 16px', borderRadius: 'var(--r-md)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', opacity: configuring ? .6 : 1 }}>
           {configuring ? 'Se configurează...' : 'Configurează formularul din documentul curent'}
         </button>
-        {configureError && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '10px' }}>{configureError}</p>}
+        {configureError && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', marginTop: '10px' }}>{configureError}</p>}
       </div>
     )
   }
@@ -83,14 +83,14 @@ export default function ReportEditor({
               <div key={c.id}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
                   <EditableLabel value={c.eticheta} onCommit={v => onCustomLabelChange(c.id, v)}/>
-                  <button onClick={() => onCustomDelete(c.id, c.eticheta)} title="Șterge câmpul (textul rămâne fix, la valoarea curentă)" style={{ fontSize: '10px', fontWeight: 600, color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>
+                  <button onClick={() => onCustomDelete(c.id, c.eticheta)} title="Șterge câmpul (textul rămâne fix, la valoarea curentă)" style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>
                     ✕ Șterge
                   </button>
                 </div>
                 <input
                   value={c.valoare}
                   onChange={e => onCustomChange(c.id, e.target.value)}
-                  style={{ width: '100%', fontSize: '14px', color: 'var(--c-dddddd)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', outline: 'none' }}
+                  style={{ width: '100%', fontSize: 'var(--fs-base)', color: 'var(--c-dddddd)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', outline: 'none' }}
                 />
               </div>
             ))}
@@ -100,14 +100,14 @@ export default function ReportEditor({
 
       {/* Documentul nu suporta inca sectiuni noi arbitrare - butonul e ascuns complet, nu doar dezactivat */}
       {template.allowCustomSections && (
-        <button style={{ fontSize: '12px', fontWeight: 600, color: 'var(--c-777777)', background: 'transparent', border: '1px dashed var(--c-2a2a2a)', borderRadius: '10px', padding: '10px', cursor: 'pointer' }}>
+        <button style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--c-777777)', background: 'transparent', border: '1px dashed var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '10px', cursor: 'pointer' }}>
           + Adaugă secțiune
         </button>
       )}
 
       <button
         onClick={onGenerate} disabled={generating}
-        style={{ fontSize: '14px', fontWeight: 600, padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--accent-mint)', color: 'var(--c-0a0a0a)', cursor: 'pointer', opacity: generating ? .6 : 1, marginTop: '4px' }}
+        style={{ fontSize: 'var(--fs-base)', fontWeight: 600, padding: '12px', borderRadius: 'var(--r-md)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', opacity: generating ? .6 : 1, marginTop: '4px' }}
       >
         {generating ? 'Se generează...' : 'Generează raportul →'}
       </button>

@@ -5,7 +5,7 @@ type FlowFilter = 'all'|'debit'|'credit'
 
 function pillStyle(active: boolean): React.CSSProperties {
   return {
-    fontSize:'11.5px', fontWeight:600, padding:'5px 10px', borderRadius:'7px',
+    fontSize:'var(--fs-sm)', fontWeight:600, padding:'5px 10px', borderRadius:'var(--r-sm)',
     border:`1px solid ${active ? 'var(--purple)' : 'var(--border)'}`,
     background: active ? 'var(--purple-soft)' : 'transparent',
     color: active ? 'var(--purple)' : 'var(--text-secondary)',
@@ -27,7 +27,7 @@ export default function TransactionFilters({ filter, flowFilter, counts, flowCou
       </div>
       <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
         {([['all',`Toate (${flowCounts.all})`],['debit',`Ieșiri (${flowCounts.debit})`],['credit',`Încasări (${flowCounts.credit})`]] as const).map(([f,l]) => (
-          <button key={f} onClick={() => onFlowFilterChange(f)} style={{ ...pillStyle(flowFilter===f), fontSize:'11px', opacity:.85 }}>{l}</button>
+          <button key={f} onClick={() => onFlowFilterChange(f)} style={{ ...pillStyle(flowFilter===f), fontSize:'var(--fs-xs)', opacity:.85 }}>{l}</button>
         ))}
       </div>
     </div>

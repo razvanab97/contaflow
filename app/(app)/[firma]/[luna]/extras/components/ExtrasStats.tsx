@@ -12,7 +12,7 @@ export default function ExtrasStats({
 }) {
   if (total === 0) return null
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:'20px', flexWrap:'wrap', padding:'12px 16px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', marginBottom:'16px', minHeight:'56px' }}>
+    <div className="card" style={{ display:'flex', alignItems:'center', gap:'16px 24px', flexWrap:'wrap', padding:'12px 16px', marginBottom:'16px', minHeight:'60px' }}>
       <div style={{ display:'flex', gap:'18px', flexWrap:'wrap', flexShrink:0 }}>
         <Stat label="Tranzacții" value={total} />
         <Stat label="Documentate" value={documentate} color="var(--success)" />
@@ -20,27 +20,27 @@ export default function ExtrasStats({
         <Stat label="Ignorate" value={ignorate} color="var(--text-muted)" />
       </div>
 
-      <div style={{ flex:1, minWidth:'120px', height:'4px', background:'var(--border-subtle)', borderRadius:'2px' }}>
-        <div style={{ height:'4px', background:culoare, borderRadius:'2px', width:`${pct}%`, transition:'width .2s ease' }} />
+      <div style={{ flex:1, minWidth:'120px', display:'flex', alignItems:'center', gap:'10px' }}>
+        <div className={`progress${pct === 100 ? ' is-done' : ''}`} style={{ flex:1 }}><span style={{ width:`${pct}%` }} /></div>
+        <span style={{ fontSize:'var(--fs-md)', fontWeight:600, color:'var(--text-primary)', flexShrink:0 }}>{pct}%</span>
       </div>
-      <span style={{ fontSize:'12px', fontWeight:600, color:'var(--text-secondary)', flexShrink:0 }}>{pct}%</span>
 
       <div style={{ display:'flex', alignItems:'center', gap:'8px', flexShrink:0 }}>
-        <button onClick={onExport} disabled={exportingDocs || documentate===0} style={{ fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:`1px solid ${documentate>0?culoare:'var(--border)'}`, background:'transparent', color:documentate>0?culoare:'var(--text-muted)', cursor:documentate>0?'pointer':'not-allowed', opacity:exportingDocs?.6:1 }}>
+        <button onClick={onExport} disabled={exportingDocs || documentate===0} className="btn btn-sm" style={{ color:documentate>0?'var(--text-primary)':'var(--text-muted)', opacity:exportingDocs?.6:1 }}>
           {exportingDocs ? 'Se generează...' : `Descarcă documentele (${documentate}) ↓`}
         </button>
         {finalizat ? (
-          <div style={{ display:'flex', alignItems:'center', gap:'6px', padding:'6px 10px', background:'var(--success-soft)', border:'1px solid var(--success)', borderRadius:'7px' }}>
-            <span style={{ fontSize:'11px', fontWeight:600, color:'var(--success)' }}>✓ Finalizat</span>
-            <button onClick={() => onToggleFinalizat(false)} disabled={finalizing} style={{ border:'none', background:'transparent', color:'var(--text-muted)', fontSize:'10px', cursor:'pointer', textDecoration:'underline' }}>anulează</button>
+          <div className="badge badge-success" style={{ height:'28px', padding:'0 4px 0 10px', gap:'6px' }}>
+            <span>✓ Finalizat</span>
+            <button onClick={() => onToggleFinalizat(false)} disabled={finalizing} style={{ border:'none', background:'transparent', color:'var(--text-muted)', fontSize:'var(--fs-xs)', textDecoration:'underline', padding:'2px 6px', borderRadius:'var(--r-xs)' }}>anulează</button>
           </div>
         ) : overallGata ? (
-          <button onClick={() => onToggleFinalizat(true)} disabled={finalizing} style={{ fontSize:'11px', fontWeight:700, padding:'6px 12px', borderRadius:'7px', border:`1px solid ${culoare}`, background:culoare, color:'var(--c-ffffff)', cursor:'pointer', opacity:finalizing?.6:1 }}>
+          <button onClick={() => onToggleFinalizat(true)} disabled={finalizing} className="btn btn-sm btn-primary" style={{ opacity:finalizing?.6:1 }}>
             Marchează finalizat
           </button>
         ) : null}
       </div>
-      {exportError && <p style={{ fontSize:'11px', color:'var(--danger)', width:'100%' }}>{exportError}</p>}
+      {exportError && <p role="alert" style={{ fontSize:'var(--fs-sm)', color:'var(--danger)', width:'100%' }}>{exportError}</p>}
     </div>
   )
 }
@@ -48,8 +48,8 @@ export default function ExtrasStats({
 function Stat({ label, value, color }: { label: string; value: number; color?: string }) {
   return (
     <div>
-      <div style={{ fontSize:'9.5px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.06em' }}>{label}</div>
-      <div style={{ fontSize:'15px', fontWeight:700, color: color || 'var(--text-primary)' }}>{value}</div>
+      <div className="stat-label">{label}</div>
+      <div style={{ fontSize:'var(--fs-lg)', fontWeight:650, color: color || 'var(--text-primary)', marginTop:'2px' }}>{value}</div>
     </div>
   )
 }

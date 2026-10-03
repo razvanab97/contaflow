@@ -35,9 +35,9 @@ export default function TransactionSidebar({
   }, [activeTxId])
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', overflow:'hidden' }}>
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
       <div style={{ padding:'14px 14px 10px' }}>
-        <h2 style={{ fontSize:'13px', fontWeight:700, color:'var(--text-primary)', marginBottom:'10px' }}>Tranzacții</h2>
+        <h2 style={{ fontSize:'var(--fs-md)', fontWeight:700, color:'var(--text-primary)', marginBottom:'10px' }}>Tranzacții</h2>
         <TransactionSearch value={search} onChange={onSearchChange} />
       </div>
       <TransactionFilters
@@ -50,7 +50,7 @@ export default function TransactionSidebar({
         style={{ flex:1, minHeight:0, overflowY:'auto', borderTop:'1px solid var(--border-subtle)' }}
       >
         {txs.length === 0 ? (
-          <p style={{ fontSize:'12px', color:'var(--text-muted)', padding:'20px 14px', textAlign:'center' }}>Nicio tranzacție găsită.</p>
+          <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-muted)', padding:'20px 14px', textAlign:'center' }}>Nicio tranzacție găsită.</p>
         ) : (
           txs.map(tx => (
             <TransactionRow key={tx.id} tx={tx} isSelected={tx.id === activeTxId} onClick={() => onSelect(tx.id)} />

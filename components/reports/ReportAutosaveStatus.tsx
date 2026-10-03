@@ -10,11 +10,11 @@ export default function ReportAutosaveStatus({ status, savedAt }: { status: Save
 
   const color =
     status === 'saving' ? 'var(--c-999999)' :
-    status === 'error' ? 'var(--accent-red)' :
-    'var(--accent-mint)'
+    status === 'error' ? 'var(--danger)' :
+    'var(--success)'
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 600, color }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: 'var(--fs-xs)', fontWeight: 600, color }}>
       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, flexShrink: 0, opacity: status === 'saving' ? 0.6 : 1 }}/>
       {label}
     </span>

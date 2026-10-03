@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { legibil, tint } from '@/lib/colors'
 import CopyButton from '@/components/CopyButton'
 
 interface Doc {
@@ -107,7 +106,7 @@ export default function UploadPanel({
   const [attachBusy, setAttachBusy] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
-  const INP: React.CSSProperties = { fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-bbbbbb)', outline: 'none', width: '100%' }
+  const INP: React.CSSProperties = { fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', color: 'var(--c-bbbbbb)', outline: 'none', width: '100%' }
   const acceptsCsv = section === 'airbnb-borderou'
   const fileAccept = acceptsCsv ? '.pdf,.jpg,.jpeg,.png,.csv,text/csv' : '.pdf,.jpg,.jpeg,.png'
   const acceptLabel = acceptsCsv ? 'PDF, JPG, PNG, CSV' : 'PDF, JPG, PNG'
@@ -285,57 +284,57 @@ export default function UploadPanel({
   const visibleDocs = section === 'airbnb-facturi' ? docs.filter(d => !airbnbMatchedIds.has(d.id)) : docs
 
   return (
-    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', overflow: 'hidden' }}>
-      <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--c-1a1a1a)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
-        <div>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-e0e0e0)', marginBottom: '2px' }}>{title}</div>
-          {description && <div style={{ fontSize: '11px', color: 'var(--c-888888)' }}>{description}</div>}
+    <div className="card" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>{title}</div>
+          {description && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{description}</div>}
         </div>
         {loaded && docs.length > 0 && (
-          <button onClick={savePdf} disabled={pdfBusy} style={{ flexShrink:0, fontSize:'11px', fontWeight:600, padding:'6px 12px', borderRadius:'7px', border:`1px solid ${culoare}`, background:'transparent', color:legibil(culoare), cursor:'pointer', opacity:pdfBusy?.6:1 }}>
-            {pdfBusy ? '...' : '↓ PDF'}
+          <button onClick={savePdf} disabled={pdfBusy} className="btn btn-sm" title="Descarcă toate documentele într-un PDF" style={{ flexShrink:0, opacity:pdfBusy?.6:1 }}>
+            {pdfBusy ? 'Se generează…' : '↓ PDF'}
           </button>
         )}
       </div>
 
-      <div style={{ padding: '18px 22px' }}>
+      <div style={{ padding: '16px' }}>
         {section === 'airbnb-facturi' && (
-          <div style={{ marginBottom: '16px', padding: '12px', border: '1px solid var(--c-1f1f1f)', borderRadius: '10px', background: 'var(--c-0d0d0d)' }}>
+          <div style={{ marginBottom: '16px', padding: '12px', border: '1px solid var(--c-1f1f1f)', borderRadius: 'var(--r-md)', background: 'var(--c-0d0d0d)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', marginBottom:'8px', flexWrap:'wrap' }}>
               <div>
-                <div style={{ fontSize:'12px', fontWeight:700, color:'var(--c-dddddd)' }}>Facturi cerute de borderoul Airbnb</div>
-                <div style={{ fontSize:'10px', color:'var(--c-777777)' }}>Se generează automat când încarci CSV-ul în Airbnb · Borderou. PDF-urile puse aici se asociază după cod rezervare sau sumă.</div>
+                <div style={{ fontSize:'var(--fs-sm)', fontWeight:700, color:'var(--c-dddddd)' }}>Facturi cerute de borderoul Airbnb</div>
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)' }}>Se generează automat când încarci CSV-ul în Airbnb · Borderou. PDF-urile puse aici se asociază după cod rezervare sau sumă.</div>
               </div>
               {airbnbExpected.length > 0 && (
                 <div style={{ display:'flex', flexWrap:'wrap', gap:'6px', flexShrink:0 }}>
-                  <span style={{ fontSize:'10px', fontWeight:700, color:'var(--accent-mint)', background:'light-dark(rgba(5,150,105,.12), rgba(110,231,176,.1))', border:'1px solid light-dark(rgba(5,150,105,.35), rgba(110,231,176,.3))', borderRadius:'999px', padding:'4px 8px' }}>
+                  <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--success)', background:'light-dark(rgba(5,150,105,.12), rgba(110,231,176,.1))', border:'1px solid light-dark(rgba(5,150,105,.35), rgba(110,231,176,.3))', borderRadius:'var(--r-full)', padding:'4px 8px' }}>
                     {airbnbMatched}/{airbnbExpected.length} atașate
                   </span>
                   {airbnbMissing > 0 && (
-                    <button onClick={() => setShowOnlyMissing(v => !v)} style={{ fontSize:'10px', fontWeight:700, color:'#f97316', background:'rgba(251,146,60,.1)', border:'1px solid rgba(251,146,60,.35)', borderRadius:'999px', padding:'4px 8px', cursor:'pointer' }}>
+                    <button onClick={() => setShowOnlyMissing(v => !v)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--warning)', background:'rgba(251,146,60,.1)', border:'1px solid rgba(251,146,60,.35)', borderRadius:'var(--r-full)', padding:'4px 8px', cursor:'pointer' }}>
                       {showOnlyMissing ? 'arată toate' : `${airbnbMissing} lipsă`}
                     </button>
                   )}
                   {airbnbOrphanDocIds.size > 0 && (
-                    <span style={{ fontSize:'10px', fontWeight:700, color:'var(--accent-red)', background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.3)', borderRadius:'999px', padding:'4px 8px' }} title="Facturi din lista de mai jos care nu s-au putut asocia cu nicio rezervare din borderou">
+                    <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--danger)', background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.3)', borderRadius:'var(--r-full)', padding:'4px 8px' }} title="Facturi din lista de mai jos care nu s-au putut asocia cu nicio rezervare din borderou">
                       {airbnbOrphanDocIds.size} fără rezervare
                     </span>
                   )}
                   {airbnbMissing > 0 && airbnbOrphanDocIds.size > 0 && (
-                    <button onClick={reconciliazaAutomat} disabled={reconcilBusy} style={{ fontSize:'10px', fontWeight:700, padding:'4px 8px', borderRadius:'999px', border:`1px solid ${culoare}`, background:'transparent', color:legibil(culoare), cursor:'pointer', opacity:reconcilBusy?.6:1 }}>
+                    <button onClick={reconciliazaAutomat} disabled={reconcilBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'4px 8px', borderRadius:'var(--r-full)', border:'1px solid var(--accent)', background:'transparent', color:'var(--accent)', cursor:'pointer', opacity:reconcilBusy?.6:1 }}>
                       {reconcilBusy ? 'Reconciliez...' : 'Reconciliază automat'}
                     </button>
                   )}
                 </div>
               )}
             </div>
-            {reconcilMessage && <div style={{ fontSize:'11px', color:'var(--c-aaaaaa)', marginBottom:'8px' }}>{reconcilMessage}</div>}
-            {airbnbExpectedError && <div style={{ fontSize:'11px', color:'var(--accent-red)' }}>{airbnbExpectedError}</div>}
+            {reconcilMessage && <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-aaaaaa)', marginBottom:'8px' }}>{reconcilMessage}</div>}
+            {airbnbExpectedError && <div style={{ fontSize:'var(--fs-xs)', color:'var(--danger)' }}>{airbnbExpectedError}</div>}
             {!airbnbExpectedError && airbnbExpected.length === 0 && (
-              <div style={{ fontSize:'11px', color:'var(--c-777777)' }}>Nu există încă facturi așteptate. Încarcă borderoul CSV Airbnb în modulul „Airbnb · Borderou”.</div>
+              <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)' }}>Nu există încă facturi așteptate. Încarcă borderoul CSV Airbnb în modulul „Airbnb · Borderou”.</div>
             )}
             {airbnbExpected.length > 0 && showOnlyMissing && airbnbVisibleExpected.length === 0 && (
-              <div style={{ fontSize:'11px', color:'var(--accent-mint)' }}>Toate rezervările au factură atașată.</div>
+              <div style={{ fontSize:'var(--fs-xs)', color:'var(--success)' }}>Toate rezervările au factură atașată.</div>
             )}
             {airbnbVisibleExpected.length > 0 && (
               <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
@@ -343,40 +342,40 @@ export default function UploadPanel({
                   const attached = !!item.factura_document_id
                   const dates = [formatDate(item.data_start), formatDate(item.data_sfarsit)].filter(Boolean).join(' - ')
                   return (
-                    <div key={item.id} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'10px', alignItems:'center', padding:'8px 10px', border:'1px solid var(--c-222222)', borderRadius:'8px', background:attached ? 'light-dark(rgba(5,150,105,.12), rgba(110,231,176,.06))' : 'var(--c-141414)' }}>
+                    <div key={item.id} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'10px', alignItems:'center', padding:'8px 10px', border:'1px solid var(--c-222222)', borderRadius:'var(--r-md)', background:attached ? 'light-dark(rgba(5,150,105,.12), rgba(110,231,176,.06))' : 'var(--c-141414)' }}>
                       <div style={{ minWidth:0 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:'6px', minWidth:0 }}>
                           <CopyButton value={item.cod_confirmare} />
-                          <span style={{ fontSize:'12px', fontWeight:700, color:attached ? 'var(--accent-mint)' : 'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          <span style={{ fontSize:'var(--fs-sm)', fontWeight:700, color:attached ? 'var(--success)' : 'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                             {item.cod_confirmare} · {item.oaspete || 'oaspete necitit'} · {formatCurrency(item.suma, item.moneda)}
                           </span>
                         </div>
-                        <div style={{ fontSize:'10px', color:'var(--c-666666)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:'2px' }}>
+                        <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:'2px' }}>
                           {dates || formatDate(item.data_tranzactie)} {item.anunt ? `· ${item.anunt}` : ''}
                         </div>
                       </div>
                       <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
                         {attached ? (
                           <>
-                            <span style={{ fontSize:'10px', fontWeight:700, color:'var(--accent-mint)' }}>
+                            <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--success)' }}>
                               atașată{item.asociere_metoda === 'cod_rezervare' ? ' (auto · cod)' : item.asociere_metoda === 'taxa_servicii_exacta' ? ' (auto · sumă)' : ''}
                             </span>
-                            <a href={`/api/chitante/document?id=${encodeURIComponent(item.factura_document_id!)}`} style={{ fontSize:'10px', color:legibil(culoare), textDecoration:'none' }}>↓</a>
-                            <button onClick={() => detaseazaFactura(item)} title="Detașează factura de la această rezervare" style={{ fontSize:'10px', color:'var(--accent-red)', background:'transparent', border:'none', cursor:'pointer', padding:0 }}>✕</button>
+                            <a href={`/api/chitante/document?id=${encodeURIComponent(item.factura_document_id!)}`} style={{ fontSize:'var(--fs-xs)', color:'var(--accent)', textDecoration:'none' }}>↓</a>
+                            <button onClick={() => detaseazaFactura(item)} title="Detașează factura de la această rezervare" style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', background:'transparent', border:'none', cursor:'pointer', padding:0 }}>✕</button>
                           </>
                         ) : attachPickerFor === item.id ? (
                           <>
-                            <select value={attachPick[item.id] || ''} onChange={e => setAttachPick(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ fontSize:'10px', padding:'4px 6px', borderRadius:'6px', border:'1px solid var(--c-2a2a2a)', background:'var(--c-0f0f0f)', color:'var(--c-cccccc)', maxWidth:'160px' }}>
+                            <select value={attachPick[item.id] || ''} onChange={e => setAttachPick(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ fontSize:'var(--fs-xs)', padding:'4px 6px', borderRadius:'var(--r-sm)', border:'1px solid var(--c-2a2a2a)', background:'var(--c-0f0f0f)', color:'var(--c-cccccc)', maxWidth:'160px' }}>
                               <option value="">Alege factura...</option>
                               {visibleDocs.map(doc => <option key={doc.id} value={doc.id}>{docLabel(doc)}</option>)}
                             </select>
-                            <button onClick={() => atribuieManualFactura(item.id)} disabled={!attachPick[item.id] || attachBusy === item.id} style={{ fontSize:'10px', fontWeight:700, padding:'4px 8px', borderRadius:'6px', border:'none', background:culoare, color:'var(--c-ffffff)', cursor:'pointer', opacity:(!attachPick[item.id] || attachBusy === item.id) ? .5 : 1 }}>
+                            <button onClick={() => atribuieManualFactura(item.id)} disabled={!attachPick[item.id] || attachBusy === item.id} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'4px 8px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer', opacity:(!attachPick[item.id] || attachBusy === item.id) ? .5 : 1 }}>
                               {attachBusy === item.id ? '...' : 'Leagă'}
                             </button>
-                            <button onClick={() => setAttachPickerFor(null)} style={{ fontSize:'10px', color:'var(--c-888888)', background:'transparent', border:'none', cursor:'pointer' }}>Anulează</button>
+                            <button onClick={() => setAttachPickerFor(null)} style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', background:'transparent', border:'none', cursor:'pointer' }}>Anulează</button>
                           </>
                         ) : (
-                          <button onClick={() => setAttachPickerFor(item.id)} style={{ fontSize:'10px', fontWeight:700, padding:'4px 9px', borderRadius:'6px', border:'1px solid var(--c-333333)', background:'transparent', color:'var(--c-999999)', cursor:'pointer' }}>
+                          <button onClick={() => setAttachPickerFor(item.id)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'4px 9px', borderRadius:'var(--r-sm)', border:'1px solid var(--c-333333)', background:'transparent', color:'var(--c-999999)', cursor:'pointer' }}>
                             Atașează factură
                           </button>
                         )}
@@ -391,7 +390,7 @@ export default function UploadPanel({
 
         {/* Document list */}
         {section === 'airbnb-facturi' && loaded && docs.length > 0 && visibleDocs.length === 0 && (
-          <div style={{ fontSize: '11px', color: 'var(--accent-mint)', marginBottom: '16px' }}>Toate facturile sunt deja asociate cu o rezervare din borderou.</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--success)', marginBottom: '16px' }}>Toate facturile sunt deja asociate cu o rezervare din borderou.</div>
         )}
         {loaded && visibleDocs.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
@@ -401,42 +400,42 @@ export default function UploadPanel({
               const open = previewIds.has(doc.id)
               return (
                 <div key={doc.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: isPaid ? 'var(--c-141414)' : 'var(--c-161616)', border: `1px solid ${isPaid ? 'var(--c-1e1e1e)' : 'var(--c-222222)'}`, borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: isPaid ? 'var(--c-141414)' : 'var(--c-161616)', border: `1px solid ${isPaid ? 'var(--c-1e1e1e)' : 'var(--c-222222)'}`, borderRadius: 'var(--r-md)' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? 'var(--c-333333)' : culoare, flexShrink: 0 }}/>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: isPaid ? 'var(--c-666666)' : 'var(--c-cccccc)', textDecoration: isPaid ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {docLabel(doc)}
                       </div>
-                      <div style={{ fontSize: '10px', color: 'var(--c-666666)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {doc.fisier_nume}
                       </div>
                     </div>
-                    {doc.tip_document && <span style={{ fontSize: '10px', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
+                    {doc.tip_document && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
                     {showPaidToggle && (
-                      <button onClick={() => togglePaid(doc)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent-mint)', cursor: 'pointer', flexShrink: 0 }}>
+                      <button onClick={() => togglePaid(doc)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '4px 10px', borderRadius: 'var(--r-sm)', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}>
                         {isPaid ? 'Anulează' : 'Marchează achitat'}
                       </button>
                     )}
                     {kind && (
-                      <button onClick={() => togglePreview(doc.id)} style={{ fontSize: '11px', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                      <button onClick={() => togglePreview(doc.id)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: open ? 'var(--c-dddddd)' : 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                         {open ? 'Ascunde' : 'Vezi'}
                       </button>
                     )}
-                    <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', fontWeight: 600, color: legibil(culoare) }}>↓</a>
-                    <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+                    <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} title="Descarcă" aria-label={`Descarcă ${doc.fisier_nume}`} className="btn btn-sm btn-ghost btn-icon" style={{ color:'var(--accent)' }}>↓</a>
+                    <button onClick={() => deleteDoc(doc)} title="Șterge" aria-label={`Șterge ${doc.fisier_nume}`} className="btn btn-sm btn-ghost btn-icon" style={{ color: 'var(--danger)' }}>✕</button>
                   </div>
                   {open && kind === 'pdf' && (
-                    <iframe src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
+                    <iframe src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', marginTop: '6px', background: 'var(--c-ffffff)' }} />
                   )}
                   {open && kind === 'image' && (
-                    <img src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} alt={doc.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: '8px', marginTop: '6px', background: 'var(--c-ffffff)' }} />
+                    <img src={`/api/chitante/document?id=${encodeURIComponent(doc.id)}&preview=1`} alt={doc.fisier_nume} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', marginTop: '6px', background: 'var(--c-ffffff)' }} />
                   )}
                 </div>
               )
             })}
           </div>
         )}
-        {!loaded && <div style={{ fontSize: '12px', color: 'var(--c-999999)', marginBottom: '12px' }}>Se încarcă...</div>}
+        {!loaded && <div aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>{[0, 1].map(i => <div key={i} className="skeleton" style={{ height: '44px' }} />)}</div>}
 
         {/* Options row */}
         <div style={{ display: 'grid', gridTemplateColumns: supplier !== undefined ? '1fr' + (documentTypeOptions ? ' 1fr' : '') : '1fr', gap: '8px', marginBottom: '10px' }}>
@@ -452,7 +451,7 @@ export default function UploadPanel({
         {showLinkImport && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginBottom: '10px' }}>
             <input value={link} onChange={e => setLink(e.target.value)} placeholder={linkPlaceholder || 'Link PDF (HTTPS)'} style={INP}/>
-            <button onClick={() => importLink()} disabled={busy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: '8px', background: culoare, color: 'var(--c-ffffff)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: busy || !link ? .5 : 1 }}>
+            <button onClick={() => importLink()} disabled={busy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: 'var(--r-md)', background:'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, opacity: busy || !link ? .5 : 1 }}>
               Import
             </button>
           </div>
@@ -460,26 +459,31 @@ export default function UploadPanel({
 
         {/* Drop zone */}
         <div
+          role="button"
+          tabIndex={0}
+          aria-label={`Adaugă fișiere (${acceptLabel})`}
           onClick={() => fileRef.current?.click()}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileRef.current?.click() } }}
           onDragOver={e => { e.preventDefault(); setDrag(true) }}
           onDragLeave={() => setDrag(false)}
           onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) upload(e.dataTransfer.files) }}
           style={{
-            border: `1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`,
-            borderRadius: '10px', padding: '18px',
-            textAlign: 'center', cursor: 'pointer',
-            background: drag ? `${tint(r,.04)}` : 'var(--c-0d0d0d)',
-            transition: 'all .15s',
+            border: `1.5px dashed ${drag ? 'var(--accent)' : 'var(--border-strong)'}`,
+            borderRadius: 'var(--r-md)', padding: '20px 16px',
+            textAlign: 'center', cursor: busy ? 'wait' : 'pointer',
+            background: drag ? 'var(--accent-soft)' : 'var(--surface-sunken)',
+            transition: 'background-color .15s, border-color .15s',
           }}
         >
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-666666)', marginBottom: '3px' }}>
-            {busy ? 'Se încarcă...' : 'Adaugă fișiere'}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={drag ? 'var(--accent)' : 'var(--text-muted)'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ margin: '0 auto 6px', display: 'block' }}><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>
+          <div style={{ fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
+            {busy ? 'Se încarcă…' : drag ? 'Eliberează pentru a încărca' : 'Adaugă fișiere'}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--c-888888)' }}>{acceptLabel} · drag & drop sau click</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{acceptLabel} · trage aici sau click</div>
         </div>
         <input ref={fileRef} type="file" multiple accept={fileAccept} style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => e.target.files && upload(e.target.files)}/>
 
-        {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '8px' }}>{error}</p>}
+        {error && <p role="alert" style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)', marginTop: '8px' }}>{error}</p>}
       </div>
     </div>
   )

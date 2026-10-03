@@ -40,7 +40,7 @@ const STATUS_LABEL: Record<string, string> = {
   finalizat: 'Finalizat',
 }
 
-const INP: React.CSSProperties = { fontSize: '13px', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '8px 12px', color: 'var(--c-dddddd)', outline: 'none' }
+const INP: React.CSSProperties = { fontSize: 'var(--fs-md)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '8px 12px', color: 'var(--c-dddddd)', outline: 'none' }
 
 function AchizitieDocumente({ achizitieId, culoare, etapaCuranta }: { achizitieId: string; culoare: string; etapaCuranta: string }) {
   const [docs, setDocs] = useState<AchizitieDoc[]>([])
@@ -70,13 +70,13 @@ function AchizitieDocumente({ achizitieId, culoare, etapaCuranta }: { achizitieI
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
       {docs.map(d => (
-        <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--c-999999)' }}>
-          <span style={{ padding: '1px 6px', borderRadius: '999px', background: 'var(--c-1a1a1a)', fontSize: '10px', fontWeight: 700, color: 'var(--c-777777)' }}>{STATUS_LABEL[d.tip_document] || d.tip_document}</span>
-          <a href={`/api/chitante/document?id=${d.id}`} style={{ color: culoare, textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</a>
-          <button onClick={() => remove(d.id)} style={{ color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '11px' }}>✕</button>
+        <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-xs)', color: 'var(--c-999999)' }}>
+          <span style={{ padding: '1px 6px', borderRadius: 'var(--r-full)', background: 'var(--c-1a1a1a)', fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)' }}>{STATUS_LABEL[d.tip_document] || d.tip_document}</span>
+          <a href={`/api/chitante/document?id=${d.id}`} style={{ color:'var(--accent)', textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</a>
+          <button onClick={() => remove(d.id)} style={{ color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 'var(--fs-xs)' }}>✕</button>
         </div>
       ))}
-      <label style={{ fontSize: '11px', fontWeight: 600, color: culoare, cursor: 'pointer', opacity: busy ? .5 : 1 }}>
+      <label style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color:'var(--accent)', cursor: 'pointer', opacity: busy ? .5 : 1 }}>
         {busy ? 'Se încarcă...' : `+ Adaugă document (${STATUS_LABEL[etapaCuranta]})`}
         <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} disabled={busy}
           onChange={e => { if (e.target.files?.[0]) upload(e.target.files[0]); e.target.value = '' }} />
@@ -95,24 +95,24 @@ function SugestieBanner({ s, culoare, onConfirm, onReject, busy }: { s: Sugestie
   return (
     <div style={{
       display: 'flex', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap',
-      padding: '10px 12px', borderRadius: '8px', marginTop: '10px',
+      padding: '10px 12px', borderRadius: 'var(--r-md)', marginTop: '10px',
       background: sigur ? 'rgba(74,222,128,.08)' : 'rgba(251,146,60,.08)',
       border: `1px solid ${sigur ? 'rgba(74,222,128,.3)' : 'rgba(251,146,60,.3)'}`,
       opacity: busy ? .6 : 1,
     }}>
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: sigur ? 'var(--accent-green)' : '#F59E0B' }}>✨ {titlu}</div>
-        {s.valoare != null && <div style={{ fontSize: '11px', color: 'var(--c-999999)', marginTop: '2px' }}>{s.valoare.toLocaleString('ro-RO')} RON{s.sursa ? ` · ${s.sursa}` : ''}</div>}
-        {s.sursa_rezumat && <div style={{ fontSize: '11px', color: 'var(--c-999999)', marginTop: '3px' }}>{s.sursa_rezumat}</div>}
+        <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: sigur ? 'var(--success)' : 'var(--warning)' }}>✨ {titlu}</div>
+        {s.valoare != null && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-999999)', marginTop: '2px' }}>{s.valoare.toLocaleString('ro-RO')} RON{s.sursa ? ` · ${s.sursa}` : ''}</div>}
+        {s.sursa_rezumat && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-999999)', marginTop: '3px' }}>{s.sursa_rezumat}</div>}
         {(s.sursa_subiect || s.sursa_data) && (
-          <div style={{ fontSize: '10px', color: 'var(--c-666666)', marginTop: '3px' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', marginTop: '3px' }}>
             {s.sursa_subiect}{s.sursa_data ? ` · ${new Date(s.sursa_data).toLocaleDateString('ro-RO')}` : ''}
           </div>
         )}
       </div>
       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-        <button onClick={onConfirm} disabled={busy || (s.actiune !== 'actualizare_status' && !s.denumire)} style={{ fontSize: '11px', fontWeight: 700, padding: '6px 10px', borderRadius: '7px', border: 'none', background: 'var(--accent-green)', color: '#08210f', cursor: 'pointer', opacity: (s.actiune !== 'actualizare_status' && !s.denumire) ? .5 : 1 }}>Confirmă</button>
-        <button onClick={onReject} disabled={busy} style={{ fontSize: '11px', color: 'var(--c-888888)', background: 'transparent', border: '1px solid var(--c-2a2a2a)', borderRadius: '7px', padding: '6px 10px', cursor: 'pointer' }}>Respinge</button>
+        <button onClick={onConfirm} disabled={busy || (s.actiune !== 'actualizare_status' && !s.denumire)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent)', color: '#08210f', cursor: 'pointer', opacity: (s.actiune !== 'actualizare_status' && !s.denumire) ? .5 : 1 }}>Confirmă</button>
+        <button onClick={onReject} disabled={busy} style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)', background: 'transparent', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer' }}>Respinge</button>
       </div>
     </div>
   )
@@ -171,7 +171,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
     load()
   }
 
-  if (!items) return <div style={{ padding: '24px', fontSize: '13px', color: 'var(--c-999999)' }}>Se încarcă...</div>
+  if (!items) return <div style={{ padding: '24px', fontSize: 'var(--fs-md)', color: 'var(--c-999999)' }}>Se încarcă...</div>
 
   const sugestiiNoi = sugestii.filter(s => !s.achizitie_id)
 
@@ -180,8 +180,8 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
       <SincronizareProiectMail firmaId={firma.id} culoare={firma.culoare} onSynced={load} />
 
       {sugestiiNoi.length > 0 && (
-        <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '16px 18px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--c-999999)', marginBottom: '4px' }}>Sugestii din email</div>
+        <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--c-999999)', marginBottom: '4px' }}>Sugestii din email</div>
           {sugestiiNoi.map(s => (
             <SugestieBanner key={s.id} s={s} culoare={firma.culoare} busy={sugestieBusy === s.id}
               onConfirm={() => confirmSugestie(s.id)} onReject={() => respingeSugestie(s.id)} />
@@ -189,7 +189,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
         </div>
       )}
 
-      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '16px 18px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <input value={denumire} onChange={e => setDenumire(e.target.value)} placeholder="Denumire achiziție (ex. Aparat cu aburi)" style={{ ...INP, flex: '2 1 220px' }} />
         <input value={valoare} onChange={e => setValoare(e.target.value)} placeholder="Valoare (RON)" type="number" style={{ ...INP, flex: '1 1 120px' }} />
         <select value={sursa} onChange={e => setSursa(e.target.value)} style={{ ...INP, flex: '1 1 140px' }}>
@@ -197,34 +197,34 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
           <option value="grant">Grant</option>
           <option value="altul">Altul</option>
         </select>
-        <button onClick={addAchizitie} disabled={adding || !denumire.trim()} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: firma.culoare, color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: adding || !denumire.trim() ? .5 : 1 }}>
+        <button onClick={addAchizitie} disabled={adding || !denumire.trim()} style={{ padding: '8px 16px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent)', color: '#fff', fontSize: 'var(--fs-md)', fontWeight: 600, cursor: 'pointer', opacity: adding || !denumire.trim() ? .5 : 1 }}>
           + Adaugă
         </button>
       </div>
 
       {items.length === 0 ? (
-        <div style={{ padding: '40px', textAlign: 'center', fontSize: '13px', color: 'var(--c-777777)', background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px' }}>
+        <div style={{ padding: '40px', textAlign: 'center', fontSize: 'var(--fs-md)', color: 'var(--c-777777)', background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)' }}>
           Nicio achiziție încă.
         </div>
       ) : items.map(item => {
         const idx = STATUS_ORDER.indexOf(item.status as typeof STATUS_ORDER[number])
         const next = STATUS_ORDER[idx + 1]
         return (
-          <div key={item.id} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '12px', padding: '16px 18px' }}>
+          <div key={item.id} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-eeeeee)' }}>{item.denumire}</div>
-                <div style={{ fontSize: '11px', color: 'var(--c-777777)', marginTop: '2px' }}>
+                <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--c-eeeeee)' }}>{item.denumire}</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)', marginTop: '2px' }}>
                   {item.valoare != null ? `${item.valoare.toLocaleString('ro-RO')} RON` : 'fără valoare'} · {item.sursa || '—'}
                 </div>
               </div>
-              <button onClick={() => remove(item.id)} style={{ fontSize: '11px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Șterge</button>
+              <button onClick={() => remove(item.id)} style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Șterge</button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', flexWrap: 'wrap' }}>
               {STATUS_ORDER.map((s, i) => (
                 <span key={s} style={{
-                  fontSize: '10.5px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px',
+                  fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--r-full)',
                   background: i <= idx ? `${firma.culoare}22` : 'var(--c-1a1a1a)',
                   color: i <= idx ? firma.culoare : 'var(--c-666666)',
                   border: `1px solid ${i <= idx ? firma.culoare : 'var(--c-262626)'}`,
@@ -233,14 +233,14 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
                 </span>
               ))}
               {next && (
-                <button onClick={() => setStatus(item.id, next)} style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '999px', border: 'none', background: firma.culoare, color: '#fff', cursor: 'pointer' }}>
+                <button onClick={() => setStatus(item.id, next)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '4px 10px', borderRadius: 'var(--r-full)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer' }}>
                   → {STATUS_LABEL[next]}
                 </button>
               )}
             </div>
 
             <details style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 650, color: firma.culoare }}>Formulare achiziție: cerere ofertă, notă estimare, recepție</summary>
+              <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650, color: firma.culoare }}>Formulare achiziție: cerere ofertă, notă estimare, recepție</summary>
               <div style={{ marginTop: 16 }}><ProiectWorkflow firmaId={firma.id} purchaseId={item.id} /></div>
             </details>
             <AchizitieDocumente achizitieId={item.id} culoare={firma.culoare} etapaCuranta={item.status} />

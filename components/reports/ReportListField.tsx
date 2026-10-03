@@ -4,10 +4,10 @@ import type { ListItem } from '@/lib/documentWorkspace/types'
 
 const ROW_STYLE: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--c-0d0d0d)',
-  border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '2px 4px 2px 10px',
+  border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '2px 4px 2px 10px',
 }
 const INPUT_STYLE: React.CSSProperties = {
-  flex: 1, minWidth: 0, fontSize: '13px', color: 'var(--c-dddddd)', background: 'transparent',
+  flex: 1, minWidth: 0, fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', background: 'transparent',
   border: 'none', outline: 'none', padding: '8px 0',
 }
 
@@ -43,14 +43,14 @@ export default function ReportListField({ items, onChange }: { items: ListItem[]
           onDrop={e => { e.preventDefault(); if (dragIdx != null) move(dragIdx, idx); setDragIdx(null) }}
           onDragEnd={() => setDragIdx(null)}
         >
-          <span style={{ cursor: 'grab', color: 'var(--c-555555)', fontSize: '13px', flexShrink: 0, userSelect: 'none' }} title="Trage pentru a reordona">⋮⋮</span>
+          <span style={{ cursor: 'grab', color: 'var(--c-555555)', fontSize: 'var(--fs-md)', flexShrink: 0, userSelect: 'none' }} title="Trage pentru a reordona">⋮⋮</span>
           <input value={item.text} onChange={e => update(item.id, e.target.value)} placeholder="Text..." style={INPUT_STYLE}/>
-          <button onClick={() => remove(item.id)} title="Șterge" style={{ width: '24px', height: '24px', flexShrink: 0, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--c-666666)', fontSize: '15px', lineHeight: 1 }}>×</button>
+          <button onClick={() => remove(item.id)} title="Șterge" style={{ width: '24px', height: '24px', flexShrink: 0, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--c-666666)', fontSize: 'var(--fs-lg)', lineHeight: 1 }}>×</button>
         </div>
       ))}
       <button
         onClick={add}
-        style={{ alignSelf: 'flex-start', fontSize: '12px', fontWeight: 600, color: 'var(--accent-mint)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0' }}
+        style={{ alignSelf: 'flex-start', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0' }}
       >
         + Adaugă
       </button>

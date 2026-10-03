@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Icon from '@/components/ui/Icon'
 
 // Bara fixă jos-dreapta de pe fiecare pagină de modul - arată explicit ce urmează, ca utilizatorul
 // să nu mai trebuiască să-și amintească sau să ghicească ordinea de lucru a lunii. Pur navigare
@@ -6,23 +7,23 @@ import Link from 'next/link'
 export default function NextStepNav({ slug, luna, nextLabel, nextHref }: { slug: string; luna: string; nextLabel: string | null; nextHref: string | null }) {
   if (!nextHref || !nextLabel) {
     return (
-      <div style={{ position: 'sticky', bottom: '20px', display: 'flex', justifyContent: 'flex-end', marginTop: '32px' }}>
+      <div className="next-step">
         <Link
           href={`/${slug}/${luna}`}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--success)', background: 'var(--success-soft)', color: 'var(--success)', textDecoration: 'none', boxShadow: 'var(--shadow-md)' }}
+          className="btn btn-lg"
+          style={{ borderColor: 'color-mix(in srgb, var(--success) 45%, transparent)', background: 'var(--success-soft)', color: 'var(--success)', boxShadow: 'var(--shadow-md)' }}
         >
-          🎉 Ultimul pas al lunii - înapoi la rezumat
+          <Icon name="check" size={16} strokeWidth={2.25} /> Ultimul pas al lunii — înapoi la rezumat
         </Link>
       </div>
     )
   }
   return (
-    <div style={{ position: 'sticky', bottom: '20px', display: 'flex', justifyContent: 'flex-end', marginTop: '32px' }}>
-      <Link
-        href={nextHref}
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', textDecoration: 'none', boxShadow: 'var(--shadow-md)' }}
-      >
-        Pasul următor: {nextLabel} →
+    <div className="next-step">
+      <Link href={nextHref} className="btn btn-primary btn-lg" style={{ boxShadow: 'var(--shadow-md)', maxWidth: '100%' }}>
+        <span style={{ fontWeight: 500, opacity: .85 }}>Pasul următor:</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{nextLabel}</span>
+        <Icon name="arrowRight" size={16} />
       </Link>
     </div>
   )

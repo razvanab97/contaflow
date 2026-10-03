@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { legibil, tint } from '@/lib/colors'
+import { tint } from '@/lib/colors'
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 
@@ -168,39 +168,39 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
   const borderouFaraLocatie = docsBorderou.filter(d => !d.cod_unitate_booking || !activeLocatii.some(l => l.cod === d.cod_unitate_booking))
 
   return (
-    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: '14px', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
       <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--c-1a1a1a)' }}>
-        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-ffffff)', marginBottom: '4px' }}>Proprietăți Booking.com</div>
-        <div style={{ fontSize: '12px', color: 'var(--c-888888)', lineHeight: 1.45 }}>
+        <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--c-ffffff)', marginBottom: '4px' }}>Proprietăți Booking.com</div>
+        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-888888)', lineHeight: 1.45 }}>
           Fiecare proprietate are un cod (numărul unității de cazare din Booking) — facturile de comision și borderourile se grupează automat după acest cod, extras din documentul încărcat.
         </div>
       </div>
 
       <div style={{ padding: '18px 22px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-          <input value={cod} onChange={e => setCod(e.target.value)} placeholder="Cod (ex. 15331624)" style={{ width: '140px', fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
-          <input value={denumire} onChange={e => setDenumire(e.target.value)} placeholder="Denumire locație" style={{ flex: 1, minWidth: '200px', fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
-          <button onClick={addLocatie} disabled={busy || !cod.trim() || !denumire.trim()} style={{ fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '8px', border: 'none', background: culoare, color: '#fff', cursor: 'pointer', opacity: (busy || !cod.trim() || !denumire.trim()) ? .5 : 1 }}>
+          <input value={cod} onChange={e => setCod(e.target.value)} placeholder="Cod (ex. 15331624)" style={{ width: '140px', fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
+          <input value={denumire} onChange={e => setDenumire(e.target.value)} placeholder="Denumire locație" style={{ flex: 1, minWidth: '200px', fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
+          <button onClick={addLocatie} disabled={busy || !cod.trim() || !denumire.trim()} style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, padding: '9px 14px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer', opacity: (busy || !cod.trim() || !denumire.trim()) ? .5 : 1 }}>
             Adaugă
           </button>
-          <button onClick={() => setShowBulk(v => !v)} style={{ fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '8px', border: `1px solid ${culoare}`, background: 'transparent', color: legibil(culoare), cursor: 'pointer' }}>
+          <button onClick={() => setShowBulk(v => !v)} style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, padding: '9px 14px', borderRadius: 'var(--r-md)', border: '1px solid var(--accent)', background: 'transparent', color:'var(--accent)', cursor: 'pointer' }}>
             {showBulk ? 'Ascunde' : 'Adaugă mai multe deodată'}
           </button>
         </div>
 
         {showBulk && (
           <div style={{ marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={6} placeholder={'Lipește lista de proprietăți copiată din Booking extranet (cod + denumire pe același rând, ex:\n15331624   SkyPort Modern & stylish apartment...\n14207430   Oaza de natură lângă Gară...)'} style={{ fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '10px 12px', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}/>
-            <button onClick={addBulk} disabled={busy || !bulkText.trim()} style={{ alignSelf: 'flex-start', fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '8px', border: 'none', background: culoare, color: '#fff', cursor: 'pointer', opacity: (busy || !bulkText.trim()) ? .5 : 1 }}>
+            <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={6} placeholder={'Lipește lista de proprietăți copiată din Booking extranet (cod + denumire pe același rând, ex:\n15331624   SkyPort Modern & stylish apartment...\n14207430   Oaza de natură lângă Gară...)'} style={{ fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '10px 12px', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}/>
+            <button onClick={addBulk} disabled={busy || !bulkText.trim()} style={{ alignSelf: 'flex-start', fontSize: 'var(--fs-sm)', fontWeight: 700, padding: '9px 14px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer', opacity: (busy || !bulkText.trim()) ? .5 : 1 }}>
               Adaugă din listă
             </button>
           </div>
         )}
 
-        {error && <p style={{ fontSize: '11px', color: 'var(--accent-red)', marginBottom: '10px' }}>{error}</p>}
-        {!loaded && <div style={{ fontSize: '12px', color: 'var(--c-888888)' }}>Se încarcă...</div>}
+        {error && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', marginBottom: '10px' }}>{error}</p>}
+        {!loaded && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-888888)' }}>Se încarcă...</div>}
         {loaded && activeLocatii.length === 0 && (
-          <div style={{ fontSize: '11px', color: 'var(--c-777777)' }}>Nu ai adăugat încă nicio proprietate Booking.</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)' }}>Nu ai adăugat încă nicio proprietate Booking.</div>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -209,27 +209,27 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
             const borderouri = docsBorderou.filter(d => d.cod_unitate_booking === loc.cod)
             const complet = facturi.length > 0 && borderouri.length > 0
             return (
-              <div key={loc.id} style={{ background: 'var(--c-161616)', border: `1px solid ${complet ? 'rgba(74,222,128,.25)' : 'var(--c-222222)'}`, borderRadius: '10px', padding: '12px 14px' }}>
+              <div key={loc.id} style={{ background: 'var(--c-161616)', border: `1px solid ${complet ? 'rgba(74,222,128,.25)' : 'var(--c-222222)'}`, borderRadius: 'var(--r-md)', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--c-eeeeee)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loc.denumire}</div>
-                    <div style={{ fontSize: '10px', color: 'var(--c-777777)' }}>Cod: {loc.cod}</div>
+                    <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--c-eeeeee)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loc.denumire}</div>
+                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)' }}>Cod: {loc.cod}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, color: complet ? 'var(--accent-mint)' : '#f97316', background: complet ? 'rgba(74,222,128,.1)' : 'rgba(251,146,60,.1)', border: `1px solid ${complet ? 'rgba(74,222,128,.3)' : 'rgba(251,146,60,.3)'}`, borderRadius: '999px', padding: '3px 8px' }}>
+                    <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: complet ? 'var(--success)' : 'var(--warning)', background: complet ? 'rgba(74,222,128,.1)' : 'rgba(251,146,60,.1)', border: `1px solid ${complet ? 'rgba(74,222,128,.3)' : 'rgba(251,146,60,.3)'}`, borderRadius: 'var(--r-full)', padding: '3px 8px' }}>
                       {facturi.length} factur{facturi.length===1?'ă':'i'} · {borderouri.length} borderou{borderouri.length===1?'':'ri'}
                     </span>
-                    <button onClick={() => removeLocatie(loc)} title="Șterge locația" style={{ fontSize: '11px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
+                    <button onClick={() => removeLocatie(loc)} title="Șterge locația" style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
                   </div>
                 </div>
                 {(facturi.length > 0 || borderouri.length > 0) && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     {[...facturi, ...borderouri].map(doc => (
-                      <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 9px', background: 'var(--c-0f0f0f)', borderRadius: '7px' }}>
-                        <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{docsFacturi.includes(doc) ? 'factură' : 'borderou'}</span>
-                        <div style={{ flex: 1, minWidth: 0, fontSize: '11px', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{docLabel(doc)}</div>
-                        <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', color: legibil(culoare), textDecoration: 'none', flexShrink: 0 }}>↓</a>
-                        <button onClick={() => deleteDoc(doc)} style={{ fontSize: '10px', color: 'var(--accent-red)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                      <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 9px', background: 'var(--c-0f0f0f)', borderRadius: 'var(--r-sm)' }}>
+                        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{docsFacturi.includes(doc) ? 'factură' : 'borderou'}</span>
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-xs)', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{docLabel(doc)}</div>
+                        <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: 'var(--fs-xs)', color:'var(--accent)', textDecoration: 'none', flexShrink: 0 }}>↓</a>
+                        <button onClick={() => deleteDoc(doc)} style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}>✕</button>
                       </div>
                     ))}
                   </div>
@@ -240,11 +240,11 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
         </div>
 
         <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--c-1a1a1a)' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--c-dddddd)', marginBottom: '4px' }}>Adaugă facturi sau borderouri Booking</div>
-          <div style={{ fontSize: '10px', color: 'var(--c-777777)', marginBottom: '10px' }}>Un singur loc pentru ambele — AI-ul recunoaște ce e fiecare fișier și îl pune la proprietatea potrivită.</div>
+          <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--c-dddddd)', marginBottom: '4px' }}>Adaugă facturi sau borderouri Booking</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)', marginBottom: '10px' }}>Un singur loc pentru ambele — AI-ul recunoaște ce e fiecare fișier și îl pune la proprietatea potrivită.</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginBottom: '10px' }}>
-            <input value={link} onChange={e => setLink(e.target.value)} placeholder="Link PDF Booking.com" style={{ fontSize: '12px', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: '8px', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
-            <button onClick={() => importLink()} disabled={uploadBusy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: '8px', background: culoare, color: '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: uploadBusy || !link ? .5 : 1 }}>
+            <input value={link} onChange={e => setLink(e.target.value)} placeholder="Link PDF Booking.com" style={{ fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
+            <button onClick={() => importLink()} disabled={uploadBusy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: 'var(--r-md)', background:'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, opacity: uploadBusy || !link ? .5 : 1 }}>
               Import
             </button>
           </div>
@@ -255,32 +255,32 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
             onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files) }}
             style={{
               border: `1.5px dashed ${drag ? culoare : 'var(--c-252525)'}`,
-              borderRadius: '10px', padding: '18px',
+              borderRadius: 'var(--r-md)', padding: '18px',
               textAlign: 'center', cursor: 'pointer',
               background: drag ? tint(r, .04) : 'var(--c-0d0d0d)',
               transition: 'all .15s',
             }}
           >
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-666666)', marginBottom: '3px' }}>
+            <div style={{ fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--c-666666)', marginBottom: '3px' }}>
               {uploadBusy ? 'Se încarcă...' : 'Adaugă fișiere'}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--c-888888)' }}>PDF, JPG, PNG · drag & drop, click sau Cmd+V</div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-888888)' }}>PDF, JPG, PNG · drag & drop, click sau Cmd+V</div>
           </div>
           <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} onChange={e => { if (e.target.files) uploadFiles(e.target.files); e.target.value = '' }}/>
         </div>
 
         {(facturiFaraLocatie.length > 0 || borderouFaraLocatie.length > 0) && (
           <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--c-1a1a1a)' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-888888)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '8px' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-888888)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '8px' }}>
               Nealocate unei proprietăți ({facturiFaraLocatie.length + borderouFaraLocatie.length})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {[...facturiFaraLocatie, ...borderouFaraLocatie].map(doc => (
-                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 9px', background: 'var(--c-161616)', borderRadius: '7px' }}>
-                  <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{facturiFaraLocatie.includes(doc) ? 'factură' : 'borderou'}</span>
-                  <div style={{ flex: 1, minWidth: 0, fontSize: '11px', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={doc.cod_unitate_booking ? `Cod necunoscut: ${doc.cod_unitate_booking}` : 'Fără cod detectat'}>{docLabel(doc)}</div>
-                  <span style={{ fontSize: '9px', color: 'var(--c-666666)', flexShrink: 0 }}>{doc.cod_unitate_booking ? `cod ${doc.cod_unitate_booking}` : 'fără cod'}</span>
-                  <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: '11px', color: legibil(culoare), textDecoration: 'none', flexShrink: 0 }}>↓</a>
+                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 9px', background: 'var(--c-161616)', borderRadius: 'var(--r-sm)' }}>
+                  <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{facturiFaraLocatie.includes(doc) ? 'factură' : 'borderou'}</span>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-xs)', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={doc.cod_unitate_booking ? `Cod necunoscut: ${doc.cod_unitate_booking}` : 'Fără cod detectat'}>{docLabel(doc)}</div>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', flexShrink: 0 }}>{doc.cod_unitate_booking ? `cod ${doc.cod_unitate_booking}` : 'fără cod'}</span>
+                  <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: 'var(--fs-xs)', color:'var(--accent)', textDecoration: 'none', flexShrink: 0 }}>↓</a>
                 </div>
               ))}
             </div>
