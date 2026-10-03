@@ -23,7 +23,7 @@ export default function FirmaTrend({ firmaId, firmaSlug, luna, culoare }: { firm
   return (
     <div style={{ marginBottom: '16px', padding: '10px 12px 4px', borderRadius: 'var(--r-md)', background: 'var(--surface-sunken)', border: '1px solid var(--border-subtle)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
-        <span>Încasări RON · {cuBani[0].label} – {ultima.label}</span>
+        <span title="Toate conturile, echivalent lei la cursul BNR, fără schimburi valutare">Încasări (lei + valută) · {cuBani[0].label} – {ultima.label}</span>
         <span className="num" style={{ color: 'var(--text-secondary)' }}>{money(ultima.incasari)}</span>
       </div>
       <Sparkline values={cuBani.map(p => p.incasari)} color={culoare} title="Încasări pe ultimele luni" />

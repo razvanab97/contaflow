@@ -1,11 +1,12 @@
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { getFirmaTotalTasks } from '@/lib/firma-config'
 import { workMonthLabel } from '@/lib/accounting-period'
+import { calculeazaFlux, type TxFlux } from '@/lib/flux-lunar'
 
 export interface PunctIstoric {
   luna: string          // luna de lucru, YYYY-MM
   label: string
-  incasari: number      // RON, din extrasele atasate lunii (aceeasi regula ca /api/emag summary)
+  incasari: number      // toate conturile, echivalent lei la cursul BNR, fara schimburi valutare (ca /api/luna/flux)
   plati: number
   pct: number           // % task-uri bifate
   initializata: boolean
@@ -34,6 +35,7 @@ export async function getIstoricLunar(firmaId: string, firmaSlug: string, luna: 
   const totalTasks = getFirmaTotalTasks(firmaSlug)
   const doneByLuna = new Map<string, number>()
   const bankByLuna = new Map<string, { in: number; out: number }>()
+  const txByLuna = new Map<string, TxFlux[]>()
 
   if (lunaIds.length) {
     const [{ data: stari }, { data: extrase }] = await Promise.all([
@@ -44,18 +46,17 @@ export async function getIstoricLunar(firmaId: string, firmaSlug: string, luna: 
     const lunaByExtras = new Map<string, string>((extrase || []).map((e: any) => [e.id, e.luna_id]))
     const extrasIds = [...lunaByExtras.keys()]
     for (let from = 0; extrasIds.length; from += 1000) {
-      const { data: txs } = await sb.from('tranzactii').select('extras_id,tip,suma,valuta').in('extras_id', extrasIds).range(from, from + 999)
+      const { data: txs } = await sb.from('tranzactii').select('extras_id,data_tranzactie,tip,suma,valuta,descriere,descriere_curatata').in('extras_id', extrasIds).order('id').range(from, from + 999)
       for (const t of txs || []) {
-        if (t.valuta !== 'RON') continue
         const lid = lunaByExtras.get(t.extras_id)
-        if (!lid) continue
-        const b = bankByLuna.get(lid) || { in: 0, out: 0 }
-        if (t.tip === 'credit') b.in += Number(t.suma) || 0
-        else b.out += Number(t.suma) || 0
-        bankByLuna.set(lid, b)
+        if (lid) txByLuna.set(lid, [...(txByLuna.get(lid) || []), t])
       }
       if (!txs || txs.length < 1000) break
     }
+    await Promise.all([...txByLuna.entries()].map(async ([lid, txs]) => {
+      const f = await calculeazaFlux(txs)
+      bankByLuna.set(lid, { in: f.consolidat.incasari, out: f.consolidat.plati })
+    }))
   }
 
   return luni.map(l => {
