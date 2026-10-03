@@ -84,6 +84,24 @@ type SyncResult = {
   activity?: SyncActivity[]
   messagesChecked?: number
   pdfsFound?: number
+  continuare?: number
+}
+
+// Cate joburi de continuare se pot lansa automat unul dupa altul cand timpul (60s) nu ajunge.
+const MAX_CONTINUARI = 8
+const STALE_MS = 3 * 60_000
+
+// Joburile ramase "running"/"queued" fara progres peste 3 minute (functie omorata de platforma)
+// se marcheaza ca eroare la orice citire - altfel ar aparea agatate in interfata pana la urmatorul click.
+async function curataJoburiBlocate(sb: ReturnType<typeof getServiceSupabase>, filtru: { firmaId?: string; sourceId?: string } = {}) {
+  let q = sb.from('inbox_sync_jobs').update({
+    status: 'error',
+    error_message: 'Job blocat fără progres peste 3 minute',
+    completed_at: new Date().toISOString(),
+  }).in('status', ['queued', 'running']).lt('updated_at', new Date(Date.now() - STALE_MS).toISOString())
+  if (filtru.firmaId) q = q.eq('firma_id', filtru.firmaId)
+  if (filtru.sourceId) q = q.eq('source_id', filtru.sourceId)
+  await q
 }
 
 function decodeBase64Url(data: string) {
@@ -222,7 +240,7 @@ async function updateJobProgress(sb: ReturnType<typeof getServiceSupabase>, job:
   }).eq('id', job.id)
 }
 
-async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
+async function runGmailSyncJob(job: SyncJob, maxMessages: number, origin?: string) {
   const startedAt = Date.now()
   const timeIsUp = () => Date.now() - startedAt > JOB_TIME_BUDGET_MS
   const sb = getServiceSupabase()
@@ -345,6 +363,10 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
         }
       }
       processedIds.push(messageRef.id)
+      // Salvat imediat, nu doar la final: daca functia e oprita brutal, emailurile deja procesate
+      // nu se mai reiau la urmatoarea rulare.
+      await sb.from('inbox_gmail_processed')
+        .upsert([{ source_id: job.source_id, message_id: messageRef.id }], { onConflict: 'source_id,message_id', ignoreDuplicates: true })
     }
 
     if (processedIds.length) {
@@ -359,11 +381,13 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
       updated_at: new Date().toISOString(),
     }).eq('id', job.source_id)
 
+    const continuare = (job.result?.continuare || 0)
+    const continuaAutomat = stoppedEarly && !!origin && continuare < MAX_CONTINUARI
     if (stoppedEarly) {
       await updateJobProgress(sb, job, {}, {
         status: 'info',
-        text: 'M-am oprit la timp ca să nu rămână jobul agățat (plan Vercel Hobby, 60s)',
-        detail: 'Apasă din nou „Sincronizează” pentru restul emailurilor — ce s-a importat deja nu se reia.',
+        text: continuaAutomat ? 'Limita de 60s atinsă — continui automat cu restul emailurilor' : 'M-am oprit la timp ca să nu rămână jobul agățat (plan Vercel Hobby, 60s)',
+        detail: continuaAutomat ? `Partea ${continuare + 2} pornește imediat; ce s-a importat deja nu se reia.` : 'Apasă din nou „Sincronizează” pentru restul emailurilor — ce s-a importat deja nu se reia.',
       })
     }
 
@@ -390,6 +414,19 @@ async function runGmailSyncJob(job: SyncJob, maxMessages: number) {
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', job.id)
+
+    // Continuare automata intr-o invocare noua (fiecare are propriile 60s).
+    if (continuaAutomat) {
+      await fetch(new URL('/api/inbox-facturi/gmail/sync', origin), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceId: job.source_id, firmaId: job.firma_id, lunaId: job.luna_id, luna: job.luna,
+          sinceDate: job.result?.sinceDate || undefined, untilDate: job.result?.untilDate || undefined,
+          max: maxMessages, continuare: continuare + 1,
+        }),
+      }).catch(() => {})
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Sincronizarea Gmail a eșuat'
     await updateJobProgress(sb, job, {}, {
@@ -417,6 +454,7 @@ export async function GET(req: NextRequest) {
   if (!firmaId) return NextResponse.json({ error: 'firmaId lipsește' }, { status: 400 })
 
   const sb = getServiceSupabase()
+  await curataJoburiBlocate(sb, { firmaId, sourceId: sourceId || undefined })
   let query = sb
     .from('inbox_sync_jobs')
     .select('id,source_id,firma_id,luna_id,luna,status,messages_checked,pdfs_found,imported_count,duplicate_count,skipped_count,since_date,error_message,result,started_at,completed_at,created_at,updated_at')
@@ -430,7 +468,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { sourceId, firmaId, lunaId, luna, max = 100, sinceDate, untilDate, preview = false } = await req.json().catch(() => ({}))
+  const { sourceId, firmaId, lunaId, luna, max = 100, sinceDate, untilDate, preview = false, continuare = 0 } = await req.json().catch(() => ({}))
   const cleanSourceId = String(sourceId || '')
   const cleanFirmaId = String(firmaId || '')
   const cleanLunaId = String(lunaId || '')
@@ -547,6 +585,7 @@ export async function POST(req: NextRequest) {
     messagesChecked: 0,
     pdfsFound: 0,
     imported: [],
+    continuare: Math.min(Math.max(Number(continuare) || 0, 0), MAX_CONTINUARI),
     activity: [{
       time: new Date().toISOString(),
       status: 'info',
@@ -567,7 +606,7 @@ export async function POST(req: NextRequest) {
   if (error || !job) return NextResponse.json({ error: error?.message || 'Jobul nu a putut fi creat' }, { status: 500 })
 
   after(async () => {
-    await runGmailSyncJob(job as SyncJob, maxMessages)
+    await runGmailSyncJob(job as SyncJob, maxMessages, req.nextUrl.origin)
   })
 
   return NextResponse.json({ job })

@@ -5,6 +5,9 @@ import FacturiLocaleGlobal from '@/components/FacturiLocaleGlobal'
 import FirmaTrend from '@/components/FirmaTrend'
 import ProgressRing from '@/components/ui/ProgressRing'
 import CountUp from '@/components/ui/CountUp'
+import DeFacut from '@/components/DeFacut'
+import DateLipsaDocumente from '@/components/DateLipsaDocumente'
+import { getDeFacut } from '@/lib/de-facut'
 import { dbSelect } from '@/lib/db'
 import { getRestanteCount } from '@/lib/queries'
 import { getStardeskDiscrepanteCount } from '@/lib/stardeskVerify'
@@ -66,6 +69,8 @@ export default async function Dashboard() {
   const firmeCuDiscrepante = discrepanteCounts.filter(n => n > 0).length
 
   const ll = accountingFullLabel(LUNA)
+  const deFacut = await getDeFacut(firme.map((f: any) => ({ id: f.id, slug: f.slug, nume: f.nume, culoare: f.culoare })), LUNA, restanteMap)
+  const urgente = deFacut.filter(i => i.urgenta !== 'normal').length
 
   // Agregate pentru banda de indicatori - calculate o singura data, aceleasi formule ca pe carduri.
   const firmeStats = firme.map((f: any) => {
@@ -113,6 +118,12 @@ export default async function Dashboard() {
           <div className="stat-hint">{totalDiscrepante > 0 ? `de preț, în ${firmeCuDiscrepante} ${firmeCuDiscrepante === 1 ? 'firmă' : 'firme'}` : 'fără diferențe de preț'}</div>
         </div>
       </div>
+
+      <div className="section-title">
+        <h2>De făcut</h2>
+        <span style={{ fontSize: 'var(--fs-sm)', color: urgente ? 'var(--warning)' : 'var(--text-muted)' }}>{deFacut.length ? `${deFacut.length} ${deFacut.length === 1 ? 'acțiune' : 'acțiuni'}${urgente ? ` · ${urgente} ${urgente === 1 ? 'urgentă' : 'urgente'}` : ''}` : ''}</span>
+      </div>
+      <DeFacut items={deFacut} />
 
       <div className="section-title"><h2>Firme</h2></div>
       <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: '12px', alignItems: 'start' }}>
@@ -200,6 +211,7 @@ export default async function Dashboard() {
       <div className="section-title" style={{ marginTop: '32px' }}><h2>Documente</h2></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(440px, 100%), 1fr))', gap: '12px', alignItems: 'start' }}>
         <FacturiLocaleGlobal firme={firme.map((f: any) => ({ id: f.id, nume: f.nume }))} />
+        <DateLipsaDocumente />
         <DocumenteGenerale />
       </div>
     </main>

@@ -3,8 +3,9 @@
 export default function ExtrasStats({
   total, documentate, neasociate, ignorate, pct,
   finalizat, finalizing, onToggleFinalizat, overallGata,
-  onExport, exportingDocs, exportError, culoare,
+  onExport, exportingDocs, exportError, culoare, deVerificat = 0, onShowDeVerificat,
 }: {
+  deVerificat?: number; onShowDeVerificat?: () => void
   total: number; documentate: number; neasociate: number; ignorate: number; pct: number
   finalizat: boolean; finalizing: boolean; onToggleFinalizat: (v: boolean) => void; overallGata: boolean
   onExport: () => void; exportingDocs: boolean; exportError: string
@@ -18,6 +19,12 @@ export default function ExtrasStats({
         <Stat label="Documentate" value={documentate} color="var(--success)" />
         <Stat label="Neasociate" value={neasociate} color="var(--purple)" />
         <Stat label="Ignorate" value={ignorate} color="var(--text-muted)" />
+        {deVerificat > 0 && (
+          <button onClick={onShowDeVerificat} title="Cheltuieli ignorate fără motiv justificat — probabil lipsește documentul" style={{ textAlign:'left', background:'var(--warning-soft)', border:'1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius:'var(--r-md)', padding:'4px 10px' }}>
+            <div className="stat-label" style={{ color:'var(--warning)' }}>⚠ De verificat</div>
+            <div style={{ fontSize:'var(--fs-lg)', fontWeight:650, color:'var(--warning)', marginTop:'2px' }}>{deVerificat}</div>
+          </button>
+        )}
       </div>
 
       <div style={{ flex:1, minWidth:'120px', display:'flex', alignItems:'center', gap:'10px' }}>

@@ -5,12 +5,14 @@ import TransactionDetails from './TransactionDetails'
 import DocumentMatch from './DocumentMatch'
 import DocumentActions from './DocumentActions'
 import DocumentAttachedList from './DocumentAttachedList'
+import { MOTIVE_IGNORARE, ignorareDeVerificat, motivEfectiv } from '@/lib/tranzactii-reguli'
 
 export default function TransactionWorkspaceCard({
   tx, index, total, firmaId, lunaId, culoare,
   onClearNA, onRefresh, onUploadSuccess,
-  activeSuggestion, sugestieBusy, onConfirmSuggestion,
+  activeSuggestion, sugestieBusy, onConfirmSuggestion, onSetMotiv,
 }: {
+  onSetMotiv?: (motiv: string) => void
   tx: Tx; index: number; total: number
   firmaId: string; lunaId: string; culoare: string
   onClearNA: () => void
@@ -47,8 +49,31 @@ export default function TransactionWorkspaceCard({
             <div style={{ width:'44px', height:'44px', borderRadius:'50%', background:'var(--surface-secondary)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
               <svg width="18" height="18" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </div>
-            <h3 style={{ fontSize:'var(--fs-lg)', fontWeight:700, color:'var(--text-primary)', marginBottom:'6px' }}>Tranzacție ignorată</h3>
-            <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-secondary)', marginBottom:'18px' }}>Această tranzacție a fost marcată ca ignorată (nu necesită document).</p>
+            <h3 style={{ fontSize:'var(--fs-lg)', fontWeight:700, color:'var(--text-primary)', marginBottom:'6px' }}>{tx.ignorat_auto ? 'Sărită automat' : 'Tranzacție ignorată'}</h3>
+            <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-secondary)', marginBottom:'14px' }}>
+              {tx.ignorat_auto ? 'Regulă standard: comisioanele, schimburile valutare și încasările Booking/Airbnb/eMAG nu au nevoie de document.' : 'Această tranzacție a fost marcată ca ignorată (nu necesită document).'}
+            </p>
+            {ignorareDeVerificat(tx) && (
+              <div role="alert" style={{ margin:'0 auto 14px', maxWidth:'440px', padding:'10px 12px', borderRadius:'var(--r-md)', background:'var(--warning-soft)', border:'1px solid color-mix(in srgb, var(--warning) 35%, transparent)', color:'var(--warning)', fontSize:'var(--fs-sm)', textAlign:'left' }}>
+                ⚠ Este o cheltuială ignorată fără un motiv care să o justifice. Probabil lipsește factura sau bonul — alege motivul de mai jos sau reactivează și atașează documentul.
+              </div>
+            )}
+            {onSetMotiv && (
+              <div style={{ marginBottom:'18px' }}>
+                <div className="eyebrow" style={{ marginBottom:'8px' }}>Motivul ignorării</div>
+                <div role="radiogroup" aria-label="Motivul ignorării" style={{ display:'flex', flexWrap:'wrap', gap:'6px', justifyContent:'center', maxWidth:'520px', margin:'0 auto' }}>
+                  {MOTIVE_IGNORARE.map(m => {
+                    const activ = motivEfectiv(tx) === m.key
+                    return (
+                      <button key={m.key} role="radio" aria-checked={activ} onClick={() => onSetMotiv(m.key)} className="btn btn-sm"
+                        style={activ ? { background:'var(--accent-soft)', borderColor:'var(--accent)', color:'var(--accent)' } : { color:'var(--text-secondary)' }}>
+                        {m.scurt}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             <button onClick={onClearNA} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'8px 16px', borderRadius:'var(--r-md)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor:'pointer' }}>
               Reactivează pentru adăugare document
             </button>

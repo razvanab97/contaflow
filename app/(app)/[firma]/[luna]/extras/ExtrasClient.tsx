@@ -10,6 +10,7 @@ import ExtrasStats from './components/ExtrasStats'
 import ExtrasImportPanel from './components/ExtrasImportPanel'
 import ExtrasWorkspace from './components/ExtrasWorkspace'
 import NextStepNav from '../NextStepNav'
+import { motivSugerat, ignorareDeVerificat, MOTIV_LABEL } from '@/lib/tranzactii-reguli'
 
 const EXTRAS_UNLOCK_CODES: Record<string, string> = {
   'ab-homes-invest': '48867823',
@@ -45,6 +46,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const restoredScrollTop = useRef(0)
   const currentSidebarScrollTop = useRef(0)
   const restored = useRef(false)
+  const autoRan = useRef(false)
   const positionRestored = useRef(false)
   const c = firma.culoare || '#F27A1A'
   const extrasUnlockCode = EXTRAS_UNLOCK_CODES[firma.slug]
@@ -184,18 +186,50 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     setExportingDocs(false)
   }
 
-  async function updateNote(id: string, note: string|null) {
-    const previous = txs.find(tx => tx.id === id)?.note || null
-    setTxs(current => current.map(tx => tx.id === id ? { ...tx, note } : tx))
+  async function updateNote(id: string, note: string|null, motiv: string|null = null) {
+    const prev = txs.find(tx => tx.id === id)
+    const snapshot = { note: prev?.note ?? null, motiv_ignorare: prev?.motiv_ignorare ?? null, ignorat_auto: prev?.ignorat_auto ?? false }
+    setTxs(current => current.map(tx => tx.id === id ? { ...tx, note, motiv_ignorare: note ? motiv : null, ignorat_auto: false } : tx))
     try {
-      const res = await fetch('/api/tranzactii/note', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, note}) })
-      if (!res.ok) setTxs(current => current.map(tx => tx.id === id ? { ...tx, note:previous } : tx))
+      const res = await fetch('/api/tranzactii/note', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id, note, motiv: note ? motiv : null }) })
+      if (!res.ok) setTxs(current => current.map(tx => tx.id === id ? { ...tx, ...snapshot } : tx))
     } catch {
-      setTxs(current => current.map(tx => tx.id === id ? { ...tx, note:previous } : tx))
+      setTxs(current => current.map(tx => tx.id === id ? { ...tx, ...snapshot } : tx))
     }
   }
+
+  function setMotiv(id: string, motiv: string) { updateNote(id, 'na', motiv) }
+
+  // Procesare automata: asocieri fara echivoc + sarirea tranzactiilor standard (comisioane,
+  // schimb valutar, incasari Booking/Airbnb/eMAG). Rulata o data la deschidere si dupa fiecare import.
+  const autoProcess = useCallback(async () => {
+    try {
+      const res = await fetch('/api/extras/auto-proceseaza', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId }) })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data || !data.total) return
+      const parti: string[] = []
+      const ign = Object.entries(data.ignorate || {}) as [string, number][]
+      const asoc = Object.values(data.asociate || {}).reduce((a: number, b) => a + (b as number), 0) as number
+      if (asoc) parti.push(`${asoc} ${asoc === 1 ? 'document asociat' : 'documente asociate'} automat`)
+      if (ign.length) parti.push(`${ign.reduce((a, [, n]) => a + n, 0)} tranzacții standard sărite (${ign.map(([k, n]) => `${n} ${(MOTIV_LABEL[k] || k).toLowerCase()}`).join(', ')})`)
+      window.dispatchEvent(new CustomEvent('cf:toast', { detail: { text: `Procesare automată: ${parti.join(' · ')}. Le poți reactiva oricând.`, tone: 'success' } }))
+      await load(true)
+    } catch {}
+  }, [lunaId, load])
+
+  useEffect(() => {
+    if (loading || autoRan.current) return
+    autoRan.current = true
+    if (txs.some(t => !t.document_id && t.note !== 'na')) autoProcess()
+  }, [loading, txs, autoProcess])
+
+  async function afterImport() {
+    await load()
+    await autoProcess()
+  }
   function markNA(id: string) {
-    updateNote(id, 'na')
+    const tx = txs.find(t => t.id === id)
+    updateNote(id, 'na', tx ? motivSugerat(tx, [firma.nume]) : null)
     if (filter === 'lipsa') {
       setActiveTxIndex(index => Math.min(index, Math.max(filtered.length - 2, 0)))
     } else {
@@ -257,7 +291,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
       <ExtrasImportPanel
         open={importOpen} onClose={() => setImportOpen(false)}
         extrase={extrase} firmaId={firma.id} lunaId={lunaId} culoare={c}
-        onDone={load} unlockCode={extrasUnlockCode}
+        onDone={afterImport} unlockCode={extrasUnlockCode}
         newSlots={newSlots} onAddSlot={() => setNewSlots(s => s+1)}
       />
 
@@ -280,6 +314,8 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
             total={scopedTxs.length} documentate={counts.ok} neasociate={counts.lipsa} ignorate={counts.na} pct={pct}
             finalizat={finalizat} finalizing={finalizing} onToggleFinalizat={toggleFinalizat} overallGata={overallGata}
             onExport={exportDocuments} exportingDocs={exportingDocs} exportError={exportError}
+            deVerificat={scopedTxs.filter(t => ignorareDeVerificat(t)).length}
+            onShowDeVerificat={() => { setFilter('na'); setFlowFilter('debit'); setActiveTxIndex(0) }}
             culoare={c}
           />
 
@@ -303,7 +339,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
             <ExtrasWorkspace
               txs={filtered} activeTxIndex={activeTxIndex} setActiveTxIndex={setActiveTxIndex}
               firmaId={firma.id} lunaId={lunaId} culoare={c}
-              onNA={markNA} onClearNA={clearNA} onUploadSuccess={onUploadSuccess} onRefresh={()=>load(true)}
+              onNA={markNA} onClearNA={clearNA} onSetMotiv={setMotiv} onUploadSuccess={onUploadSuccess} onRefresh={()=>load(true)}
               search={search} onSearchChange={setSearchValue}
               filter={filter} flowFilter={flowFilter} counts={counts} flowCounts={flowCounts}
               onFilterChange={setF} onFlowFilterChange={setFlow}

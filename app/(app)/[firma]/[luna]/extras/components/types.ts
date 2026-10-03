@@ -4,6 +4,7 @@ export interface Tx {
   tip: 'debit'|'credit'; suma: number; valuta: string
   referinta: string|null
   categorie: string; document_id: string|null; note: string|null; status_note: string|null
+  motiv_ignorare?: string|null; ignorat_auto?: boolean
   documente: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }|null
   documenteToate?: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }[]
   sugestieFactura?: { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_factura:string|null; created_at?:string }|null
