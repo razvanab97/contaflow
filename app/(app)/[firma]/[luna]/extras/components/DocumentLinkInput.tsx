@@ -47,7 +47,7 @@ export default function DocumentLinkInput({ mode, txId, firmaId, lunaId, tip, fu
     <div style={{ padding:'10px', background:'var(--surface-secondary)', border:'1px solid var(--border)', borderRadius:'var(--r-md)' }}>
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:'8px' }}>
         <input value={url} onChange={e => setUrl(e.target.value)} placeholder="Link PDF (Oblio, Booking, Airbnb, etc.)" style={INP} autoFocus />
-        <button onClick={submit} disabled={busy || !url} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'8px 14px', borderRadius:'var(--r-md)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer', opacity:(busy||!url)?.5:1 }}>
+        <button onClick={submit} disabled={busy || !url} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'8px 14px', borderRadius:'var(--r-md)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor:'pointer', opacity:(busy||!url)?.5:1 }}>
           {busy ? 'Se adaugă...' : 'Adaugă'}
         </button>
         <button onClick={() => { setOpen(false); setUrl(''); setError('') }} style={{ fontSize:'var(--fs-sm)', color:'var(--text-muted)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>

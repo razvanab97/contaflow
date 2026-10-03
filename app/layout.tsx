@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import UpdateWidget from '@/components/UpdateWidget'
 import Toaster from '@/components/ui/Toaster'
@@ -7,6 +7,10 @@ import Toaster from '@/components/ui/Toaster'
 // Self-hostat de Next.js (fara cerere externa la Google Fonts in runtime) - subset
 // latin-ext e necesar pentru diacriticele romanesti (ă â î ș ț).
 const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-inter' })
+// Geist pentru titluri si cifre mari (personalitate, spatiere stransa), Geist Mono pentru sume -
+// cifrele se aliniaza ca intr-un terminal financiar. Textul curent ramane pe Inter.
+const geist = Geist({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-geist' })
+const geistMono = Geist_Mono({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
   title: 'ContaFlow',
@@ -25,7 +29,7 @@ try {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ro" suppressHydrationWarning className={inter.variable}>
+    <html lang="ro" suppressHydrationWarning className={`${inter.variable} ${geist.variable} ${geistMono.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

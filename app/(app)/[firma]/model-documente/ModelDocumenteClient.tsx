@@ -216,7 +216,7 @@ export default function ModelDocumenteClient({ firmaId }: { firmaId: string }) {
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                         <button onClick={() => saveNotiteAction(s.key)} disabled={busy} style={{
                           fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '6px 14px', borderRadius: 'var(--r-sm)', border: 'none',
-                          background: 'var(--accent)', color: '#fff', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1,
+                          background: 'var(--accent-solid)', color: '#fff', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1,
                         }}>{busy ? 'Se salvează...' : 'Salvează'}</button>
                         {hasContent && (
                           <button onClick={() => cancelEditNotite(s.key)} disabled={busy} style={{

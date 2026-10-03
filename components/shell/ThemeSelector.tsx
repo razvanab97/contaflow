@@ -62,6 +62,19 @@ export default function ThemeSelector() {
     apply(next)
   }
 
+  // Tema poate fi schimbata si din paleta de comenzi (⌘K) - eveniment "cf:theme".
+  useEffect(() => {
+    const onTheme = (e: Event) => {
+      const next = (e as CustomEvent).detail as Pref
+      if (!['system', 'light', 'dark', 'glass'].includes(next)) return
+      setPref(next)
+      try { localStorage.setItem(KEY, next) } catch {}
+      apply(next)
+    }
+    window.addEventListener('cf:theme', onTheme)
+    return () => window.removeEventListener('cf:theme', onTheme)
+  }, [])
+
   return (
     <div role="group" aria-label="Aspect" style={{ display: 'flex', gap: '2px', padding: '2px', background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-md)' }}>
       {OPTIONS.map(o => (

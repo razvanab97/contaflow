@@ -49,7 +49,7 @@ export default function TransactionWorkspaceCard({
             </div>
             <h3 style={{ fontSize:'var(--fs-lg)', fontWeight:700, color:'var(--text-primary)', marginBottom:'6px' }}>Tranzacție ignorată</h3>
             <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-secondary)', marginBottom:'18px' }}>Această tranzacție a fost marcată ca ignorată (nu necesită document).</p>
-            <button onClick={onClearNA} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'8px 16px', borderRadius:'var(--r-md)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer' }}>
+            <button onClick={onClearNA} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'8px 16px', borderRadius:'var(--r-md)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor:'pointer' }}>
               Reactivează pentru adăugare document
             </button>
           </div>

@@ -2,6 +2,9 @@ import Link from 'next/link'
 import DocumenteGenerale from '@/components/DocumenteGenerale'
 import FirmaQuickInfo from '@/components/FirmaQuickInfo'
 import FacturiLocaleGlobal from '@/components/FacturiLocaleGlobal'
+import FirmaTrend from '@/components/FirmaTrend'
+import ProgressRing from '@/components/ui/ProgressRing'
+import CountUp from '@/components/ui/CountUp'
 import { dbSelect } from '@/lib/db'
 import { getRestanteCount } from '@/lib/queries'
 import { getStardeskDiscrepanteCount } from '@/lib/stardeskVerify'
@@ -81,38 +84,38 @@ export default async function Dashboard() {
       <div className="page-header">
         <div className="page-header-main">
           <div className="eyebrow" style={{ marginBottom: '8px' }}>Contabilitate {accountingPeriodLabel(LUNA)}</div>
-          <h1 className="page-title" style={{ fontSize: 'var(--fs-2xl)' }}>Bună, Razvan</h1>
+          <h1 className="hero-title">Bună, Razvan</h1>
           <p className="page-subtitle">{ll} · {firme.length} firme active</p>
         </div>
       </div>
 
       {/* Indicatori lunari - tot ce cere atentie, vizibil fara sa intri in fiecare firma */}
-      <div className="stat-grid" style={{ marginBottom: '28px' }}>
+      <div className="stat-grid stagger" style={{ marginBottom: '28px' }}>
         <div className="stat">
           <div className="stat-label">Progres general</div>
-          <div className="stat-value" style={{ color: pctGlobal === 100 ? 'var(--success)' : 'var(--text-primary)' }}>{pctGlobal}%</div>
+          <div className="stat-value" style={{ color: pctGlobal === 100 ? 'var(--success)' : 'var(--text-primary)' }}><CountUp value={pctGlobal} suffix="%" /></div>
           <div className="progress" style={{ marginTop: '10px' }}><span style={{ width: `${pctGlobal}%` }} /></div>
           <div className="stat-hint">{sumDone}/{sumTotal} task-uri</div>
         </div>
         <div className="stat">
           <div className="stat-label">Firme finalizate</div>
-          <div className="stat-value">{firmeFinalizate}<span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>/{firme.length}</span></div>
+          <div className="stat-value"><CountUp value={firmeFinalizate} /><span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>/{firme.length}</span></div>
           <div className="stat-hint">luna aceasta</div>
         </div>
         <div className="stat" style={totalRestante > 0 ? { borderColor: 'color-mix(in srgb, var(--danger) 35%, var(--border))' } : undefined}>
           <div className="stat-label">Facturi restante</div>
-          <div className="stat-value" style={{ color: totalRestante > 0 ? 'var(--danger)' : 'var(--text-primary)' }}>{totalRestante}</div>
+          <div className="stat-value" style={{ color: totalRestante > 0 ? 'var(--danger)' : 'var(--text-primary)' }}><CountUp value={totalRestante} /></div>
           <div className="stat-hint">{totalRestante > 0 ? `în ${firmeCuRestante} ${firmeCuRestante === 1 ? 'firmă' : 'firme'}` : 'nimic restant'}</div>
         </div>
         <div className="stat" style={totalDiscrepante > 0 ? { borderColor: 'color-mix(in srgb, var(--warning) 35%, var(--border))' } : undefined}>
           <div className="stat-label">Discrepanțe 5StarDesk</div>
-          <div className="stat-value" style={{ color: totalDiscrepante > 0 ? 'var(--warning)' : 'var(--text-primary)' }}>{totalDiscrepante}</div>
+          <div className="stat-value" style={{ color: totalDiscrepante > 0 ? 'var(--warning)' : 'var(--text-primary)' }}><CountUp value={totalDiscrepante} /></div>
           <div className="stat-hint">{totalDiscrepante > 0 ? `de preț, în ${firmeCuDiscrepante} ${firmeCuDiscrepante === 1 ? 'firmă' : 'firme'}` : 'fără diferențe de preț'}</div>
         </div>
       </div>
 
       <div className="section-title"><h2>Firme</h2></div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: '12px', alignItems: 'start' }}>
+      <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: '12px', alignItems: 'start' }}>
         {firme.map((f: any) => {
           const lunaData = luniMap[`${f.id}_${LUNA}`]
           const total = getFirmaTotalTasks(f.slug)
@@ -128,7 +131,8 @@ export default async function Dashboard() {
           const discrepante = discrepanteMap[f.id] || 0
 
           return (
-            <div key={f.id} className="card" style={{ display: 'flex', flexDirection: 'column', padding: '20px' }}>
+            <div key={f.id} className="card card-interactive" style={{ display: 'flex', flexDirection: 'column', padding: '20px', position: 'relative', overflow: 'hidden' }}>
+              <div aria-hidden="true" style={{ position: 'absolute', inset: '0 0 auto 0', height: '120px', background: `radial-gradient(420px 120px at 85% -20%, ${tint(r, .16, .1)}, transparent 70%)`, pointerEvents: 'none' }} />
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
                 <div style={{
                   width: '40px', height: '40px', borderRadius: 'var(--r-md)', flexShrink: 0,
@@ -148,19 +152,16 @@ export default async function Dashboard() {
                     {discrepante > 0 && <span className="badge badge-warning">{discrepante} discrepanțe preț</span>}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: 650, letterSpacing: '-0.03em', lineHeight: 1, color: pct === 100 ? 'var(--success)' : 'var(--text-primary)' }}>
-                    {pct}%
-                  </div>
-                  <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {done}/{total} task-uri
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                  <ProgressRing pct={pct} size={60} stroke={6} color={f.culoare} title={`${pct}% din task-urile lunii`} />
+                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
+                    <span className="num">{done}/{total}</span> task-uri
                   </div>
                 </div>
               </div>
 
-              <div className={`progress${pct === 100 ? ' is-done' : ''}`} style={{ margin: '16px 0' }}>
-                <span style={{ width: `${pct}%` }} />
-              </div>
+              <div style={{ height: '16px' }} />
+              <FirmaTrend firmaId={f.id} firmaSlug={f.slug} luna={LUNA} culoare={f.culoare} />
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '16px' }} aria-label={`${modules.length} module`}>
                 {modules.map(m => (
@@ -186,7 +187,7 @@ export default async function Dashboard() {
                 <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
                   {lunaData ? `${modules.length} module · ${total} task-uri lunare` : 'Lună neîncepută'}
                 </span>
-                <Link href={`/${f.slug}/${LUNA}`} className="btn btn-sm">
+                <Link href={`/${f.slug}/${LUNA}`} className="btn btn-sm" style={{ position: 'relative', zIndex: 1 }}>
                   Deschide luna
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                 </Link>

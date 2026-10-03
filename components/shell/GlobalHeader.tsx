@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { FirmaNav } from '@/components/Sidebar'
-import DocumentSearch from '@/components/DocumentSearch'
 import Icon from '@/components/ui/Icon'
 import { MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
 import { accountingShortLabel } from '@/lib/accounting-period'
@@ -14,6 +13,7 @@ interface Props {
   luna: string
   lunaInPath: boolean
   onMenu: () => void
+  onSearch: () => void
 }
 
 const PAGINI_FIRMA: Record<string, string> = {
@@ -28,7 +28,9 @@ const PAGINI_FIRMA: Record<string, string> = {
 // contextual (Firma ▾ › Luna › Modul) + cautarea de documente a firmei active. Comutatorul de
 // firma pastreaza pagina curenta cand se poate (aceeasi luna/modul, sau aceeasi pagina de firma),
 // ca schimbarea firmei sa nu te scoata din contextul in care lucrai.
-export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMenu }: Props) {
+export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMenu, onSearch }: Props) {
+  const [isMac, setIsMac] = useState(true)
+  useEffect(() => { setIsMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) }, [])
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
   const menuRef = useRef<HTMLDivElement>(null)
@@ -126,7 +128,14 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMe
         )}
       </nav>
 
-      {firmaAtiva && <DocumentSearch firmaId={firmaAtiva.id} culoare={firmaAtiva.culoare} />}
+      <button type="button" className="search-trigger header-search" onClick={onSearch} aria-label="Caută în toate firmele și documentele">
+        <Icon name="search" size={15} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Caută documente, sume, module…</span>
+        <span className="kbd">{isMac ? '⌘K' : 'Ctrl K'}</span>
+      </button>
+      <button type="button" className="btn btn-ghost btn-icon header-search-icon" onClick={onSearch} aria-label="Caută">
+        <Icon name="search" size={18} />
+      </button>
     </header>
   )
 }

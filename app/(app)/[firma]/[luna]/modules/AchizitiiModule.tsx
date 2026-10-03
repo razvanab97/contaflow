@@ -111,7 +111,7 @@ function SugestieBanner({ s, culoare, onConfirm, onReject, busy }: { s: Sugestie
         )}
       </div>
       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-        <button onClick={onConfirm} disabled={busy || (s.actiune !== 'actualizare_status' && !s.denumire)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent)', color: '#08210f', cursor: 'pointer', opacity: (s.actiune !== 'actualizare_status' && !s.denumire) ? .5 : 1 }}>Confirmă</button>
+        <button onClick={onConfirm} disabled={busy || (s.actiune !== 'actualizare_status' && !s.denumire)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent-solid)', color: '#08210f', cursor: 'pointer', opacity: (s.actiune !== 'actualizare_status' && !s.denumire) ? .5 : 1 }}>Confirmă</button>
         <button onClick={onReject} disabled={busy} style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)', background: 'transparent', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer' }}>Respinge</button>
       </div>
     </div>
@@ -197,7 +197,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
           <option value="grant">Grant</option>
           <option value="altul">Altul</option>
         </select>
-        <button onClick={addAchizitie} disabled={adding || !denumire.trim()} style={{ padding: '8px 16px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent)', color: '#fff', fontSize: 'var(--fs-md)', fontWeight: 600, cursor: 'pointer', opacity: adding || !denumire.trim() ? .5 : 1 }}>
+        <button onClick={addAchizitie} disabled={adding || !denumire.trim()} style={{ padding: '8px 16px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent-solid)', color: '#fff', fontSize: 'var(--fs-md)', fontWeight: 600, cursor: 'pointer', opacity: adding || !denumire.trim() ? .5 : 1 }}>
           + Adaugă
         </button>
       </div>
@@ -233,7 +233,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
                 </span>
               ))}
               {next && (
-                <button onClick={() => setStatus(item.id, next)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '4px 10px', borderRadius: 'var(--r-full)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer' }}>
+                <button onClick={() => setStatus(item.id, next)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '4px 10px', borderRadius: 'var(--r-full)', border: 'none', background:'var(--accent-solid)', color: '#fff', cursor: 'pointer' }}>
                   → {STATUS_LABEL[next]}
                 </button>
               )}

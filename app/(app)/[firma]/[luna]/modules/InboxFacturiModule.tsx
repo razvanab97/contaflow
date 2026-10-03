@@ -560,7 +560,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
                 <input value={sourceEmail} onChange={e => setSourceEmail(e.target.value)} placeholder={sourceDef.placeholder} style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
                 {sourceDef.provider === 'oblio' && <input type="password" value={sourceSecret} onChange={e => setSourceSecret(e.target.value)} placeholder="Token API din Oblio → Setări → Date Cont" style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>}
                 <div style={{ display:'flex', gap:'7px' }}>
-                  <button onClick={() => sourceDef.provider === 'oblio' ? connectOblio() : saveSource(sourceDef)} disabled={sourceBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer', opacity:sourceBusy?.6:1 }}>{sourceDef.provider === 'oblio' ? 'Testează și salvează' : 'Salvează'}</button>
+                  <button onClick={() => sourceDef.provider === 'oblio' ? connectOblio() : saveSource(sourceDef)} disabled={sourceBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor:'pointer', opacity:sourceBusy?.6:1 }}>{sourceDef.provider === 'oblio' ? 'Testează și salvează' : 'Salvează'}</button>
                   <button onClick={() => { setEditingSource(null); setSourceSecret('') }} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-888888)', cursor:'pointer' }}>Anulează</button>
                 </div>
                 {sourceError && <div style={{ fontSize:'var(--fs-xs)', color:'var(--danger)' }}>{sourceError}</div>}
@@ -568,7 +568,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
             ) : (
               <div style={{ marginTop:'10px', display:'flex', flexWrap:'wrap', gap:'7px' }}>
                 {sourceDef.provider === 'gmail' && (
-                  <button onClick={() => connectGmail(sourceDef)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer' }}>
+                  <button onClick={() => connectGmail(sourceDef)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor:'pointer' }}>
                     {active ? 'Reconectează Google' : 'Conectează Google'}
                   </button>
                 )}

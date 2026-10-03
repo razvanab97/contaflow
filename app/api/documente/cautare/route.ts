@@ -53,20 +53,35 @@ interface Rezultat {
   id: string; fisierNume: string; furnizor: string | null; numarDocument: string | null
   suma: number | null; locatie: string | null; utilitate: string | null; dataDocument: string | null
   sectiune: string; luna: string | null; downloadUrl: string
+  firmaId: string | null
+  tip: 'document' | 'model' | 'factura' | 'bon' | 'tranzactie'
+  valuta?: string | null
 }
 
-export async function GET(req: NextRequest) {
-  const firmaId = req.nextUrl.searchParams.get('firmaId')
-  const q = (req.nextUrl.searchParams.get('q') || '').trim()
-  if (!firmaId || q.length < 2) return NextResponse.json([])
+async function getJson(url: string): Promise<any[] | null> {
+  try {
+    const r = await fetch(url, { headers: H, cache: 'no-store' })
+    return r.ok ? await r.json() : null
+  } catch { return null }
+}
 
-  const escaped = q.replace(/[%,()]/g, '')
+// Cautare unificata. Fara firmaId (sau firmaId=all) cauta in TOATE firmele - folosita de paleta
+// de comenzi ⌘K din shell; cu firmaId ramane limitata la firma respectiva (compatibil cu vechiul
+// apel). Toate sursele (documente, modele, facturi de asociat, bonuri, tranzactii bancare) se
+// interogheaza in paralel, nu una dupa alta.
+export async function GET(req: NextRequest) {
+  const firmaParam = req.nextUrl.searchParams.get('firmaId')
+  const firmaId = firmaParam && firmaParam !== 'all' ? firmaParam : null
+  const q = (req.nextUrl.searchParams.get('q') || '').trim()
+  if (q.length < 2) return NextResponse.json([])
+  const ff = firmaId ? `firma_id=eq.${encodeURIComponent(firmaId)}&` : ''
+
+  const escaped = q.replace(/[%,()*]/g, '')
   const numeric = Number(q.replace(',', '.'))
   const hasNumeric = Number.isFinite(numeric) && q.trim() !== ''
   // Cautarea dupa suma e mai utila aproximativa decat exacta: un numar intreg tastat (ex. "300")
   // inseamna de obicei "imi amintesc aproximativ suma" - gaseste orice suma intre 300.00 si 300.99.
-  // Un numar cu zecimale tastat (ex. "300.01") inseamna "stiu suma exact" - cautare aproape exacta,
-  // +/- 0.01, ca sa acopere doar eventuale erori de rotunjire in float, nu o plaja larga.
+  // Un numar cu zecimale tastat (ex. "300.01") inseamna "stiu suma exact" - cautare aproape exacta.
   const numericIsInteger = hasNumeric && /^\d+$/.test(q)
   const sumaMin = hasNumeric ? (numericIsInteger ? numeric : numeric - 0.01) : null
   const sumaMax = hasNumeric ? (numericIsInteger ? numeric + 0.999 : numeric + 0.01) : null
@@ -74,25 +89,13 @@ export async function GET(req: NextRequest) {
 
   const dateQuery = parseDateQuery(q)
 
-  // Numele fișierelor sunt generate automat și au deseori concatenate mai multe numere fără
-  // legătură cu ce caută utilizatorul (timestamp Unix, numere de tranzacție POS, hash-uri) - un
-  // termen pur numeric (ex. "300") aproape sigur se potrivește din întâmplare cu o bucată dintr-un
-  // asemenea număr lung, aducând rezultate irelevante. Pentru căutare numerică pură, nu mai căutăm
-  // în numele fișierului - doar în sumă (mai sus) și număr de document (câmpuri cu sens real).
+  // Numele fisierelor sunt generate automat si contin deseori numere lungi fara legatura (timestamp,
+  // POS, hash) - pentru cautare numerica pura nu cautam in numele fisierului, doar in suma/numar document.
   const includeFisierNume = !hasNumeric
-
-  const results: Rezultat[] = []
   const qLower = q.toLowerCase()
 
-  // 1. Documente principale (facturi, avize, dispoziții, extras etc.) — toate secțiunile lunare
-  // "furnizor" nu e mereu un nume curat: la Inbox Facturi are metadata AI adaugata dupa primul "|"
-  // (Sursa/Firma detectata/Motiv/Hash - vezi furnizorCurat mai sus), iar la Dispozitii de plata poate
-  // fi un bloc JSON intern (DP_DATA:.../"Atasament DP..."). Ambele ingramadesc zeci de numere si
-  // cuvinte fara legatura cu documentul (ex. campul "Motiv" repeta CUI-ul firmei la fiecare document
-  // importat automat, deci o cautare dupa CUI ar "gasi" aproape orice document din firma respectiva).
-  // Interogarea SQL de mai jos ramane un filtru larg (nu poate taia coloana la primul "|"), dar fiecare
-  // rezultat e reverificat mai jos (docMatchesGenuinely) doar pe campurile curate, inainte de a intra
-  // in lista finala - asa cautarea raspunde la ce a fost gasit cu adevarat, nu la zgomot din metadata.
+  // 1. Documente principale. "furnizor" poate contine metadata interna (Inbox Facturi: dupa primul "|";
+  // Dispozitii: bloc JSON) - filtrul SQL e larg, apoi fiecare rezultat e reverificat pe campurile curate.
   const orParts = [
     ...(includeFisierNume ? [`fisier_nume.ilike.*${escaped}*`] : []),
     `furnizor.ilike.*${escaped}*`,
@@ -102,14 +105,49 @@ export async function GET(req: NextRequest) {
   ]
   if (sumaCondition) orParts.push(sumaCondition)
   if (dateQuery) orParts.push(`data_document.eq.${dateQuery}`)
-
-  const docUrl = `${SB}/documente?firma_id=eq.${encodeURIComponent(firmaId)}&or=(${orParts.join(',')})` +
+  const docUrl = `${SB}/documente?${ff}or=(${orParts.join(',')})` +
     `&fisier_path=not.like.*%2Fconfig%2F*&fisier_path=not.like.*%2Fdispozitii-plata%2Fresetari%2F*` +
-    `&select=id,fisier_nume,furnizor,numar_document,suma,locatie,utilitate,data_document,fisier_path,luna_id,created_at` +
-    `&order=created_at.desc&limit=80`
-  const docRes = await fetch(docUrl, { headers: H })
-  if (!docRes.ok) return NextResponse.json({ error: await docRes.text() }, { status: 502 })
-  const docsRaw = await docRes.json()
+    `&select=id,firma_id,fisier_nume,furnizor,numar_document,suma,locatie,utilitate,data_document,fisier_path,luna_id,created_at` +
+    `&order=created_at.desc&limit=${firmaId ? 80 : 120}`
+
+  const modelUrl = `${SB}/model_documente?${ff}fisier_nume=ilike.*${escaped}*` +
+    `&select=id,firma_id,fisier_nume,sectiune,created_at&order=created_at.desc&limit=20`
+
+  const facturaOr = [
+    ...(includeFisierNume ? [`fisier_nume.ilike.*${escaped}*`] : []),
+    `furnizor.ilike.*${escaped}*`,
+    `numar_document.ilike.*${escaped}*`,
+  ]
+  if (sumaCondition) facturaOr.push(sumaCondition)
+  if (dateQuery) facturaOr.push(`data_factura.eq.${dateQuery}`)
+  const facturaUrl = `${SB}/facturi_asteptate?${ff}or=(${facturaOr.join(',')})` +
+    `&select=id,firma_id,fisier_nume,furnizor,numar_document,suma,data_factura,status,created_at&order=created_at.desc&limit=20`
+
+  const bonOr = [
+    ...(includeFisierNume ? [`fisier_nume.ilike.*${escaped}*`] : []),
+    `comerciant.ilike.*${escaped}*`,
+    `cui_client.ilike.*${escaped}*`,
+  ]
+  if (sumaCondition) bonOr.push(sumaCondition)
+  if (dateQuery) bonOr.push(`data_bon.eq.${dateQuery}`)
+  const bonUrl = `${SB}/bonuri?${ff}or=(${bonOr.join(',')})` +
+    `&select=id,firma_id,fisier_nume,comerciant,cui_client,suma,data_bon,status,created_at&order=created_at.desc&limit=20`
+
+  // 5. Tranzactii bancare - dupa descriere, suma (aceeasi logica aproximativa) sau data.
+  const txOr = [
+    ...(hasNumeric ? [] : [`descriere.ilike.*${escaped}*`, `descriere_curatata.ilike.*${escaped}*`]),
+  ]
+  if (sumaCondition) txOr.push(sumaCondition)
+  if (dateQuery) txOr.push(`data_tranzactie.eq.${dateQuery}`)
+  const txUrl = txOr.length ? `${SB}/tranzactii?${ff}or=(${txOr.join(',')})` +
+    `&select=id,firma_id,extras_id,data_tranzactie,descriere,descriere_curatata,suma,valuta,tip,document_id` +
+    `&order=data_tranzactie.desc&limit=20` : null
+
+  const [docsRaw, modelDocs, facturi, bonuri, txs] = await Promise.all([
+    getJson(docUrl), getJson(modelUrl), getJson(facturaUrl), getJson(bonUrl), txUrl ? getJson(txUrl) : Promise.resolve([]),
+  ])
+  if (docsRaw === null && modelDocs === null && facturi === null && bonuri === null)
+    return NextResponse.json({ error: 'Căutarea nu a putut accesa baza de date' }, { status: 502 })
 
   function docMatchesGenuinely(d: any): boolean {
     const furnizorClean = furnizorCurat(d.furnizor)
@@ -124,96 +162,62 @@ export async function GET(req: NextRequest) {
   }
   const docs = (docsRaw || []).filter(docMatchesGenuinely).slice(0, 40)
 
-  const lunaIds = [...new Set((docs || []).map((d: any) => d.luna_id).filter(Boolean))]
+  // Luna fiecarui document / tranzactii (prin extras) - doua cereri mici, tot in paralel.
+  const extrasIds = [...new Set((txs || []).map((t: any) => t.extras_id).filter(Boolean))]
+  const extrase = extrasIds.length ? await getJson(`${SB}/extrase?id=in.(${extrasIds.join(',')})&select=id,luna_id`) : []
+  const extrasLuna = new Map<string, string>((extrase || []).map((e: any) => [e.id, e.luna_id]))
+  const lunaIds = [...new Set([
+    ...docs.map((d: any) => d.luna_id),
+    ...[...extrasLuna.values()],
+  ].filter(Boolean))]
   const luniById = new Map<string, string>()
   if (lunaIds.length) {
-    const lRes = await fetch(`${SB}/luni_contabile?id=in.(${lunaIds.join(',')})&select=id,luna`, { headers: H })
-    if (lRes.ok) {
-      const luni = await lRes.json()
-      for (const l of luni) luniById.set(l.id, l.luna)
-    }
+    const luni = await getJson(`${SB}/luni_contabile?id=in.(${lunaIds.join(',')})&select=id,luna`)
+    for (const l of luni || []) luniById.set(l.id, l.luna)
   }
 
-  for (const d of docs || []) {
+  const results: Rezultat[] = []
+  for (const d of docs) {
     results.push({
-      id: d.id,
-      fisierNume: d.fisier_nume,
-      furnizor: furnizorCurat(d.furnizor),
-      numarDocument: d.numar_document || null,
-      suma: d.suma,
-      locatie: d.locatie,
-      utilitate: d.utilitate,
-      dataDocument: d.data_document,
-      sectiune: sectionFromPath(d.fisier_path),
-      luna: luniById.get(d.luna_id) || null,
-      downloadUrl: `/api/chitante/document?id=${d.id}`,
+      id: d.id, fisierNume: d.fisier_nume, furnizor: furnizorCurat(d.furnizor), numarDocument: d.numar_document || null,
+      suma: d.suma, locatie: d.locatie, utilitate: d.utilitate, dataDocument: d.data_document,
+      sectiune: sectionFromPath(d.fisier_path), luna: luniById.get(d.luna_id) || null,
+      downloadUrl: `/api/chitante/document?id=${d.id}`, firmaId: d.firma_id || null, tip: 'document',
+    })
+  }
+  for (const t of txs || []) {
+    const luna = luniById.get(extrasLuna.get(t.extras_id) || '') || null
+    results.push({
+      id: t.id, fisierNume: t.descriere_curatata || t.descriere || 'Tranzacție', furnizor: t.descriere_curatata || t.descriere || null,
+      numarDocument: null, suma: typeof t.suma === 'number' ? t.suma : Number(t.suma), locatie: null, utilitate: null,
+      dataDocument: t.data_tranzactie, sectiune: t.document_id ? 'Tranzacție · documentată' : 'Tranzacție · fără document',
+      luna, downloadUrl: '', firmaId: t.firma_id || null, tip: 'tranzactie', valuta: t.valuta || null,
+    })
+  }
+  for (const f of facturi || []) {
+    results.push({
+      id: f.id, fisierNume: f.fisier_nume, furnizor: furnizorCurat(f.furnizor), numarDocument: f.numar_document || null,
+      suma: f.suma, locatie: null, utilitate: null, dataDocument: f.data_factura,
+      sectiune: `Facturi de asociat${f.status === 'asociata' ? ' (asociată)' : ''}`, luna: null,
+      downloadUrl: `/api/facturi-asteptate/download?id=${f.id}`, firmaId: f.firma_id || null, tip: 'factura',
+    })
+  }
+  for (const b of bonuri || []) {
+    results.push({
+      id: b.id, fisierNume: b.fisier_nume, furnizor: b.comerciant || null, numarDocument: null,
+      suma: b.suma, locatie: null, utilitate: null, dataDocument: b.data_bon,
+      sectiune: `Bonuri${b.status === 'asociata' ? ' (asociat)' : ''}`, luna: null,
+      downloadUrl: `/api/bonuri/download?id=${b.id}`, firmaId: b.firma_id || null, tip: 'bon',
+    })
+  }
+  for (const d of modelDocs || []) {
+    results.push({
+      id: d.id, fisierNume: d.fisier_nume, furnizor: null, numarDocument: null,
+      suma: null, locatie: null, utilitate: null, dataDocument: null,
+      sectiune: MODEL_DOC_LABELS[d.sectiune] || 'Model documente', luna: null,
+      downloadUrl: `/api/model-documente/download?id=${d.id}`, firmaId: d.firma_id || null, tip: 'model',
     })
   }
 
-  // 2. Șabloane firmă (Model documente) — doar după nume, nu au furnizor/sumă
-  const modelUrl = `${SB}/model_documente?firma_id=eq.${encodeURIComponent(firmaId)}&fisier_nume=ilike.*${escaped}*` +
-    `&select=id,fisier_nume,sectiune,created_at&order=created_at.desc&limit=20`
-  const modelRes = await fetch(modelUrl, { headers: H })
-  if (modelRes.ok) {
-    const modelDocs = await modelRes.json()
-    for (const d of modelDocs || []) {
-      results.push({
-        id: d.id, fisierNume: d.fisier_nume, furnizor: null, numarDocument: null,
-        suma: null, locatie: null, utilitate: null, dataDocument: null,
-        sectiune: MODEL_DOC_LABELS[d.sectiune] || 'Model documente',
-        luna: null,
-        downloadUrl: `/api/model-documente/download?id=${d.id}`,
-      })
-    }
-  }
-
-  // 3. Facturi de asociat (adăugate în avans, în așteptarea extrasului lunii viitoare)
-  const facturaOr = [
-    ...(includeFisierNume ? [`fisier_nume.ilike.*${escaped}*`] : []),
-    `furnizor.ilike.*${escaped}*`,
-    `numar_document.ilike.*${escaped}*`,
-  ]
-  if (sumaCondition) facturaOr.push(sumaCondition)
-  if (dateQuery) facturaOr.push(`data_factura.eq.${dateQuery}`)
-  const facturaUrl = `${SB}/facturi_asteptate?firma_id=eq.${encodeURIComponent(firmaId)}&or=(${facturaOr.join(',')})` +
-    `&select=id,fisier_nume,furnizor,numar_document,suma,data_factura,status,created_at&order=created_at.desc&limit=20`
-  const facturaRes = await fetch(facturaUrl, { headers: H })
-  if (facturaRes.ok) {
-    const facturi = await facturaRes.json()
-    for (const f of facturi || []) {
-      results.push({
-        id: f.id, fisierNume: f.fisier_nume, furnizor: furnizorCurat(f.furnizor), numarDocument: f.numar_document || null,
-        suma: f.suma, locatie: null, utilitate: null, dataDocument: f.data_factura,
-        sectiune: `Facturi de asociat${f.status === 'asociata' ? ' (asociată)' : ''}`,
-        luna: null,
-        downloadUrl: `/api/facturi-asteptate/download?id=${f.id}`,
-      })
-    }
-  }
-
-  // 4. Bonuri (combustibil și altele) — după comerciant, CUI client, sumă sau dată
-  const bonOr = [
-    ...(includeFisierNume ? [`fisier_nume.ilike.*${escaped}*`] : []),
-    `comerciant.ilike.*${escaped}*`,
-    `cui_client.ilike.*${escaped}*`,
-  ]
-  if (sumaCondition) bonOr.push(sumaCondition)
-  if (dateQuery) bonOr.push(`data_bon.eq.${dateQuery}`)
-  const bonUrl = `${SB}/bonuri?firma_id=eq.${encodeURIComponent(firmaId)}&or=(${bonOr.join(',')})` +
-    `&select=id,fisier_nume,comerciant,cui_client,suma,data_bon,status,created_at&order=created_at.desc&limit=20`
-  const bonRes = await fetch(bonUrl, { headers: H })
-  if (bonRes.ok) {
-    const bonuri = await bonRes.json()
-    for (const b of bonuri || []) {
-      results.push({
-        id: b.id, fisierNume: b.fisier_nume, furnizor: b.comerciant || null, numarDocument: null,
-        suma: b.suma, locatie: null, utilitate: null, dataDocument: b.data_bon,
-        sectiune: `Bonuri${b.status === 'asociata' ? ' (asociat)' : ''}`,
-        luna: null,
-        downloadUrl: `/api/bonuri/download?id=${b.id}`,
-      })
-    }
-  }
-
-  return NextResponse.json(results.slice(0, 60))
+  return NextResponse.json(results.slice(0, 80))
 }

@@ -187,7 +187,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
 
       {/* NORMAL MODE — lista compacta */}
       {!reordering && (
-        <div className="module-list">
+        <div className="module-list stagger">
           {sorted.map(mod => {
             const modTasks = mod.tasks
             const modDone = modTasks.filter(t => taskMap[t.key]).length

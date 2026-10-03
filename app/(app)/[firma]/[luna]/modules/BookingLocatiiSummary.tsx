@@ -180,7 +180,7 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
           <input value={cod} onChange={e => setCod(e.target.value)} placeholder="Cod (ex. 15331624)" style={{ width: '140px', fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
           <input value={denumire} onChange={e => setDenumire(e.target.value)} placeholder="Denumire locație" style={{ flex: 1, minWidth: '200px', fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
-          <button onClick={addLocatie} disabled={busy || !cod.trim() || !denumire.trim()} style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, padding: '9px 14px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer', opacity: (busy || !cod.trim() || !denumire.trim()) ? .5 : 1 }}>
+          <button onClick={addLocatie} disabled={busy || !cod.trim() || !denumire.trim()} style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, padding: '9px 14px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent-solid)', color: '#fff', cursor: 'pointer', opacity: (busy || !cod.trim() || !denumire.trim()) ? .5 : 1 }}>
             Adaugă
           </button>
           <button onClick={() => setShowBulk(v => !v)} style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, padding: '9px 14px', borderRadius: 'var(--r-md)', border: '1px solid var(--accent)', background: 'transparent', color:'var(--accent)', cursor: 'pointer' }}>
@@ -191,7 +191,7 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
         {showBulk && (
           <div style={{ marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={6} placeholder={'Lipește lista de proprietăți copiată din Booking extranet (cod + denumire pe același rând, ex:\n15331624   SkyPort Modern & stylish apartment...\n14207430   Oaza de natură lângă Gară...)'} style={{ fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '10px 12px', color: 'var(--c-dddddd)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}/>
-            <button onClick={addBulk} disabled={busy || !bulkText.trim()} style={{ alignSelf: 'flex-start', fontSize: 'var(--fs-sm)', fontWeight: 700, padding: '9px 14px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer', opacity: (busy || !bulkText.trim()) ? .5 : 1 }}>
+            <button onClick={addBulk} disabled={busy || !bulkText.trim()} style={{ alignSelf: 'flex-start', fontSize: 'var(--fs-sm)', fontWeight: 700, padding: '9px 14px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent-solid)', color: '#fff', cursor: 'pointer', opacity: (busy || !bulkText.trim()) ? .5 : 1 }}>
               Adaugă din listă
             </button>
           </div>
@@ -244,7 +244,7 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
           <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)', marginBottom: '10px' }}>Un singur loc pentru ambele — AI-ul recunoaște ce e fiecare fișier și îl pune la proprietatea potrivită.</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginBottom: '10px' }}>
             <input value={link} onChange={e => setLink(e.target.value)} placeholder="Link PDF Booking.com" style={{ fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
-            <button onClick={() => importLink()} disabled={uploadBusy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: 'var(--r-md)', background:'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, opacity: uploadBusy || !link ? .5 : 1 }}>
+            <button onClick={() => importLink()} disabled={uploadBusy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: 'var(--r-md)', background:'var(--accent-solid)', color: '#fff', cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, opacity: uploadBusy || !link ? .5 : 1 }}>
               Import
             </button>
           </div>

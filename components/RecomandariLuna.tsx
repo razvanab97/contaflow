@@ -85,7 +85,7 @@ export default function RecomandariLuna({ lunaId, firmaId, firmaSlug, firmaNume,
         <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {recomandare.continut.split('\n').filter(l => l.trim()).map((line, i) => (
             <div key={i} style={{ display: 'flex', gap: '10px', fontSize: 'var(--fs-md)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', marginTop: '8px', flexShrink: 0 }} />
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent-solid)', marginTop: '8px', flexShrink: 0 }} />
               <span>{line.replace(/^•\s*/, '')}</span>
             </div>
           ))}

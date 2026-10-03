@@ -56,7 +56,7 @@ export default function ReportEditor({
         <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', marginBottom: '14px', lineHeight: 1.6 }}>
           Detectez automat, în documentul din stânga, secțiunile care se schimbă lunar — o singură dată, apoi le completezi de aici, fără să mai deschizi Word.
         </p>
-        <button onClick={onConfigure} disabled={configuring} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '9px 16px', borderRadius: 'var(--r-md)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', opacity: configuring ? .6 : 1 }}>
+        <button onClick={onConfigure} disabled={configuring} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '9px 16px', borderRadius: 'var(--r-md)', border: 'none', background: 'var(--accent-solid)', color: '#fff', cursor: 'pointer', opacity: configuring ? .6 : 1 }}>
           {configuring ? 'Se configurează...' : 'Configurează formularul din documentul curent'}
         </button>
         {configureError && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', marginTop: '10px' }}>{configureError}</p>}
@@ -107,7 +107,7 @@ export default function ReportEditor({
 
       <button
         onClick={onGenerate} disabled={generating}
-        style={{ fontSize: 'var(--fs-base)', fontWeight: 600, padding: '12px', borderRadius: 'var(--r-md)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', opacity: generating ? .6 : 1, marginTop: '4px' }}
+        style={{ fontSize: 'var(--fs-base)', fontWeight: 600, padding: '12px', borderRadius: 'var(--r-md)', border: 'none', background: 'var(--accent-solid)', color: '#fff', cursor: 'pointer', opacity: generating ? .6 : 1, marginTop: '4px' }}
       >
         {generating ? 'Se generează...' : 'Generează raportul →'}
       </button>

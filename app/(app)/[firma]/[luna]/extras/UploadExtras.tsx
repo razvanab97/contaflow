@@ -121,7 +121,7 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
         <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
           <div style={{ display: 'flex', gap: '8px' }}>
             {valuta !== 'AUTO' && (
-              <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent)', color: '#fff', fontSize: 'var(--fs-sm)', fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => csvRef.current?.click()} style={{ flex: 1, padding: '9px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent-solid)', color: '#fff', fontSize: 'var(--fs-sm)', fontWeight: 700, cursor: 'pointer' }}>
                 ↑ Import CSV
               </button>
             )}

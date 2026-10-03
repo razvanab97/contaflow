@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '@/components/ui/Icon'
 
 interface Props {
@@ -34,6 +34,19 @@ export default function ExportButtons({ firmaId, firmaNume, firmaSlug, lunaId, l
     } catch(e) { alert('Eroare conexiune: '+String(e)) }
     setPdfBusy(false)
   }
+
+  // Exportul poate fi pornit si din paleta de comenzi (⌘K) - eveniment "cf:export".
+  const handlers = useRef({ downloadZip, downloadPdf })
+  handlers.current = { downloadZip, downloadPdf }
+  useEffect(() => {
+    const onExport = (e: Event) => {
+      const kind = (e as CustomEvent).detail
+      if (kind === 'zip') handlers.current.downloadZip()
+      else if (kind === 'pdf') handlers.current.downloadPdf()
+    }
+    window.addEventListener('cf:export', onExport)
+    return () => window.removeEventListener('cf:export', onExport)
+  }, [])
 
   return (
     <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>

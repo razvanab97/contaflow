@@ -117,7 +117,7 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
                   {c.monedaDiferita ? ` · monedă diferită de tranzacție (${tx.valuta}) - verifică manual` : c.diferentaSuma !== null && c.diferentaSuma > 0.01 ? ` · diferență ${c.diferentaSuma.toFixed(2)} ${c.valuta}` : ''}
                 </div>
               </div>
-              <button onClick={() => associate(c)} disabled={!!assocId} style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'6px 12px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor: assocId ? 'wait' : 'pointer', opacity: assocId && assocId!==c.id ? .5 : 1, whiteSpace:'nowrap' }}>
+              <button onClick={() => associate(c)} disabled={!!assocId} style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'6px 12px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor: assocId ? 'wait' : 'pointer', opacity: assocId && assocId!==c.id ? .5 : 1, whiteSpace:'nowrap' }}>
                 {assocId===c.id ? '...' : 'Asociază'}
               </button>
             </div>

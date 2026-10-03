@@ -208,7 +208,7 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        <button onClick={() => confirmSugestie(s.id)} disabled={busy} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent)', color: '#08210f', cursor: 'pointer' }}>Confirmă</button>
+                        <button onClick={() => confirmSugestie(s.id)} disabled={busy} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent-solid)', color: '#08210f', cursor: 'pointer' }}>Confirmă</button>
                         <button onClick={() => respingeSugestie(s.id)} disabled={busy} style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)', background: 'transparent', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer' }}>Respinge</button>
                       </div>
                     </div>

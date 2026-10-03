@@ -71,7 +71,7 @@ function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated, zoom }:
       {sel && (
         <div style={{ position: 'absolute', left: sel.x, top: Math.max(0, sel.y - 38), transform: 'translateX(-50%)', zIndex: 20 }}>
           {!labeling ? (
-            <button onClick={() => setLabeling(true)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,.35)' }}>
+            <button onClick={() => setLabeling(true)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background:'var(--accent-solid)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,.35)' }}>
               + Fă câmp editabil
             </button>
           ) : (
@@ -81,7 +81,7 @@ function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated, zoom }:
                 onKeyDown={e => { if (e.key === 'Enter') salveaza(); if (e.key === 'Escape') { setSel(null); setLabeling(false) } }}
                 placeholder="Etichetă (ex: Perioadă)" style={{ fontSize: 'var(--fs-sm)', width: '160px', color: 'var(--c-dddddd)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '5px 8px', outline: 'none' }}
               />
-              <button onClick={salveaza} disabled={saving || !label.trim()} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '5px 10px', borderRadius: 'var(--r-sm)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer', opacity: saving ? .6 : 1, whiteSpace: 'nowrap' }}>
+              <button onClick={salveaza} disabled={saving || !label.trim()} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '5px 10px', borderRadius: 'var(--r-sm)', border: 'none', background:'var(--accent-solid)', color: '#fff', cursor: 'pointer', opacity: saving ? .6 : 1, whiteSpace: 'nowrap' }}>
                 {saving ? '...' : 'Salvează'}
               </button>
             </div>

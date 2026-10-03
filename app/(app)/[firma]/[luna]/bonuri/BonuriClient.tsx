@@ -283,7 +283,7 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
             <video ref={videoRef} autoPlay playsInline style={{ width: '100%', maxHeight: '50vh', borderRadius: 'var(--r-md)', background: '#000' }} />
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={capturePhoto} style={{ fontSize: 'var(--fs-md)', fontWeight: 600, padding: '8px 16px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer' }}>Capturează</button>
+              <button onClick={capturePhoto} style={{ fontSize: 'var(--fs-md)', fontWeight: 600, padding: '8px 16px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent-solid)', color: '#fff', cursor: 'pointer' }}>Capturează</button>
               <button onClick={closeCamera} style={{ fontSize: 'var(--fs-md)', fontWeight: 600, padding: '8px 16px', borderRadius: 'var(--r-sm)', border: '1px solid var(--c-2a2a2a)', background: 'transparent', color: 'var(--c-999999)', cursor: 'pointer' }}>Anulează</button>
             </div>
           </div>

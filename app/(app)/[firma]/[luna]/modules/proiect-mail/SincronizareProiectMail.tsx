@@ -59,7 +59,7 @@ export default function SincronizareProiectMail({ firmaId, culoare, onSynced }: 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
       {!connected ? (
-        <button onClick={connectGmail} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 12px', borderRadius: 'var(--r-sm)', border: 'none', background:'var(--accent)', color: '#fff', cursor: 'pointer' }}>
+        <button onClick={connectGmail} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 12px', borderRadius: 'var(--r-sm)', border: 'none', background:'var(--accent-solid)', color: '#fff', cursor: 'pointer' }}>
           Conectează Gmail (Prosocial/Orieda)
         </button>
       ) : (

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 export interface TaskItem {
@@ -20,6 +20,8 @@ export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: P
   const router = useRouter()
   const [items, setItems] = useState(tasks)
   const [loading, setLoading] = useState<string | null>(null)
+  const [celebrate, setCelebrate] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setItems(tasks) }, [tasks])
 
@@ -45,6 +47,13 @@ export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: P
     if (!res.ok) {
       updateItems(prev => prev.map(t => t.key === key ? { ...t, completat: !next } : t))
     } else {
+      // Ultima bifa a modulului -> moment de "gata": puls pe card + notificare + confetti discret.
+      const doneAfter = items.filter(t => (t.key === key ? next : t.completat)).length
+      if (next && doneAfter === items.length && items.length > 0) {
+        setCelebrate(true)
+        setTimeout(() => setCelebrate(false), 1900)
+        window.dispatchEvent(new CustomEvent('cf:toast', { detail: { text: 'Modul complet — toate task-urile sunt bifate.', tone: 'success', confetti: true } }))
+      }
       router.refresh()
     }
     setLoading(null)
@@ -57,7 +66,7 @@ export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: P
   // Checklist-ul modulului: bife mari (tinta usoara pe mobil), progres vizibil, stare "complet"
   // integrata in antet in loc de un bloc separat sub lista.
   return (
-    <div className="card" style={{ padding: '16px 16px 10px', marginBottom: '20px' }}>
+    <div ref={cardRef} className={`card${celebrate ? ' celebrate' : ''}`} style={{ padding: '16px 16px 10px', marginBottom: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
         <span className="eyebrow" style={{ flexShrink: 0 }}>Task-uri modul</span>
         <div className={`progress${done === total ? ' is-done' : ''}`} style={{ flex: 1, maxWidth: '160px' }}><span style={{ width: `${pct}%` }} /></div>
@@ -89,7 +98,7 @@ export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: P
               transition: 'background-color .15s, border-color .15s',
             }}>
               {task.completat && (
-                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <svg className="check-pop" width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                   <path d="M2 6l3 3 5-5" stroke="var(--surface)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               )}

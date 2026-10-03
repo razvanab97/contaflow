@@ -16,7 +16,7 @@ export default function DocumentMatch({ suggestion, busy, onConfirm }: { suggest
             {suggestion.dataPotrivita && <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--success)' }}>✓ Adăugată recent</span>}
           </div>
         </div>
-        <button onClick={onConfirm} disabled={busy} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'7px 14px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1, flexShrink:0 }}>
+        <button onClick={onConfirm} disabled={busy} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'7px 14px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1, flexShrink:0 }}>
           {busy ? 'Se asociază...' : 'Asociază'}
         </button>
       </div>

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar, { FirmaNav } from '@/components/Sidebar'
 import GlobalHeader from './GlobalHeader'
+import CommandPalette from './CommandPalette'
 import { getFirmaModules } from '@/lib/firma-config'
 import { accountingShortLabel } from '@/lib/accounting-period'
 
@@ -31,6 +32,23 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
   const [moduleComplete, setModuleComplete] = useState<Record<string, boolean>>({})
   const [menuOpen, setMenuOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const openPalette = useCallback(() => { setMenuOpen(false); setPaletteOpen(true) }, [])
+  const closePalette = useCallback(() => setPaletteOpen(false), [])
+
+  // ⌘K / Ctrl+K oriunde, sau "/" cand nu se scrie intr-un camp -> paleta de comenzi/cautare.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null
+      const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
+      if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setPaletteOpen(o => !o) }
+      else if (e.key === '/' && !typing) { e.preventDefault(); setPaletteOpen(true) }
+    }
+    const onOpen = () => setPaletteOpen(true)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('cf:palette', onOpen)
+    return () => { document.removeEventListener('keydown', onKey); window.removeEventListener('cf:palette', onOpen) }
+  }, [])
 
   const firmaAtivaObj = firmeNav.find(f => f.slug === firmaSlug)
   const firmaId = firmaAtivaObj?.id
@@ -65,6 +83,9 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
 
   return (
     <div className="app-shell">
+      {/* Directia "brand per firma": culoarea firmei active devine --brand pentru toata interfata.
+          Randat ca <style> (si pe server), ca sa nu clipeasca accentul implicit la incarcare. */}
+      {firmaAtivaObj && <style>{`:root{--brand:${/^#[0-9a-fA-F]{6}$/.test(firmaAtivaObj.culoare) ? firmaAtivaObj.culoare : '#6366F1'}}`}</style>}
       <Sidebar
         firme={firmeNav}
         lunaCurenta={lunaEfectiva}
@@ -75,9 +96,12 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
         moduleComplete={moduleComplete}
         open={menuOpen}
         onClose={closeMenu}
+        onSearch={openPalette}
       />
       <div className="app-main">
-        <GlobalHeader firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} onMenu={() => setMenuOpen(true)} />
+        <GlobalHeader firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} onMenu={() => setMenuOpen(true)} onSearch={openPalette} />
+        {/* Montata doar cat e deschisa -> fiecare deschidere porneste cu stare curata (text gol, scope implicit). */}
+        {paletteOpen && <CommandPalette open onClose={closePalette} firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} />}
         <div id="continut" tabIndex={-1} style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, outline: 'none' }}>
           {children}
         </div>

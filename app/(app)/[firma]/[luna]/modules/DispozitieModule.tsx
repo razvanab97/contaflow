@@ -424,7 +424,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
                     <option value="">Alege proprietar...</option>
                     {proprietari.filter(p => p.id).map(p => <option key={p.id} value={p.id}>{p.nume}</option>)}
                   </select>
-                  <button onClick={addLocatie} disabled={locatieBusy || !newLocatieEticheta.trim() || !newLocatieProprietarId} style={{ border:'none', borderRadius:'var(--r-md)', background:'var(--accent)', color:'#fff', padding:'9px 14px', cursor:'pointer', fontSize:'var(--fs-sm)', fontWeight:700, opacity:(locatieBusy || !newLocatieEticheta.trim() || !newLocatieProprietarId)?.5:1 }}>Adaugă</button>
+                  <button onClick={addLocatie} disabled={locatieBusy || !newLocatieEticheta.trim() || !newLocatieProprietarId} style={{ border:'none', borderRadius:'var(--r-md)', background:'var(--accent-solid)', color:'#fff', padding:'9px 14px', cursor:'pointer', fontSize:'var(--fs-sm)', fontWeight:700, opacity:(locatieBusy || !newLocatieEticheta.trim() || !newLocatieProprietarId)?.5:1 }}>Adaugă</button>
                 </div>
                 {locatii.length > 0 && (
                   <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
@@ -479,7 +479,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
                   <input value={bNumar} onChange={e=>setBNumar(e.target.value)} placeholder="Nr. CI" style={INP}/>
                 </div>
                 <div style={{ display:'flex', gap:'8px' }}>
-                  <button onClick={saveProprietar} disabled={!bPrenume&&!bNume} style={{ border:'none', borderRadius:'var(--r-md)', background:'var(--accent)', color:'#fff', padding:'8px 16px', cursor:'pointer', fontSize:'var(--fs-sm)', fontWeight:700 }}>Salvează preset</button>
+                  <button onClick={saveProprietar} disabled={!bPrenume&&!bNume} style={{ border:'none', borderRadius:'var(--r-md)', background:'var(--accent-solid)', color:'#fff', padding:'8px 16px', cursor:'pointer', fontSize:'var(--fs-sm)', fontWeight:700 }}>Salvează preset</button>
                   <button onClick={()=>setBuletinResult(null)} style={{ border:'1px solid var(--c-333333)', borderRadius:'var(--r-md)', background:'transparent', color:'var(--c-888888)', padding:'8px 12px', cursor:'pointer', fontSize:'var(--fs-sm)' }}>Anulează</button>
                 </div>
               </div>
@@ -531,7 +531,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
             <input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="Scopul plății" style={INP}/>
             <div style={{ display:'flex', gap:'6px' }}>
               {editId && <button onClick={()=>{setEditId('');setAttachedInvoices([]);setPreset('');loadNumber()}} style={{ border:'1px solid var(--c-333333)', borderRadius:'var(--r-md)', background:'transparent', color:'var(--c-888888)', padding:'9px 12px', cursor:'pointer', fontSize:'var(--fs-sm)' }}>Anulează</button>}
-              <button onClick={generate} disabled={!(beneficiary||owner)||!amount||!purpose} style={{ border:'none', borderRadius:'var(--r-md)', background:'var(--accent)', color:'#fff', padding:'9px 14px', cursor:'pointer', fontSize:'var(--fs-sm)', fontWeight:600, opacity:!(beneficiary||owner)||!amount||!purpose?.5:1 }}>{editId?'Salvează':'Generează PDF'}</button>
+              <button onClick={generate} disabled={!(beneficiary||owner)||!amount||!purpose} style={{ border:'none', borderRadius:'var(--r-md)', background:'var(--accent-solid)', color:'#fff', padding:'9px 14px', cursor:'pointer', fontSize:'var(--fs-sm)', fontWeight:600, opacity:!(beneficiary||owner)||!amount||!purpose?.5:1 }}>{editId?'Salvează':'Generează PDF'}</button>
             </div>
             </div>
           </div>

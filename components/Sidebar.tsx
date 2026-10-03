@@ -1,10 +1,11 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
 import ThemeSelector from './shell/ThemeSelector'
 import Icon, { MODULE_ICONS } from './ui/Icon'
+import ProgressRing from './ui/ProgressRing'
 
 export interface FirmaNav {
   id: string
@@ -24,13 +25,14 @@ interface Props {
   moduleComplete?: Record<string, boolean>
   open: boolean
   onClose: () => void
+  onSearch: () => void
 }
 
 // Navigatia principala, organizata pe 3 niveluri de context: global (Dashboard + firme) ->
 // luna firmei active (rezumat + module, in ordinea de lucru) -> date permanente ale firmei
 // (furnizori, date personale, modele, facturi de asociat). Pe desktop e fixa (sticky); sub
 // 900px devine sertar, deschis din butonul de meniu al header-ului (starea traieste in ShellClient).
-export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, moduleFirma, restanteCount, moduleComplete, open, onClose }: Props) {
+export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, moduleFirma, restanteCount, moduleComplete, open, onClose, onSearch }: Props) {
   const pathname = usePathname()
   const isDashboard = pathname === '/dashboard'
 
@@ -51,6 +53,19 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
+
+  // Indicatorul elementului activ aluneca (top/height animate) intre pagini, in loc sa sara.
+  const navRef = useRef<HTMLElement>(null)
+  const [ind, setInd] = useState<{ top: number; height: number } | null>(null)
+  useLayoutEffect(() => {
+    function measure() {
+      const el = navRef.current?.querySelector<HTMLElement>('.nav-item.is-active')
+      setInd(el ? { top: el.offsetTop, height: el.offsetHeight } : null)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [pathname, firmaAtiva, moduleFirma, moduleComplete, restanteCount])
 
   const firmaObj = firme.find(f => f.slug === firmaAtiva)
   const doneCount = moduleFirma ? moduleFirma.filter(m => moduleComplete?.[m.slug]).length : 0
@@ -83,7 +98,16 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
           </button>
         </div>
 
-        <nav className="sidebar-scroll">
+        <div style={{ padding: '2px 12px 6px' }}>
+          <button type="button" className="search-trigger" onClick={onSearch} aria-label="Caută în toate firmele și documentele">
+            <Icon name="search" size={15} />
+            <span>Caută peste tot…</span>
+            <span className="kbd">⌘K</span>
+          </button>
+        </div>
+
+        <nav className={`sidebar-scroll${ind ? ' has-indicator' : ''}`} ref={navRef}>
+          {ind && <span className="nav-indicator" style={{ top: ind.top, height: ind.height }} aria-hidden="true" />}
           <div className="sidebar-section">
             <Link href="/dashboard" className={`nav-item${isDashboard ? ' is-active' : ''}`} aria-current={isDashboard ? 'page' : undefined}>
               <span className="nav-icon"><Icon name="dashboard" /></span>
@@ -101,8 +125,9 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
                   style={isActive ? { color: 'var(--text-primary)', fontWeight: 600, background: 'var(--hover)' } : undefined}>
                   <span className="nav-icon"><span className="dot" style={{ background: f.culoare }} /></span>
                   <span className="nav-text">{f.nume.replace(' SRL', '')}</span>
-                  <span className="nav-meta" style={{ color: f.pct === 100 ? 'var(--success)' : f.pct > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+                  <span className="nav-meta" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: f.pct === 100 ? 'var(--success)' : f.pct > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
                     {f.pct}%
+                    <ProgressRing pct={f.pct} size={16} stroke={2.5} label={false} color={f.culoare} title={`${f.pct}% din task-uri`} />
                   </span>
                 </Link>
               )

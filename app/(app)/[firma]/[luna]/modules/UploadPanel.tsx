@@ -369,7 +369,7 @@ export default function UploadPanel({
                               <option value="">Alege factura...</option>
                               {visibleDocs.map(doc => <option key={doc.id} value={doc.id}>{docLabel(doc)}</option>)}
                             </select>
-                            <button onClick={() => atribuieManualFactura(item.id)} disabled={!attachPick[item.id] || attachBusy === item.id} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'4px 8px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer', opacity:(!attachPick[item.id] || attachBusy === item.id) ? .5 : 1 }}>
+                            <button onClick={() => atribuieManualFactura(item.id)} disabled={!attachPick[item.id] || attachBusy === item.id} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'4px 8px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor:'pointer', opacity:(!attachPick[item.id] || attachBusy === item.id) ? .5 : 1 }}>
                               {attachBusy === item.id ? '...' : 'Leagă'}
                             </button>
                             <button onClick={() => setAttachPickerFor(null)} style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', background:'transparent', border:'none', cursor:'pointer' }}>Anulează</button>
@@ -451,7 +451,7 @@ export default function UploadPanel({
         {showLinkImport && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginBottom: '10px' }}>
             <input value={link} onChange={e => setLink(e.target.value)} placeholder={linkPlaceholder || 'Link PDF (HTTPS)'} style={INP}/>
-            <button onClick={() => importLink()} disabled={busy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: 'var(--r-md)', background:'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, opacity: busy || !link ? .5 : 1 }}>
+            <button onClick={() => importLink()} disabled={busy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: 'var(--r-md)', background:'var(--accent-solid)', color: '#fff', cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, opacity: busy || !link ? .5 : 1 }}>
               Import
             </button>
           </div>
