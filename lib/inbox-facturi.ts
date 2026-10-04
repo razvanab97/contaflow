@@ -330,6 +330,16 @@ export async function importInboxDocument({
       }
     })
 
+  // Acelasi fisier deja importat (hash identic) -> duplicat, fara sa mai platim un apel AI.
+  {
+    const hashInitial = crypto.createHash('sha256').update(bytes).digest('hex')
+    const dejaImportat = await findExistingByOptionalColumn(sb, 'document_hash', hashInitial)
+    if (dejaImportat) {
+      const firmaDoc = firmaRows.find(f => f.id === dejaImportat.firma_id)
+      return { duplicate: true, doc: dejaImportat, extracted: null, targetFirma: firmaDoc?.nume || currentFirma?.nume || null, source: sourceLabel || null }
+    }
+  }
+
   let extracted = await analyzeInvoice(bytes, mediaType, candidates)
   if (extracted && !extracted.esteFactura) {
     return {
@@ -384,8 +394,20 @@ export async function importInboxDocument({
     return { duplicate: true, doc: existingByMetadata, extracted, targetFirma: target?.nume || currentFirma?.nume || null, source: sourceLabel || null }
   }
   const match = await findMatchingTransaction(sb, target?.id || firmaId, extracted)
-  const docMonth = monthFromIso(extracted?.dataDocument) || luna
-  const dateBasedLunaId = luniRows.find(l => l.firma_id === target?.id && l.luna?.startsWith(docMonth))?.id || target?.luna_id || lunaId
+  // Luna de LUCRU in care intra factura = luna urmatoare datei ei: o factura din septembrie tine de
+  // contabilitatea lui septembrie, care se lucreaza in octombrie (vezi lib/accounting-period.ts) -
+  // acolo e si extrasul din septembrie cu plata ei. Fara data pe document: luna de lucru curenta.
+  const lunaFactura = monthFromIso(extracted?.dataDocument)
+  const docMonth = lunaFactura
+    ? (() => { const [y, m] = lunaFactura.split('-').map(Number); const d = new Date(Date.UTC(y, m, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}` })()
+    : luna
+  // Luna documentului; daca nu e inceputa la firma: luna curenta; altfel cea mai recenta luna
+  // inceputa a firmei (pana la luna documentului, apoi oricare) - ca importul sa nu esueze doar
+  // pentru ca luna respectiva nu a fost inca initializata.
+  const luniFirma = luniRows.filter(l => l.firma_id === (target?.id || firmaId)).sort((a, b) => String(b.luna).localeCompare(String(a.luna)))
+  const dateBasedLunaId = luniFirma.find(l => l.luna?.startsWith(docMonth))?.id || target?.luna_id || lunaId
+    || luniFirma.find(l => String(l.luna).slice(0, 7) <= docMonth)?.id || luniFirma[0]?.id || ''
+  if (!dateBasedLunaId) throw new Error(`Firma ${target?.nume || ''} nu are nicio lună contabilă începută`)
   // Cand documentul se asociaza automat cu o tranzactie existenta, trebuie filat sub luna
   // contabila a extrasului acelei tranzactii (nu dupa data proprie a facturii) - altfel exportul
   // grupat pe tranzactii (ZIP/PDF/"Descarca toate documentele") nu-l mai gaseste, pentru ca acelea
@@ -481,7 +503,7 @@ const PRAG_PAGINI_VERIFICARE_PACHET = 1
 // Verifica daca PDF-ul contine de fapt mai multe documente distincte, unul dupa altul, si daca da
 // intoarce paginile fiecaruia. Intoarce null daca e un singur document sau daca verificarea esueaza
 // (in acel caz documentul se proceseaza intreg, nesplit, ca sa nu blocam complet sincronizarea).
-async function detecteazaDocumenteMultiple(bytes: Uint8Array): Promise<SegmentDocument[] | null> {
+export async function detecteazaDocumenteMultiple(bytes: Uint8Array): Promise<SegmentDocument[] | null> {
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const response = await client.messages.create({

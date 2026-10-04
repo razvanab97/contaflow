@@ -6,31 +6,38 @@ import { currentWorkMonthKey } from '@/lib/accounting-period'
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
-  const { id, firmaId } = await req.json().catch(() => ({}))
+  const { id, firmaId, ignora } = await req.json().catch(() => ({}))
   const cleanId = String(id || '')
   const cleanFirmaId = String(firmaId || '')
+  const sb = getServiceSupabase()
+
+  // "Nu e factura" (AWB, proforma, document de transport): iese din lista de atribuit, fara import.
+  if (cleanId && ignora) {
+    const { data: f } = await sb.from('inbox_watch_files').select('id,fisier_path,status').eq('id', cleanId).single()
+    if (!f || !['nedetectat', 'eroare'].includes(f.status)) return NextResponse.json({ error: 'Fișierul nu poate fi ignorat' }, { status: 400 })
+    await sb.from('inbox_watch_files').update({ status: 'imported', error_message: 'Ignorat manual — nu e factură', synced_at: new Date().toISOString() }).eq('id', cleanId)
+    await sb.storage.from('documente').remove([f.fisier_path])
+    return NextResponse.json({ ok: true, ignorat: true })
+  }
   if (!cleanId || !cleanFirmaId) return NextResponse.json({ error: 'id/firmaId lipsesc' }, { status: 400 })
 
-  const sb = getServiceSupabase()
   const { data: file, error: findError } = await sb
     .from('inbox_watch_files')
     .select('id,fisier_path,fisier_nume,fisier_tip,status')
     .eq('id', cleanId)
     .single()
   if (findError || !file) return NextResponse.json({ error: 'Fișierul nu a fost găsit' }, { status: 404 })
-  if (!['nedetectat', 'eroare'].includes(file.status)) return NextResponse.json({ error: 'Fișierul a fost deja procesat' }, { status: 400 })
+  if (file.status !== 'nedetectat') return NextResponse.json({ error: file.status === 'eroare' ? 'Fișierul are o eroare de procesare — folosește „Reîncearcă”' : 'Fișierul a fost deja procesat' }, { status: 400 })
 
   const luna = currentWorkMonthKey()
   // "luna" e coloana de tip date (mereu prima zi a lunii) - .like() nu functioneaza pe o
   // coloana de tip date in Postgres/PostgREST (eroare de operator), asa ca interogarea
   // esua mereu, indiferent de firma, cu un mesaj fals ca luna nu ar fi inceputa.
-  const { data: lunaRow, error: lunaError } = await sb
-    .from('luni_contabile')
-    .select('id')
-    .eq('firma_id', cleanFirmaId)
-    .eq('luna', `${luna}-01`)
-    .single()
-  if (lunaError || !lunaRow) return NextResponse.json({ error: 'Firma aleasă nu are încă începută luna curentă' }, { status: 400 })
+  // Luna curenta a firmei daca e inceputa, altfel cea mai recenta luna inceputa. Documentul ajunge
+  // oricum in luna datei sale daca aceea exista (vezi importInboxDocument).
+  const { data: luniFirma } = await sb.from('luni_contabile').select('id,luna').eq('firma_id', cleanFirmaId).order('luna', { ascending: false })
+  const lunaRow = (luniFirma || []).find(l => String(l.luna).startsWith(luna)) || (luniFirma || [])[0]
+  if (!lunaRow) return NextResponse.json({ error: 'Firma aleasă nu are nicio lună contabilă începută' }, { status: 400 })
 
   const { data: blob, error: downloadError } = await sb.storage.from('documente').download(file.fisier_path)
   if (downloadError || !blob) return NextResponse.json({ error: downloadError?.message || 'Fișierul nu a putut fi citit' }, { status: 500 })

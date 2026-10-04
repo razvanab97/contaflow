@@ -40,5 +40,9 @@ export async function GET(req: NextRequest) {
     const d = r ? await r.json().catch(() => ({})) : {}
     rezultate.push({ sursa: s.eticheta, status: !r ? 'eroare conexiune' : d.alreadyRunning ? 'deja în curs' : r.ok ? 'pornit' : (d.error || `HTTP ${r.status}`) })
   }
-  return NextResponse.json({ luna, rezultate })
+  // Coada de facturi din folderul local (Personal Computer): un lot (~28s); restul se continua la
+  // deschiderea Dashboard-ului sau la cron-ul urmator.
+  const local = await fetch(new URL('/api/inbox-facturi/global/sync', req.nextUrl.origin), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    .then(r => r.json()).catch(() => null)
+  return NextResponse.json({ luna, rezultate, folderLocal: local ? { procesate: local.total, importate: local.imported, ramase: local.ramase } : 'eroare' })
 }
