@@ -5,6 +5,10 @@ import type { Tx } from './types'
 import { isPreviewable, shortReference, sumaDocument } from './types'
 import DocumentUpload from './DocumentUpload'
 import DocumentLinkInput from './DocumentLinkInput'
+import InboxSearch from './InboxSearch'
+
+// Furnizorul poate contine metadata interna dupa "|" (sursa, firma detectata, motiv AI, hash).
+const furnizorCurat = (f: string | null | undefined) => { const p = String(f || '').split('|')[0].trim(); return /^(DP_DATA:|Ata(ș|s)ament |Sursa:|Categorie:|\{)/i.test(p) ? '' : p }
 
 export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onRefresh, onEditPrimary }: {
   tx: Tx; firmaId: string; lunaId: string; culoare: string; onRefresh: () => void; onEditPrimary: () => void
@@ -17,6 +21,10 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
 
   const docsForTx = tx.documenteToate?.length ? tx.documenteToate : tx.documente ? [tx.documente] : []
   const orderRef = shortReference(tx.referinta)
+  // Cat din plata e acoperit de documentele atasate (in lei; valuta prin echivalentul BNR).
+  const acoperit = Math.round(docsForTx.reduce((s, d) => s + Number((d.valuta && d.valuta !== 'RON' ? d.suma_ron : d.suma) ?? 0), 0) * 100) / 100
+  const totalTx = Math.abs(tx.suma ?? 0)
+  const ramas = Math.round((totalTx - acoperit) * 100) / 100
 
   function togglePreview(id: string) {
     // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
@@ -43,6 +51,9 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
       <div style={{ display:'inline-flex', alignItems:'center', gap:'8px', padding:'6px 10px', borderRadius:'var(--r-full)', background:'var(--surface-secondary)', border:'1px solid var(--border)', color:'var(--text-secondary)', fontSize:'var(--fs-xs)', fontWeight:700, marginBottom:'14px' }}>
         {orderRef ? `Comanda/ref. ${orderRef}` : 'Aceeași tranzacție'}
         <span style={{ color:'var(--success)' }}>· {docsForTx.length || 1} document{(docsForTx.length || 1) === 1 ? '' : 'e'}</span>
+        {acoperit > 0 && (Math.abs(ramas) < 0.02
+          ? <span style={{ color:'var(--success)' }}>· ✓ acoperă toată plata</span>
+          : <span style={{ color: ramas > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>· acoperit {acoperit.toFixed(2)} din {totalTx.toFixed(2)} {tx.valuta}{ramas > 0 ? ` · rămas ${ramas.toFixed(2)}` : ''}</span>)}
       </div>
 
       <div style={{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'14px' }}>
@@ -66,8 +77,8 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
                     }}
                     style={{ width:'100%', fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--success)', background:'transparent', border:'none', outline:'none', padding:0 }}
                   />
-                  {(doc.furnizor || doc.numar_document) && (
-                    <div style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)', marginTop:'2px' }}>{[doc.furnizor, doc.numar_document && `nr. ${doc.numar_document}`].filter(Boolean).join(' · ')}</div>
+                  {(furnizorCurat(doc.furnizor) || doc.numar_document) && (
+                    <div style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)', marginTop:'2px' }}>{[furnizorCurat(doc.furnizor), doc.numar_document && `nr. ${doc.numar_document}`].filter(Boolean).join(' · ')}</div>
                   )}
                   {(() => {
                     const s = sumaDocument(doc)
@@ -99,7 +110,7 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
 
       <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom: showAddMore ? '14px' : 0 }}>
         <button onClick={() => setShowAddMore(v => !v)} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'8px 14px', borderRadius:'var(--r-md)', border:`1px solid var(--purple)`, background:'transparent', color:'var(--purple)', cursor:'pointer' }}>
-          {showAddMore ? 'Ascunde' : '+ Adaugă altă factură'}
+          {showAddMore ? 'Ascunde' : '+ Adaugă / caută alte facturi'}
         </button>
         <button onClick={onEditPrimary} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'8px 14px', borderRadius:'var(--r-md)', border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer' }}>
           Schimbă documentul principal
@@ -108,7 +119,9 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
 
       {showAddMore && (
         <div style={{ display:'flex', flexDirection:'column', gap:'8px', padding:'14px', background:'var(--surface-secondary)', border:'1px solid var(--border)', borderRadius:'var(--r-md)' }}>
-          <p style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)' }}>Adaugă una sau mai multe facturi pentru aceeași plată/comandă.</p>
+          <p style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)' }}>Adaugă una sau mai multe facturi pentru aceeași plată/comandă — caută și bifează documente deja încărcate, sau încarcă unele noi mai jos.</p>
+          <InboxSearch tx={tx} firmaId={firmaId} onAssociated={onRefresh} multi deschis sumaTinta={ramas > 0.01 ? ramas : null} />
+          <p style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.06em', margin:'6px 0 0' }}>Sau încarcă un document nou</p>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
             <input value={addFurnizor} onChange={e => setAddFurnizor(e.target.value)} placeholder="Furnizor factură" style={{ fontSize:'var(--fs-sm)', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'8px 12px', color:'var(--text-primary)', outline:'none' }} />
             <input value={addSuma} onChange={e => setAddSuma(e.target.value)} placeholder={`Suma (din ${tx.suma?.toFixed(2)} total)`} inputMode="decimal" style={{ fontSize:'var(--fs-sm)', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'8px 12px', color:'var(--text-primary)', outline:'none' }} />

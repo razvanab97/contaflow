@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { InboxCandidat, SursaInbox, Tx } from './types'
 import { SURSA_LABEL } from './types'
 import VeziButon from '@/components/ui/VeziButon'
@@ -15,8 +15,13 @@ const ASSOC_ENDPOINT: Record<InboxCandidat['tabel'], { url: string; idKey: strin
 const SURSE: ('toate'|SursaInbox)[] = ['toate', 'local', 'gmail', 'oblio', 'module', 'deasociat', 'bonuri', 'altele']
 const zi = (d: string | null | undefined) => d ? d.slice(0, 10).split('-').reverse().join('.') : ''
 
-export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; firmaId: string; onAssociated: () => void }) {
-  const [open, setOpen] = useState(false)
+// `multi`: pe o tranzactie care are deja document(e) - se pot bifa mai multe documente (ex. mai
+// multe comenzi platite intr-o singura plata) si asocia deodata; `sumaTinta` = suma ramasa
+// neacoperita, dupa care se ordoneaza rezultatele.
+export default function InboxSearch({ tx, firmaId, onAssociated, multi = false, sumaTinta, deschis = false }: { tx: Tx; firmaId: string; onAssociated: () => void; multi?: boolean; sumaTinta?: number | null; deschis?: boolean }) {
+  const [open, setOpen] = useState(deschis)
+  const [selectate, setSelectate] = useState<Map<string, InboxCandidat>>(new Map())
+  const [progres, setProgres] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
   const [candidati, setCandidati] = useState<InboxCandidat[]>([])
@@ -35,7 +40,7 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
     const controller = new AbortController()
     abortRef.current = controller
     setBusy(true)
-    const params = new URLSearchParams({ firmaId, suma: String(tx.suma), valutaTx: tx.valuta || 'RON' })
+    const params = new URLSearchParams({ firmaId, suma: String(sumaTinta != null && sumaTinta > 0 ? sumaTinta : tx.suma), valutaTx: tx.valuta || 'RON' })
     if (sursa !== 'toate') params.set('sursa', sursa)
     if (q.trim()) params.set('q', q.trim())
     try {
@@ -48,6 +53,9 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
       if ((e as Error).name !== 'AbortError') { setBusy(false); setDone(true) }
     }
   }
+
+  // Deschisa din start (panoul "alte facturi"): cauta imediat si din nou cand se schimba suma ramasa.
+  useEffect(() => { if (deschis || multi) search() }, [sumaTinta]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function openAndSearch() {
     setOpen(true)
@@ -68,6 +76,27 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
     debounce.current = setTimeout(() => search(sursaFiltru, q), 300)
   }
 
+  // Asocierea mai multor documente deodata, pe rand (fiecare endpoint leaga un singur document).
+  async function asociazaSelectate() {
+    const lista = [...selectate.values()]
+    setEroare('')
+    for (let i = 0; i < lista.length; i++) {
+      const c = lista[i]
+      setProgres(`${i + 1}/${lista.length}`); setAssocId(c.id)
+      const { url, idKey } = ASSOC_ENDPOINT[c.tabel || 'documente']
+      const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ [idKey]: c.id, tranzactieId: tx.id }) }).catch(() => null)
+      if (!res?.ok) { const d = res ? await res.json().catch(() => ({})) : {}; setEroare(`${c.furnizor || c.fisier_nume}: ${d.error || 'asocierea a eșuat'}`); break }
+    }
+    setAssocId(''); setProgres(''); setSelectate(new Map())
+    onAssociated()
+    search()
+  }
+
+  function comuta(c: InboxCandidat) {
+    setSelectate(prev => { const m = new Map(prev); if (m.has(c.id)) m.delete(c.id); else m.set(c.id, c); return m })
+  }
+  const totalSelectat = [...selectate.values()].reduce((s, c) => s + (c.suma_ron ?? c.suma ?? 0), 0)
+
   async function associate(c: InboxCandidat) {
     setAssocId(c.id); setEroare('')
     const { url, idKey } = ASSOC_ENDPOINT[c.tabel || 'documente']
@@ -76,9 +105,11 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
     setAssocId('')
     if (!res?.ok) { setEroare(d.error || 'Asocierea a eșuat'); return }
     onAssociated()
+    if (multi) search()
   }
 
-  if (!open) {
+  // In modul multi componenta sta mereu deschisa (e deja intr-un panou propriu).
+  if (!open && !multi) {
     return (
       <button onClick={openAndSearch} style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--text-secondary)', background:'transparent', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'8px 12px', cursor:'pointer', width:'100%', textAlign:'center' }}>
         🔍 Caută în Inbox Facturi și Bonuri
@@ -89,8 +120,8 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
   return (
     <div style={{ padding:'12px', background:'var(--surface-secondary)', border:'1px solid var(--border)', borderRadius:'var(--r-md)' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
-        <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--text-secondary)' }}>Inbox Facturi &amp; Bonuri</span>
-        <button onClick={() => setOpen(false)} style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)', background:'transparent', border:'none', cursor:'pointer' }}>Ascunde</button>
+        <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--text-secondary)' }}>{multi ? 'Caută documente existente (poți bifa mai multe)' : 'Inbox Facturi & Bonuri'}</span>
+        {!multi && <button onClick={() => setOpen(false)} style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)', background:'transparent', border:'none', cursor:'pointer' }}>Ascunde</button>}
       </div>
 
       <div style={{ display:'flex', gap:'5px', flexWrap:'wrap', marginBottom:'8px' }}>
@@ -107,7 +138,7 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
 
       <input value={query} onChange={e => setQ(e.target.value)} placeholder="Caută după furnizor/firmă, sumă (ex. 714), număr document sau dată (15.09.2026)…" style={{ ...INP, marginBottom:'8px' }} />
       <p style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)', margin:'-2px 0 8px' }}>
-        {query.trim().length >= 2 ? 'Caut în toate documentele firmei (Inbox, module, facturi de asociat, bonuri), inclusiv cele deja asociate.' : `Documente încă neasociate, cele mai apropiate de ${Math.abs(tx.suma ?? 0).toFixed(2)} ${tx.valuta} primele.`}
+        {query.trim().length >= 2 ? 'Caut în toate documentele firmei (Inbox, module, facturi de asociat, bonuri), inclusiv cele deja asociate.' : `Documente încă neasociate, cele mai apropiate de ${Math.abs(sumaTinta != null && sumaTinta > 0 ? sumaTinta : tx.suma ?? 0).toFixed(2)} ${tx.valuta}${sumaTinta != null && sumaTinta > 0 ? ' (suma rămasă)' : ''} primele.`}
       </p>
       {eroare && <p role="alert" style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', margin:'0 0 8px' }}>{eroare}</p>}
 
@@ -118,7 +149,8 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:'6px', maxHeight:'360px', overflowY:'auto' }}>
           {candidati.map(c => (
-            <div key={`${c.tabel}-${c.id}`} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', opacity: c.deja ? .7 : 1 }}>
+            <div key={`${c.tabel}-${c.id}`} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--surface)', border:`1px solid ${selectate.has(c.id) ? 'var(--purple)' : 'var(--border)'}`, borderRadius:'var(--r-md)', opacity: c.deja ? .7 : 1 }}>
+              {multi && <input type="checkbox" checked={selectate.has(c.id)} disabled={!!c.deja || !!assocId} onChange={() => comuta(c)} aria-label={`Selectează ${c.furnizor || c.fisier_nume}`} style={{ width:'16px', height:'16px', flexShrink:0, accentColor:'var(--purple)', cursor: c.deja ? 'not-allowed' : 'pointer' }}/>}
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ display:'flex', alignItems:'baseline', gap:'8px' }}>
                   <span style={{ flex:1, minWidth:0, fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={c.fisier_nume}>{c.furnizor || c.fisier_nume}</span>
@@ -142,6 +174,17 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
               </button>
             </div>
           ))}
+        </div>
+      )}
+      {multi && selectate.size > 0 && (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', marginTop:'8px', padding:'8px 10px', borderRadius:'var(--r-md)', background:'var(--purple-soft)', border:'1px solid var(--purple)' }}>
+          <span style={{ fontSize:'var(--fs-sm)', color:'var(--text-primary)' }}>
+            <b>{selectate.size}</b> selectate · total <b>{totalSelectat.toFixed(2)} lei</b>
+            {sumaTinta != null && sumaTinta > 0 && <span style={{ color: Math.abs(totalSelectat - sumaTinta) < 0.02 ? 'var(--success)' : 'var(--text-muted)' }}> {Math.abs(totalSelectat - sumaTinta) < 0.02 ? '· ✓ acoperă exact suma rămasă' : `· rămas ${(sumaTinta - totalSelectat).toFixed(2)} lei`}</span>}
+          </span>
+          <button onClick={asociazaSelectate} disabled={!!assocId} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'7px 14px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor: assocId ? 'wait' : 'pointer' }}>
+            {progres ? `Asociez ${progres}…` : `Asociază ${selectate.size === 1 ? 'documentul' : `toate ${selectate.size}`}`}
+          </button>
         </div>
       )}
     </div>
