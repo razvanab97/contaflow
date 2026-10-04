@@ -131,6 +131,9 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
   const { data: lunaRow } = await sb.from('luni_contabile').select('luna').eq('id', lunaId).single()
   const [ly, lm] = String(lunaRow?.luna || '').slice(0, 7).split('-').map(Number)
   const sfarsitPerioada = ly ? new Date(Date.UTC(ly, lm - 1, 0)).toISOString().slice(0, 10) : '9999-12-31'
+  const inceputPerioada = ly ? new Date(Date.UTC(ly, lm - 2, 1)).toISOString().slice(0, 10) : '0000-01-01'
+  const lunaNume = (iso: string) => new Intl.DateTimeFormat('ro-RO', { month: 'long', timeZone: 'UTC' }).format(new Date(iso + 'T00:00:00Z'))
+  const ziRo = (iso: string) => iso.split('-').reverse().slice(0, 2).join('.')
   const coduriAirbnb = rezervari.filter(r => r.platforma === 'airbnb').map(r => r.cod_rezervare).filter(Boolean)
   const { data: sejururi } = firmaId && coduriAirbnb.length
     ? await sb.from('airbnb_facturi_asteptate').select('cod_confirmare,data_start,data_sfarsit').eq('firma_id', firmaId).in('cod_confirmare', coduriAirbnb)
@@ -198,8 +201,15 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
     facturateAlteLuni: facturateAlteLuni.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, luna: lunaLabelById.get(d.factura.luna_id) || '?' })),
     facturiFaraRezervare: facturiFaraRezervare.map(f => {
       const r = (rezAlteLuni || []).find(x => isStardeskCandidate({ cod_rezervare: x.cod_rezervare, nume_oaspete: x.nume_oaspete }, f))
+      // Fara rezervare in borderou: check-out-ul de pe factura spune unde ar trebui sa fie.
+      const co: string = f.data_sfarsit || ''
+      const motiv = r ? `rezervarea e în borderoul din ${lunaRez.get(r.luna_id) || 'altă lună'}`
+        : !co ? 'rezervarea nu apare în niciun borderou încărcat (perioada sejurului nu a putut fi citită din factură)'
+        : co > sfarsitPerioada ? `check-out ${ziRo(co)}, după ${ziRo(sfarsitPerioada)} — intră în borderoul lunii următoare, nu e o problemă acum`
+        : co < inceputPerioada ? `check-out ${ziRo(co)}, înainte de ${ziRo(inceputPerioada)} — trebuia să fie în borderoul din ${lunaNume(co)}; nu e găsită acolo, verifică luna trecută`
+        : `⚠ check-out ${ziRo(co)}, în perioada borderoului — dar rezervarea lipsește din el, de verificat`
       return { id: f.id, numarFactura: f.numar_factura, numeClient: f.nume_client, suma: f.suma, idRezervare: f.id_rezervare,
-        motiv: r ? `rezervarea e în borderoul din ${lunaRez.get(r.luna_id) || 'altă lună'}` : 'rezervarea nu apare în niciun borderou încărcat — probabil intră în borderoul lunii următoare (plata platformei vine după check-out)' }
+        dataStart: f.data_start || null, dataSfarsit: co || null, motiv, unde: r ? 'alta-luna' : !co ? 'necunoscut' : co > sfarsitPerioada ? 'viitoare' : co < inceputPerioada ? 'trecuta' : 'lipsa' }
     }),
     seFactureazaLunaViitoare: seFactureazaLunaViitoare.map(r => { const s = sejur.get(normalizeCode(r.cod_rezervare)); return { id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma, dataStart: s?.data_start || null, dataSfarsit: s?.data_sfarsit || null } }),
     faraComisionAirbnb: faraComisionAirbnb.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),

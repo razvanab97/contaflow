@@ -9,7 +9,7 @@ import { computeVerification } from '@/lib/stardeskVerify'
 const PAGES_PER_BATCH = 15
 
 interface RezervareRow { codRezervare?: string; numeOaspete?: string; suma?: number }
-interface StardeskFacturaRow { numarFactura?: string; numeClient?: string; suma?: number; idRezervare?: string }
+interface StardeskFacturaRow { numarFactura?: string; numeClient?: string; suma?: number; idRezervare?: string; dataStart?: string; dataSfarsit?: string }
 interface ComisionFacturaRow { numarFactura?: string; codRezervare?: string; suma?: number }
 
 function extractJson<T>(text: string): T | null {
@@ -44,6 +44,13 @@ Extrage TOATE liniile de rezervare din document, nu doar primele cateva.` },
   return parsed?.rezervari || []
 }
 
+function dataIso(v?: string) {
+  const s = String(v || '').trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null
+}
+
 async function extractStardeskInvoices(bytes: Buffer): Promise<StardeskFacturaRow[]> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const response = await client.messages.create({
@@ -52,9 +59,9 @@ async function extractStardeskInvoices(bytes: Buffer): Promise<StardeskFacturaRo
     messages: [{ role:'user', content:[
       { type:'document', source:{ type:'base64', media_type:'application/pdf', data:bytes.toString('base64') } },
       { type:'text', text:`Acest document contine facturi fiscale 5StarDesk, de obicei una pe pagina. Extrage FIECARE factura din TOATE paginile.
-Pentru fiecare factura: numarFactura = "Nr." (ex: "ABRH 1188"), numeClient = "Client / Nume:", suma = "Total Factura" (numar, fara simbol monetar), idRezervare = numarul din paranteza "(ID: XXXXXXXXXX)" mentionat langa serviciul de cazare.
+Pentru fiecare factura: numarFactura = "Nr." (ex: "ABRH 1188"), numeClient = "Client / Nume:", suma = "Total Factura" (numar, fara simbol monetar), idRezervare = numarul din paranteza "(ID: XXXXXXXXXX)" mentionat langa serviciul de cazare, dataStart / dataSfarsit = perioada sejurului din "nopti (DD.MM.YYYY - DD.MM.YYYY)", in format YYYY-MM-DD (check-in / check-out).
 Returneaza DOAR JSON valid, fara alt text:
-{"facturi":[{"numarFactura":"ABRH 1188","numeClient":"Andrada Gherghey","suma":292.49,"idRezervare":"5649678350"}]}
+{"facturi":[{"numarFactura":"ABRH 1188","numeClient":"Andrada Gherghey","suma":292.49,"idRezervare":"5649678350","dataStart":"2026-09-12","dataSfarsit":"2026-09-14"}]}
 Extrage TOATE facturile din document (poate fi vorba de zeci de pagini), nu doar primele cateva.` },
     ] }],
   })
@@ -159,10 +166,14 @@ export async function POST(req: NextRequest) {
         try { facturi = await extractInBatches(bytes, PAGES_PER_BATCH, extractStardeskInvoices) }
         catch (err) { console.error('[5stardesk] extracție facturi client eșuată pentru documentul', doc.id, doc.fisier_nume, err) }
         if (facturi.length) {
-          await sb.from('stardesk_facturi').insert(facturi.map(f => ({
+          const rows = facturi.map(f => ({
             luna_id: lunaId, firma_id: firmaId, document_id: doc.id,
             numar_factura: f.numarFactura || '', nume_client: f.numeClient || '', suma: Number(f.suma) || null, id_rezervare: f.idRezervare || '',
-          })))
+            data_start: dataIso(f.dataStart), data_sfarsit: dataIso(f.dataSfarsit),
+          }))
+          // Fara migrarea cu perioada sejurului (data_start/data_sfarsit) se salveaza ca inainte.
+          const { error } = await sb.from('stardesk_facturi').insert(rows)
+          if (error) await sb.from('stardesk_facturi').insert(rows.map(({ data_start, data_sfarsit, ...r }) => r))
         }
       }
     }

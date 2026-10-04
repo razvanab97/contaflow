@@ -7,7 +7,7 @@ import OldItemDocs, { ChecklistItem } from './OldItemDocs'
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string; tasks: TaskItem[]; checklistItems: ChecklistItem[] }
 interface Nefacturata { id:string; codRezervare:string; numeOaspete:string; suma:number|null; platforma:string; dataStart?:string|null; dataSfarsit?:string|null }
-interface FacturaOrfana { id:string; numarFactura:string; numeClient:string; suma:number|null; idRezervare:string; motiv?:string }
+interface FacturaOrfana { id:string; numarFactura:string; numeClient:string; suma:number|null; idRezervare:string; motiv?:string; dataStart?:string|null; dataSfarsit?:string|null; unde?:'lipsa'|'trecuta'|'necunoscut'|'alta-luna'|'viitoare' }
 interface Discrepanta extends Nefacturata { numarFactura:string; sumaFactura:number|null; mesaj:string; potrivire?:'cod'|'nume'; codRezervareFactura?:string|null }
 interface DiscrepantaExplicata extends Discrepanta { numarComision:string; sumaComision:number|null }
 interface FacturataAltaLuna extends Discrepanta { luna:string }
@@ -24,6 +24,11 @@ function zi(d?: string|null) { if (!d) return ''; const [, m, z] = d.split('-');
 function sejurText(n: Nefacturata) { return n.dataStart || n.dataSfarsit ? `sejur ${zi(n.dataStart)}–${zi(n.dataSfarsit)}` : '' }
 
 function money(v: number|null) { return v == null ? '—' : new Intl.NumberFormat('ro-RO', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(v) }
+
+// Suma efectiv facturata, afisata imediat dupa numarul facturii.
+function FacturatSuma({ v }: { v: number|null }) {
+  return v == null ? null : <span style={{ fontWeight:600, color:'var(--c-cccccc)', whiteSpace:'nowrap' }}>· {money(v)} RON facturat</span>
+}
 
 function ListaLipsa({ items, tip, onResolved, faraActiune }: { items: Nefacturata[]; tip:'client'|'comision'; onResolved:(id:string)=>void; faraActiune?:boolean }) {
   const [resolving, setResolving] = useState<string|null>(null)
@@ -69,18 +74,23 @@ function ListaLipsa({ items, tip, onResolved, faraActiune }: { items: Nefacturat
   )
 }
 
+// Ordinea: intai ce e de verificat (check-out in perioada sau in luna trecuta), la final cele care
+// intra firesc in borderoul lunii urmatoare.
+const ORDINE_ORFANE = ['lipsa', 'trecuta', 'necunoscut', 'alta-luna', 'viitoare']
 function ListaOrfane({ items }: { items: FacturaOrfana[] }) {
+  const sortate = [...items].sort((a, b) => ORDINE_ORFANE.indexOf(a.unde || 'necunoscut') - ORDINE_ORFANE.indexOf(b.unde || 'necunoscut'))
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
-      {items.map(f => (
+      {sortate.map(f => (
         <div key={f.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'var(--r-sm)', flexWrap:'wrap' }}>
           <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'2px 7px', borderRadius:'var(--r-sm)', background:'light-dark(rgba(180,83,9,.25), rgba(245,201,106,.1))', color:'var(--warning)', flexShrink:0 }}>
             {f.numarFactura || '—'}
           </span>
           <span style={{ flex:1, fontSize:'var(--fs-sm)', color:'var(--c-dddddd)' }}>{f.numeClient || '—'}</span>
           {f.idRezervare && <span style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace' }}>{f.idRezervare}</span>}
+          {(f.dataStart || f.dataSfarsit) && <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', flexShrink:0 }}>sejur {zi(f.dataStart)}–{zi(f.dataSfarsit)}</span>}
           <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', flexShrink:0 }}>{money(f.suma)} RON</span>
-          {f.motiv && <span style={{ flexBasis:'100%', fontSize:'var(--fs-xs)', color:'var(--c-777777)' }}>ℹ {f.motiv}</span>}
+          {f.motiv && <span style={{ flexBasis:'100%', fontSize:'var(--fs-xs)', color: f.unde === 'lipsa' || f.unde === 'trecuta' ? 'var(--warning)' : f.unde === 'viitoare' ? 'var(--success)' : 'var(--c-777777)' }}>{f.unde === 'viitoare' ? '✓' : f.unde === 'trecuta' ? '⚠' : 'ℹ'} {f.motiv}</span>}
         </div>
       ))}
     </div>
@@ -108,7 +118,7 @@ function ListaDiscrepante({ items, tip, onResolved }: { items: Discrepanta[]; ti
             <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'2px 7px', borderRadius:'var(--r-sm)', background: d.platforma==='airbnb' ? 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))' : 'light-dark(rgba(37,99,235,.25), rgba(96,165,250,.1))', color: d.platforma==='airbnb' ? 'var(--danger)' : 'var(--accent-blue)', flexShrink:0 }}>
               {d.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
             </span>
-            <span style={{ flex:1, fontSize:'var(--fs-sm)', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· factura {d.numarFactura || '—'}</span></span>
+            <span style={{ flex:1, fontSize:'var(--fs-sm)', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· factura {d.numarFactura || '—'}</span> <FacturatSuma v={d.sumaFactura}/></span>
             <span style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace' }}>{d.codRezervare}</span>
             {d.potrivire && <span title={d.potrivire === 'cod' ? 'Factura are același cod de rezervare' : `Codul nu se potrivește (pe factură: ${d.codRezervareFactura || 'lipsă'}) — găsită după numele oaspetelui`} style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'2px 6px', borderRadius:'var(--r-sm)', background: d.potrivire === 'cod' ? 'light-dark(rgba(5,150,105,.15), rgba(110,231,176,.08))' : 'light-dark(rgba(180,83,9,.15), rgba(245,201,106,.1))', color: d.potrivire === 'cod' ? 'var(--success)' : 'var(--warning)', flexShrink:0 }}>{d.potrivire === 'cod' ? '✓ după cod' : 'după nume'}</span>}
             <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', flexShrink:0 }}>borderou {money(d.suma)} RON ≠ factură {money(d.sumaFactura)} RON</span>
@@ -135,7 +145,8 @@ function ListaExplicate({ items }: { items: DiscrepantaExplicata[] }) {
       {items.map(d => (
         <div key={d.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'var(--r-sm)' }}>
           <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'2px 7px', borderRadius:'var(--r-sm)', background:'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))', color:'var(--danger)', flexShrink:0 }}>Airbnb</span>
-          <span style={{ flex:1, fontSize:'var(--fs-sm)', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· factura {d.numarFactura || '—'}</span></span>
+          <span style={{ flex:1, fontSize:'var(--fs-sm)', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· factura {d.numarFactura || '—'}</span> <FacturatSuma v={d.sumaFactura}/></span>
+          <span style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace' }}>{d.codRezervare}</span>
           <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', flexShrink:0 }}>
             {money(d.suma)} <span style={{ color:'var(--c-555555)' }}>+ comision</span> {money(d.sumaComision)} <span style={{ color:'var(--c-555555)' }}>=</span> {money(d.sumaFactura)} RON
           </span>
@@ -156,7 +167,7 @@ function ListaAltaLuna({ items, tip }: { items: FacturataAltaLuna[]; tip:'client
           <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'2px 7px', borderRadius:'var(--r-sm)', background: d.platforma==='airbnb' ? 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))' : 'light-dark(rgba(37,99,235,.25), rgba(96,165,250,.1))', color: d.platforma==='airbnb' ? 'var(--danger)' : 'var(--accent-blue)', flexShrink:0 }}>
             {d.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
           </span>
-          <span style={{ flex:1, fontSize:'var(--fs-sm)', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· {tip === 'client' ? 'factura' : 'comision'} {d.numarFactura || '—'}</span></span>
+          <span style={{ flex:1, fontSize:'var(--fs-sm)', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· {tip === 'client' ? 'factura' : 'comision'} {d.numarFactura || '—'}</span> <FacturatSuma v={d.sumaFactura}/></span>
           <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', flexShrink:0 }}>ℹ facturat în <b style={{ color:'var(--c-aaaaaa)' }}>{d.luna}</b></span>
         </div>
       ))}
@@ -289,7 +300,7 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
           <div style={{ marginBottom:'8px' }}>
             <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>Facturi 5StarDesk fără rezervare în borderou</span>
           </div>
-          <p style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)', marginTop:'-4px', marginBottom:'8px' }}>Verificare inversă — factura 5StarDesk există, dar rezervarea ei nu e în borderoul acestei luni. Fiecare rând spune dacă rezervarea e în borderoul altei luni sau încă în niciunul.</p>
+          <p style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)', marginTop:'-4px', marginBottom:'8px' }}>Verificare inversă — factura 5StarDesk există, dar rezervarea ei nu e în borderoul acestei luni. După check-out-ul de pe factură: după sfârșitul perioadei → intră în borderoul lunii următoare (ok); înainte de începutul ei → trebuia să fie în borderoul lunii trecute (de verificat); în perioadă → lipsește din borderou (de verificat). Cele de verificat apar primele.</p>
           {result && (result.facturiFaraRezervare.length === 0
             ? <p style={{ fontSize:'var(--fs-sm)', color:'var(--success)' }}>✓ Toate facturile 5StarDesk au rezervare asociată în borderou.</p>
             : <ListaOrfane items={result.facturiFaraRezervare}/>)}
