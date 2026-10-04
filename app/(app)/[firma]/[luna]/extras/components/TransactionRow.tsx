@@ -39,7 +39,7 @@ function TransactionRowImpl({ tx, isSelected, onClick }: { tx: Tx; isSelected: b
         {label}
       </span>
       <span style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'2px', flexShrink:0 }}>
-        <span style={{ fontSize:'var(--fs-md)', fontWeight:700, color: tx.tip==='credit' ? 'var(--success)' : 'var(--danger)' }}>
+        <span style={{ fontSize:'var(--fs-md)', fontWeight:700, color: tx.tip==='credit' ? 'var(--success)' : 'color-mix(in srgb, var(--danger) 62%, var(--text-secondary))' }}>
           {tx.tip==='credit'?'+':'-'}{tx.suma.toFixed(2)} {tx.valuta}
         </span>
         <span style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'var(--fs-xs)', fontWeight:600, color: deVerificat ? 'var(--warning)' : STATUS_COLOR[status] }}

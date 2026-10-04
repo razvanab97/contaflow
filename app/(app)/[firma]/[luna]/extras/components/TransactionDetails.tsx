@@ -174,7 +174,7 @@ export default function TransactionDetails({ tx, index, total, onRefresh }: { tx
         <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'3px 9px', borderRadius:'var(--r-full)', background:cat.bg, color:cat.c }}>{tx.categorie || 'altele'}</span>
       </div>
 
-      <div style={{ fontSize:'30px', fontWeight:800, color: tx.tip==='credit' ? 'var(--success)' : 'var(--danger)', letterSpacing:'-0.5px', marginBottom:'16px' }}>
+      <div style={{ fontSize:'30px', fontWeight:800, color: tx.tip==='credit' ? 'var(--success)' : 'color-mix(in srgb, var(--danger) 62%, var(--text-secondary))', letterSpacing:'-0.5px', marginBottom:'16px' }}>
         {tx.tip==='credit' ? '+' : '-'}{tx.suma?.toFixed(2)} {tx.valuta}
       </div>
 
