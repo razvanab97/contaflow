@@ -59,13 +59,17 @@ function comisionDiagnostic(
   facturaClient: { suma:number|null },
   comisionAirbnb: { numar_factura:string|null; cod_rezervare:string|null; suma:number|null }[],
 ) {
+  const diferentaAsteptata = (facturaClient.suma != null && rez.suma != null) ? facturaClient.suma - rez.suma : null
+  // Factura mai MICA decat borderoul: o parte din rezervare nu e facturata deloc - de facturat diferenta.
+  if (diferentaAsteptata != null && diferentaAsteptata < -0.99) {
+    return { explicat: false, comision: null, mesaj: `Nefacturat: ${(-diferentaAsteptata).toFixed(2)} RON — factura e mai mică decât suma din borderou; de emis factură pentru diferență.` }
+  }
   if (rez.platforma !== 'airbnb') {
     return { explicat: false, comision: null, mesaj: 'Booking nu emite comision per rezervare - diferența nu poate fi verificată automat, necesită verificare manuală.' }
   }
-  const diferentaAsteptata = (facturaClient.suma != null && rez.suma != null) ? facturaClient.suma - rez.suma : null
   const comision = comisionAirbnb.find(c => codesMatch(rez.cod_rezervare, c.cod_rezervare || ''))
   if (!comision || comision.suma == null) {
-    return { explicat: false, comision: null, mesaj: 'Nicio factură de comision Airbnb găsită pentru acest cod de rezervare.' }
+    return { explicat: false, comision: null, mesaj: `Factura e mai mare cu ${diferentaAsteptata != null ? diferentaAsteptata.toFixed(2) : '?'} RON decât borderoul — ar trebui să fie comisionul Airbnb, dar factura de comision pentru acest cod lipsește (adu-o în Airbnb · Facturi).` }
   }
   if (diferentaAsteptata == null) {
     return { explicat: false, comision, mesaj: 'Sumă lipsă pe factura clientului sau pe borderou - diferența nu poate fi calculată.' }
@@ -90,6 +94,17 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
   const comisionFacturi = allComision || []
   const comisionAirbnb = comisionFacturi.filter(f => f.platforma === 'airbnb')
 
+  // Facturile de comision incarcate in Airbnb · Facturi au codul rezervarii citit la incarcare
+  // (documente.cod_rezervare_airbnb) - le folosim direct, ca verificarea sa fie mereu la zi cu
+  // modulul Airbnb, fara un "Verifica" separat. Cele deja citite si aici nu se dubleaza.
+  const { data: docsComisionAirbnb } = await sb.from('documente').select('id,luna_id,firma_id,numar_document,suma,cod_rezervare_airbnb')
+    .eq('luna_id', lunaId).like('fisier_path', '%/airbnb-facturi/%').not('cod_rezervare_airbnb', 'is', null)
+  for (const d of docsComisionAirbnb || []) {
+    const cod = String(d.cod_rezervare_airbnb || '')
+    if (!cod || cod === '-' || comisionAirbnb.some(c => codesMatch(c.cod_rezervare || '', cod))) continue
+    comisionAirbnb.push({ id: d.id, luna_id: d.luna_id, firma_id: d.firma_id, document_id: d.id, platforma: 'airbnb', numar_factura: d.numar_document || '', cod_rezervare: cod, suma: d.suma } as any)
+  }
+
   // O rezervare a acestei luni poate fi deja facturata intr-o alta luna contabila (facturata mai
   // devreme/mai tarziu decat perioada borderoului) - cautam si acolo, pe toata firma, inainte sa o
   // consideram "fara factura". La fel pentru comisionul Airbnb.
@@ -111,28 +126,50 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
     }
   }
 
+  // Perioada sejurului (din CSV-ul Airbnb) - o rezervare cu check-out dupa sfarsitul lunii contabile
+  // se factureaza, de regula, la check-out, deci luna viitoare: nu e o problema acum.
+  const { data: lunaRow } = await sb.from('luni_contabile').select('luna').eq('id', lunaId).single()
+  const [ly, lm] = String(lunaRow?.luna || '').slice(0, 7).split('-').map(Number)
+  const sfarsitPerioada = ly ? new Date(Date.UTC(ly, lm - 1, 0)).toISOString().slice(0, 10) : '9999-12-31'
+  const coduriAirbnb = rezervari.filter(r => r.platforma === 'airbnb').map(r => r.cod_rezervare).filter(Boolean)
+  const { data: sejururi } = firmaId && coduriAirbnb.length
+    ? await sb.from('airbnb_facturi_asteptate').select('cod_confirmare,data_start,data_sfarsit').eq('firma_id', firmaId).in('cod_confirmare', coduriAirbnb)
+    : { data: [] as { cod_confirmare: string; data_start: string | null; data_sfarsit: string | null }[] }
+  const sejur = new Map((sejururi || []).map(s => [normalizeCode(s.cod_confirmare), s]))
+
   const faraFacturaClient: typeof rezervari = []
-  const discrepanteClient: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number]; mesaj:string }[] = []
+  const seFactureazaLunaViitoare: typeof rezervari = []
+  const discrepanteClient: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number]; mesaj:string; potrivire:'cod'|'nume' }[] = []
   const discrepanteExplicateComision: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturi[number]; comision:typeof comisionAirbnb[number] }[] = []
   const facturateAlteLuni: { rezervare:typeof rezervari[number]; factura:typeof stardeskFacturiAlteLuni[number] }[] = []
   for (const rez of rezervari) {
     if (rez.rezolvat_client) continue
-    const candidat = gasesteCandidat(rez, stardeskFacturi, f => isStardeskCandidate(rez, f))
+    // Codul rezervarii are prioritate; numele oaspetelui e doar plasa de siguranta (cod lipsa/citit gresit).
+    const candidat = gasesteCandidat(rez, stardeskFacturi, f => codesMatch(rez.cod_rezervare, f.id_rezervare || ''))
+      || gasesteCandidat(rez, stardeskFacturi, f => isStardeskCandidate(rez, f))
     if (!candidat) {
       const altaLuna = stardeskFacturiAlteLuni.find(f => isStardeskCandidate(rez, f))
       if (altaLuna) facturateAlteLuni.push({ rezervare: rez, factura: altaLuna })
+      else if ((sejur.get(normalizeCode(rez.cod_rezervare))?.data_sfarsit || '') > sfarsitPerioada) seFactureazaLunaViitoare.push(rez)
       else faraFacturaClient.push(rez)
       continue
     }
     if (candidat.sumaCorecta) continue
     const diagnostic = comisionDiagnostic(rez, candidat.factura, comisionAirbnb)
     if (diagnostic.explicat && diagnostic.comision) discrepanteExplicateComision.push({ rezervare: rez, factura: candidat.factura, comision: diagnostic.comision })
-    else discrepanteClient.push({ rezervare: rez, factura: candidat.factura, mesaj: diagnostic.mesaj })
+    else discrepanteClient.push({ rezervare: rez, factura: candidat.factura, mesaj: diagnostic.mesaj, potrivire: codesMatch(rez.cod_rezervare, candidat.factura.id_rezervare || '') ? 'cod' : 'nume' })
   }
 
   // Verificare inversă: facturi 5StarDesk care nu se potrivesc cu nicio rezervare din borderoul lunii
   // (rezervare lipsă din borderou, cod citit greșit, sau lună diferită)
   const facturiFaraRezervare = stardeskFacturi.filter(f => !rezervari.some(rez => isStardeskCandidate(rez, f)))
+  // ...cautate si in borderourile celorlalte luni (rezervarea poate fi platita/raportata in alta luna).
+  const { data: rezAlteLuni } = firmaId && facturiFaraRezervare.length
+    ? await sb.from('borderou_rezervari').select('luna_id,cod_rezervare,nume_oaspete').eq('firma_id', firmaId).neq('luna_id', lunaId)
+    : { data: [] as { luna_id: string; cod_rezervare: string; nume_oaspete: string | null }[] }
+  const luniRezIds = [...new Set((rezAlteLuni || []).map(r => r.luna_id))]
+  const { data: luniRez } = luniRezIds.length ? await sb.from('luni_contabile').select('id,luna').in('id', luniRezIds) : { data: [] as { id: string; luna: string }[] }
+  const lunaRez = new Map((luniRez || []).map(l => [l.id, workMonthLabel(String(l.luna).slice(0, 7))]))
 
   // Comisionul e doar o fractiune din suma rezervarii, nu aceeasi suma - deci aici verificam
   // NUMAI daca exista o factura de comision pentru cod, fara sa comparam sume (comparatia de suma
@@ -155,11 +192,16 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
     totalRezervari: rezervari.length,
     totalFacturiClient: stardeskFacturi.length,
     totalFacturiComision: comisionFacturi.length,
-    faraFacturaClient: faraFacturaClient.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
-    discrepanteClient: discrepanteClient.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, mesaj: d.mesaj })),
+    faraFacturaClient: faraFacturaClient.map(r => { const s = sejur.get(normalizeCode(r.cod_rezervare)); return { id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma, dataStart: s?.data_start || null, dataSfarsit: s?.data_sfarsit || null } }),
+    discrepanteClient: discrepanteClient.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, mesaj: d.mesaj, potrivire: d.potrivire, codRezervareFactura: d.factura.id_rezervare })),
     discrepanteExplicateComision: discrepanteExplicateComision.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, numarComision: d.comision.numar_factura, sumaComision: d.comision.suma })),
     facturateAlteLuni: facturateAlteLuni.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, luna: lunaLabelById.get(d.factura.luna_id) || '?' })),
-    facturiFaraRezervare: facturiFaraRezervare.map(f => ({ id: f.id, numarFactura: f.numar_factura, numeClient: f.nume_client, suma: f.suma, idRezervare: f.id_rezervare })),
+    facturiFaraRezervare: facturiFaraRezervare.map(f => {
+      const r = (rezAlteLuni || []).find(x => isStardeskCandidate({ cod_rezervare: x.cod_rezervare, nume_oaspete: x.nume_oaspete }, f))
+      return { id: f.id, numarFactura: f.numar_factura, numeClient: f.nume_client, suma: f.suma, idRezervare: f.id_rezervare,
+        motiv: r ? `rezervarea e în borderoul din ${lunaRez.get(r.luna_id) || 'altă lună'}` : 'rezervarea nu apare în niciun borderou încărcat — probabil intră în borderoul lunii următoare (plata platformei vine după check-out)' }
+    }),
+    seFactureazaLunaViitoare: seFactureazaLunaViitoare.map(r => { const s = sejur.get(normalizeCode(r.cod_rezervare)); return { id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma, dataStart: s?.data_start || null, dataSfarsit: s?.data_sfarsit || null } }),
     faraComisionAirbnb: faraComisionAirbnb.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
     comisionAlteLuni: comisionAlteLuni.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, luna: lunaLabelById.get(d.factura.luna_id) || '?' })),
     comisionBookingLipsa: rezervariBooking.length > 0 && !comisionBookingExista,
