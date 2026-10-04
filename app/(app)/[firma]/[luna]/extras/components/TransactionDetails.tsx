@@ -4,6 +4,63 @@ import type { Tx } from './types'
 import { CAT, shortReference } from './types'
 import CopyButton from '@/components/CopyButton'
 
+// Detaliile brute din extras (un rand lung, separat prin ";") -> randuri lizibile, cu sumele, codurile
+// si IBAN-urile evidentiate, plus campurile utile extrase separat, fiecare cu buton de copiere.
+const CAMPURI: { label: string; re: RegExp }[] = [
+  { label: 'Valoare', re: /valoare tranzac[tț]ie:?\s*([\d.,]+\s*[A-Z]{3})/i },
+  { label: 'Comision', re: /comision tranzac[tț]ie:?\s*([\d.,]+\s*[A-Z]{3})/i },
+  { label: 'IBAN', re: /\b([A-Z]{2}\d{2}[A-Z]{4}[A-Z0-9]{12,20})\b/ },
+  { label: 'Data', re: /\b(\d{2}[./]\d{2}[./]\d{4})\b/ },
+  { label: 'TID', re: /\bTID:\s*(\S+)/i },
+  { label: 'RRN', re: /\bRRN:\s*(\S+)/i },
+  { label: 'Referință', re: /\b(?:ref(?:erinta)?|nr\.? comanda|comanda)[:.]?\s*([A-Z0-9-]{5,})/i },
+]
+const EVIDENTIAT = /(\b[A-Z]{2}\d{2}[A-Z]{4}[A-Z0-9]{12,20}\b|\b\d+[.,]\d{2}\s*(?:RON|EUR|USD|HUF|BGN)\b|\b(?:TID|RRN):\s*\S+|\b\d{2}[./]\d{2}[./]\d{4}\b)/g
+
+function campuriDetalii(text: string) {
+  const out: { label: string; valoare: string }[] = []
+  for (const c of CAMPURI) { const m = text.match(c.re); if (m?.[1] && !out.some(x => x.valoare === m[1])) out.push({ label: c.label, valoare: m[1].trim() }) }
+  return out
+}
+
+function RandEvidentiat({ text }: { text: string }) {
+  const parti = text.split(EVIDENTIAT)
+  return <>{parti.map((p, i) => i % 2 === 1
+    ? <span key={i} style={{ fontWeight:700, color:'var(--text-primary)', fontFamily: /^\d/.test(p) && !/RON|EUR|USD|HUF|BGN/.test(p) ? 'inherit' : /[A-Z]{2}\d{2}[A-Z]{4}|TID|RRN/.test(p) ? 'monospace' : 'inherit', background:'var(--surface-sunken)', padding:'0 4px', borderRadius:'var(--r-xs)' }}>{p}</span>
+    : <span key={i}>{p}</span>)}</>
+}
+
+function DetaliiExtras({ text }: { text: string }) {
+  const randuri = text.split(';').map(x => x.replace(/\bOD null\b/gi, '').replace(/\s+/g, ' ').trim()).filter(x => x && x.toLowerCase() !== 'null')
+  const campuri = campuriDetalii(text)
+  return (
+    <div style={{ padding:'14px 16px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-md)' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', marginBottom:'8px' }}>
+        <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.06em' }}>Detalii din extras</span>
+        <span style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'var(--fs-xs)', color:'var(--text-muted)' }}>Copiază tot <CopyButton value={text} /></span>
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+        {randuri.map((r, i) => (
+          <div key={i} style={{ fontSize:'var(--fs-md)', color:'var(--text-secondary)', lineHeight:'1.6', wordBreak:'break-word', paddingLeft: i ? '10px' : 0, borderLeft: i ? '2px solid var(--border)' : 'none' }}>
+            <RandEvidentiat text={r} />
+          </div>
+        ))}
+      </div>
+      {campuri.length > 0 && (
+        <div style={{ display:'flex', flexWrap:'wrap', gap:'8px', marginTop:'12px', paddingTop:'12px', borderTop:'1px dashed var(--border)' }}>
+          {campuri.map(c => (
+            <div key={c.label + c.valoare} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'4px 4px 4px 10px', background:'var(--surface-secondary)', border:'1px solid var(--border-subtle)', borderRadius:'var(--r-md)' }}>
+              <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.04em' }}>{c.label}</span>
+              <span style={{ fontSize:'var(--fs-md)', fontWeight:650, color:'var(--text-primary)', fontFamily: c.label === 'Valoare' || c.label === 'Comision' || c.label === 'Data' ? 'inherit' : 'monospace', wordBreak:'break-all' }}>{c.valoare}</span>
+              <CopyButton value={c.valoare} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function TransactionDetails({ tx, index, total, onRefresh }: { tx: Tx; index: number; total: number; onRefresh?: () => void }) {
   const cat = tx.categorie ? CAT[tx.categorie] || CAT.altele : CAT.altele
   const [citire, setCitire] = useState<'idle' | 'busy' | 'gol' | 'eroare'>('idle')
@@ -45,10 +102,7 @@ export default function TransactionDetails({ tx, index, total, onRefresh }: { tx
         </div>
 
         {areDetalii ? (
-          <div style={{ padding:'10px 14px', background:'var(--surface)', border:'1px dashed var(--border)', borderRadius:'var(--r-md)' }}>
-            <div style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'4px' }}>Detalii din extras</div>
-            <div style={{ fontSize:'var(--fs-sm)', color:'var(--text-secondary)', lineHeight:'1.45', wordBreak:'break-word' }}>{tx.descriere}</div>
-          </div>
+          <DetaliiExtras text={tx.descriere!} />
         ) : onRefresh && (
           <div>
             <button onClick={citesteDetalii} disabled={citire === 'busy'} style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'6px 12px', borderRadius:'var(--r-sm)', border:'1px solid var(--border)', background:'transparent', color:'var(--accent)', cursor: citire === 'busy' ? 'wait' : 'pointer' }}>
