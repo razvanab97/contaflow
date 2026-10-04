@@ -53,7 +53,8 @@ export default function AirbnbRezervari({ firmaId, lunaId, mod }: { firmaId: str
   const lipsa = lista.filter(i => !i.factura_document_id)
   const atasate = lista.length - lipsa.length
   // In Facturi tabelul arata doar ce lipseste (lista completa, cu atasare manuala, e in panoul de mai jos).
-  const vizibile = mod === 'facturi' ? lipsa : doarLipsa ? lipsa : lista
+  // In Facturi nu repetam tabelul: rezervarile fara factura (cu buton de atasare) sunt in panoul de mai jos.
+  const vizibile = mod === 'facturi' ? [] : doarLipsa ? lipsa : lista
   const pct = lista.length ? Math.round((atasate / lista.length) * 100) : 0
 
   async function copiazaLipsa() {
@@ -113,7 +114,7 @@ export default function AirbnbRezervari({ firmaId, lunaId, mod }: { firmaId: str
       )}
       {mod === 'facturi' && lipsa.length > 0 && (
         <div style={{ padding: '10px 16px', fontSize: 'var(--fs-sm)', color: 'var(--warning)', background: 'var(--warning-soft)' }}>
-          ⚠ {lipsa.length === 1 ? 'O factură a fost sărită' : `${lipsa.length} facturi au fost sărite`} — caută în Airbnb după codul rezervării și încarc-o mai jos; se asociază automat.
+          ⚠ {lipsa.length === 1 ? 'O factură lipsește' : `${lipsa.length} facturi lipsesc`} — rezervările fără factură sunt mai jos. Caută-le în Airbnb după cod („Copiază codurile lipsă”) și încarcă PDF-urile: se asociază automat.
         </div>
       )}
 

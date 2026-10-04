@@ -71,7 +71,7 @@ async function analyzeAngajatiDoc(bytes: Uint8Array, mediaType: string): Promise
   }
 }
 
-type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; locatie: string | null; codLocatie: string | null; tipDocumentBooking: 'factura' | 'borderou' | null }
+type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; locatie: string | null; codLocatie: string | null; tipDocumentBooking: 'factura' | 'borderou' | null; codRezervare: string | null }
 type AirbnbBorderouRow = {
   uniqueKey: string
   codConfirmare: string
@@ -100,7 +100,7 @@ async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<
       max_tokens: 500,
       messages: [{ role: 'user', content: [
         source,
-        { type: 'text', text: 'Extrage datele acestui document (factura, chitanta, borderou sau alt act contabil). Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului sau al platformei","numarDocument":"seria si numarul documentului, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","locatie":"apartamentul/adresa/locul de consum daca apare (ex: Ap. 99), altfel null","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null","tipDocumentBooking":"factura (daca documentul e o FACTURA de comision Booking.com, cu \'Suma totala de plata\') sau borderou (daca e un centralizator/sumar de plati cu lista de rezervari), altfel null"}. "suma" e suma totala. "dataDocument" e data emiterii (format ISO). Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+        { type: 'text', text: 'Extrage datele acestui document (factura, chitanta, borderou sau alt act contabil). Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului sau al platformei","numarDocument":"seria si numarul documentului, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","locatie":"apartamentul/adresa/locul de consum daca apare (ex: Ap. 99), altfel null","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null","tipDocumentBooking":"factura (daca documentul e o FACTURA de comision Booking.com, cu \'Suma totala de plata\') sau borderou (daca e un centralizator/sumar de plati cu lista de rezervari), altfel null","codRezervare":"codul de confirmare al rezervarii daca apare (la Airbnb incepe de obicei cu HM, ex. HMKWC2ESYN), altfel null"}. "suma" e suma totala. "dataDocument" e data emiterii (format ISO). Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -115,6 +115,7 @@ async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<
       locatie: typeof parsed.locatie === 'string' ? parsed.locatie : null,
       codLocatie: typeof parsed.codLocatie === 'string' && parsed.codLocatie.trim() ? parsed.codLocatie.trim() : null,
       tipDocumentBooking: parsed.tipDocumentBooking === 'factura' || parsed.tipDocumentBooking === 'borderou' ? parsed.tipDocumentBooking : null,
+      codRezervare: typeof parsed.codRezervare === 'string' && parsed.codRezervare.trim() ? parsed.codRezervare.trim() : null,
     }
   } catch {
     return null
@@ -269,30 +270,42 @@ async function linkAirbnbInvoiceIfPossible(sb: ReturnType<typeof getServiceSupab
   fileName: string
   extractie: GenericExtractie | null
 }) {
+  // Codul rezervarii citit din factura se pastreaza pe document (refolosit la reconcilieri).
+  const cod = String(params.extractie?.codRezervare || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || null
+  if (cod) await sb.from('documente').update({ cod_rezervare_airbnb: cod }).eq('id', params.documentId)
+
   const { data: expected } = await sb
     .from('airbnb_facturi_asteptate')
-    .select('id,cod_confirmare,suma')
+    .select('id,cod_confirmare,taxa_servicii')
     .eq('firma_id', params.firmaId)
     .eq('luna_id', params.lunaId)
     .is('factura_document_id', null)
-
   if (!expected?.length) return null
-  const haystack = normalizedText(params.fileName, params.extractie?.numarDocument, params.extractie?.furnizor)
-  const amount = typeof params.extractie?.suma === 'number' ? params.extractie.suma : null
 
-  const match = expected.find(row => {
-    const code = normalizedText(row.cod_confirmare)
-    if (code && haystack.includes(code)) return true
-    const expectedAmount = typeof row.suma === 'number' ? row.suma : Number(row.suma)
-    return amount != null && Number.isFinite(expectedAmount) && Math.abs(expectedAmount - amount) < 0.01
+  // 1) codul rezervarii (din factura sau din numele fisierului) - sigur;
+  // 2) suma facturii = taxa de servicii din borderou (comisionul, NU valoarea rezervarii) - doar
+  //    daca exact o singura rezervare are acea taxa, ca doua rezervari sa nu fie incurcate.
+  const haystack = normalizedText(params.fileName, params.extractie?.numarDocument, cod)
+  const amount = typeof params.extractie?.suma === 'number' ? params.extractie.suma : null
+  const dupaCod = expected.find(row => { const c = normalizedText(row.cod_confirmare); return !!c && haystack.includes(c) })
+  const dupaTaxa = amount == null ? [] : expected.filter(row => {
+    const taxa = typeof row.taxa_servicii === 'number' ? row.taxa_servicii : Number(row.taxa_servicii)
+    return Number.isFinite(taxa) && Math.abs(taxa - amount) <= 0.01
   })
+  const match = dupaCod || (dupaTaxa.length === 1 ? dupaTaxa[0] : null)
   if (!match) return null
 
-  await sb
+  // Atomic: se leaga doar daca rezervarea e inca libera (facturile se incarca in paralel).
+  const { data: legat } = await sb
     .from('airbnb_facturi_asteptate')
-    .update({ factura_document_id: params.documentId, status: 'atasata', updated_at: new Date().toISOString() })
+    .update({
+      factura_document_id: params.documentId, status: 'atasata', updated_at: new Date().toISOString(),
+      asociere_scor: dupaCod ? 100 : 90, asociere_metoda: dupaCod ? 'cod_rezervare' : 'taxa_servicii_exacta',
+    })
     .eq('id', match.id)
-  return match.id
+    .is('factura_document_id', null)
+    .select('id')
+  return legat?.length ? match.id : null
 }
 
 export async function GET(req: NextRequest) {
@@ -430,7 +443,8 @@ export async function POST(req: NextRequest) {
   }
   if (transactionId) await sb.from('tranzactii').update({ document_id: doc.id, note: null }).eq('id', transactionId)
   // Nume descriptiv (firma, tip, numar, furnizor, data, suma) - vezi lib/denumire-document.ts
-  const numeNou = await finalizeazaDocument(sb, doc.id)
+  // Datele au fost deja citite cu AI mai sus - fara a doua citire (dubla timpul de incarcare).
+  const numeNou = await finalizeazaDocument(sb, doc.id, { extrage: false })
   if (numeNou) doc.fisier_nume = numeNou
 
   let airbnbRows = 0

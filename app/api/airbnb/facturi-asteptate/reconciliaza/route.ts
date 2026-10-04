@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { potrivesteFacturiAirbnb, potrivesteDupaCodRezervare, extrageCodRezervareAirbnb } from '@/lib/airbnb-reconciliere'
 
-export const maxDuration = 120
+export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
   const { firmaId, lunaId } = await req.json().catch(() => ({}))
@@ -39,17 +39,24 @@ export async function POST(req: NextRequest) {
 
   // Codul de rezervare e scris explicit în textul facturii; îl extragem o singură dată
   // per factură (AI) și îl ținem minte, ca reconcilierile următoare să nu-l mai ceară.
-  for (const doc of orphanDocs) {
-    if (doc.cod_rezervare_airbnb || !doc.fisier_path) continue
-    const { data: blob, error: downloadError } = await sb.storage.from('documente').download(doc.fisier_path)
-    if (downloadError || !blob) continue
-    const bytes = new Uint8Array(await blob.arrayBuffer())
-    const cod = await extrageCodRezervareAirbnb(bytes, doc.fisier_tip || 'application/pdf')
-    if (cod) {
-      doc.cod_rezervare_airbnb = cod
-      await sb.from('documente').update({ cod_rezervare_airbnb: cod }).eq('id', doc.id)
+  // In paralel (cate 6) si cu buget de timp (limita Vercel 60s): facturile ramase necitite se
+  // reiau la urmatorul apel - clientul repeta pana nu mai e nimic de citit (ramanDeCitit = 0).
+  const start = Date.now()
+  const deCitit = orphanDocs.filter(d => !d.cod_rezervare_airbnb && d.fisier_path)
+  let urmator = 0
+  await Promise.all(Array.from({ length: Math.min(6, deCitit.length) }, async () => {
+    while (urmator < deCitit.length && Date.now() - start < 35_000) {
+      const doc = deCitit[urmator++]
+      const { data: blob, error: downloadError } = await sb.storage.from('documente').download(doc.fisier_path)
+      if (downloadError || !blob) continue
+      const bytes = new Uint8Array(await blob.arrayBuffer())
+      const cod = await extrageCodRezervareAirbnb(bytes, doc.fisier_tip || 'application/pdf')
+      // si cand nu se gaseste cod, marcam documentul ca citit ('-'), ca sa nu fie recitit la nesfarsit
+      doc.cod_rezervare_airbnb = cod || '-'
+      await sb.from('documente').update({ cod_rezervare_airbnb: cod || '-' }).eq('id', doc.id)
     }
-  }
+  }))
+  const ramanDeCitit = deCitit.length - Math.min(urmator, deCitit.length)
 
   const potriviriCod = potrivesteDupaCodRezervare(rows || [], orphanDocs)
   const randuriPotriviteCod = new Set(potriviriCod.map(p => p.borderouId))
@@ -86,6 +93,7 @@ export async function POST(req: NextRequest) {
     dupaCod: potriviriCod.length,
     dupaSuma: potriviriSuma.length,
     ramanNepotrivite: (rows?.length || 0) - totalPotrivite,
+    ramanDeCitit,
   })
 }
 

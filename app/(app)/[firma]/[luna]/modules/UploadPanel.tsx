@@ -100,7 +100,9 @@ export default function UploadPanel({
   const [error, setError] = useState('')
   const [drag, setDrag] = useState(false)
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set())
-  const [showOnlyMissing, setShowOnlyMissing] = useState(false)
+  const [progres, setProgres] = useState<{ gata: number; total: number } | null>(null)
+  const [showOnlyMissing, setShowOnlyMissing] = useState(true)
+  const autoReconcil = useRef(false)
   const [reconcilBusy, setReconcilBusy] = useState(false)
   const [reconcilMessage, setReconcilMessage] = useState('')
   const [attachPickerFor, setAttachPickerFor] = useState<string | null>(null)
@@ -141,10 +143,16 @@ export default function UploadPanel({
 
   useEffect(() => { load(); loadAirbnbExpected() }, [load, loadAirbnbExpected])
 
+  // Fisierele se trimit in paralel (cate 4) - fiecare e citit cu AI pe server, deci in serie un lot
+  // de 30 de facturi dura minute. Lista se reincarca pe parcurs, ca progresul sa se vada.
   async function upload(files: FileList) {
     setBusy(true); setError('')
     const documentTypeLabel = documentTypeOptions?.find(o => o.value === documentType)?.label || ''
-    for (const file of Array.from(files)) {
+    const lista = Array.from(files)
+    setProgres({ gata: 0, total: lista.length })
+    const erori: string[] = []
+    let urmator = 0, gata = 0
+    const trimite = async (file: File) => {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('firmaId', firmaId)
@@ -154,11 +162,20 @@ export default function UploadPanel({
       fd.append('documentType', documentType)
       fd.append('documentTypeLabel', documentTypeLabel)
       fd.append('supplier', supplier)
-      const res = await fetch('/api/chitante', { method: 'POST', body: fd })
-      if (!res.ok) { const d = await res.json().catch(()=>({})); setError(d.error || 'Eroare upload'); break }
+      const res = await fetch('/api/chitante', { method: 'POST', body: fd }).catch(() => null)
+      if (!res || !res.ok) { const d = res ? await res.json().catch(() => ({})) : {}; erori.push(`${file.name}: ${d.error || 'eroare la încărcare'}`) }
+      gata++
+      setProgres({ gata, total: lista.length })
+      if (gata % 4 === 0) { load(); loadAirbnbExpected() }
     }
+    await Promise.all(Array.from({ length: Math.min(4, lista.length) }, async () => {
+      while (urmator < lista.length) await trimite(lista[urmator++])
+    }))
+    if (erori.length) setError(erori.slice(0, 3).join(' · ') + (erori.length > 3 ? ` (+${erori.length - 3})` : ''))
     await load()
     await loadAirbnbExpected()
+    if (section === 'airbnb-facturi') await reconciliazaAutomat(true)
+    setProgres(null)
     setBusy(false)
     onChange?.()
   }
@@ -237,20 +254,28 @@ export default function UploadPanel({
     deschideDocument(`/api/chitante/document?id=${encodeURIComponent(id)}`)
   }
 
-  async function reconciliazaAutomat() {
+  // Potriveste facturile neasociate cu rezervarile din borderou (cod de rezervare citit din factura,
+  // apoi taxa de servicii exacta). Se repeta pana nu mai sunt facturi de citit (fiecare apel are buget
+  // de timp pe server). Ruleaza si singura, dupa incarcare si la deschiderea paginii.
+  async function reconciliazaAutomat(silentios = false) {
     setReconcilBusy(true)
-    setReconcilMessage('')
-    const res = await fetch('/api/airbnb/facturi-asteptate/reconciliaza', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firmaId, lunaId }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) setReconcilMessage(data.error || 'Reconcilierea a eșuat')
-    else {
-      setReconcilMessage(data.matched > 0 ? `${data.matched} facturi asociate automat (${data.dupaCod} după codul de rezervare, ${data.dupaSuma} după sumă exactă).` : 'Nu am găsit potriviri noi.')
+    if (!silentios) setReconcilMessage('')
+    let total = 0, dupaCod = 0, dupaSuma = 0, eroare = ''
+    for (let i = 0; i < 10; i++) {
+      const res = await fetch('/api/airbnb/facturi-asteptate/reconciliaza', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firmaId, lunaId }),
+      }).catch(() => null)
+      const data = res ? await res.json().catch(() => ({})) : {}
+      if (!res || !res.ok) { eroare = data.error || 'Reconcilierea a eșuat'; break }
+      total += data.matched || 0; dupaCod += data.dupaCod || 0; dupaSuma += data.dupaSuma || 0
       await loadAirbnbExpected()
+      if (!data.ramanDeCitit) break
     }
+    if (eroare) setReconcilMessage(eroare)
+    else if (total > 0) setReconcilMessage(`${total} facturi asociate automat (${dupaCod} după codul de rezervare, ${dupaSuma} după taxa de servicii).`)
+    else if (!silentios) setReconcilMessage('Nu am găsit potriviri noi.')
     setReconcilBusy(false)
   }
 
@@ -288,6 +313,11 @@ export default function UploadPanel({
   const airbnbOrphanDocIds = section === 'airbnb-facturi' && airbnbExpected.length > 0
     ? new Set(docs.filter(d => !airbnbMatchedIds.has(d.id)).map(d => d.id))
     : new Set<string>()
+  useEffect(() => {
+    if (section !== 'airbnb-facturi' || autoReconcil.current || !loaded) return
+    if (airbnbMissing > 0 && airbnbOrphanDocIds.size > 0) { autoReconcil.current = true; reconciliazaAutomat(true) }
+  }, [section, loaded, airbnbMissing, airbnbOrphanDocIds.size]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const airbnbVisibleExpected = showOnlyMissing ? airbnbExpected.filter(i => !i.factura_document_id) : airbnbExpected
   // Facturile deja asociate unei rezervări nu mai apar în lista de jos — rămân vizibile doar prin rezervarea lor de mai sus.
   const visibleDocs = section === 'airbnb-facturi' ? docs.filter(d => !airbnbMatchedIds.has(d.id)) : docs
@@ -330,7 +360,7 @@ export default function UploadPanel({
                     </span>
                   )}
                   {airbnbMissing > 0 && airbnbOrphanDocIds.size > 0 && (
-                    <button onClick={reconciliazaAutomat} disabled={reconcilBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'4px 8px', borderRadius:'var(--r-full)', border:'1px solid var(--accent)', background:'transparent', color:'var(--accent)', cursor:'pointer', opacity:reconcilBusy?.6:1 }}>
+                    <button onClick={() => reconciliazaAutomat()} disabled={reconcilBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'4px 8px', borderRadius:'var(--r-full)', border:'1px solid var(--accent)', background:'transparent', color:'var(--accent)', cursor:'pointer', opacity:reconcilBusy?.6:1 }}>
                       {reconcilBusy ? 'Reconciliez...' : 'Reconciliază automat'}
                     </button>
                   )}
@@ -487,7 +517,7 @@ export default function UploadPanel({
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={drag ? 'var(--accent)' : 'var(--text-muted)'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ margin: '0 auto 6px', display: 'block' }}><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>
           <div style={{ fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
-            {busy ? 'Se încarcă…' : drag ? 'Eliberează pentru a încărca' : 'Adaugă fișiere'}
+            {busy ? (progres && progres.total > 1 ? `Se încarcă și se asociază… ${progres.gata}/${progres.total}` : 'Se încarcă…') : drag ? 'Eliberează pentru a încărca' : 'Adaugă fișiere'}
           </div>
           <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{acceptLabel} · trage aici sau click</div>
         </div>
