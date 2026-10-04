@@ -11,7 +11,7 @@ export interface RandDiscrepanta {
   nota: string | null; created_at: string
 }
 
-function safe(v: unknown) { return String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[ȘșŞş]/g, 's').replace(/[ȚțŢţ]/g, 't').replace(/[^\x20-\x7E]/g, '') }
+function safe(v: unknown) { return String(v ?? '').replace(/[–—·]/g, '-').replace(/[„”“]/g, '"').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[ȘșŞş]/g, 's').replace(/[ȚțŢţ]/g, 't').replace(/[^\x20-\x7E]/g, '') }
 
 function wrap(text: string, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, max: number) {
   const out: string[] = []

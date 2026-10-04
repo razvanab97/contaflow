@@ -6,7 +6,7 @@ import OldItemDocs, { ChecklistItem } from './OldItemDocs'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string; tasks: TaskItem[]; checklistItems: ChecklistItem[] }
-interface Nefacturata { id:string; codRezervare:string; numeOaspete:string; suma:number|null; platforma:string; dataStart?:string|null; dataSfarsit?:string|null }
+interface Nefacturata { id:string; codRezervare:string; numeOaspete:string; suma:number|null; platforma:string; dataStart?:string|null; dataSfarsit?:string|null; comision?:number|null; total?:number|null }
 interface FacturaOrfana { id:string; numarFactura:string; numeClient:string; suma:number|null; idRezervare:string; motiv?:string; dataStart?:string|null; dataSfarsit?:string|null; unde?:'lipsa'|'trecuta'|'necunoscut'|'alta-luna'|'viitoare' }
 interface Discrepanta extends Nefacturata { numarFactura:string; sumaFactura:number|null; mesaj:string; potrivire?:'cod'|'nume'; codRezervareFactura?:string|null }
 interface DiscrepantaExplicata extends Discrepanta { numarComision:string; sumaComision:number|null }
@@ -74,14 +74,18 @@ function ListaLipsa({ items, tip, onResolved, faraActiune, sectiune }: { items: 
     <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
       {items.map(n => (
         <div key={n.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', background:'var(--c-161616)', borderRadius:'var(--r-sm)', flexWrap:'wrap' }}>
-          <Bifa p={{ cheie:`${sectiune}:${n.id}`, sectiune, titlu:n.numeOaspete || '—', codRezervare:n.codRezervare, suma:n.suma, detalii:[n.platforma === 'airbnb' ? 'Airbnb' : 'Booking', sejurText(n), `borderou ${money(n.suma)} RON`].filter(Boolean).join(' · ') }}/>
+          <Bifa p={{ cheie:`${sectiune}:${n.id}`, sectiune, titlu:n.numeOaspete || '—', codRezervare:n.codRezervare, suma:n.total ?? n.suma, detalii:[n.platforma === 'airbnb' ? 'Airbnb' : 'Booking', sejurText(n), n.total != null ? `borderou ${money(n.suma)} + comision ${money(n.comision ?? null)} = ${money(n.total)} RON de facturat` : `borderou ${money(n.suma)} RON`].filter(Boolean).join(' · ') }}/>
           <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'2px 7px', borderRadius:'var(--r-sm)', background: n.platforma==='airbnb' ? 'light-dark(rgba(220,38,38,.25), rgba(248,113,113,.1))' : 'light-dark(rgba(37,99,235,.25), rgba(96,165,250,.1))', color: n.platforma==='airbnb' ? 'var(--danger)' : 'var(--accent-blue)', flexShrink:0 }}>
             {n.platforma === 'airbnb' ? 'Airbnb' : 'Booking'}
           </span>
           <span style={{ flex:'1 1 80px', fontSize:'var(--fs-sm)', color:'var(--c-dddddd)', minWidth:'80px' }}>{n.numeOaspete || '—'}</span>
           <span style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace' }}>{n.codRezervare}</span>
           {sejurText(n) && <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', flexShrink:0 }}>{sejurText(n)}</span>}
-          <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', flexShrink:0 }}>{money(n.suma)} RON</span>
+          {n.total != null
+            ? <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', flexShrink:0, whiteSpace:'nowrap' }} title="Suma netă din borderou + comisionul Airbnb al rezervării = prețul complet plătit de client, de facturat">
+                {money(n.suma)} <span style={{ color:'var(--c-555555)' }}>+ comision</span> {money(n.comision ?? null)} <span style={{ color:'var(--c-555555)' }}>=</span> <b style={{ color:'var(--c-ffffff)', fontSize:'var(--fs-sm)' }}>{money(n.total)} RON</b>
+              </span>
+            : <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', flexShrink:0 }}>{money(n.suma)} RON{n.platforma === 'airbnb' ? <span style={{ color:'var(--warning)' }} title="Comisionul nu a fost găsit (lipsește din CSV-ul Airbnb și nu există factura de comision)"> · comision necunoscut</span> : null}</span>}
           {!faraActiune && <><input
             value={note[n.id] || ''}
             onChange={e => setNote(prev => ({ ...prev, [n.id]: e.target.value }))}

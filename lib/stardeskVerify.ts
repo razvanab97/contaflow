@@ -136,9 +136,17 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
   const ziRo = (iso: string) => iso.split('-').reverse().slice(0, 2).join('.')
   const coduriAirbnb = rezervari.filter(r => r.platforma === 'airbnb').map(r => r.cod_rezervare).filter(Boolean)
   const { data: sejururi } = firmaId && coduriAirbnb.length
-    ? await sb.from('airbnb_facturi_asteptate').select('cod_confirmare,data_start,data_sfarsit').eq('firma_id', firmaId).in('cod_confirmare', coduriAirbnb)
-    : { data: [] as { cod_confirmare: string; data_start: string | null; data_sfarsit: string | null }[] }
+    ? await sb.from('airbnb_facturi_asteptate').select('cod_confirmare,data_start,data_sfarsit,taxa_servicii').eq('firma_id', firmaId).in('cod_confirmare', coduriAirbnb)
+    : { data: [] as { cod_confirmare: string; data_start: string | null; data_sfarsit: string | null; taxa_servicii: number | null }[] }
   const sejur = new Map((sejururi || []).map(s => [normalizeCode(s.cod_confirmare), s]))
+  // Pretul complet de facturat clientului (Airbnb): suma neta din borderou + comisionul Airbnb al
+  // rezervarii - din CSV-ul Airbnb (taxa de servicii) sau, altfel, din factura de comision.
+  const pretComplet = (r: { cod_rezervare: string; suma: number | null; platforma: string }) => {
+    if (r.platforma !== 'airbnb') return { comision: null, total: null }
+    const csv = sejur.get(normalizeCode(r.cod_rezervare))?.taxa_servicii
+    const com = csv != null ? Number(csv) : comisionAirbnb.find(c => codesMatch(c.cod_rezervare || '', r.cod_rezervare))?.suma ?? null
+    return { comision: com != null ? Number(com) : null, total: com != null && r.suma != null ? Math.round((Number(r.suma) + Number(com)) * 100) / 100 : null }
+  }
 
   const faraFacturaClient: typeof rezervari = []
   const seFactureazaLunaViitoare: typeof rezervari = []
@@ -195,7 +203,7 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
     totalRezervari: rezervari.length,
     totalFacturiClient: stardeskFacturi.length,
     totalFacturiComision: comisionFacturi.length,
-    faraFacturaClient: faraFacturaClient.map(r => { const s = sejur.get(normalizeCode(r.cod_rezervare)); return { id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma, dataStart: s?.data_start || null, dataSfarsit: s?.data_sfarsit || null } }),
+    faraFacturaClient: faraFacturaClient.map(r => { const s = sejur.get(normalizeCode(r.cod_rezervare)); return { id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma, dataStart: s?.data_start || null, dataSfarsit: s?.data_sfarsit || null, ...pretComplet(r) } }),
     discrepanteClient: discrepanteClient.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, mesaj: d.mesaj, potrivire: d.potrivire, codRezervareFactura: d.factura.id_rezervare })),
     discrepanteExplicateComision: discrepanteExplicateComision.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, numarComision: d.comision.numar_factura, sumaComision: d.comision.suma })),
     facturateAlteLuni: facturateAlteLuni.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, luna: lunaLabelById.get(d.factura.luna_id) || '?' })),
@@ -211,7 +219,7 @@ export async function computeVerification(sb: ReturnType<typeof getServiceSupaba
       return { id: f.id, numarFactura: f.numar_factura, numeClient: f.nume_client, suma: f.suma, idRezervare: f.id_rezervare,
         dataStart: f.data_start || null, dataSfarsit: co || null, motiv, unde: r ? 'alta-luna' : !co ? 'necunoscut' : co > sfarsitPerioada ? 'viitoare' : co < inceputPerioada ? 'trecuta' : 'lipsa' }
     }),
-    seFactureazaLunaViitoare: seFactureazaLunaViitoare.map(r => { const s = sejur.get(normalizeCode(r.cod_rezervare)); return { id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma, dataStart: s?.data_start || null, dataSfarsit: s?.data_sfarsit || null } }),
+    seFactureazaLunaViitoare: seFactureazaLunaViitoare.map(r => { const s = sejur.get(normalizeCode(r.cod_rezervare)); return { id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma, dataStart: s?.data_start || null, dataSfarsit: s?.data_sfarsit || null, ...pretComplet(r) } }),
     faraComisionAirbnb: faraComisionAirbnb.map(r => ({ id: r.id, codRezervare: r.cod_rezervare, numeOaspete: r.nume_oaspete, suma: r.suma, platforma: r.platforma })),
     comisionAlteLuni: comisionAlteLuni.map(d => ({ id: d.rezervare.id, codRezervare: d.rezervare.cod_rezervare, numeOaspete: d.rezervare.nume_oaspete, suma: d.rezervare.suma, platforma: d.rezervare.platforma, numarFactura: d.factura.numar_factura, sumaFactura: d.factura.suma, luna: lunaLabelById.get(d.factura.luna_id) || '?' })),
     comisionBookingLipsa: rezervariBooking.length > 0 && !comisionBookingExista,
