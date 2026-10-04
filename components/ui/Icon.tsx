@@ -23,6 +23,7 @@ const PATHS: Record<string, React.ReactNode> = {
   inbox: <><path d="M3 13l2.5-7.5A1.5 1.5 0 016.9 4.5h10.2a1.5 1.5 0 011.4 1L21 13"/><path d="M3 13v5.5A1.5 1.5 0 004.5 20h15a1.5 1.5 0 001.5-1.5V13h-5.5l-1.5 2.5h-5L7.5 13z"/></>,
   alert: <><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16v.5"/></>,
   receipt: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></>,
   send: <><path d="M21 3L10 14"/><path d="M21 3l-6.5 18-4.5-7-7-4.5z"/></>,
   briefcase: <><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1.5 1.5 0 011.5-1.5h3A1.5 1.5 0 0115 5v2M3 12.5h18"/></>,
   folder: <path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>,
@@ -83,4 +84,5 @@ export const MODULE_ICONS: Record<string, string> = {
   'raport-lunar-proiect': 'fileText',
   'obligatii-recurente': 'repeat',
   'achizitii': 'briefcase',
+  'mail-contabil': 'mail',
 }

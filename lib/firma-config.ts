@@ -10,6 +10,7 @@ export type ModuleSlug =
   | 'raport-lunar-proiect'
   | 'obligatii-recurente'
   | 'achizitii'
+  | 'mail-contabil'
 
 export interface TaskDef {
   key: string
@@ -73,6 +74,8 @@ export interface FirmaConfigDef {
 const COMUNE: ModuleSlug[] = [
   'inbox-facturi', 'facturi-restante', 'facturi-chitanta', 'dispozitie-plata',
   'angajati', 'acte-contabile', 'bonuri', 'extras', 'impozite', 'raport-lunar',
+  // Mailurile contabilului (ce lipseste / e neclar) - verificate cu AI fata de datele din platforma.
+  'mail-contabil',
 ]
 
 export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
@@ -258,6 +261,12 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     slug: 'achizitii',
     label: 'Achiziții',
     description: 'Aparate, materiale și servicii cumpărate din proiect — ofertă → notă semnată → plată → dovadă',
+    tasks: [],
+  },
+  'mail-contabil': {
+    slug: 'mail-contabil',
+    label: 'Mail contabil',
+    description: 'Mailurile contabilului, verificate cu AI: ce e deja rezolvat în platformă și ce mai e de făcut',
     tasks: [],
   },
 }
