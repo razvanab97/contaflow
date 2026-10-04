@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
 import { createHash } from 'crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { getExtrasTxDocs } from '@/lib/extras-tx-docs'
 import { FIRMA_CONFIGS, MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
 import { generateNotePdfBytes } from '@/lib/notePdf'
 import { generateDiscrepantePdfBytes } from '@/lib/discrepante-lista'
@@ -98,31 +99,6 @@ function sortEmagDocs<T extends { fisier_path:string; furnizor?:string|null; cre
   return [...ordered, ...dante]
 }
 
-// Documentele atașate individual pe tranzacții (facturi/chitanțe din extras), ordonate după data tranzacției
-async function getExtrasTxDocs(sb: ReturnType<typeof getServiceSupabase>, lunaId: string) {
-  const { data: txDocs } = await sb.from('documente')
-    .select('fisier_path,fisier_nume,fisier_tip,tranzactie_id')
-    .eq('luna_id', lunaId)
-    .eq('modul', 'extras')
-    .not('tranzactie_id', 'is', null)
-    .not('fisier_path', 'like', '%/inbox-facturi/%')
-  if (!txDocs?.length) return []
-  const txIds = [...new Set(txDocs.map(d => d.tranzactie_id).filter(Boolean))]
-  const { data: txs } = await sb.from('tranzactii').select('id,extras_id,data_tranzactie').in('id', txIds)
-  const txById = new Map((txs || []).map(t => [t.id, t]))
-  return txDocs.map(doc => {
-    const tx = txById.get(doc.tranzactie_id)
-    return { ...doc, extras_id: tx?.extras_id || null, data_tranzactie: tx?.data_tranzactie || '' }
-  }).sort((a, b) => {
-    const ea = a.extras_id || ''
-    const eb = b.extras_id || ''
-    if (ea !== eb) return ea.localeCompare(eb)
-    const da = a.data_tranzactie || ''
-    const db = b.data_tranzactie || ''
-    if (da !== db) return da.localeCompare(db)
-    return String(a.fisier_nume || '').localeCompare(String(b.fisier_nume || ''))
-  })
-}
 
 async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: string) {
   try {
@@ -169,13 +145,17 @@ export async function POST(req: NextRequest) {
   // (ex. un document Inbox Facturi asociat cu o tranzactie isi schimba modul in 'extras', dar
   // fisier_path ramane neschimbat sub /inbox-facturi/ - fara acest filtru ar aparea de doua ori
   // in exportul complet, o data la 'extras' si o data la 'inbox-facturi').
+  // PDF-ul unei singure sectiuni (nu exportul complet) contine ABSOLUT toate documentele ei, inclusiv
+  // cele deja asociate unei plati (la exportul complet acelea apar o singura data, la Extras de cont).
+  const oSectiune = !!scope?.section && !isExtras
+  let docsQuery = sb.from('documente')
+    .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor,data_document')
+    .eq('luna_id', lunaId)
+  if (!oSectiune) docsQuery = docsQuery.is('tranzactie_id', null)
+  if (!(oSectiune && scope.section === 'inbox-facturi')) docsQuery = docsQuery.not('fisier_path', 'like', '%/inbox-facturi/%')
   const { data: allDocs, error } = isExtras
     ? { data: [], error: null }
-    : await sb.from('documente')
-        .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor,data_document')
-        .eq('luna_id', lunaId)
-        .is('tranzactie_id', null)
-        .not('fisier_path', 'like', '%/inbox-facturi/%')
+    : await docsQuery
         .not('fisier_path', 'like', '%/tx/%')
         .not('fisier_path', 'like', '%/checklist/%')
         .not('fisier_path', 'like', '%/config/%')
