@@ -1,6 +1,8 @@
 'use client'
+import { useState } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import UploadPanel from './UploadPanel'
+import RecomandariChitanta from './RecomandariChitanta'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 interface Props {
@@ -23,10 +25,14 @@ const CONFIG = {
 
 export default function FacturiModule({ firma, lunaId, tasks, section }: Props) {
   const cfg = CONFIG[section]
+  // Documentele recomandate si adaugate se vad imediat in lista de mai jos (remontare UploadPanel).
+  const [versiune, setVersiune] = useState(0)
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
+      {section === 'facturi-chitanta' && <RecomandariChitanta firmaId={firma.id} lunaId={lunaId} onAdaugat={() => setVersiune(v => v + 1)} />}
       <UploadPanel
+        key={versiune}
         firmaId={firma.id}
         lunaId={lunaId}
         section={section}
