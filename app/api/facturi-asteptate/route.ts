@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { numeDescriptiv } from '@/lib/denumire-document'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
@@ -71,10 +72,12 @@ export async function POST(req: NextRequest) {
   const { error: storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType: file.type })
   if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
 
+  const { data: firmaRow } = await sb.from('firme').select('nume').eq('id', firmaId).single()
+  const numeAfisat = numeDescriptiv({ firma: firmaRow?.nume, tip: 'factura', numar: extracted?.numarDocument, furnizor: extracted?.furnizor, data: extracted?.dataFactura, suma: extracted?.suma, valuta: 'RON', extensie: extension })
   const { data, error } = await sb.from('facturi_asteptate').insert({
     firma_id: firmaId,
     fisier_path: path,
-    fisier_nume: fileName,
+    fisier_nume: numeAfisat,
     fisier_tip: file.type,
     furnizor: extracted?.furnizor || null,
     numar_document: extracted?.numarDocument || null,

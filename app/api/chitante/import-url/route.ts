@@ -1,6 +1,7 @@
 import { isIP } from 'node:net'
 import dns from 'node:dns/promises'
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { syncComandaNote } from '@/lib/comandaNote'
@@ -283,6 +284,7 @@ export async function POST(req: NextRequest) {
     await sb.storage.from('documente').remove([path])
     return NextResponse.json({ error:error.message }, { status:500 })
   }
+  if (data?.id) { const numeNou = await finalizeazaDocument(sb, data.id); if (numeNou) data.fisier_nume = numeNou }
 
   if (transactionId && transaction) {
     if (mode !== 'add' || !transaction.document_id) {

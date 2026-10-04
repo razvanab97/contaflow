@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
 function filenamePart(value: string, fallback = '') {
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
     await sb.storage.from('documente').remove([path])
     return NextResponse.json({ error: docError?.message || 'Eroare salvare document' }, { status: 500 })
   }
+  await finalizeazaDocument(sb, doc.id)
 
   if (!tx.document_id) {
     await sb.from('tranzactii').update({ document_id: doc.id, note: null, status_note: null }).eq('id', tranzactieId)

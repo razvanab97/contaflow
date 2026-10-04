@@ -119,11 +119,17 @@ export default function UploadPanel({
   }, [lunaId, firmaId, section])
 
   const loadAirbnbExpected = useCallback(async () => {
-    if (section !== 'airbnb-facturi') return
+    if (section !== 'airbnb-facturi') {
+      // In Borderou: un CSV nou genereaza rezervarile - anuntam lista de rezervari sa se reincarce.
+      if (section === 'airbnb-borderou') window.dispatchEvent(new CustomEvent('cf:airbnb-refresh'))
+      return
+    }
     const res = await fetch(`/api/airbnb/facturi-asteptate?lunaId=${encodeURIComponent(lunaId)}&firmaId=${encodeURIComponent(firmaId)}`)
     const data = await res.json().catch(() => ({}))
     if (res.ok) {
       setAirbnbExpected(data.items || [])
+      // Anunta lista de rezervari (AirbnbRezervari) ca s-a schimbat ceva (borderou nou, factura atasata etc.)
+      window.dispatchEvent(new CustomEvent('cf:airbnb-refresh'))
       setAirbnbExpectedError('')
     } else {
       setAirbnbExpected([])

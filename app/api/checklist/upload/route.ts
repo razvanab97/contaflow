@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
+import { getServiceSupabase } from '@/lib/supabase/server'
 
 const SB = 'https://aqlmuoaaipbanjdptleg.supabase.co'
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -25,9 +27,9 @@ export async function POST(req: NextRequest) {
   })
   if (!upRes.ok) return NextResponse.json({ error: await upRes.text() }, { status: 500 })
 
-  await fetch(`${SB}/rest/v1/documente`, {
+  const ins = await fetch(`${SB}/rest/v1/documente`, {
     method: 'POST',
-    headers: { ...H, 'Prefer': 'return=minimal' },
+    headers: { ...H, 'Prefer': 'return=representation' },
     body: JSON.stringify({
       firma_id: firmaId, luna_id: lunaId, checklist_item_id: itemId,
       tip_document: tip, furnizor: desc,
@@ -35,5 +37,7 @@ export async function POST(req: NextRequest) {
     })
   })
 
+  const [creat] = ins.ok ? await ins.json().catch(() => []) : []
+  if (creat?.id) await finalizeazaDocument(getServiceSupabase(), creat.id)
   return NextResponse.json({ ok: true })
 }

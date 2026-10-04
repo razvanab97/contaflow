@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import Anthropic from '@anthropic-ai/sdk'
 import { createHash } from 'node:crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
@@ -241,6 +242,7 @@ export async function POST(req: NextRequest) {
       suma: extracted.amount || null, locatie: extracted.apartment || null, utilitate: utilitate || null, data_document: invoiceDate,
     }).select('id,fisier_nume,furnizor,data_document,created_at,locatie,utilitate,suma').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error:error.message }, { status:500 }) }
+    if (document?.id) { const numeNou = await finalizeazaDocument(sb, document.id, { extrage: false }); if (numeNou) document.fisier_nume = numeNou }
     return NextResponse.json({ document, purpose, amount:extracted.amount || null, locatie:extracted.apartment || null, utilitate: utilitate || null, receiptFrom: extracted.receiptFrom || null, duplicateWarning })
   } catch (error) {
     return NextResponse.json({ error:String(error) }, { status:500 })

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import { PDFDocument } from 'pdf-lib'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
@@ -428,6 +429,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   if (transactionId) await sb.from('tranzactii').update({ document_id: doc.id, note: null }).eq('id', transactionId)
+  // Nume descriptiv (firma, tip, numar, furnizor, data, suma) - vezi lib/denumire-document.ts
+  const numeNou = await finalizeazaDocument(sb, doc.id)
+  if (numeNou) doc.fisier_nume = numeNou
 
   let airbnbRows = 0
   if (isAirbnbCsv) {

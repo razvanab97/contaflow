@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
       unmatched.push({ fileName: file.name, reason: error?.message || 'Eroare salvare' })
       continue
     }
+    await finalizeazaDocument(sb, doc.id)
 
     const { error: updError } = await sb.from('emag_avize_facturi').update({ factura_document_id: doc.id }).eq('id', target.id)
     if (updError) { unmatched.push({ fileName: file.name, reason: updError.message }); continue }

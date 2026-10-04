@@ -278,9 +278,10 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
   },
   abxhomes: {
     slug: 'abxhomes',
-    // 5StarDesk -> Airbnb -> Booking: ordinea platformelor de rezervare, fiecare genereaza
+    // 5StarDesk -> Airbnb (intai Borderoul - din el se creeaza rezervarile -, apoi Facturile de comision
+    // potrivite pe ele) -> Booking: ordinea platformelor de rezervare, fiecare genereaza
     // facturile de vânzare ale lunii, utile deja adunate până se ajunge la Extras de cont.
-    module: ['5stardesk', 'airbnb-facturi', 'airbnb-borderou', 'booking-facturi', ...COMUNE],
+    module: ['5stardesk', 'airbnb-borderou', 'airbnb-facturi', 'booking-facturi', ...COMUNE],
     legal: {
       nrRegCom: 'J2025022705009',
       cif: '51540013',

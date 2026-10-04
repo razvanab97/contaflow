@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
     fisier_marime: bytes.length,
     in_zip: true,
   }).select('id,fisier_nume,fisier_tip,created_at').single()
+  if (doc?.id) { const numeNou = await finalizeazaDocument(sb, doc.id, { extrage: false }); if (numeNou) doc.fisier_nume = numeNou }
   if (docError || !doc) {
     await sb.storage.from('documente').remove([path])
     return NextResponse.json({ error: docError?.message || 'Eroare salvare document' }, { status: 500 })

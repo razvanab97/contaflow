@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { numeDescriptiv } from '@/lib/denumire-document'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { pdfPageCount, extractPageRange } from '@/lib/pdfBatch'
@@ -133,10 +134,12 @@ async function saveBon(sb: ReturnType<typeof getServiceSupabase>, firmaIncarcare
   const { error: storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType: mediaType })
   if (storageError) throw new Error(storageError.message)
 
+  // Numele afisat/descarcat e descriptiv; path-ul din storage ramane unic (cu timestamp).
+  const numeAfisat = numeDescriptiv({ firma: firmaNume, tip: 'bon', furnizor: extracted?.comerciant, data: extracted?.dataBon, suma: extracted?.suma, valuta: 'RON', extensie: originalExtension })
   const { data, error } = await sb.from('bonuri').insert({
     firma_id: firmaId,
     fisier_path: path,
-    fisier_nume: fileName,
+    fisier_nume: numeAfisat,
     fisier_tip: mediaType,
     tip: extracted?.tip || 'combustibil',
     comerciant: extracted?.comerciant || null,

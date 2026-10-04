@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { extrageCampuriDocument } from '@/lib/ai/campuri-document'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 
 export const maxDuration = 60
 const TIP_ELIGIBIL = ['factura', 'bon', 'chitanta', 'aviz_plata', 'invoice']
@@ -68,6 +69,8 @@ export async function POST(req: NextRequest) {
     if (campuri?.dataDocument && !d.data_document) patch.data_document = campuri.dataDocument
     if (cuMarcaj) patch.extractie_incercata_at = new Date().toISOString()
     if (Object.keys(patch).length) await sb.from('documente').update(patch).eq('id', d.id).is('suma', null)
+    // Cu datele noi, documentul primeste si numele descriptiv (firma, numar, furnizor, data, suma).
+    if (campuri?.suma != null || patch.numar_document || patch.furnizor) await finalizeazaDocument(sb, d.id, { extrage: false })
     return { id: d.id, completat: campuri?.suma != null }
   }))
 

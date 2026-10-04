@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import { getServiceSupabase } from '@/lib/supabase/server'
 
 function safePart(value: string, fallback: string) {
@@ -61,6 +62,7 @@ export async function POST(req: NextRequest) {
       await sb.storage.from('documente').remove([path])
       return NextResponse.json({ error: error?.message || 'Eroare salvare' }, { status: 500 })
     }
+    await finalizeazaDocument(sb, doc.id)
 
     // Inlocuieste documentul anterior daca era deja incarcat unul (re-upload)
     if (fact.factura_document_id) {

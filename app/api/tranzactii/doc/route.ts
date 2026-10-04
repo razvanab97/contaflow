@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { syncComandaNote } from '@/lib/comandaNote'
@@ -173,7 +174,8 @@ export async function POST(req: NextRequest) {
       const doc = Array.isArray(docs) ? docs[0] : docs
       if (!docRes.ok || !doc?.id) return NextResponse.json({ error: 'DB doc: ' + JSON.stringify(doc) }, { status: 500 })
       if (!primaryDocId) primaryDocId = doc.id
-      documents.push({ docId: doc.id, filename: renamedFile })
+      const numeNou = await finalizeazaDocument(getServiceSupabase(), doc.id)
+      documents.push({ docId: doc.id, filename: numeNou || renamedFile })
     }
 
     // La adaugare suplimentara, document_id (documentul "principal") se seteaza doar daca tranzactia nu avea deja unul.

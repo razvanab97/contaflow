@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { FIRMA_CONFIGS } from '@/lib/firma-config'
 import { pdfPageCount, extractPageRange } from '@/lib/pdfBatch'
 import { isEonApartment99, isEonInvoice, keepOnlyFirstPage } from '@/lib/eonInvoice'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 
 type SupabaseService = ReturnType<typeof import('@/lib/supabase/server').getServiceSupabase>
 
@@ -488,6 +489,11 @@ export async function importInboxDocument({
   }
   if (doc?.tranzactie_id) {
     await sb.from('tranzactii').update({ document_id: doc.id, note: null, status_note: null }).eq('id', doc.tranzactie_id)
+  }
+  // Nume descriptiv (firma, numar, furnizor, data, suma) - campurile vin deja din extragerea AI de mai sus.
+  if (doc?.id) {
+    const numeNou = await finalizeazaDocument(sb, doc.id, { extrage: false })
+    if (numeNou) doc.fisier_nume = numeNou
   }
   return { duplicate: false, doc, extracted, targetFirma: target?.nume || currentFirma?.nume || null, source: sourceLabel || null }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
     const sb = getServiceSupabase()
     const { error: storageError } = await sb.storage.from('documente').upload(path, bytes, { contentType: 'application/pdf' })
     if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 })
-    const { error } = await sb.from('documente').insert({
+    const { data: inserat, error } = await sb.from('documente').insert({
       firma_id: firmaId,
       luna_id: lunaId,
       modul: 'acte_contabile',
@@ -158,11 +159,12 @@ export async function POST(req: NextRequest) {
       fisier_tip: 'application/pdf',
       fisier_marime: bytes.length,
       in_zip: true,
-    })
+    }).select('id').single()
     if (error) {
       await sb.storage.from('documente').remove([path])
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+    if (inserat?.id) await finalizeazaDocument(sb, inserat.id)
     return NextResponse.json({ ok: true, extracted:{ amount:numericAmount, category:resolvedCategory, effect:resolvedEffect, invoiceNumber:resolvedNumber, date:resolvedDate, notes:resolvedNotes } })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })

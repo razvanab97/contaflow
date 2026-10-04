@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -184,6 +185,7 @@ export async function POST(req: NextRequest) {
       await sb.storage.from('documente').remove([path])
       return NextResponse.json({ error: error?.message || 'Eroare salvare' }, { status: 500 })
     }
+    await finalizeazaDocument(sb, doc.id)
 
     const invoices = extracted.facturi || []
     const valuta = currencyForTaskKey(taskKey)
