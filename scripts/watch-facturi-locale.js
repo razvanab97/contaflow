@@ -179,8 +179,72 @@ function recoverMisplacedFiles() {
   }
 }
 
+// Stergere ceruta din platforma ("Sterge" pe o factura venita din acest folder): randurile din coada
+// marcate sterge_local -> fisierul local (cautat dupa nume si verificat dupa hash) e mutat in Cos
+// (Trash), recuperabil, iar randul iese din coada. Daca watcher-ul nu ruleaza, se face la pornire.
+const TRASH_DIR = path.join(os.homedir(), '.Trash')
+const hashCache = new Map() // cale -> { mtimeMs, hash }
+function hashFisier(cale) {
+  const st = fs.statSync(cale)
+  const c = hashCache.get(cale)
+  if (c && c.mtimeMs === st.mtimeMs) return c.hash
+  const hash = crypto.createHash('sha256').update(fs.readFileSync(cale)).digest('hex')
+  hashCache.set(cale, { mtimeMs: st.mtimeMs, hash })
+  return hash
+}
+function gasesteLocal(rand) {
+  const variante = new Set([rand.fisier_nume, safeName(rand.fisier_nume)])
+  const toate = []
+  for (const dir of [DONE_DIR, ERROR_DIR, WATCH_DIR]) {
+    let e = []
+    try { e = fs.readdirSync(dir, { withFileTypes: true }) } catch {}
+    for (const f of e) if (f.isFile() && !f.name.startsWith('.')) toate.push(path.join(dir, f.name))
+  }
+  const dupaNume = toate.filter(c => { const n = path.basename(c); return [...variante].some(v => n === v || n.endsWith(`_${v}`)) })
+  // intai dupa nume (verificat cu hash), apoi orice fisier cu acelasi continut
+  for (const c of [...dupaNume, ...toate.filter(x => !dupaNume.includes(x))]) {
+    try { if (hashFisier(c) === rand.document_hash) return c } catch {}
+  }
+  return null
+}
+function mutaInCos(cale) {
+  let dest = path.join(TRASH_DIR, path.basename(cale))
+  if (fs.existsSync(dest)) dest = path.join(TRASH_DIR, `${Date.now()}_${path.basename(cale)}`)
+  try { fs.renameSync(cale, dest) } catch { fs.copyFileSync(cale, dest); fs.unlinkSync(cale) }
+}
+let stergereIndisponibila = false
+async function proceseazaStergeri() {
+  if (stergereIndisponibila) return
+  let randuri, error
+  try {
+    ;({ data: randuri, error } = await withTimeout(
+      sb.from('inbox_watch_files').select('id,fisier_nume,fisier_path,document_hash').eq('sterge_local', true).limit(50),
+      'citire ștergeri'
+    ))
+  } catch (err) { error = err }
+  if (error) {
+    if (/sterge_local/.test(error.message || '')) { stergereIndisponibila = true; log('Ștergerea locală nu e activă încă (lipsește coloana sterge_local - rulează migrarea SQL).') }
+    return
+  }
+  for (const r of randuri || []) {
+    const local = gasesteLocal(r)
+    try {
+      if (local) { mutaInCos(local); log(`Șters din platformă -> mutat în Coș: ${path.basename(local)}`) }
+      else log(`Șters din platformă; fișierul local nu mai există (deja șters/mutat): ${r.fisier_nume}`)
+    } catch (err) {
+      log(`Nu am putut muta în Coș ${r.fisier_nume}: ${err.message} - reîncerc`)
+      continue
+    }
+    try {
+      await withTimeout(sb.storage.from('documente').remove([r.fisier_path]), 'ștergere storage')
+      await withTimeout(sb.from('inbox_watch_files').delete().eq('id', r.id), 'ștergere din coadă')
+    } catch (err) { log(`Fișierul e în Coș, dar rândul din coadă rămâne (${err.message})`) }
+  }
+}
+
 async function tick() {
   recoverMisplacedFiles()
+  await proceseazaStergeri()
   let entries
   try {
     entries = fs.readdirSync(WATCH_DIR, { withFileTypes: true })

@@ -19,7 +19,7 @@ const EXEMPLE = ['Ce facturi sunt de la VMD în folderul local?', 'Facturile Jum
 const zi = (d: string | null) => d ? d.split('-').reverse().join('.') : ''
 const lei = (v: number | null, valuta = 'RON') => v == null ? '—' : `${new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)} ${valuta}`
 
-function Rand({ r }: { r: Rezultat }) {
+function Rand({ r, onSterge, sterge }: { r: Rezultat; onSterge?: (r: Rezultat) => void; sterge?: boolean }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: 'var(--r-md)', background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', flexWrap: 'wrap' }}>
       {r.firma && <span title={r.firma.nume} style={{ width: '8px', height: '8px', borderRadius: '50%', background: r.firma.culoare, flexShrink: 0 }} />}
@@ -37,6 +37,7 @@ function Rand({ r }: { r: Rezultat }) {
       </span>
       <VeziButon url={r.docUrl} nume={r.fisierNume} />
       {r.href && <Link href={r.href} prefetch={false} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--accent)' }}>Deschide</Link>}
+      {onSterge && <button type="button" onClick={() => onSterge(r)} disabled={sterge} title={r.sursa === 'local' ? 'Șterge din platformă și din folderul local' : 'Șterge din platformă'} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--danger)', background: 'transparent', border: 'none', cursor: sterge ? 'wait' : 'pointer', padding: '2px 4px' }}>{sterge ? '…' : 'Șterge'}</button>}
     </div>
   )
 }
@@ -49,6 +50,24 @@ export default function AiCautareFacturi() {
   const [r, setR] = useState<Raspuns | null>(null)
   const [error, setError] = useState('')
   const [arataAlte, setArataAlte] = useState(false)
+  const [stergeId, setStergeId] = useState<string | null>(null)
+  const [mesaj, setMesaj] = useState('')
+
+  // Sterge din platforma; daca factura a venit din folderul local, scriptul de pe Mac muta si
+  // fisierul local in Cos (vezi /api/inbox-facturi/sterge si scripts/watch-facturi-locale.js).
+  async function sterge(x: Rezultat) {
+    const local = x.sursa === 'local'
+    if (!confirm(`Ștergi „${x.furnizor || x.fisierNume}${x.numar ? ` nr. ${x.numar}` : ''}” (${lei(x.suma, x.valuta)})?\n\nSe șterge din ContaFlow${local ? ' și fișierul din folderul local e mutat în Coș (Trash) de pe Mac' : ''}.${x.platita ? '\nFactura e asociată unei plăți — plata rămâne fără document.' : ''}`)) return
+    setStergeId(x.id); setMesaj('')
+    const res = await fetch(`/api/inbox-facturi/sterge?id=${encodeURIComponent(x.id)}`, { method: 'DELETE' }).catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : {}
+    setStergeId(null)
+    if (!res?.ok) { setMesaj(d.error || 'Ștergerea a eșuat'); return }
+    setR(prev => prev ? { ...prev, rezultate: prev.rezultate.filter(y => y.id !== x.id), alteSurse: prev.alteSurse.filter(y => y.id !== x.id) } : prev)
+    setMesaj(d.fisiereLocale?.length
+      ? `Șters din ContaFlow. Fișierul local (${d.fisiereLocale.join(', ')}) va fi mutat în Coș de scriptul de pe Mac în câteva secunde (dacă „npm run watch:facturi” rulează; altfel la următoarea pornire).`
+      : 'Șters din ContaFlow.')
+  }
 
   async function cauta(intrebare = q) {
     if (intrebare.trim().length < 3) return
@@ -78,7 +97,8 @@ export default function AiCautareFacturi() {
       {r && (
         <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>{r.rezumat}</div>
-          {r.rezultate.map(x => <Rand key={x.id} r={x} />)}
+          {mesaj && <div role="status" style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', padding: '6px 8px', borderRadius: 'var(--r-sm)', background: 'var(--surface-secondary)' }}>{mesaj}</div>}
+          {r.rezultate.map(x => <Rand key={x.id} r={x} onSterge={sterge} sterge={stergeId === x.id} />)}
           {r.neprocesate.length > 0 && (
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--warning)', marginTop: '4px' }}>
               În folderul local, încă neprocesate / de atribuit: {r.neprocesate.map(n => `${n.fisierNume}${n.motiv ? ` (${n.motiv})` : ''}`).join(' · ')}
@@ -89,7 +109,7 @@ export default function AiCautareFacturi() {
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setArataAlte(v => !v)} style={{ paddingLeft: 0 }}>
                 {arataAlte ? '▾' : '▸'} Același furnizor, din alte surse sau mutate în alte module ({r.alteSurse.length})
               </button>
-              {arataAlte && <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>{r.alteSurse.map(x => <Rand key={x.id} r={x} />)}</div>}
+              {arataAlte && <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>{r.alteSurse.map(x => <Rand key={x.id} r={x} onSterge={sterge} sterge={stergeId === x.id} />)}</div>}
             </div>
           )}
         </div>
