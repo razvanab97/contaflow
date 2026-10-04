@@ -284,6 +284,7 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
                   <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', flexShrink: 0 }}>{doc.cod_unitate_booking ? `cod ${doc.cod_unitate_booking}` : 'fără cod'}</span>
                   <VeziButon url={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} />
                   <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: 'var(--fs-xs)', color:'var(--accent)', textDecoration: 'none', flexShrink: 0 }}>↓</a>
+                  <button onClick={() => deleteDoc(doc)} title="Șterge documentul (nu ține de nicio proprietate)" aria-label="Șterge documentul" style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', background: 'transparent', border: 'none', padding: '2px 4px', borderRadius: 'var(--r-xs)', flexShrink: 0 }}>✕</button>
                 </div>
               ))}
             </div>
