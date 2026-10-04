@@ -33,6 +33,19 @@ function Bifa({ p }: { p: BifaPayload }) {
   return <input type="checkbox" checked={on} onChange={() => c.comuta(p)} aria-label="Adaugă în lista de discrepanțe" title={on ? 'Scoate din lista de discrepanțe' : 'Adaugă în lista de discrepanțe'} style={{ width:'16px', height:'16px', flexShrink:0, cursor:'pointer', accentColor:'var(--accent)' }}/>
 }
 
+// Stergere rand din verificare (rezervare din borderou / factura 5StarDesk citita), cu confirmare.
+type TipSters = 'rezervare' | 'factura'
+const StergeCtx = createContext<((tip: TipSters, id: string, eticheta: string) => void) | null>(null)
+function StergeBtn({ tip, id, eticheta }: { tip: TipSters; id: string; eticheta: string }) {
+  const sterge = useContext(StergeCtx)
+  if (!sterge) return null
+  return (
+    <button type="button" onClick={() => sterge(tip, id, eticheta)} aria-label={`Șterge ${eticheta}`} title={tip === 'rezervare' ? 'Șterge rezervarea din verificare' : 'Șterge factura citită din verificare'}
+      style={{ fontSize:'var(--fs-sm)', lineHeight:1, padding:'4px 7px', borderRadius:'var(--r-sm)', border:'1px solid transparent', background:'transparent', color:'var(--c-777777)', cursor:'pointer', flexShrink:0 }}
+      onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)' }} onMouseLeave={e => { e.currentTarget.style.color = 'var(--c-777777)' }}>✕</button>
+  )
+}
+
 function zi(d?: string|null) { if (!d) return ''; const [, m, z] = d.split('-'); return `${z}.${m}` }
 function sejurText(n: Nefacturata) { return n.dataStart || n.dataSfarsit ? `sejur ${zi(n.dataStart)}–${zi(n.dataSfarsit)}` : '' }
 
@@ -82,6 +95,7 @@ function ListaLipsa({ items, tip, onResolved, faraActiune, sectiune }: { items: 
           >
             {resolving === n.id ? '...' : '✓ Am facturat'}
           </button></>}
+          <StergeBtn tip="rezervare" id={n.id} eticheta={`${n.numeOaspete || '—'} (${n.codRezervare})`}/>
         </div>
       ))}
     </div>
@@ -105,6 +119,7 @@ function ListaOrfane({ items, sectiune }: { items: FacturaOrfana[]; sectiune:str
           {f.idRezervare && <span style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--c-ffffff)', fontFamily:'monospace' }}>{f.idRezervare}</span>}
           {(f.dataStart || f.dataSfarsit) && <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', flexShrink:0 }}>sejur {zi(f.dataStart)}–{zi(f.dataSfarsit)}</span>}
           <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', flexShrink:0 }}>{money(f.suma)} RON</span>
+          <StergeBtn tip="factura" id={f.id} eticheta={`factura ${f.numarFactura || '—'} (${f.numeClient || '—'})`}/>
           {f.motiv && <span style={{ flexBasis:'100%', fontSize:'var(--fs-xs)', color: f.unde === 'lipsa' || f.unde === 'trecuta' ? 'var(--warning)' : f.unde === 'viitoare' ? 'var(--success)' : 'var(--c-777777)' }}>{f.unde === 'viitoare' ? '✓' : f.unde === 'trecuta' ? '⚠' : 'ℹ'} {f.motiv}</span>}
         </div>
       ))}
@@ -145,6 +160,7 @@ function ListaDiscrepante({ items, tip, onResolved, sectiune }: { items: Discrep
             >
               {resolving === d.id ? '...' : '✓ E în regulă'}
             </button>
+            <StergeBtn tip="rezervare" id={d.id} eticheta={`${d.numeOaspete || '—'} (${d.codRezervare})`}/>
           </div>
           <p style={{ fontSize:'var(--fs-xs)', color:'var(--warning)', margin:0, paddingLeft:'2px' }}>ℹ {d.mesaj}</p>
         </div>
@@ -167,6 +183,7 @@ function ListaExplicate({ items, sectiune }: { items: DiscrepantaExplicata[]; se
           <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', flexShrink:0 }}>
             {money(d.suma)} <span style={{ color:'var(--c-555555)' }}>+ comision</span> {money(d.sumaComision)} <span style={{ color:'var(--c-555555)' }}>=</span> {money(d.sumaFactura)} RON
           </span>
+          <StergeBtn tip="rezervare" id={d.id} eticheta={`${d.numeOaspete || '—'} (${d.codRezervare})`}/>
         </div>
       ))}
     </div>
@@ -187,6 +204,7 @@ function ListaAltaLuna({ items, tip, sectiune }: { items: FacturataAltaLuna[]; t
           </span>
           <span style={{ flex:1, fontSize:'var(--fs-sm)', color:'var(--c-dddddd)' }}>{d.numeOaspete || '—'} <span style={{ color:'var(--c-666666)' }}>· {tip === 'client' ? 'factura' : 'comision'} {d.numarFactura || '—'}</span> <FacturatSuma v={d.sumaFactura}/></span>
           <span style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', flexShrink:0 }}>ℹ facturat în <b style={{ color:'var(--c-aaaaaa)' }}>{d.luna}</b></span>
+          <StergeBtn tip="rezervare" id={d.id} eticheta={`${d.numeOaspete || '—'} (${d.codRezervare})`}/>
         </div>
       ))}
     </div>
@@ -246,6 +264,20 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
   const [lista, setLista] = useState<Map<string, RandLista>>(new Map())
   const [eroareLista, setEroareLista] = useState('')
 
+  const stergeRand = useCallback(async (tip: TipSters, id: string, eticheta: string) => {
+    if (!confirm(tip === 'rezervare'
+      ? `Ștergi rezervarea ${eticheta} din verificare?\n\nSe șterge doar rândul citit din borderou (ex. rezervare anulată sau dublată) — borderoul încărcat rămâne neatins.`
+      : `Ștergi ${eticheta} din verificare?\n\nSe șterge doar factura citită din PDF-ul 5StarDesk — documentul încărcat rămâne neatins.`)) return
+    setError('')
+    const res = await fetch(`/api/5stardesk/sterge?tip=${tip}&id=${encodeURIComponent(id)}`, { method:'DELETE' }).catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok) { setError(d.error || 'Ștergerea a eșuat'); return }
+    setLista(prev => { const m = new Map(prev); for (const k of [...m.keys()]) if (k.endsWith(`:${id}`)) m.delete(k); return m })
+    const r = await fetch(`/api/5stardesk/verifica?lunaId=${encodeURIComponent(lunaId)}`).catch(() => null)
+    const v = r ? await r.json().catch(() => null) : null
+    if (v && !v.error) setResult(v)
+  }, [lunaId])
+
   useEffect(() => {
     fetch(`/api/5stardesk/lista?lunaId=${encodeURIComponent(lunaId)}`).then(r => r.json()).then(d => {
       if (d.error) setEroareLista(d.error)
@@ -301,6 +333,7 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
 
   return (
     <ListaCtx.Provider value={{ randuri: lista, comuta }}>
+    <StergeCtx.Provider value={stergeRand}>
     <div style={{ background:'var(--c-111111)', border:'1px solid var(--c-1e1e1e)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
       <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--c-1a1a1a)', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'12px', flexWrap:'wrap' }}>
         <div>
@@ -428,6 +461,7 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
         </div>
       </div>
     </div>
+    </StergeCtx.Provider>
     </ListaCtx.Provider>
   )
 }
