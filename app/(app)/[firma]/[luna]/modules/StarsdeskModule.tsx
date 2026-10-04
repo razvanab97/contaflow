@@ -211,8 +211,24 @@ function ListaAltaLuna({ items, tip, sectiune }: { items: FacturataAltaLuna[]; t
   )
 }
 
-function PanouLista({ randuri, firma, lunaId, onNota, onScoate, eroare }: { randuri: RandLista[]; firma: Firma; lunaId: string; onNota:(id:string, nota:string)=>void; onScoate:(cheie:string)=>void; eroare:string }) {
+function PanouLista({ randuri, firma, lunaId, onNota, onScoate, eroare }: { randuri: RandLista[]; firma: Firma; lunaId: string; onNota:(id:string, nota:string)=>Promise<boolean>; onScoate:(cheie:string)=>void; eroare:string }) {
   const [note, setNote] = useState<Record<string,string>>({})
+  const [salvez, setSalvez] = useState<Set<string>>(new Set())
+  const [salvatToate, setSalvatToate] = useState(false)
+  // Nota scrisa si inca nesalvata = diferita de cea din baza (cea care intra in PDF / export).
+  const nesalvat = (r: RandLista) => note[r.id] !== undefined && note[r.id].trim() !== (r.nota || '').trim()
+  const deSalvat = randuri.filter(nesalvat)
+  async function salveaza(r: RandLista) {
+    if (!nesalvat(r)) return true
+    setSalvez(prev => new Set(prev).add(r.id))
+    const ok = await onNota(r.id, note[r.id])
+    setSalvez(prev => { const n = new Set(prev); n.delete(r.id); return n })
+    return ok
+  }
+  async function salveazaToate() {
+    const rez = await Promise.all(deSalvat.map(salveaza))
+    if (rez.every(Boolean)) { setSalvatToate(true); setTimeout(() => setSalvatToate(false), 2500) }
+  }
   return (
     <div style={{ border:'1px solid light-dark(rgba(180,83,9,.35), rgba(245,201,106,.25))', borderRadius:'var(--r-md)', padding:'12px 14px', background:'light-dark(rgba(180,83,9,.05), rgba(245,201,106,.04))' }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', marginBottom: randuri.length ? '10px' : 0 }}>
@@ -220,7 +236,14 @@ function PanouLista({ randuri, firma, lunaId, onNota, onScoate, eroare }: { rand
           <div style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--warning)', textTransform:'uppercase', letterSpacing:'.06em' }}>Listă discrepanțe ({randuri.length})</div>
           <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', marginTop:'2px' }}>Bifează orice rând de mai jos ca să-l adaugi aici; scrie ce s-a întâmplat. Lista se salvează și intră în descărcarea contabilității (ZIP / PDF).</div>
         </div>
-        {randuri.length > 0 && <a className="btn btn-sm" href={`/api/5stardesk/lista?lunaId=${encodeURIComponent(lunaId)}&format=pdf&firmaNume=${encodeURIComponent(firma.nume)}`}>↓ Descarcă lista (PDF)</a>}
+        {randuri.length > 0 && (
+          <div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap' }}>
+            <button className={deSalvat.length ? 'btn btn-sm btn-primary' : 'btn btn-sm'} onClick={salveazaToate} disabled={!deSalvat.length || salvez.size > 0}>
+              {salvez.size > 0 ? 'Se salvează…' : deSalvat.length ? `Salvează notele (${deSalvat.length})` : salvatToate ? '✓ Toate salvate' : '✓ Salvat'}
+            </button>
+            <a className="btn btn-sm" href={`/api/5stardesk/lista?lunaId=${encodeURIComponent(lunaId)}&format=pdf&firmaNume=${encodeURIComponent(firma.nume)}`} onClick={async e => { if (deSalvat.length) { e.preventDefault(); await salveazaToate(); window.location.href = e.currentTarget.href } }}>↓ Descarcă lista (PDF)</a>
+          </div>
+        )}
       </div>
       {eroare && <p style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', margin:0 }}>{eroare}</p>}
       <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
@@ -233,13 +256,19 @@ function PanouLista({ randuri, firma, lunaId, onNota, onScoate, eroare }: { rand
               <button className="btn btn-sm btn-ghost btn-icon" aria-label="Scoate din listă" title="Scoate din listă" onClick={() => onScoate(r.cheie)}>✕</button>
             </div>
             {r.detalii && <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)' }}>{r.detalii}</div>}
-            <input
-              value={note[r.id] ?? r.nota ?? ''}
-              onChange={e => setNote(prev => ({ ...prev, [r.id]: e.target.value }))}
-              onBlur={e => { if (e.target.value !== (r.nota || '')) onNota(r.id, e.target.value) }}
-              placeholder="Ce s-a întâmplat? (ex: refacturat diferența în ABRH 1550 · client neprezentat, storno)"
-              style={{ fontSize:'var(--fs-sm)', background:'var(--c-0d0d0d)', border:`1px solid ${r.nota ? 'var(--c-2a2a2a)' : 'light-dark(rgba(180,83,9,.4), rgba(245,201,106,.3))'}`, borderRadius:'var(--r-sm)', padding:'6px 10px', color:'var(--c-cccccc)', outline:'none' }}
-            />
+            <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
+              <input
+                value={note[r.id] ?? r.nota ?? ''}
+                onChange={e => setNote(prev => ({ ...prev, [r.id]: e.target.value }))}
+                onBlur={() => { salveaza(r) }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); salveaza(r) } }}
+                placeholder="Ce s-a întâmplat? (ex: refacturat diferența în ABRH 1550 · client neprezentat, storno)"
+                style={{ flex:1, minWidth:0, fontSize:'var(--fs-sm)', background:'var(--c-0d0d0d)', border:`1px solid ${nesalvat(r) ? 'var(--accent)' : r.nota ? 'var(--c-2a2a2a)' : 'light-dark(rgba(180,83,9,.4), rgba(245,201,106,.3))'}`, borderRadius:'var(--r-sm)', padding:'6px 10px', color:'var(--c-cccccc)', outline:'none' }}
+              />
+              {nesalvat(r) || salvez.has(r.id)
+                ? <button className="btn btn-sm btn-primary" onMouseDown={e => e.preventDefault()} onClick={() => salveaza(r)} disabled={salvez.has(r.id)} style={{ flexShrink:0 }}>{salvez.has(r.id) ? '…' : 'Salvează'}</button>
+                : r.nota ? <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--success)', flexShrink:0, whiteSpace:'nowrap' }} title="Salvat — intră în PDF și în exportul contabilității">✓ Salvat</span> : null}
+            </div>
           </div>
         ))}
       </div>
@@ -297,10 +326,10 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
     if (!exista && d.rand) setLista(prev => new Map(prev).set(p.cheie, d.rand))
   }, [lista, lunaId, firma.id])
 
-  async function salveazaNota(id: string, nota: string) {
-    const res = await fetch('/api/5stardesk/lista', { method:'PATCH', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ id, nota }) })
-    if (res.ok) setLista(prev => { const m = new Map(prev); for (const [k, r] of m) if (r.id === id) m.set(k, { ...r, nota: nota.trim() || null }); return m })
-    else setEroareLista('Nota nu a putut fi salvată')
+  async function salveazaNota(id: string, nota: string): Promise<boolean> {
+    const res = await fetch('/api/5stardesk/lista', { method:'PATCH', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ id, nota }) }).catch(() => null)
+    if (res?.ok) { setEroareLista(''); setLista(prev => { const m = new Map(prev); for (const [k, r] of m) if (r.id === id) m.set(k, { ...r, nota: nota.trim() || null }); return m }); return true }
+    setEroareLista('Nota nu a putut fi salvată — încearcă din nou'); return false
   }
 
   const load = useCallback(async () => {
