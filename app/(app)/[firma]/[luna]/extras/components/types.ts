@@ -18,7 +18,14 @@ export interface Tx {
 // BNR din ziua documentului, calculat de server doar pentru afisare.
 export interface DocTx { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string; suma?:number|null; valuta?:string|null; data_document?:string|null; suma_ron?:number|null; curs_bnr?:number|null }
 
-export interface InboxCandidat { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; valuta:string; monedaDiferita:boolean; data_document:string|null; diferentaSuma:number|null; suma_ron?:number|null; curs_bnr?:number|null; sursa:'local'|'gmail'|'oblio'|'bonuri'|'altele' }
+export type SursaInbox = 'local'|'gmail'|'oblio'|'bonuri'|'altele'|'module'|'deasociat'
+export interface InboxCandidat {
+  id:string; tabel:'documente'|'bonuri'|'facturi_asteptate'; fisier_nume:string; furnizor:string|null; numar_document?:string|null
+  suma:number|null; valuta:string; monedaDiferita:boolean; data_document:string|null; diferentaSuma:number|null; suma_ron?:number|null; curs_bnr?:number|null
+  sursa:SursaInbox; sectiune?:string; docUrl?:string
+  // Documentul e deja legat de o alta tranzactie (data/suma ei, cand se cunosc).
+  deja?:{ data:string|null; suma:number|null; valuta:string|null }|null
+}
 
 // "18.00 EUR" + "≈ 94.74 lei · curs BNR 5.2636 din 15.09.2026" (a doua parte doar pentru valuta).
 export function sumaDocument(d: { suma?:number|null; valuta?:string|null; data_document?:string|null; suma_ron?:number|null; curs_bnr?:number|null }): { principal: string|null; lei: string|null } {
@@ -30,7 +37,7 @@ export function sumaDocument(d: { suma?:number|null; valuta?:string|null; data_d
   return { principal, lei: `≈ ${d.suma_ron.toFixed(2)} lei · curs BNR ${d.curs_bnr.toFixed(4)}${data}` }
 }
 
-export const SURSA_LABEL: Record<'toate'|'local'|'gmail'|'oblio'|'bonuri'|'altele', string> = { toate:'Toate', local:'Local', gmail:'Gmail', oblio:'e-Factură (Oblio)', bonuri:'Bonuri', altele:'Altele' }
+export const SURSA_LABEL: Record<'toate'|SursaInbox, string> = { toate:'Toate', local:'Local', gmail:'Gmail', oblio:'e-Factură (Oblio)', bonuri:'Bonuri', altele:'Altele', module:'Din module', deasociat:'Facturi de asociat' }
 
 export interface Extras { id:string; valuta:string; iban?:string|null; pdf_path?:string|null; pdf_nume?:string|null; nr_tranzactii:number; nr_documentate:number; sold_final?:number }
 
