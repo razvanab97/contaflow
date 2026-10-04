@@ -26,13 +26,14 @@ interface Props {
   open: boolean
   onClose: () => void
   onSearch: () => void
+  lunaCalendaristica?: boolean
 }
 
 // Navigatia principala, organizata pe 3 niveluri de context: global (Dashboard + firme) ->
 // luna firmei active (rezumat + module, in ordinea de lucru) -> date permanente ale firmei
 // (furnizori, date personale, modele, facturi de asociat). Pe desktop e fixa (sticky); sub
 // 900px devine sertar, deschis din butonul de meniu al header-ului (starea traieste in ShellClient).
-export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, moduleFirma, restanteCount, moduleComplete, open, onClose, onSearch }: Props) {
+export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, moduleFirma, restanteCount, moduleComplete, open, onClose, onSearch, lunaCalendaristica = false }: Props) {
   const pathname = usePathname()
   const isDashboard = pathname === '/dashboard'
 
@@ -138,7 +139,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
           {firmaAtiva && moduleFirma && moduleFirma.length > 0 && (
             <div className="sidebar-section">
               <div className="sidebar-label">
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={lunaLabel}>Luna contabilă</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={lunaLabel}>{lunaCalendaristica ? `Luna · ${lunaLabel}` : 'Luna contabilă'}</span>
                 <span style={{ letterSpacing: 0, textTransform: 'none', fontWeight: 600 }} title="Module complete">{doneCount}/{moduleFirma.length}</span>
               </div>
               <Link href={`/${firmaAtiva}/${lunaCurenta}`} className={`nav-item${isHub ? ' is-active' : ''}`} aria-current={isHub ? 'page' : undefined}>
@@ -192,7 +193,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
           <ThemeSelector />
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', padding: '0 4px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
             <Icon name="calendar" size={13} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Contabilitate ${lunaLabel}`}>Contabilitate {lunaLabel}</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={lunaLabel}>{lunaCalendaristica ? `Luna ${lunaLabel}` : `Contabilitate ${lunaLabel}`}</span>
           </div>
         </div>
       </aside>

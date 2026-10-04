@@ -4,8 +4,8 @@ import { usePathname } from 'next/navigation'
 import Sidebar, { FirmaNav } from '@/components/Sidebar'
 import GlobalHeader from './GlobalHeader'
 import CommandPalette from './CommandPalette'
-import { getFirmaModules } from '@/lib/firma-config'
-import { accountingShortLabel } from '@/lib/accounting-period'
+import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
+import { etichetaLunaScurta } from '@/lib/accounting-period'
 
 interface Props {
   initialFirmeNav: FirmaNav[]
@@ -89,7 +89,8 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
       <Sidebar
         firme={firmeNav}
         lunaCurenta={lunaEfectiva}
-        lunaLabel={accountingShortLabel(lunaEfectiva)}
+        lunaLabel={etichetaLunaScurta(lunaEfectiva, esteLunaCalendaristica(firmaSlug))}
+        lunaCalendaristica={esteLunaCalendaristica(firmaSlug)}
         firmaAtiva={firmaSlug}
         moduleFirma={modules}
         restanteCount={restanteCount}

@@ -1,5 +1,6 @@
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { getFirmaModules } from '@/lib/firma-config'
+import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
+import { workMonthLabel } from '@/lib/accounting-period'
 import { ignorareDeVerificat } from '@/lib/tranzactii-reguli'
 
 export interface ItemDeFacut {
@@ -39,7 +40,8 @@ export async function getDeFacut(firme: { id: string; slug: string; nume: string
     const { data: luni } = await sb.from('luni_contabile').select('id,luna').eq('firma_id', f.id)
     const l = (luni || []).find(x => String(x.luna).startsWith(luna))
     if (!l) {
-      items.push({ ...base, id: `init-${f.id}`, titlu: 'Luna nu e începută', detaliu: 'Pornește contabilitatea lunii ca să apară task-urile', href: `/${f.slug}/${luna}`, icon: 'calendar', urgenta: 'normal' })
+      const calendar = esteLunaCalendaristica(f.slug)
+      items.push({ ...base, id: `init-${f.id}`, titlu: calendar ? `Luna ${workMonthLabel(luna)} nu e începută` : 'Luna nu e începută', detaliu: calendar ? 'Pornește luna ca să apară rutina și task-urile' : 'Pornește contabilitatea lunii ca să apară task-urile', href: `/${f.slug}/${luna}`, icon: 'calendar', urgenta: 'normal' })
       return
     }
     const modules = getFirmaModules(f.slug)

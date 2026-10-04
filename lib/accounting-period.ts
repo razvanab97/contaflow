@@ -51,3 +51,12 @@ export function accountingShortLabel(workMonth: string) {
   const [, workMonthNumber] = workMonth.split('-').map(Number)
   return `1-${p.endDay} ${p.monthName} (${LUNI_FULL[workMonthNumber] || workMonth})`
 }
+
+// Etichete care tin cont de tipul lunii firmei: la proiecte (luna calendaristica) "Octombrie 2026",
+// la firme (luna contabila) perioada contabila "1-30 Septembrie ..." - vezi esteLunaCalendaristica.
+export function etichetaLunaScurta(workMonth: string, calendar: boolean) {
+  return calendar ? workMonthLabel(workMonth) : accountingShortLabel(workMonth)
+}
+export function etichetaLunaCompleta(workMonth: string, calendar: boolean) {
+  return calendar ? workMonthLabel(workMonth) : accountingFullLabel(workMonth)
+}

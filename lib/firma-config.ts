@@ -57,6 +57,9 @@ export interface FirmaConfigDef {
   module: ModuleSlug[]
   legal: FirmaLegal
   proprietari?: Proprietar[]
+  // true = luna e luna calendaristica (ex. "Octombrie 2026"), nu o luna contabila "1-30 Septembrie
+  // (lucrat in Octombrie)". Pentru proiecte cu rutina lunara proprie, nu contabilitate.
+  lunaCalendaristica?: boolean
 }
 
 // Ordinea reflectă fluxul logic de lucru al unei luni de contabilitate, nu ordinea în care au
@@ -307,6 +310,7 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
     // Nu e o firmă reală (fără CUI/ONRC) - e un proiect european derulat de AB Textile SRL,
     // cu propriile documente lunare de raportat, distincte de contabilitatea firmei.
     module: ['raport-lunar-proiect', 'obligatii-recurente', 'achizitii'],
+    lunaCalendaristica: true,
     legal: {
       nrRegCom: '',
       cif: '',
@@ -333,3 +337,7 @@ export function getFirmaTotalTasks(slug: string): number {
 
 // getLegal/getProprietari au fost migrate în DB (tabelele firme + proprietari) —
 // FIRMA_CONFIGS.legal/.proprietari de mai sus rămân doar ca valori inițiale de seed.
+
+export function esteLunaCalendaristica(slug: string | null | undefined): boolean {
+  return !!(slug && FIRMA_CONFIGS[slug]?.lunaCalendaristica)
+}

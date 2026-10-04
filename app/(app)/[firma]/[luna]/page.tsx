@@ -4,11 +4,11 @@ import ProiectWorkflow from '@/components/ProiectWorkflow'
 import ModuleGrid from './ModuleGrid'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getLuniContabile, getRestanteCount } from '@/lib/queries'
-import { getFirmaModules } from '@/lib/firma-config'
+import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
 import LunaSummary from './LunaSummary'
 import ExportButtons from './ExportButtons'
 import RecomandariLuna from '@/components/RecomandariLuna'
-import { accountingFullLabel } from '@/lib/accounting-period'
+import { etichetaLunaCompleta } from '@/lib/accounting-period'
 import MonthNav from '@/components/ui/MonthNav'
 import ProgressRing from '@/components/ui/ProgressRing'
 import Icon, { MODULE_ICONS } from '@/components/ui/Icon'
@@ -44,7 +44,8 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
   const total = activeModules.reduce((sum, m) => sum + m.tasks.length, 0)
   const done = activeModules.reduce((sum, m) => sum + m.tasks.filter(t => taskMap[t.key]).length, 0)
   const pct = total > 0 ? Math.round((done/total)*100) : 0
-  const ll = accountingFullLabel(luna)
+  const calendar = esteLunaCalendaristica(slug)
+  const ll = etichetaLunaCompleta(luna, calendar)
 
   const activeCount = activeModules.length
   const modulesDone = activeModules.filter(m => m.tasks.length > 0 && m.tasks.every(t => taskMap[t.key])).length
@@ -59,7 +60,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
           <div style={{ minWidth: 0 }}>
             <div className="eyebrow" style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="dot" style={{ background: firma.culoare, boxShadow: '0 0 0 4px var(--brand-glow)' }} />
-              Contabilitate lunară
+              {calendar ? 'Rutina lunii' : 'Contabilitate lunară'}
             </div>
             <h1 className="hero-title">{firma.nume}</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>

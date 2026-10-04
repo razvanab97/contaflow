@@ -5,7 +5,7 @@ import nextDynamic from 'next/dynamic'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getActiveFirme, getLuniContabile } from '@/lib/queries'
 import { getFirmaConfig, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
-import { accountingFullLabel } from '@/lib/accounting-period'
+import { etichetaLunaCompleta } from '@/lib/accounting-period'
 import NextStepNav from '../NextStepNav'
 import InitLuna from '../InitLuna'
 
@@ -71,7 +71,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   const extraTaskDefs = modulSlug === 'booking-facturi' ? (MODULE_DEFS['booking-borderou']?.tasks || []) : []
   const tasks = [...modulDef.tasks, ...extraTaskDefs].map(t => ({ ...t, completat: taskMap[t.key] ?? false }))
 
-  const ll = accountingFullLabel(luna)
+  const ll = etichetaLunaCompleta(luna, !!firmaConfig.lunaCalendaristica)
 
   const firmaForModule = {
     id: firma.id, slug: firma.slug, nume: firma.nume, culoare: firma.culoare,

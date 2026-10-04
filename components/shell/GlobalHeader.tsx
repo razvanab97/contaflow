@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { FirmaNav } from '@/components/Sidebar'
 import Icon from '@/components/ui/Icon'
-import { MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
-import { accountingShortLabel } from '@/lib/accounting-period'
+import { MODULE_DEFS, type ModuleSlug, esteLunaCalendaristica } from '@/lib/firma-config'
+import { etichetaLunaScurta } from '@/lib/accounting-period'
 
 interface Props {
   firme: FirmaNav[]
@@ -112,9 +112,9 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMe
               <>
                 <Icon name="chevronRight" size={14} className="crumb-sep hide-mobile" />
                 {modulLabel ? (
-                  <Link href={`/${firmaAtiva.slug}/${luna}`} className="crumb-link hide-mobile">{accountingShortLabel(luna)}</Link>
+                  <Link href={`/${firmaAtiva.slug}/${luna}`} className="crumb-link hide-mobile">{etichetaLunaScurta(luna, esteLunaCalendaristica(firmaAtiva.slug))}</Link>
                 ) : (
-                  <span className="crumb-current hide-mobile">{accountingShortLabel(luna)}</span>
+                  <span className="crumb-current hide-mobile">{etichetaLunaScurta(luna, esteLunaCalendaristica(firmaAtiva.slug))}</span>
                 )}
               </>
             )}

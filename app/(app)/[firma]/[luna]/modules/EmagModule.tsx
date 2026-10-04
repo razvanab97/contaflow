@@ -1,4 +1,5 @@
 'use client'
+import ConcluzieEmag from './ConcluzieEmag'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import CopyButton from '@/components/CopyButton'
@@ -594,6 +595,9 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
 
       {/* Task-uri bifabile */}
       <TaskSection tasks={moduleTasks} lunaId={lunaId} culoare={firma.culoare} onItemsChange={setModuleTasks}/>
+
+      {/* Concluzia eMAG: vanzari -> retineri -> incasat -> costuri separate -> rezultat */}
+      <ConcluzieEmag lunaId={lunaId} />
 
       {/* Avize de plată — încarcă PDF-ul, AI-ul extrage facturile de căutat + copy */}
       <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>

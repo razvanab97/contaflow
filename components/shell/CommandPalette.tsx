@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import type { FirmaNav } from '@/components/Sidebar'
 import Icon, { MODULE_ICONS } from '@/components/ui/Icon'
-import { getFirmaModules } from '@/lib/firma-config'
-import { accountingShortLabel } from '@/lib/accounting-period'
+import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
+import { etichetaLunaScurta } from '@/lib/accounting-period'
 
 interface Rezultat {
   id: string; fisierNume: string; furnizor: string | null; numarDocument: string | null
@@ -114,7 +114,7 @@ export default function CommandPalette({ open, onClose, firme, firmaAtiva, luna,
     list.push({ id: 'nav-dashboard', group: 'Navigare', title: 'Dashboard', sub: 'Toate firmele', icon: 'dashboard', keywords: 'acasa home start', run: ({ newTab }) => go('/dashboard', newTab) })
     for (const f of firme) {
       const nume = f.nume.replace(' SRL', '')
-      list.push({ id: `hub-${f.slug}`, group: 'Firme', title: nume, sub: `Rezumatul lunii · ${accountingShortLabel(luna)}`, icon: 'calendar', dot: f.culoare, meta: `${f.pct}%`, keywords: 'firma rezumat luna hub', run: ({ newTab }) => go(`/${f.slug}/${luna}`, newTab) })
+      list.push({ id: `hub-${f.slug}`, group: 'Firme', title: nume, sub: `Rezumatul lunii · ${etichetaLunaScurta(luna, esteLunaCalendaristica(f.slug))}`, icon: 'calendar', dot: f.culoare, meta: `${f.pct}%`, keywords: 'firma rezumat luna hub', run: ({ newTab }) => go(`/${f.slug}/${luna}`, newTab) })
       for (const m of getFirmaModules(f.slug)) {
         list.push({ id: `mod-${f.slug}-${m.slug}`, group: 'Module', title: m.label, sub: `${nume} · ${m.description}`, icon: MODULE_ICONS[m.slug] || 'fileText', dot: f.culoare, keywords: `${nume} modul`, run: ({ newTab }) => go(`/${f.slug}/${luna}/${m.linkDirect || m.slug}`, newTab) })
       }
@@ -126,8 +126,8 @@ export default function CommandPalette({ open, onClose, firme, firmaAtiva, luna,
       const parts = pathname.split('/').filter(Boolean)
       const rest = lunaInPath ? parts.slice(2).join('/') : ''
       const base = `/${firmaAtiva.slug}`
-      list.push({ id: 'act-prev', group: 'Acțiuni', title: 'Luna anterioară', sub: accountingShortLabel(shift(luna, -1)), icon: 'chevronLeft', keywords: 'luna inapoi precedenta', run: () => go(`${base}/${shift(luna, -1)}${rest ? '/' + rest : ''}`) })
-      list.push({ id: 'act-next', group: 'Acțiuni', title: 'Luna următoare', sub: accountingShortLabel(shift(luna, 1)), icon: 'chevronRight', keywords: 'luna inainte urmatoare', run: () => go(`${base}/${shift(luna, 1)}${rest ? '/' + rest : ''}`) })
+      list.push({ id: 'act-prev', group: 'Acțiuni', title: 'Luna anterioară', sub: etichetaLunaScurta(shift(luna, -1), esteLunaCalendaristica(firmaAtiva.slug)), icon: 'chevronLeft', keywords: 'luna inapoi precedenta', run: () => go(`${base}/${shift(luna, -1)}${rest ? '/' + rest : ''}`) })
+      list.push({ id: 'act-next', group: 'Acțiuni', title: 'Luna următoare', sub: etichetaLunaScurta(shift(luna, 1), esteLunaCalendaristica(firmaAtiva.slug)), icon: 'chevronRight', keywords: 'luna inainte urmatoare', run: () => go(`${base}/${shift(luna, 1)}${rest ? '/' + rest : ''}`) })
       const onHub = lunaInPath && parts.length === 2
       if (onHub) {
         list.push({ id: 'act-pdf', group: 'Acțiuni', title: 'Exportă PDF cu toate documentele lunii', sub: firmaAtiva.nume, icon: 'download', keywords: 'export descarca pdf toate', run: () => { onClose(); window.dispatchEvent(new CustomEvent('cf:export', { detail: 'pdf' })) } })
