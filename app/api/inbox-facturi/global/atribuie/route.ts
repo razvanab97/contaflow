@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       luna,
       sourceLabel: 'Folder local (Personal Computer) · atribuit manual',
       requireDetectedFirm: false,
+      fortat: true,
     })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Import eșuat' }, { status: 500 })
@@ -62,6 +63,11 @@ export async function POST(req: NextRequest) {
 
   const primul = results[0]
   const toateOk = results.every(r => !r.skipped)
+  // Nimic importat (toate sarite): fisierul ramane de atribuit, cu motivul - nu "imported" fara document.
+  if (results.every(r => r.skipped)) {
+    await sb.from('inbox_watch_files').update({ status: 'nedetectat', error_message: primul.skipReason || 'Documentul nu a putut fi importat', synced_at: new Date().toISOString() }).eq('id', cleanId)
+    return NextResponse.json({ error: primul.skipReason || 'Documentul nu a putut fi importat' }, { status: 422 })
+  }
   await sb.from('inbox_watch_files').update({
     status: results.length === 1 ? (primul.duplicate ? 'duplicat' : 'imported') : (toateOk ? 'imported' : 'eroare'),
     firma_id: primul.doc?.firma_id || cleanFirmaId,

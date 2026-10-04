@@ -18,7 +18,7 @@ function detecteazaSursa(furnizor: string | null): Sursa {
 
 function furnizorCurat(furnizor: string | null): string {
   const p = (furnizor || '').split('|')[0]?.trim() || ''
-  return /^(DP_DATA:|Ata(ș|s)ament |Sursa:|\{)/i.test(p) ? '' : p
+  return /^(DP_DATA:|Ata(ș|s)ament |Sursa:|Categorie:|\{)/i.test(p) ? '' : p
 }
 
 const SECTIUNI: [string, string][] = [
@@ -28,6 +28,9 @@ const SECTIUNI: [string, string][] = [
   ['/checklist/', 'Documente lună'], ['/achizitii/', 'Achiziții'], ['/tx/', 'Extras de cont'],
 ]
 const sectiune = (path: string) => SECTIUNI.find(([k]) => path.includes(k))?.[1] || 'Documente'
+
+// Numele comercial cautat de obicei -> firma care emite efectiv factura (ex. eMAG factureaza prin Dante).
+const ALIAS: Record<string, string[]> = { emag: ['dante international', 'dante'], sameday: ['delivery solutions'], fan: ['fan courier'] }
 
 function ascii(s: string) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[ȘșŞş]/g, 's').replace(/[ȚțŢţ]/g, 't').toLowerCase()
@@ -140,13 +143,14 @@ export async function GET(req: NextRequest) {
   // n,00-n,99; cu zecimale -> exact) sau parte din numarul documentului. Data: DD.MM.YYYY / ISO.
   if (q.length >= 2) {
     const qn = ascii(q)
+    const variante = [qn, ...(ALIAS[qn] || [])]
     const num = Number(q.replace(/\s/g, '').replace(',', '.'))
     const esteSuma = Number.isFinite(num) && /^[\d\s.,]+$/.test(q) && q.replace(/\D/g, '').length < 8
     const [min, max] = esteSuma ? (/[.,]\d/.test(q) ? [num - 0.01, num + 0.01] : [num, num + 0.999]) : [0, -1]
     const dm = q.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
     const data = dm ? `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}` : /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : null
     candidates = candidates.filter(c =>
-      ascii(`${c.furnizor} ${c.numar_document || ''} ${c.fisier_nume || ''} ${c.cauta}`).includes(qn) ||
+      variante.some(v => ascii(`${c.furnizor} ${c.numar_document || ''} ${c.fisier_nume || ''} ${c.cauta}`).includes(v)) ||
       (esteSuma && c.suma != null && ((Math.abs(c.suma) >= min && Math.abs(c.suma) <= max) || (c.suma_ron != null && c.suma_ron >= min && c.suma_ron <= max))) ||
       (!!data && c.data_document === data))
   } else {

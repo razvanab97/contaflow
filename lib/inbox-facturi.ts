@@ -250,7 +250,8 @@ Moneda este cea in care e exprimat totalul de plata pe document, NU moneda tarii
 Nu inventa valori. Daca documentul contine mai multe firme, firma noastra este beneficiarul/cumparatorul, nu furnizorul.
 Accepta furnizori externi/straini (de exemplu ISO/Maxy/Verk/Jumbo/Anthropic/OpenAI), dar numai daca documentul indica una dintre firmele noastre ca beneficiar/cumparator, prin CUI/CIF, nume firma sau adresa. Daca documentul pare personal sau pentru alta entitate, seteaza firmaSlug si firmaCui null, incredereFirma necunoscut.
 Pentru Maxy si Verk accepta doar facturi reale cu numar/serie care incepe cu "FS"; proformele sau documentele cu alt prefix nu sunt utile si trebuie marcate cu "esteFactura":false.
-Nu importa AWB-uri, etichete de transport, packing list, shipping documents sau delivery notes: pentru acestea seteaza "esteFactura":false si "tipDocument":"altul", chiar daca apar sume sau furnizori.` },
+Nu importa AWB-uri, etichete de transport, packing list, shipping documents sau delivery notes FARA preturi: pentru acestea seteaza "esteFactura":false si "tipDocument":"altul", chiar daca apar sume sau furnizori.
+EXCEPTIE: "Aviz de insotire a marfii" cu produse, preturi, TVA si total (ex. eMAG / Dante International pentru o comanda platita) ESTE document contabil util - seteaza "esteFactura":true, "tipDocument":"factura", suma = totalul de plata (valoare + TVA), numarDocument = numarul avizului.` },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -305,6 +306,7 @@ export async function importInboxDocument({
   requireDetectedFirm = false,
   extractie,
   tranzactie,
+  fortat = false,
 }: {
   sb: SupabaseService
   bytes: Uint8Array
@@ -320,8 +322,11 @@ export async function importInboxDocument({
   // Plata bancara deja identificata pentru document (vezi firmaDupaPlata) - se leaga direct de ea
   // cand potrivirea automata la ban nu o gaseste (ex. 72.22 pe factura, 72.17 platit).
   tranzactie?: { id: string; extras_id: string | null; data_tranzactie: string } | null
+  // Atribuire manuala: utilizatorul a decis ca documentul trebuie importat - nu-l mai respingem ca
+  // "nu e factura" (ex. aviz de insotire a marfii eMAG, document fara serie FS).
+  fortat?: boolean
 }): Promise<InboxImportResult> {
-  if (isNonInvoiceName(originalName)) {
+  if (!fortat && isNonInvoiceName(originalName)) {
     return {
       duplicate: false,
       skipped: true,
@@ -365,7 +370,7 @@ export async function importInboxDocument({
   }
 
   let extracted = extractie !== undefined ? extractie : await analyzeInvoice(bytes, mediaType, candidates)
-  if (extracted && !extracted.esteFactura) {
+  if (!fortat && extracted && !extracted.esteFactura) {
     return {
       duplicate: false,
       skipped: true,
@@ -375,7 +380,7 @@ export async function importInboxDocument({
       extracted,
     }
   }
-  if (shouldSkipMaxyVerk(extracted, originalName)) {
+  if (!fortat && shouldSkipMaxyVerk(extracted, originalName)) {
     return {
       duplicate: false,
       skipped: true,
