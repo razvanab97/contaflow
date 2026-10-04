@@ -1,6 +1,7 @@
 'use client'
 import { deschideDocument } from '@/lib/vizualizare'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import AiCautareFacturi from './AiCautareFacturi'
 
 interface WatchFile {
   id: string
@@ -186,6 +187,8 @@ export default function FacturiLocaleGlobal({ firme }: Props) {
           </button>
         )}
       </div>
+
+      <AiCautareFacturi />
 
       {(syncBusy || progresTotal > 0) && (
         <div style={{ marginTop: '14px' }} aria-live="polite">
