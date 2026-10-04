@@ -114,7 +114,11 @@ export default function InboxSearch({ tx, firmaId, onAssociated }: { tx: Tx; fir
                 <div style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)', marginTop:'2px' }}>
                   <span style={{ padding:'1px 6px', borderRadius:'var(--r-full)', background:'var(--surface-secondary)', marginRight:'6px' }}>{SURSA_LABEL[c.sursa]}</span>
                   {c.suma != null ? `${c.suma.toFixed(2)} ${c.valuta}` : 'sumă necunoscută'}
-                  {c.monedaDiferita ? ` · monedă diferită de tranzacție (${tx.valuta}) - verifică manual` : c.diferentaSuma !== null && c.diferentaSuma > 0.01 ? ` · diferență ${c.diferentaSuma.toFixed(2)} ${c.valuta}` : ''}
+                  {c.monedaDiferita
+                    ? c.suma_ron != null && c.curs_bnr != null
+                      ? ` · ≈ ${c.suma_ron.toFixed(2)} lei la cursul BNR ${c.curs_bnr.toFixed(4)}${c.diferentaSuma !== null ? ` (diferență ${c.diferentaSuma.toFixed(2)} lei față de plată)` : ''}`
+                      : ` · monedă diferită de tranzacție (${tx.valuta}) - verifică manual`
+                    : c.diferentaSuma !== null && c.diferentaSuma > 0.01 ? ` · diferență ${c.diferentaSuma.toFixed(2)} ${c.valuta}` : ''}
                 </div>
               </div>
               <button onClick={() => associate(c)} disabled={!!assocId} style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'6px 12px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor: assocId ? 'wait' : 'pointer', opacity: assocId && assocId!==c.id ? .5 : 1, whiteSpace:'nowrap' }}>

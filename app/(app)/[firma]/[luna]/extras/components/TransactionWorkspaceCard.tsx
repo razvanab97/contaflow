@@ -5,7 +5,7 @@ import TransactionDetails from './TransactionDetails'
 import DocumentMatch from './DocumentMatch'
 import DocumentActions from './DocumentActions'
 import DocumentAttachedList from './DocumentAttachedList'
-import { MOTIVE_IGNORARE, ignorareDeVerificat, motivEfectiv } from '@/lib/tranzactii-reguli'
+import { MOTIVE_IGNORARE, EXPLICATIE_REGULA, ignorareDeVerificat, motivEfectiv } from '@/lib/tranzactii-reguli'
 
 export default function TransactionWorkspaceCard({
   tx, index, total, firmaId, lunaId, culoare,
@@ -29,7 +29,7 @@ export default function TransactionWorkspaceCard({
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
       <div style={{ flex:1, minHeight:0, overflowY:'auto' }}>
-        <TransactionDetails tx={tx} index={index} total={total} />
+        <TransactionDetails tx={tx} index={index} total={total} onRefresh={onRefresh} />
 
         {isDone && !editDoc ? (
           <div style={{ padding:'24px 28px' }}>
@@ -51,7 +51,7 @@ export default function TransactionWorkspaceCard({
             </div>
             <h3 style={{ fontSize:'var(--fs-lg)', fontWeight:700, color:'var(--text-primary)', marginBottom:'6px' }}>{tx.ignorat_auto ? 'Sărită automat' : 'Tranzacție ignorată'}</h3>
             <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-secondary)', marginBottom:'14px' }}>
-              {tx.ignorat_auto ? 'Regulă standard: comisioanele, schimburile valutare și încasările Booking/Airbnb/eMAG nu au nevoie de document.' : 'Această tranzacție a fost marcată ca ignorată (nu necesită document).'}
+              {tx.ignorat_auto ? `Regulă standard: ${EXPLICATIE_REGULA[motivEfectiv(tx) || ''] || 'nu are nevoie de document.'}` : 'Această tranzacție a fost marcată ca ignorată (nu necesită document).'}
             </p>
             {ignorareDeVerificat(tx) && (
               <div role="alert" style={{ margin:'0 auto 14px', maxWidth:'440px', padding:'10px 12px', borderRadius:'var(--r-md)', background:'var(--warning-soft)', border:'1px solid color-mix(in srgb, var(--warning) 35%, transparent)', color:'var(--warning)', fontSize:'var(--fs-sm)', textAlign:'left' }}>

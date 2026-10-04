@@ -43,3 +43,22 @@ export async function cursuriBnr(date: string[]): Promise<(data: string, valuta:
     return null
   }
 }
+
+export type CursFn = Awaited<ReturnType<typeof cursuriBnr>>
+export type ConversieLei = { sumaRon: number; curs: number }
+
+// Echivalentul in lei al unei sume in valuta, la cursul BNR din ziua documentului (pentru facturile
+// in EUR/USD etc., salvate in moneda lor - lei e doar afisare/comparatie, calculat la cerere).
+export function inLei(curs: CursFn | null, suma: number | null | undefined, valuta: string | null | undefined, data: string | null | undefined): ConversieLei | null {
+  const v = (valuta || 'RON').toUpperCase()
+  if (!curs || suma == null || v === 'RON' || !data) return null
+  const r = curs(String(data).slice(0, 10), v)
+  return r ? { sumaRon: Math.round(Number(suma) * r * 100) / 100, curs: r } : null
+}
+
+// Ca cursuriBnr, dar fara sa arunce: daca BNR nu raspunde, conversia lipseste (null), nu pica pagina.
+export async function cursuriBnrSigur(date: (string | null | undefined)[]): Promise<CursFn | null> {
+  const valide = date.filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}/.test(d))
+  if (!valide.length) return null
+  try { return await cursuriBnr(valide) } catch { return null }
+}

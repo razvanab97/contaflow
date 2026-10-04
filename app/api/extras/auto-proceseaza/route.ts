@@ -25,7 +25,8 @@ async function patchTx(ids: string[], body: Record<string, unknown>) {
 // Procesare automata a tranzactiilor DESCHISE dintr-o luna (fara document, neignorate):
 //  1. asociaza documentele care se potrivesc fara echivoc (suma la ban + data apropiata + candidat unic):
 //     facturi adaugate in avans, bonuri, facturi din Inbox - prin aceleasi rute ca butonul manual;
-//  2. sare tranzactiile standard (comisioane, schimb valutar, incasari Booking/Airbnb/eMAG),
+//  2. sare tranzactiile standard (comisioane, schimb valutar, incasari Booking/Airbnb/eMAG, chirii catre
+//     persoane fizice, impozite catre Trezorerie/ANAF),
 //     marcate "automat" si cu motivul lor - oricare se poate reactiva cu un click.
 // Rulata dupa importul unui extras si la deschiderea Extrasului de cont. Nu atinge tranzactiile deja
 // documentate sau ignorate manual.

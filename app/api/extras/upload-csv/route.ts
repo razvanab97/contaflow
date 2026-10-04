@@ -29,6 +29,21 @@ const CAT_MAP: Record<string, string> = {
   'pachet': 'banca',
 }
 
+// Numele beneficiarului/platitorului din descrierea bancii (BT), pentru lista de tranzactii:
+//  - plata cu cardul: "EPOS 05/05/2026 293EI001 TID:293EI101 JUMBO EC.R SRL  BUCURESTI RO 4244..." -> comerciantul
+//  - OP / Plata Instant: "Order 12531;155;Winner Global Trade SRL;RO13BTRL...;" -> campul dinaintea IBAN-ului
+//  - fara descriere (comisioane, pachet): tipul operatiei
+function numeDinDescriereBanca(tipOperatie: string, descriere: string): string {
+  const d = descriere.replace(/\s+/g, ' ').trim()
+  const pos = d.match(/TID:\S+\s+(.+?)(?:\s+\d{6,}|\s+valoare\b|$)/i)
+  if (pos) return pos[1].replace(/\s+(RO|ROM|ROU|IE|US|NL|DE|GB|LU)$/i, '').trim().slice(0, 80)
+  const campuri = d.split(';').map(c => c.trim()).filter(Boolean)
+  const iIban = campuri.findIndex(c => /^[A-Z]{2}\d{2}[A-Z0-9]{10,}$/.test(c.replace(/\s/g, '')))
+  if (iIban > 0) return campuri[iIban - 1].slice(0, 80)
+  const text = campuri.find(c => /[a-z]{3}/i.test(c) && !/^(\/ROC|\/RFB|C\.I\.F|CURS\s)/i.test(c))
+  return (text || tipOperatie || d).slice(0, 80)
+}
+
 function guessCategorie(descriere: string, catSugerata: string): string {
   const d = (descriere + ' ' + catSugerata).toLowerCase()
   for (const [key, cat] of Object.entries(CAT_MAP)) {
@@ -116,7 +131,9 @@ function parseBankCSV(text: string): {
 
   // 1. Extract metadata from preamble lines
   for (const line of lines) {
-    const cleanLine = line.replace(/\t+/g, ' ').replace(/\s+/g, ' ')
+    // BT exporta antetul ca "Numar cont:",RO88...,,,,, - fara ghilimele si fara separatorul de dupa
+    // ":" regex-urile de mai jos nu gaseau nimic (IBAN, moneda si soldul final ramaneau goale)
+    const cleanLine = line.replace(/"/g, '').replace(/:\s*[,;\t]/, ': ').replace(/[,;\t]+\s*$/, '').replace(/\t+/g, ' ').replace(/\s+/g, ' ')
     const lowerLine = cleanLine.toLowerCase()
     
     if (lowerLine.includes('numar cont:') || lowerLine.includes('iban:')) {
@@ -195,10 +212,12 @@ function parseBankCSV(text: string): {
       idxData = idx
     } else if (cleanH.includes('referinta') || cleanH === 'ref') {
       idxRef = idx
+    } else if (cleanH.includes('tip tranzactie') || cleanH === 'tip') {
+      // inaintea descrierii: "Tip tranzactie" contine si el "tranzactie" si ar fi fost inghitit
+      // de ramura de mai jos, pierzand "Plata Instant" / "Comision Plata Instant" / "Incasare OP"
+      idxTip = idx
     } else if (cleanH.includes('descriere') || cleanH.includes('explicatii') || cleanH.includes('detalii') || cleanH.includes('tranzactie')) {
-      if (cleanH !== 'tip tranzactie') {
-        idxDesc = idx
-      }
+      idxDesc = idx
     } else if (cleanH.includes('debit')) {
       idxDebit = idx
     } else if (cleanH.includes('credit')) {
@@ -229,7 +248,11 @@ function parseBankCSV(text: string): {
       continue
     }
 
-    const descriere = idxDesc !== -1 ? (cols[idxDesc] || '') : ''
+    // Textul complet din extras = tipul operatiei + descrierea bancii (comerciant, oras, nr. comanda,
+    // cod plata, IBAN) - sursa din care se intelege ulterior la ce se refera plata.
+    const tipOperatie = idxTip !== -1 ? (cols[idxTip] || '').trim() : ''
+    const descriereBanca = idxDesc !== -1 ? (cols[idxDesc] || '').trim() : ''
+    const descriere = [tipOperatie, descriereBanca].filter(Boolean).join(' ')
     const ref = idxRef !== -1 ? (cols[idxRef] || '') : ''
     const catSugerata = idxCatSugerata !== -1 ? (cols[idxCatSugerata] || '') : ''
 
@@ -271,6 +294,7 @@ function parseBankCSV(text: string): {
       suma,
       ref,
       categorie_sugerata: catSugerata,
+      nume: numeDinDescriereBanca(tipOperatie, descriereBanca),
       valuta: valuta || 'RON'
     })
   }
@@ -374,7 +398,7 @@ export async function POST(req: NextRequest) {
           firma_id: firmaId,
           data_tranzactie: row.data,
           descriere: row.descriere,
-          descriere_curatata: row.categorie_sugerata || row.descriere.slice(0, 80),
+          descriere_curatata: row.categorie_sugerata || row.nume || row.descriere.slice(0, 80),
           tip: row.tip,
           suma: row.suma,
           valuta: row.valuta,

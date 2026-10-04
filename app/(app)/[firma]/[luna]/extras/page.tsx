@@ -26,7 +26,7 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
   if (!lunaData) notFound()
 
   const [extrase, taskStariRaw, moduleStariRaw] = await Promise.all([
-    get(`extrase?luna_id=eq.${lunaData.id}&select=id,valuta,iban,pdf_nume,nr_tranzactii,nr_documentate,procesat_ai,sold_final&order=valuta`),
+    get(`extrase?luna_id=eq.${lunaData.id}&select=id,valuta,iban,pdf_path,pdf_nume,nr_tranzactii,nr_documentate,procesat_ai,sold_final&order=valuta`),
     get(`task_stari?luna_id=eq.${lunaData.id}&select=task_key,completat`),
     get(`module_stari?luna_id=eq.${lunaData.id}&select=modul_slug,dezactivat`),
   ])

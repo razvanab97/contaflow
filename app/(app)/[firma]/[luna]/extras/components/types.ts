@@ -5,14 +5,30 @@ export interface Tx {
   referinta: string|null
   categorie: string; document_id: string|null; note: string|null; status_note: string|null
   motiv_ignorare?: string|null; ignorat_auto?: boolean
-  documente: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }|null
-  documenteToate?: { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string }[]
+  documente: DocTx|null
+  documenteToate?: DocTx[]
   sugestieFactura?: { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_factura:string|null; created_at?:string }|null
-  sugestieInbox?: { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_document:string|null }|null
+  sugestieInbox?: { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; valuta?:string|null; data_document:string|null; suma_ron?:number|null; curs_bnr?:number|null }|null
   sugestieBon?: { id:string; fisier_nume:string; comerciant:string|null; cui_client:string|null; suma:number|null; data_bon:string|null; tip:'combustibil'|'altul'; created_at?:string }|null
+  // O singura plata acoperita de mai multe facturi (tipic eMAG: 2-3 facturi pe aceeasi comanda)
+  sugestieGrup?: { ids:string[]; suma:number; docs:{ id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_document:string|null; numar_document?:string|null }[] }|null
 }
 
-export interface InboxCandidat { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; valuta:string; monedaDiferita:boolean; data_document:string|null; diferentaSuma:number|null; sursa:'local'|'gmail'|'oblio'|'bonuri'|'altele' }
+// Documentele in valuta raman in moneda lor (suma/valuta); suma_ron/curs_bnr = echivalentul la cursul
+// BNR din ziua documentului, calculat de server doar pentru afisare.
+export interface DocTx { id:string; tip_document:string; furnizor:string; numar_document:string; fisier_nume:string; suma?:number|null; valuta?:string|null; data_document?:string|null; suma_ron?:number|null; curs_bnr?:number|null }
+
+export interface InboxCandidat { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; valuta:string; monedaDiferita:boolean; data_document:string|null; diferentaSuma:number|null; suma_ron?:number|null; curs_bnr?:number|null; sursa:'local'|'gmail'|'oblio'|'bonuri'|'altele' }
+
+// "18.00 EUR" + "≈ 94.74 lei · curs BNR 5.2636 din 15.09.2026" (a doua parte doar pentru valuta).
+export function sumaDocument(d: { suma?:number|null; valuta?:string|null; data_document?:string|null; suma_ron?:number|null; curs_bnr?:number|null }): { principal: string|null; lei: string|null } {
+  if (d.suma == null) return { principal: null, lei: null }
+  const valuta = (d.valuta || 'RON').toUpperCase()
+  const principal = `${Number(d.suma).toFixed(2)} ${valuta}`
+  if (valuta === 'RON' || d.suma_ron == null || d.curs_bnr == null) return { principal, lei: null }
+  const data = d.data_document ? ` din ${d.data_document.slice(8, 10)}.${d.data_document.slice(5, 7)}.${d.data_document.slice(0, 4)}` : ''
+  return { principal, lei: `≈ ${d.suma_ron.toFixed(2)} lei · curs BNR ${d.curs_bnr.toFixed(4)}${data}` }
+}
 
 export const SURSA_LABEL: Record<'toate'|'local'|'gmail'|'oblio'|'bonuri'|'altele', string> = { toate:'Toate', local:'Local', gmail:'Gmail', oblio:'e-Factură (Oblio)', bonuri:'Bonuri', altele:'Altele' }
 
@@ -53,8 +69,9 @@ export function txStatus(tx: Tx): 'asociata'|'neasociata'|'ignorata' {
 
 // Sugestia activa, cu prioritatea exacta deja folosita in productie: factura > bon > inbox.
 export type ActiveSuggestion = {
-  tip: 'factura'|'bon'|'inbox'
+  tip: 'factura'|'bon'|'inbox'|'grup'
   id: string
+  ids?: string[]
   label: string
   detaliu: string
   sumaPotrivita: boolean
@@ -103,12 +120,27 @@ export function getActiveSuggestion(tx: Tx): ActiveSuggestion | null {
   }
   if (tx.sugestieInbox) {
     const s = tx.sugestieInbox
-    const suma = sumaLabel(s.suma, tx.suma)
+    const valuta = (s.valuta || 'RON').toUpperCase()
+    const conv = sumaDocument(s)
+    const suma = valuta === (tx.valuta || 'RON').toUpperCase() || !conv.principal
+      ? sumaLabel(s.suma, tx.suma)
+      : { text: `${conv.principal}${conv.lei ? ` (${conv.lei})` : ''}`, exacta: false }
     return {
       tip: 'inbox', id: s.id,
       label: 'Am găsit o factură în Inbox Facturi care se potrivește',
       detaliu: [s.furnizor, suma.text].filter(Boolean).join(' · ') || s.fisier_nume,
       sumaPotrivita: suma.exacta,
+      dataPotrivita: false,
+    }
+  }
+  if (tx.sugestieGrup) {
+    const g = tx.sugestieGrup
+    const furnizor = (f: string|null) => (f || '').split('|')[0].trim()
+    return {
+      tip: 'grup', id: g.ids[0], ids: g.ids,
+      label: `Am găsit ${g.ids.length} facturi care împreună dau suma plății`,
+      detaliu: g.docs.map(d => [furnizor(d.furnizor), d.numar_document && `nr. ${d.numar_document}`, d.suma != null && `${Number(d.suma).toFixed(2)} RON`].filter(Boolean).join(' · ')).join('  +  ') + `  =  ${g.suma.toFixed(2)} RON`,
+      sumaPotrivita: Math.abs(g.suma - tx.suma) < 0.01,
       dataPotrivita: false,
     }
   }
@@ -119,4 +151,5 @@ export const SUGGESTION_ENDPOINT: Record<ActiveSuggestion['tip'], { url: string;
   factura: { url: '/api/facturi-asteptate/asociaza', idKey: 'facturaId' },
   bon: { url: '/api/bonuri/asociaza', idKey: 'bonId' },
   inbox: { url: '/api/inbox-facturi/asociaza', idKey: 'facturaId' },
+  grup: { url: '/api/inbox-facturi/asociaza', idKey: 'facturaId' },
 }

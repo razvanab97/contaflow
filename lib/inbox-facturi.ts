@@ -4,6 +4,8 @@ import { FIRMA_CONFIGS } from '@/lib/firma-config'
 import { pdfPageCount, extractPageRange } from '@/lib/pdfBatch'
 import { isEonApartment99, isEonInvoice, keepOnlyFirstPage } from '@/lib/eonInvoice'
 import { finalizeazaDocument } from '@/lib/denumire-document'
+import { diferentaSuma, furnizorInDescriere } from '@/lib/tranzactii-potrivire'
+import { cursuriBnrSigur } from '@/lib/curs-bnr'
 
 type SupabaseService = ReturnType<typeof import('@/lib/supabase/server').getServiceSupabase>
 
@@ -25,7 +27,7 @@ export const CUI_ALTERNATIVE: Record<string, string[]> = {
   abxhomes: ['51842895'],
 }
 
-type ExtractieInbox = {
+export type ExtractieInbox = {
   firmaSlug: string | null
   firmaCui: string | null
   incredereFirma: 'sigur' | 'posibil' | 'necunoscut'
@@ -85,6 +87,19 @@ function normalizeText(value: string | null | undefined) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
+}
+
+// Moneda ca cod ISO ("€"/"euro" -> EUR, "lei" -> RON etc.). Un raspuns nerecunoscut devine null,
+// nu RON - altfel o factura de 18 EUR s-ar salva tacit ca 18 RON si n-ar mai putea fi potrivita
+// cu plata ei (convertita in lei la cursul bancii).
+export function normalizeazaMoneda(value: unknown): string | null {
+  const v = String(value ?? '').trim().toUpperCase()
+  if (!v) return null
+  if (v === '€' || v.includes('EUR')) return 'EUR'
+  if (v === '$' || v.includes('USD') || v.includes('DOLLAR') || v === 'US$') return 'USD'
+  if (v === '£' || v.includes('GBP')) return 'GBP'
+  if (v === 'LEI' || v.includes('RON')) return 'RON'
+  return /^[A-Z]{3}$/.test(v) ? v : null
 }
 
 function normalizeDocumentNo(value: string | null | undefined) {
@@ -230,7 +245,8 @@ async function analyzeInvoice(bytes: Uint8Array, mediaType: string, candidates: 
         source,
         { type: 'text', text: `Acesta este un document contabil primit in inbox (factura, chitanta, invoice, e-Factura sau document similar). Identifica pentru care dintre firmele noastre este documentul, folosind mai ales CUI/CIF/cod fiscal si apoi numele firmei. O firma poate avea mai multe CUI-uri valide - lista completa e in "cuiValide"; orice CUI din acea lista gasit pe document conteaza ca potrivire sigura pentru firma respectiva. Firme disponibile: ${JSON.stringify(firme)}.
 Raspunde DOAR cu JSON:
-{"firmaSlug":"slug-ul firmei sau null","firmaCui":"CUI/CIF gasit pe document pentru firma noastra sau null","incredereFirma":"sigur|posibil|necunoscut","esteFactura":true,"furnizor":"emitent/furnizor sau null","numarDocument":"seria si numarul facturii/documentului sau null","suma":123.45,"moneda":"RON|EUR|HUF|BGN sau null","dataDocument":"AAAA-LL-ZZ sau null","locatie":"apartamentul/adresa/locul de consum daca apare (ex: Ap. 99), altfel null","tipDocument":"factura|chitanta|invoice|altul","motiv":"pe scurt de ce ai ales firma"}.
+{"firmaSlug":"slug-ul firmei sau null","firmaCui":"CUI/CIF gasit pe document pentru firma noastra sau null","incredereFirma":"sigur|posibil|necunoscut","esteFactura":true,"furnizor":"emitent/furnizor sau null","numarDocument":"seria si numarul facturii/documentului sau null","suma":123.45,"moneda":"codul ISO al monedei totalului: RON|EUR|USD|GBP|HUF|BGN|PLN sau null","dataDocument":"AAAA-LL-ZZ sau null","locatie":"apartamentul/adresa/locul de consum daca apare (ex: Ap. 99), altfel null","tipDocument":"factura|chitanta|invoice|altul","motiv":"pe scurt de ce ai ales firma"}.
+Moneda este cea in care e exprimat totalul de plata pe document, NU moneda tarii firmei noastre: simbolul € sau "EUR"/"euro" = EUR, $ sau "USD" = USD, £ = GBP, "lei"/"RON" = RON. Nu converti suma - pastreaz-o exact cum apare, in moneda documentului.
 Nu inventa valori. Daca documentul contine mai multe firme, firma noastra este beneficiarul/cumparatorul, nu furnizorul.
 Accepta furnizori externi/straini (de exemplu ISO/Maxy/Verk/Jumbo/Anthropic/OpenAI), dar numai daca documentul indica una dintre firmele noastre ca beneficiar/cumparator, prin CUI/CIF, nume firma sau adresa. Daca documentul pare personal sau pentru alta entitate, seteaza firmaSlug si firmaCui null, incredereFirma necunoscut.
 Pentru Maxy si Verk accepta doar facturi reale cu numar/serie care incepe cu "FS"; proformele sau documentele cu alt prefix nu sunt utile si trebuie marcate cu "esteFactura":false.
@@ -249,7 +265,7 @@ Nu importa AWB-uri, etichete de transport, packing list, shipping documents sau 
       furnizor: typeof parsed.furnizor === 'string' ? parsed.furnizor : null,
       numarDocument: typeof parsed.numarDocument === 'string' ? parsed.numarDocument : null,
       suma: typeof parsed.suma === 'number' ? parsed.suma : null,
-      moneda: typeof parsed.moneda === 'string' ? parsed.moneda : null,
+      moneda: normalizeazaMoneda(parsed.moneda),
       dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
       locatie: typeof parsed.locatie === 'string' ? parsed.locatie : null,
       tipDocument: typeof parsed.tipDocument === 'string' ? parsed.tipDocument : 'factura',
@@ -287,6 +303,8 @@ export async function importInboxDocument({
   luna,
   sourceLabel,
   requireDetectedFirm = false,
+  extractie,
+  tranzactie,
 }: {
   sb: SupabaseService
   bytes: Uint8Array
@@ -297,6 +315,11 @@ export async function importInboxDocument({
   luna: string
   sourceLabel?: string | null
   requireDetectedFirm?: boolean
+  // Extragerea AI deja facuta pentru acest fisier (evita un al doilea apel AI la reincercare).
+  extractie?: ExtractieInbox | null
+  // Plata bancara deja identificata pentru document (vezi firmaDupaPlata) - se leaga direct de ea
+  // cand potrivirea automata la ban nu o gaseste (ex. 72.22 pe factura, 72.17 platit).
+  tranzactie?: { id: string; extras_id: string | null; data_tranzactie: string } | null
 }): Promise<InboxImportResult> {
   if (isNonInvoiceName(originalName)) {
     return {
@@ -341,7 +364,7 @@ export async function importInboxDocument({
     }
   }
 
-  let extracted = await analyzeInvoice(bytes, mediaType, candidates)
+  let extracted = extractie !== undefined ? extractie : await analyzeInvoice(bytes, mediaType, candidates)
   if (extracted && !extracted.esteFactura) {
     return {
       duplicate: false,
@@ -368,7 +391,19 @@ export async function importInboxDocument({
   }
   const byCui = candidates.find(f => f.cuiToate.some(c => norm(c) && norm(c) === norm(extracted?.firmaCui)))
   const bySlug = candidates.find(f => f.slug === extracted?.firmaSlug)
-  const detected = extracted?.incredereFirma === 'sigur' ? (byCui || bySlug) : byCui || null
+  let detected = extracted?.incredereFirma === 'sigur' ? (byCui || bySlug) : byCui || null
+  // Firma nu apare pe factura (ex. utilitati emise pe numele chiriasului): o deducem din plata din
+  // extras, daca exact o firma are plata catre acel furnizor (vezi firmaDupaPlata). Valabil pentru
+  // orice sursa (folder local, Gmail) si orice firma.
+  if (requireDetectedFirm && !detected && extracted?.esteFactura) {
+    const plata = await firmaDupaPlata(sb, extracted)
+    const firmaPlata = plata ? candidates.find(f => f.id === plata.firmaId) : null
+    if (plata && firmaPlata) {
+      detected = firmaPlata
+      tranzactie = tranzactie || plata.tranzactie
+      sourceLabel = `${sourceLabel || 'Inbox'} · firmă dedusă din plata din extras`
+    }
+  }
   if (requireDetectedFirm && !detected) {
     return {
       duplicate: false,
@@ -395,6 +430,7 @@ export async function importInboxDocument({
     return { duplicate: true, doc: existingByMetadata, extracted, targetFirma: target?.nume || currentFirma?.nume || null, source: sourceLabel || null }
   }
   const match = await findMatchingTransaction(sb, target?.id || firmaId, extracted)
+    || (tranzactie ? { tx: tranzactie, score: 80, details: 'firma și plata deduse din extrasul bancar (furnizor + sumă + dată)' } : null)
   // Luna de LUCRU in care intra factura = luna urmatoare datei ei: o factura din septembrie tine de
   // contabilitatea lui septembrie, care se lucreaza in octombrie (vezi lib/accounting-period.ts) -
   // acolo e si extrasul din septembrie cu plata ei. Fara data pe document: luna de lucru curenta.
@@ -498,6 +534,28 @@ export async function importInboxDocument({
   return { duplicate: false, doc, extracted, targetFirma: target?.nume || currentFirma?.nume || null, source: sourceLabel || null }
 }
 
+// Factura fara firma noastra pe ea (ex. DIGI/utilitati emise pe numele chiriasului, fara CUI) nu
+// poate fi atribuita dupa CUI - dar daca exact una dintre firme are in extras o plata deschisa catre
+// acel furnizor, cu aceeasi suma (sau echivalentul BNR, pentru valuta) si la o data apropiata,
+// plata arata cine a platit-o. Intoarce firma (si plata, cand e una singura) sau null la orice dubiu.
+export async function firmaDupaPlata(sb: SupabaseService, extracted: ExtractieInbox | null | undefined): Promise<{ firmaId: string; tranzactie: { id: string; extras_id: string | null; data_tranzactie: string } | null } | null> {
+  if (!extracted?.suma || !extracted.dataDocument || !extracted.furnizor) return null
+  const zi = (d: string, plus: number) => new Date(new Date(d + 'T00:00:00Z').getTime() + plus * 86400000).toISOString().slice(0, 10)
+  const { data } = await sb.from('tranzactii')
+    .select('id,firma_id,extras_id,data_tranzactie,descriere,descriere_curatata,referinta,suma,valuta,tip,document_id,note')
+    .is('document_id', null)
+    .eq('tip', 'debit')
+    .gte('data_tranzactie', zi(extracted.dataDocument, -5))
+    .lte('data_tranzactie', zi(extracted.dataDocument, 45))
+    .limit(1000)
+  const doc = { suma: Math.abs(Number(extracted.suma)), valuta: extracted.moneda || 'RON', data_document: extracted.dataDocument, furnizor: extracted.furnizor }
+  const curs = (doc.valuta || 'RON').toUpperCase() !== 'RON' ? await cursuriBnrSigur([doc.data_document]) : null
+  const potrivite = (data || []).filter(tx => tx.note !== 'na' && furnizorInDescriere(doc.furnizor, tx) && diferentaSuma(doc, tx, curs))
+  const firme = [...new Set(potrivite.map(tx => tx.firma_id))]
+  if (firme.length !== 1) return null
+  return { firmaId: firme[0], tranzactie: potrivite.length === 1 ? potrivite[0] : null }
+}
+
 type SegmentDocument = { pageStart: number; pageEnd: number }
 
 // Peste acest numar de pagini merita verificat daca fisierul e de fapt un pachet cu mai multe
@@ -519,15 +577,27 @@ export async function detecteazaDocumenteMultiple(bytes: Uint8Array): Promise<Se
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: Buffer.from(bytes).toString('base64') } },
         { type: 'text', text: `Acest fișier poate conține FIE un singur document contabil (factură/chitanță), posibil pe mai multe pagini, FIE mai multe documente complet separate, unul după altul (de exemplu un export în bloc din ANAF SPV sau Oblio, cu facturi de la furnizori diferiți, de obicei câte una pe pagină).
 Analizează fiecare pagină și determină unde începe fiecare document nou - o pagină cu un antet nou de factură/chitanță (furnizor, număr de document, dată proprii) e un document nou, chiar dacă formatul vizual seamănă cu pagina anterioară.
-Returnează DOAR JSON, fără alt text: {"documente":[{"pageStart":1,"pageEnd":1},{"pageStart":2,"pageEnd":2}]} - pageStart/pageEnd sunt numere de pagină începând de la 1, inclusiv. Dacă tot fișierul e UN SINGUR document, returnează un singur element care acoperă toate paginile.` },
+Paginile de detalii/anexe ale aceleiași facturi (ex. "detalii factura" pe fiecare număr de telefon, cu ACELAȘI număr de factură în antet) NU sunt documente noi - fac parte din factura respectivă.
+Returnează DOAR JSON, fără alt text: {"documente":[{"pageStart":1,"pageEnd":1,"numarDocument":"seria si numarul sau null"},{"pageStart":2,"pageEnd":2,"numarDocument":"..."}]} - pageStart/pageEnd sunt numere de pagină începând de la 1, inclusiv. Dacă tot fișierul e UN SINGUR document, returnează un singur element care acoperă toate paginile.` },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
-    const parsed = extractJson<{ documente?: SegmentDocument[] }>(raw)
+    const parsed = extractJson<{ documente?: (SegmentDocument & { numarDocument?: string | null })[] }>(raw)
     const segmente = (parsed?.documente || [])
       .filter(s => Number.isFinite(s?.pageStart) && Number.isFinite(s?.pageEnd) && s.pageStart >= 1 && s.pageEnd >= s.pageStart)
       .sort((a, b) => a.pageStart - b.pageStart)
-    return segmente.length ? segmente : null
+    // Regula: paginile consecutive cu ACELASI numar de factura sunt o singura factura (ex. factura
+    // Orange de 19 pagini, cu cate o pagina de detalii pe fiecare numar de telefon) - se lipesc la loc.
+    const unite: SegmentDocument[] = []
+    let ultimNr: string | null = null
+    for (const seg of segmente) {
+      const nr = normalizeDocumentNo(seg.numarDocument) || null
+      const prev = unite[unite.length - 1]
+      if (prev && nr && nr === ultimNr) prev.pageEnd = Math.max(prev.pageEnd, seg.pageEnd)
+      else unite.push({ pageStart: seg.pageStart, pageEnd: seg.pageEnd })
+      ultimNr = nr
+    }
+    return unite.length ? unite : null
   } catch {
     return null
   }

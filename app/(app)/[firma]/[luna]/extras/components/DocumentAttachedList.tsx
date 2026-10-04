@@ -2,7 +2,7 @@
 import { deschideDocument } from '@/lib/vizualizare'
 import { useState } from 'react'
 import type { Tx } from './types'
-import { isPreviewable, shortReference } from './types'
+import { isPreviewable, shortReference, sumaDocument } from './types'
 import DocumentUpload from './DocumentUpload'
 import DocumentLinkInput from './DocumentLinkInput'
 
@@ -69,6 +69,16 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
                   {(doc.furnizor || doc.numar_document) && (
                     <div style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)', marginTop:'2px' }}>{[doc.furnizor, doc.numar_document && `nr. ${doc.numar_document}`].filter(Boolean).join(' · ')}</div>
                   )}
+                  {(() => {
+                    const s = sumaDocument(doc)
+                    if (!s.principal) return null
+                    return (
+                      <div style={{ marginTop:'4px' }}>
+                        <div style={{ fontSize:'var(--fs-sm)', fontWeight:700, color:'var(--text-primary)' }}>{s.principal}</div>
+                        {s.lei && <div style={{ fontSize:'var(--fs-xs)', color:'var(--text-muted)' }}>{s.lei}</div>}
+                      </div>
+                    )
+                  })()}
                 </div>
                 {kind && <button onClick={() => togglePreview(doc.id)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color: open ? 'var(--text-primary)' : 'var(--accent)', background:'transparent', border:'none', cursor:'pointer', flexShrink:0 }}>{open ? 'Ascunde' : 'Vezi'}</button>}
                 <a href={`/api/tranzactii/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--accent)', flexShrink:0 }}>↓</a>

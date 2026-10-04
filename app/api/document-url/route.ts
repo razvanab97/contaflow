@@ -36,12 +36,17 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
 
   let path: string | null = null, nume = 'document', tip: string | null = null
+  let bucket = 'documente'
   const ruta = RUTE[tinta.pathname]
   if (ruta) {
     const id = tinta.searchParams.get(ruta.param)
     if (!id) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
     const { data } = await sb.from(ruta.tabel).select('*').eq('id', id).single() // '*': unele tabele nu au fisier_tip
     if (data) { path = data.fisier_path; nume = data.fisier_nume || nume; tip = data.fisier_tip || null }
+  } else if (tinta.pathname === '/api/extras/pdf-download') {
+    // PDF-ul original al extrasului de cont (tab-ul Extras PDF) - sta in bucket-ul extrase-pdf
+    const { data } = await sb.from('extrase').select('pdf_path,pdf_nume').eq('id', tinta.searchParams.get('extrasId') || '').single()
+    if (data) { path = data.pdf_path; nume = data.pdf_nume || 'extras.pdf'; tip = 'application/pdf'; bucket = 'extrase-pdf' }
   } else if (tinta.pathname === '/api/firma-date/download') {
     const t = tinta.searchParams.get('tip')
     if (t === 'certificat') {
@@ -54,7 +59,7 @@ export async function GET(req: NextRequest) {
   }
   if (!path) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
 
-  const { data: semnat, error } = await sb.storage.from('documente').createSignedUrl(path, 3600)
+  const { data: semnat, error } = await sb.storage.from(bucket).createSignedUrl(path, 3600)
   if (error || !semnat?.signedUrl) return NextResponse.json({ error: error?.message || 'Link indisponibil' }, { status: 500 })
   return NextResponse.json({ url: semnat.signedUrl, nume, tip: mimeDin(nume || path, tip) }, { headers: { 'Cache-Control': 'private, max-age=600' } })
 }

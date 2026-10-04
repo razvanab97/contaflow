@@ -67,7 +67,10 @@ export default function ExtrasWorkspace({
     if (!activeSuggestion) return
     setSugestieBusy(true)
     const { url, idKey } = SUGGESTION_ENDPOINT[activeSuggestion.tip]
-    await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ [idKey]: activeSuggestion.id, tranzactieId: activeTx.id }) })
+    // grup (ex. 3 facturi eMAG pe aceeasi plata): le atasam pe rand - prima devine documentul principal
+    for (const id of activeSuggestion.ids || [activeSuggestion.id]) {
+      await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ [idKey]: id, tranzactieId: activeTx.id }) })
+    }
     setSugestieBusy(false)
     onUploadSuccess(activeTx.id)
   }

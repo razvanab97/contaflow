@@ -44,6 +44,11 @@ export default function UploadExtras({ valuta, extrasId, firmaId, lunaId, extras
       const details = Array.isArray(d.results) && d.results.length > 1
         ? d.results.map((result: { count:number; valuta:string }) => `${result.count} ${result.valuta}`).join(' + ')
         : `${d.count} tranzacții · ${d.valuta || valuta}`
+      // Textul complet al fiecarei tranzactii (comerciant, oras, nr. comanda) se citeste separat,
+      // pe bucati de pagini in paralel - in acelasi apel cu importul ar depasi limita de timp.
+      setStatus(`✓ ${details} · citesc detaliile din extras...`)
+      const ids: string[] = Array.isArray(d.results) ? d.results.map((result: { extrasId: string }) => result.extrasId) : [d.extrasId]
+      await Promise.all(ids.filter(Boolean).map(id => fetch('/api/extras/detalii', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ extrasId: id }) }).catch(() => null)))
       setStatus(`✓ ${details}`)
       onDone()
     }

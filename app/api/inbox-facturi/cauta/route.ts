@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { cursuriBnrSigur, inLei } from '@/lib/curs-bnr'
 
 type Sursa = 'local' | 'gmail' | 'oblio' | 'bonuri' | 'altele'
 
@@ -60,8 +61,10 @@ export async function GET(req: NextRequest) {
   if (bonuriError) return NextResponse.json({ error: bonuriError.message }, { status: 500 })
 
   const target = suma !== null && Number.isFinite(suma) ? Math.abs(suma) : null
+  const curs = await cursuriBnrSigur((docs || []).filter(d => (d.valuta || 'RON').toUpperCase() !== 'RON').map(d => d.data_document))
   let candidates = (docs || []).map(d => {
     const valuta = (d.valuta || 'RON').toUpperCase()
+    const conv = inLei(curs, d.suma, valuta, d.data_document)
     // Compararea directa a sumelor are sens doar daca sunt in aceeasi moneda - altfel o factura
     // de 10 USD ar parea gresit "departe" de o tranzactie de 46 RON, cand de fapt e conversia
     // exacta a aceleiasi sume, doar ca banca a convertit-o la plata cu cardul.
@@ -72,7 +75,12 @@ export async function GET(req: NextRequest) {
       furnizor: furnizorCurat(d.furnizor),
       sursa: detecteazaSursa(d.furnizor) as Sursa,
       monedaDiferita,
-      diferentaSuma: target !== null && d.suma != null && !monedaDiferita ? Math.abs(Number(d.suma) - target) : null,
+      // Factura in valuta vs. plata in lei: comparam prin echivalentul BNR din ziua facturii.
+      diferentaSuma: target !== null && d.suma != null
+        ? !monedaDiferita ? Math.abs(Number(d.suma) - target) : conv && valutaTx === 'RON' ? Math.abs(conv.sumaRon - target) : null
+        : null,
+      suma_ron: conv?.sumaRon ?? null,
+      curs_bnr: conv?.curs ?? null,
     }
   })
 
@@ -91,6 +99,8 @@ export async function GET(req: NextRequest) {
       sursa: 'bonuri' as Sursa,
       monedaDiferita,
       diferentaSuma: target !== null && b.suma != null && !monedaDiferita ? Math.abs(Number(b.suma) - target) : null,
+      suma_ron: null,
+      curs_bnr: null,
     }
   }))
 

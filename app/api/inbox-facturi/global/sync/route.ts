@@ -103,7 +103,8 @@ export async function POST(req: NextRequest) {
   const luna = currentWorkMonthKey()
 
   if (body?.reincearca) {
-    await sb.from('inbox_watch_files').update({ status: 'pending', error_message: null }).eq('id', String(body.reincearca)).eq('status', 'eroare')
+    // si "nedetectat": o factura fara firma pe ea poate fi atribuita dupa plata, odata ce extrasul e importat
+    await sb.from('inbox_watch_files').update({ status: 'pending', error_message: null }).eq('id', String(body.reincearca)).in('status', ['eroare', 'nedetectat'])
   }
 
   const { data: anyFirma } = await sb.from('firme').select('id').eq('activa', true).limit(1).single()

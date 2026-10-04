@@ -8,6 +8,7 @@ import { shortReference } from './components/types'
 import ExtrasHeader from './components/ExtrasHeader'
 import ExtrasStats from './components/ExtrasStats'
 import ExtrasImportPanel from './components/ExtrasImportPanel'
+import ExtrasPdfTab from './components/ExtrasPdfTab'
 import ExtrasWorkspace from './components/ExtrasWorkspace'
 import NextStepNav from '../NextStepNav'
 import { motivSugerat, ignorareDeVerificat, MOTIV_LABEL } from '@/lib/tranzactii-reguli'
@@ -24,7 +25,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   firma: Firma; lunaId: string; luna: string; lunaLabel: string; extrase: Extras[]; slug: string; facturiTasks: TaskItem[]; extrasFinalizat: boolean
   nextLabel?: string | null; nextHref?: string | null
 }) {
-  const [pageTab, setPageTab] = useState<'extras'|'facturi'|'note'>('extras')
+  const [pageTab, setPageTab] = useState<'extras'|'facturi'|'note'|'pdf'>('extras')
   const [finalizat, setFinalizat] = useState(initFinalizat)
   const [finalizing, setFinalizing] = useState(false)
   const [txs, setTxs] = useState<Tx[]>([])
@@ -297,6 +298,8 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
 
       {pageTab === 'facturi' ? (
         <FacturiModule firma={firma} lunaId={lunaId} tasks={facturiTasks} section="facturi-chitanta"/>
+      ) : pageTab === 'pdf' ? (
+        <ExtrasPdfTab extrase={extrase} lunaLabel={lunaLabel} firmaId={firma.id} lunaId={lunaId} onImport={() => setImportOpen(true)} onChanged={afterImport} />
       ) : pageTab === 'note' ? (
         <NoteTranzactii
           txs={txs}

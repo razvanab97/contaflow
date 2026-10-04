@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { matchBonuri, matchFacturiAsteptate, matchInboxFacturi } from '@/lib/tranzactii-potrivire'
+import { matchBonuri, matchFacturiAsteptate, matchInboxFacturi, matchGrupuriInbox, cuEchivalentLei } from '@/lib/tranzactii-potrivire'
+import { cursuriBnrSigur } from '@/lib/curs-bnr'
 
 const SB = 'https://aqlmuoaaipbanjdptleg.supabase.co/rest/v1'
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
   const documentsById = new Map<string, any>()
   if (documentIds.length > 0) {
     const dRes = await fetch(
-      `${SB}/documente?id=in.(${documentIds.join(',')})&select=id,tip_document,furnizor,numar_document,fisier_nume`,
+      `${SB}/documente?id=in.(${documentIds.join(',')})&select=id,tip_document,furnizor,numar_document,fisier_nume,suma,valuta,data_document`,
       { headers: H }
     )
     if (!dRes.ok)
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
   const allDocsByTx = new Map<string, any[]>()
   if (txIds.length > 0) {
     const adRes = await fetch(
-      `${SB}/documente?tranzactie_id=in.(${txIds.join(',')})&select=id,tranzactie_id,tip_document,furnizor,numar_document,fisier_nume&order=created_at`,
+      `${SB}/documente?tranzactie_id=in.(${txIds.join(',')})&select=id,tranzactie_id,tip_document,furnizor,numar_document,fisier_nume,suma,valuta,data_document&order=created_at`,
       { headers: H }
     )
     if (adRes.ok) {
@@ -71,13 +72,25 @@ export async function GET(req: NextRequest) {
   const sugestii = lunaRow?.firma_id ? await matchFacturiAsteptate(lunaRow.firma_id, all) : new Map<string, any>()
   const sugestiiInbox = lunaRow?.firma_id ? await matchInboxFacturi(lunaRow.firma_id, all) : new Map<string, any>()
   const sugestiiBon = lunaRow?.firma_id ? await matchBonuri(lunaRow.firma_id, all) : new Map<string, any>()
+  // O plata = mai multe facturi (tipic eMAG) - doar pentru tranzactiile fara sugestie simpla, si fara
+  // facturile deja propuse altor tranzactii.
+  const sugestiiGrup = lunaRow?.firma_id ? await matchGrupuriInbox(lunaRow.firma_id, all, {
+    tx: new Set([...sugestii.keys(), ...sugestiiInbox.keys(), ...sugestiiBon.keys()]),
+    docs: new Set([...sugestiiInbox.values()].map((d: any) => d.id)),
+  }) : new Map<string, any>()
+
+  // Documentele in valuta (ex. factura 18 EUR) raman in moneda lor; adaugam doar echivalentul in lei
+  // la cursul BNR din ziua documentului, pentru afisare.
+  const docsValuta = [...documentsById.values(), ...[...allDocsByTx.values()].flat()].filter(d => (d.valuta || 'RON').toUpperCase() !== 'RON')
+  const curs = await cursuriBnrSigur(docsValuta.map(d => d.data_document))
 
   return NextResponse.json(all.map(tx => ({
     ...tx,
-    documente: tx.document_id ? documentsById.get(tx.document_id) || null : null,
-    documenteToate: allDocsByTx.get(tx.id) || [],
+    documente: tx.document_id && documentsById.get(tx.document_id) ? cuEchivalentLei(documentsById.get(tx.document_id), curs) : null,
+    documenteToate: (allDocsByTx.get(tx.id) || []).map(d => cuEchivalentLei(d, curs)),
     sugestieFactura: sugestii.get(tx.id) || null,
     sugestieInbox: sugestiiInbox.get(tx.id) || null,
     sugestieBon: sugestiiBon.get(tx.id) || null,
+    sugestieGrup: sugestiiGrup.get(tx.id) || null,
   })))
 }
