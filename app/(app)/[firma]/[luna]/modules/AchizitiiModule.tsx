@@ -1,4 +1,5 @@
 'use client'
+import VeziButon from '@/components/ui/VeziButon'
 import { useEffect, useState, useCallback } from 'react'
 import ProiectWorkflow from '@/components/ProiectWorkflow'
 import SincronizareProiectMail from './proiect-mail/SincronizareProiectMail'
@@ -72,6 +73,7 @@ function AchizitieDocumente({ achizitieId, culoare, etapaCuranta }: { achizitieI
       {docs.map(d => (
         <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-xs)', color: 'var(--c-999999)' }}>
           <span style={{ padding: '1px 6px', borderRadius: 'var(--r-full)', background: 'var(--c-1a1a1a)', fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)' }}>{STATUS_LABEL[d.tip_document] || d.tip_document}</span>
+          <VeziButon url={`/api/chitante/document?id=${d.id}`} />
           <a href={`/api/chitante/document?id=${d.id}`} style={{ color:'var(--accent)', textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</a>
           <button onClick={() => remove(d.id)} style={{ color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 'var(--fs-xs)' }}>✕</button>
         </div>

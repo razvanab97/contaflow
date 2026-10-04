@@ -1,4 +1,6 @@
 'use client'
+import VeziButon from '@/components/ui/VeziButon'
+import { deschideDocument } from '@/lib/vizualizare'
 import ConcluzieEmag from './ConcluzieEmag'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
@@ -61,7 +63,8 @@ function AvizRow({ item, lunaId, firmaId, culoare }: { item:ChecklistItem; lunaI
   const t = item.checklist_templates
 
   function togglePreview(id: string) {
-    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+    // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
+    deschideDocument(`/api/checklist/docs?docId=${encodeURIComponent(id)}`)
   }
 
   const loadDocs = useCallback(async () => {
@@ -240,7 +243,7 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, currency, onChange }: {
               onBlur={e => renameFacturaFisier(e.target.value.trim())}
               style={{ width:'130px', fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--success)', background:'transparent', border:'none', outline:'none', padding:0 }}
             />
-            {kind && <button onClick={() => setPreview(v => !v)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi'}</button>}
+            {kind && <button onClick={() => deschideDocument(`/api/emag?docId=${encodeURIComponent(inv.factura_document_id!)}`)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi'}</button>}
             <a href={`/api/emag?docId=${encodeURIComponent(inv.factura_document_id)}`} style={{ fontSize:'var(--fs-xs)', color:'var(--accent)' }}>↓</a>
             <button onClick={removeFactura} style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
           </div>
@@ -404,7 +407,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                   />
                 </div>
                 <div style={{ display:'flex', gap:'12px', alignItems:'center', flexShrink:0 }}>
-                  <button onClick={() => setPreview(v => !v)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi aviz'}</button>
+                  <button onClick={() => deschideDocument(`/api/emag?docId=${encodeURIComponent(data!.documentId!)}`)} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color: preview ? 'var(--c-dddddd)' : 'var(--accent)', background:'transparent', border:'none', cursor:'pointer' }}>{preview ? 'Ascunde' : 'Vezi aviz'}</button>
                   <a href={`/api/emag/aviz/pdf?documentId=${encodeURIComponent(data!.documentId!)}`} style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--accent)' }}>↓ PDF (aviz + facturi)</a>
                   <button onClick={removeAviz} style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', background:'transparent', border:'none', cursor:'pointer' }}>✕</button>
                 </div>
@@ -428,6 +431,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                   {orphanInvoices.map(inv => (
                     <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'var(--fs-xs)', color:'var(--c-888888)', padding:'3px 0' }}>
                       <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.numar_document || inv.fisier_nume}</span>
+                      <VeziButon url={`/api/emag?docId=${encodeURIComponent(inv.id)}`} />
                       <a href={`/api/emag?docId=${encodeURIComponent(inv.id)}`} style={{ color:'var(--accent)', textDecoration:'none' }}>↓</a>
                     </div>
                   ))}
@@ -442,6 +446,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                   {orphanInvoices.map(inv => (
                     <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'var(--fs-xs)', color:'var(--c-888888)', padding:'3px 0' }}>
                       <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{inv.numar_document || inv.fisier_nume}</span>
+                      <VeziButon url={`/api/emag?docId=${encodeURIComponent(inv.id)}`} />
                       <a href={`/api/emag?docId=${encodeURIComponent(inv.id)}`} style={{ color:'var(--accent)', textDecoration:'none' }}>↓</a>
                     </div>
                   ))}
@@ -493,7 +498,8 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
   }, [moduleTasks])
 
   function togglePreview(id: string) {
-    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+    // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
+    deschideDocument(`/api/emag?docId=${encodeURIComponent(id)}`)
   }
 
   const load = useCallback(async () => {

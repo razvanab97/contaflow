@@ -1,4 +1,5 @@
 'use client'
+import { deschideDocument } from '@/lib/vizualizare'
 import { useEffect, useRef, useState } from 'react'
 
 type Doc = { id: string; fisier_nume: string; fisier_tip: string; fisier_marime: number; created_at: string }
@@ -23,7 +24,8 @@ export default function DocumenteGenerale() {
   const inputRef = useRef<HTMLInputElement>(null)
 
   function togglePreview(id: string) {
-    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+    // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
+    deschideDocument(`/api/documente-generale?download=${id}`)
   }
 
   const load = async () => {

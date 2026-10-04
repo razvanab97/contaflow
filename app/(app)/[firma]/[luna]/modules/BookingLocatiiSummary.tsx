@@ -1,4 +1,5 @@
 'use client'
+import VeziButon from '@/components/ui/VeziButon'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { tint } from '@/lib/colors'
 
@@ -228,6 +229,7 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
                       <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 9px', background: 'var(--c-0f0f0f)', borderRadius: 'var(--r-sm)' }}>
                         <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{docsFacturi.includes(doc) ? 'factură' : 'borderou'}</span>
                         <div style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-xs)', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{docLabel(doc)}</div>
+                        <VeziButon url={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} />
                         <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: 'var(--fs-xs)', color:'var(--accent)', textDecoration: 'none', flexShrink: 0 }}>↓</a>
                         <button onClick={() => deleteDoc(doc)} style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}>✕</button>
                       </div>
@@ -280,6 +282,7 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
                   <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{facturiFaraLocatie.includes(doc) ? 'factură' : 'borderou'}</span>
                   <div style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-xs)', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={doc.cod_unitate_booking ? `Cod necunoscut: ${doc.cod_unitate_booking}` : 'Fără cod detectat'}>{docLabel(doc)}</div>
                   <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', flexShrink: 0 }}>{doc.cod_unitate_booking ? `cod ${doc.cod_unitate_booking}` : 'fără cod'}</span>
+                  <VeziButon url={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} />
                   <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: 'var(--fs-xs)', color:'var(--accent)', textDecoration: 'none', flexShrink: 0 }}>↓</a>
                 </div>
               ))}

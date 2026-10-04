@@ -1,4 +1,5 @@
 'use client'
+import { deschideDocument } from '@/lib/vizualizare'
 import { useState } from 'react'
 import type { Tx } from './types'
 import { isPreviewable, shortReference } from './types'
@@ -18,7 +19,8 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
   const orderRef = shortReference(tx.referinta)
 
   function togglePreview(id: string) {
-    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+    // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
+    deschideDocument(`/api/tranzactii/document?id=${encodeURIComponent(id)}`)
   }
 
   // Sterge un document gresit atasat pe tranzactie - daca era documentul principal, tranzactia

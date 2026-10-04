@@ -1,4 +1,5 @@
 'use client'
+import { deschideDocument } from '@/lib/vizualizare'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import { Proprietar } from '@/lib/firma-config'
@@ -515,7 +516,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
                   <div key={w.docId} style={{ display:'flex', alignItems:'baseline', gap:'8px', flexWrap:'wrap' }}>
                     <span style={{ fontSize:'var(--fs-xs)', color:'var(--danger)' }}>⚠ {w.text}</span>
                     {w.existingDocumentId && (
-                      <a href={`/api/chitante/document?id=${encodeURIComponent(w.existingDocumentId)}&preview=1`} target="_blank" rel="noopener noreferrer" style={{ fontSize:'var(--fs-xs)', color:'#8DB8FF', whiteSpace:'nowrap' }}>Vezi factura originală ↗</a>
+                      <a href={`/api/chitante/document?id=${encodeURIComponent(w.existingDocumentId)}&preview=1`} onClick={e => { e.preventDefault(); deschideDocument(`/api/chitante/document?id=${encodeURIComponent(w.existingDocumentId || "")}`) }} style={{ fontSize:'var(--fs-xs)', color:'#8DB8FF', whiteSpace:'nowrap' }}>Vezi factura originală ↗</a>
                     )}
                   </div>
                 ))}

@@ -5,6 +5,7 @@ import type { FirmaNav } from '@/components/Sidebar'
 import Icon, { MODULE_ICONS } from '@/components/ui/Icon'
 import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
 import { etichetaLunaScurta } from '@/lib/accounting-period'
+import { deschideDocument } from '@/lib/vizualizare'
 
 interface Rezultat {
   id: string; fisierNume: string; furnizor: string | null; numarDocument: string | null
@@ -214,8 +215,9 @@ export default function CommandPalette({ open, onClose, firme, firmaAtiva, luna,
           return
         }
         onClose()
-        if (newTab) window.open(r.downloadUrl, '_blank', 'noopener')
-        else window.location.href = r.downloadUrl
+        // Enter -> vizualizatorul pop-up; Cmd/Ctrl+Enter -> descarcare directa (ca inainte)
+        if (newTab) window.location.href = r.downloadUrl
+        else deschideDocument(r.downloadUrl, r.fisierNume)
       },
     }
   }), [docs, firmaById, scope, go, onClose, q]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -320,8 +322,8 @@ export default function CommandPalette({ open, onClose, firme, firmaAtiva, luna,
 
         <div className="palette-foot">
           <span><span className="kbd">↑</span><span className="kbd">↓</span> navighează</span>
-          <span><span className="kbd">↵</span> deschide</span>
-          <span><span className="kbd">⌘↵</span> tab nou</span>
+          <span><span className="kbd">↵</span> deschide / vezi</span>
+          <span><span className="kbd">⌘↵</span> tab nou / descarcă</span>
           {firmaAtiva && <span><span className="kbd">Tab</span> toate firmele / doar firma</span>}
           <span style={{ marginLeft: 'auto' }}><span className="kbd">Esc</span> închide</span>
         </div>

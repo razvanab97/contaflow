@@ -1,4 +1,5 @@
 'use client'
+import { deschideDocument } from '@/lib/vizualizare'
 import { useState, useCallback, useRef } from 'react'
 import { tint } from '@/lib/colors'
 
@@ -38,7 +39,8 @@ export default function OldItemDocs({ item, firmaId, lunaId, culoare }: Props) {
   const t = item.checklist_templates
 
   function togglePreview(id: string) {
-    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+    // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
+    deschideDocument(`/api/checklist/docs?docId=${encodeURIComponent(id)}`)
   }
 
   const loadDocs = useCallback(async () => {

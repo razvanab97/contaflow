@@ -1,4 +1,5 @@
 'use client'
+import { deschideDocument } from '@/lib/vizualizare'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import { legibil, tint } from '@/lib/colors'
@@ -369,7 +370,8 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   }
 
   function togglePreview(id: string) {
-    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+    // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
+    deschideDocument(`/api/chitante/document?id=${encodeURIComponent(id)}`)
   }
 
   function toggleLink(docId: string) {

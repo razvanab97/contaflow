@@ -3,6 +3,7 @@ import { Inter, Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import UpdateWidget from '@/components/UpdateWidget'
 import Toaster from '@/components/ui/Toaster'
+import DocViewer from '@/components/ui/DocViewer'
 
 // Self-hostat de Next.js (fara cerere externa la Google Fonts in runtime) - subset
 // latin-ext e necesar pentru diacriticele romanesti (ă â î ș ț).
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Contor update — in layout-ul radacina, vizibil garantat pe orice pagina din aplicatie */}
         <UpdateWidget />
         <Toaster />
+        <DocViewer />
       </body>
     </html>
   )

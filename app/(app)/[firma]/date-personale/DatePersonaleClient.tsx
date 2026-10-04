@@ -1,4 +1,5 @@
 'use client'
+import { deschideDocument } from '@/lib/vizualizare'
 import { useEffect, useRef, useState } from 'react'
 import CopyButton from '@/components/CopyButton'
 
@@ -162,7 +163,7 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                 style={{ flex: 1, fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
               />
               {isPreviewable(firma.certificat_nume) && (
-                <button onClick={() => setPreviewCert(v => !v)} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: previewCert ? 'var(--c-dddddd)' : 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewCert ? 'Ascunde' : 'Vezi'}</button>
+                <button onClick={() => deschideDocument(`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`, 'Certificat de înregistrare')} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: previewCert ? 'var(--c-dddddd)' : 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewCert ? 'Ascunde' : 'Vezi'}</button>
               )}
               <a href={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
             </>
@@ -238,7 +239,7 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
                       style={{ flex: 1, fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
                     />
                     {isPreviewable(p.buletin_nume) && (
-                      <button onClick={() => toggleBuletinPreview(p.id)} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: previewBuletinIds.has(p.id) ? 'var(--c-dddddd)' : 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewBuletinIds.has(p.id) ? 'Ascunde' : 'Vezi'}</button>
+                      <button onClick={() => deschideDocument(`/api/firma-date/download?tip=buletin&proprietarId=${p.id}`, `Buletin ${p.nume || ''}`)} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: previewBuletinIds.has(p.id) ? 'var(--c-dddddd)' : 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewBuletinIds.has(p.id) ? 'Ascunde' : 'Vezi'}</button>
                     )}
                     <a href={`/api/firma-date/download?tip=buletin&proprietarId=${p.id}`} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
                   </>

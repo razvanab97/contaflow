@@ -1,4 +1,6 @@
 'use client'
+import VeziButon from '@/components/ui/VeziButon'
+import { deschideDocument } from '@/lib/vizualizare'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import CopyButton from '@/components/CopyButton'
 
@@ -231,7 +233,8 @@ export default function UploadPanel({
   }
 
   function togglePreview(id: string) {
-    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+    // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
+    deschideDocument(`/api/chitante/document?id=${encodeURIComponent(id)}`)
   }
 
   async function reconciliazaAutomat() {
@@ -366,6 +369,7 @@ export default function UploadPanel({
                             <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--success)' }}>
                               atașată{item.asociere_metoda === 'cod_rezervare' ? ' (auto · cod)' : item.asociere_metoda === 'taxa_servicii_exacta' ? ' (auto · sumă)' : ''}
                             </span>
+                            <VeziButon url={`/api/chitante/document?id=${encodeURIComponent(item.factura_document_id!)}`} />
                             <a href={`/api/chitante/document?id=${encodeURIComponent(item.factura_document_id!)}`} style={{ fontSize:'var(--fs-xs)', color:'var(--accent)', textDecoration:'none' }}>↓</a>
                             <button onClick={() => detaseazaFactura(item)} title="Detașează factura de la această rezervare" style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', background:'transparent', border:'none', cursor:'pointer', padding:0 }}>✕</button>
                           </>

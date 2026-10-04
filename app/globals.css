@@ -787,3 +787,19 @@ mark.hl { background: color-mix(in srgb, var(--brand) 26%, transparent); color: 
   .palette-scope button { flex: 1; }
   .palette-foot span:not(:last-child) { display: none; }
 }
+
+/* Vizualizator documente (pop-up) */
+.doc-viewer {
+  position: fixed; z-index: 9001; inset: 3vh 50% auto auto; transform: translateX(50%);
+  width: min(1100px, calc(100vw - 24px)); height: 94vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-floating);
+  animation: cf-viewer-in .16s var(--ease) both;
+}
+@keyframes cf-viewer-in { from { opacity: 0; transform: translateX(50%) scale(.985); } to { opacity: 1; transform: translateX(50%); } }
+@media (max-width: 640px) { .doc-viewer { inset: 0; transform: none; width: 100vw; height: 100dvh; border-radius: 0; animation: cf-fade-in .16s ease both; } }
+.doc-viewer-bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
+.doc-viewer-body { position: relative; flex: 1; min-height: 0; display: flex; background: var(--surface-sunken); }
+.doc-viewer-loading { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); font-size: var(--fs-md); padding: 16px; }
+.spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent); border-top-color: transparent; animation: spin .7s linear infinite; display: inline-block; }

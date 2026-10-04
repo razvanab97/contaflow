@@ -1,4 +1,5 @@
 'use client'
+import { deschideDocument } from '@/lib/vizualizare'
 import { useEffect, useRef, useState } from 'react'
 
 interface Factura {
@@ -66,7 +67,8 @@ export default function FacturiAsteptateClient({ firmaId }: { firmaId: string })
   }
 
   function togglePreview(id: string) {
-    setPreviewIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+    // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
+    deschideDocument(`/api/facturi-asteptate/download?id=${id}`)
   }
 
   if (loading) return <div style={{ color: 'var(--c-555555)', fontSize: 'var(--fs-base)', padding: '32px 0' }}>Se încarcă...</div>

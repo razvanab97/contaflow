@@ -1,4 +1,5 @@
 'use client'
+import VeziButon from '@/components/ui/VeziButon'
 import { useRef, useState } from 'react'
 import { tint } from '@/lib/colors'
 
@@ -46,6 +47,7 @@ export default function ReportFiles({ doc, culoare, uploading, onUpload, onRemov
             <div style={{ fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fisier_nume}</div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', marginTop: '2px' }}>{fmtSize(doc.fisier_marime)} · actualizat {fmtData(doc.updated_at)}</div>
           </div>
+          <VeziButon url={`/api/proiect-documente/download?id=${doc.id}`} />
           <a href={`/api/proiect-documente/download?id=${doc.id}`} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none', flexShrink: 0 }}>Descarcă</a>
           <button onClick={() => inputRef.current?.click()} disabled={uploading} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '6px 12px', borderRadius: 'var(--r-sm)', border: '1px solid var(--accent)', background: 'transparent', color:'var(--accent)', cursor: 'pointer', flexShrink: 0, opacity: uploading ? .6 : 1 }}>
             {uploading ? 'Se încarcă...' : 'Încarcă versiune nouă'}

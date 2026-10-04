@@ -1,4 +1,5 @@
 'use client'
+import { deschideDocument } from '@/lib/vizualizare'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 
@@ -75,7 +76,7 @@ export default function ObligatieDocumente({ obligatieStareId, label, destinatar
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ flex: 1, fontSize: 'var(--fs-xs)', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
                       {kind && (
-                        <button onClick={() => setPreviewId(open ? null : d.id)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color:'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                        <button onClick={() => deschideDocument(`/api/chitante/document?id=${d.id}`, d.fisier_nume)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color:'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
                           {open ? 'Ascunde' : 'Previzualizare'}
                         </button>
                       )}
