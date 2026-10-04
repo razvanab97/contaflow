@@ -3,6 +3,7 @@ import { createHash } from 'crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS, MODULE_DEFS } from '@/lib/firma-config'
 import { generateNotePdfBytes } from '@/lib/notePdf'
+import { generateDiscrepantePdfBytes } from '@/lib/discrepante-lista'
 import { generateBonuriPdfBytes } from '@/lib/bonuriPdf'
 import JSZip from 'jszip'
 
@@ -234,6 +235,10 @@ export async function POST(req: NextRequest) {
         if (noteBytes) root.folder('Note tranzacții')!.file('note_tranzactii.pdf', noteBytes)
       }
     }
+
+    // Lista de discrepante 5StarDesk (randurile bifate in verificare, cu notele lor) - dosar propriu.
+    const discrepanteBytes = await generateDiscrepantePdfBytes(lunaId, firmaNume || '', luna || '')
+    if (discrepanteBytes) root.folder('Listă discrepanțe 5StarDesk')!.file('lista_discrepante_5stardesk.pdf', discrepanteBytes)
 
     const buf = await zip.generateAsync({ type: 'arraybuffer' })
     return new NextResponse(buf, {

@@ -11,7 +11,7 @@ interface Rezultat {
   id: string; fisierNume: string; furnizor: string | null; numarDocument: string | null
   suma: number | null; locatie: string | null; dataDocument: string | null
   sectiune: string; luna: string | null; downloadUrl: string
-  firmaId: string | null; tip: 'document' | 'model' | 'factura' | 'bon' | 'tranzactie'; valuta?: string | null
+  firmaId: string | null; tip: 'document' | 'model' | 'factura' | 'bon' | 'tranzactie' | 'rezervare' | 'factura_client' | 'comision' | 'mail'; valuta?: string | null; modul?: string | null
 }
 
 interface Cmd {
@@ -32,6 +32,11 @@ const LUNI = ['', 'Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep',
 function norm(s: string) { return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase() }
 function shift(luna: string, d: number) { const [y, m] = luna.split('-').map(Number); const x = new Date(Date.UTC(y, m - 1 + d, 1)); return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}` }
 function fmtData(s: string | null) { if (!s) return ''; const [y, m, d] = s.split('-'); return y && m && d ? `${d}.${m}.${y}` : s }
+// Grupurile rezultatelor din cautare, in ordinea afisarii.
+const GRUP_ORDINE = ['Rezervări', 'Facturi client & comision', 'Documente', 'Tranzacții bancare', 'Mail contabil']
+function grupRezultat(tip: string) {
+  return tip === 'tranzactie' ? 'Tranzacții bancare' : tip === 'rezervare' ? 'Rezervări' : tip === 'factura_client' || tip === 'comision' ? 'Facturi client & comision' : tip === 'mail' ? 'Mail contabil' : 'Documente'
+}
 function fmtLuna(s: string | null) { if (!s) return ''; const [y, m] = s.split('-'); return `${LUNI[+m]} ${y}` }
 function fmtSuma(v: number | null, valuta?: string | null) {
   if (v == null || Number.isNaN(v)) return ''
@@ -192,19 +197,21 @@ export default function CommandPalette({ open, onClose, firme, firmaAtiva, luna,
     return () => { clearTimeout(t); ctrl.abort() }
   }, [q, scope, open, firmaAtiva])
 
-  // Grupate pe tip (documentele intai, apoi tranzactiile) - API-ul le intoarce intercalate.
-  const docCommands = useMemo<Cmd[]>(() => [...docs].sort((a, b) => Number(a.tip === 'tranzactie') - Number(b.tip === 'tranzactie')).map(r => {
+  // Grupate pe tip - API-ul le intoarce intercalate. Rezultatele aduse prin legatura (documentul unei
+  // tranzactii gasite etc.) vin dupa potrivirile directe din grupul lor.
+  const docCommands = useMemo<Cmd[]>(() => [...docs].sort((a, b) => GRUP_ORDINE.indexOf(grupRezultat(a.tip)) - GRUP_ORDINE.indexOf(grupRezultat(b.tip)) || Number(a.sectiune.startsWith('legat')) - Number(b.sectiune.startsWith('legat'))).map(r => {
     const f = r.firmaId ? firmaById.get(r.firmaId) : undefined
     const firmaNume = f ? f.nume.replace(' SRL', '') : ''
     const isTx = r.tip === 'tranzactie'
+    const faraFisier = !r.downloadUrl && !!r.modul
     const lunaKey = r.luna ? r.luna.slice(0, 7) : null
     const subParts = [r.sectiune, r.luna ? fmtLuna(r.luna) : '', r.dataDocument ? fmtData(r.dataDocument) : '', r.numarDocument ? `nr. ${r.numarDocument}` : '', r.locatie ? `ap. ${r.locatie}` : ''].filter(Boolean)
     return {
       id: `${r.tip}-${r.id}`,
-      group: isTx ? 'Tranzacții bancare' : 'Documente',
+      group: grupRezultat(r.tip),
       title: r.furnizor || r.fisierNume,
       sub: subParts.join(' · '),
-      icon: isTx ? 'bank' : r.tip === 'bon' ? 'fuel' : r.tip === 'model' ? 'fileText' : r.tip === 'factura' ? 'link' : 'receipt',
+      icon: isTx ? 'bank' : r.tip === 'bon' ? 'fuel' : r.tip === 'model' ? 'fileText' : r.tip === 'factura' ? 'link' : r.tip === 'rezervare' ? 'bed' : r.tip === 'mail' ? 'mail' : r.tip === 'factura_client' ? 'star' : 'receipt',
       dot: f?.culoare,
       keywords: firmaNume,
       meta: <><div className="num" style={{ color: isTx ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: 600 }}>{fmtSuma(r.suma, r.valuta)}</div>{scope === 'all' && firmaNume && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{firmaNume}</div>}</>,
@@ -212,6 +219,11 @@ export default function CommandPalette({ open, onClose, firme, firmaAtiva, luna,
         remember(q)
         if (isTx) {
           if (f && lunaKey) go(`/${f.slug}/${lunaKey}/extras`, newTab)
+          return
+        }
+        // Rezervari, mailuri: se deschide modulul lunii lor (nu au un fisier propriu)
+        if (faraFisier) {
+          if (f && lunaKey) go(`/${f.slug}/${lunaKey}/${r.modul}`, newTab)
           return
         }
         onClose()
@@ -287,7 +299,7 @@ export default function CommandPalette({ open, onClose, firme, firmaAtiva, luna,
             const header = it.group !== lastGroup ? (lastGroup = it.group, (
               <div className="palette-group" key={`g-${it.group}-${idx}`}>
                 <span>{it.group}</span>
-                {(it.group === 'Documente' || it.group === 'Tranzacții bancare') && <span style={{ textTransform: 'none', letterSpacing: 0 }}>{docCommands.filter(d => d.group === it.group).length}</span>}
+                {GRUP_ORDINE.includes(it.group) && <span style={{ textTransform: 'none', letterSpacing: 0 }}>{docCommands.filter(d => d.group === it.group).length}</span>}
               </div>
             )) : null
             return (

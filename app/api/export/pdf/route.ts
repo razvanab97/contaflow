@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { FIRMA_CONFIGS, MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
 import { generateNotePdfBytes } from '@/lib/notePdf'
+import { generateDiscrepantePdfBytes } from '@/lib/discrepante-lista'
 import { generateBonuriPdfBytes } from '@/lib/bonuriPdf'
 
 export const maxDuration = 120
@@ -290,6 +291,11 @@ export async function POST(req: NextRequest) {
     }
 
     const nonEmpty = ordered.filter(s => (sectionMap.get(s) || []).length > 0)
+    // Lista de discrepante 5StarDesk (randurile bifate, cu note) - dupa sectiunea 5StarDesk.
+    const adaugaDiscrepante = async () => {
+      const b = await generateDiscrepantePdfBytes(lunaId, firmaNume || '', lunaLabel || '')
+      if (b) { addSectionCover(merged, coverFont, 'Listă discrepanțe 5StarDesk'); await embedDoc(merged, Buffer.from(b), 'application/pdf', 'lista_discrepante_5stardesk.pdf') }
+    }
     for (const section of nonEmpty) {
       addSectionCover(merged, coverFont, sectionLabel(section))
       for (const entry of sectionMap.get(section) || []) {
@@ -310,7 +316,9 @@ export async function POST(req: NextRequest) {
           await embedDoc(merged, Buffer.from(noteBytes), 'application/pdf', 'note_tranzactii.pdf')
         }
       }
+      if (section === '5stardesk') await adaugaDiscrepante()
     }
+    if (!nonEmpty.includes('5stardesk')) await adaugaDiscrepante()
   } else {
     // PDF per-secțiune (sau fără firmaSlug): pagină cu numele categoriei, apoi extras + documente secțiunii
     const label = scope?.section ? sectionLabel(scope.section) : isExtras ? sectionLabel('extras') : 'Documente'
@@ -357,6 +365,10 @@ export async function POST(req: NextRequest) {
       const { data } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!data) continue
       await embedDoc(merged, Buffer.from(await data.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)
+    }
+    if (scope?.section === '5stardesk') {
+      const b = await generateDiscrepantePdfBytes(lunaId, firmaNume || '', lunaLabel || '')
+      if (b) { addSectionCover(merged, coverFont, 'Listă discrepanțe 5StarDesk'); await embedDoc(merged, Buffer.from(b), 'application/pdf', 'lista_discrepante_5stardesk.pdf') }
     }
     if (isExtras && firmaNume && lunaLabel) {
       const noteBytes = await generateNotePdfBytes(lunaId, firmaNume, lunaLabel)
