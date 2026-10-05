@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 191, text: 'eMAG Facturi + Trendyol: task-ul „Desfășurătoare de încasare încărcate în eCap” e scos în evidență în listă, cu chenar portocaliu, fundal, titlu îngroșat și eticheta „⚠ Important · contabilitate”. După bifare devine discret.' },
   { v: 190, text: 'Trendyol: task nou „Desfășurătoare de încasare încărcate în eCap”, același reminder pentru contabilitate ca la eMAG.' },
   { v: 189, text: 'eMAG Facturi: task nou „Desfășurătoare de încasare încărcate în eCap”, cu reminder pentru contabilitate: încarcă în eCap avizele de plată eMAG RO / BG / HU și notificările Heyblu ale lunii.' },
   { v: 188, text: 'eMAG Facturi · Avize: antetul fiecărui aviz arată totalul încasat (ex. „812,98 RON încasat · fără facturi” la Heyblu, „6.188,04 RON încasat · 4 facturi (-1.333,03 RON)” la RO), nu doar suma facturilor, care la Heyblu era 0. Numărul avizului apare întreg, nu tăiat.' },

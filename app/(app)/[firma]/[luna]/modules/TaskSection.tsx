@@ -7,6 +7,7 @@ export interface TaskItem {
   label: string
   completat: boolean
   descriere?: string
+  important?: boolean
 }
 
 interface Props {
@@ -85,8 +86,9 @@ export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: P
             disabled={loading === task.key}
             style={{
               display: 'flex', alignItems: 'flex-start', gap: '12px',
-              background: 'transparent', border: 'none',
-              padding: '8px 8px', margin: '0 -8px', borderRadius: 'var(--r-md)', textAlign: 'left', width: 'calc(100% + 16px)',
+              background: task.important && !task.completat ? 'var(--accent-soft)' : 'transparent',
+              border: task.important ? `1.5px solid ${task.completat ? 'var(--border)' : 'var(--accent)'}` : 'none',
+              padding: task.important ? '12px' : '8px 8px', margin: task.important ? '6px -8px' : '0 -8px', borderRadius: 'var(--r-md)', textAlign: 'left', width: 'calc(100% + 16px)',
               opacity: loading === task.key ? 0.5 : 1,
             }}
           >
@@ -104,8 +106,13 @@ export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: P
               )}
             </div>
             <div style={{ minWidth: 0 }}>
+              {task.important && (
+                <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: task.completat ? 'var(--text-muted)' : 'var(--accent)', marginBottom: '3px' }}>
+                  {task.completat ? '✓ Important · contabilitate' : '⚠ Important · contabilitate'}
+                </div>
+              )}
               <span style={{
-                fontSize: 'var(--fs-md)', fontWeight: 500,
+                fontSize: 'var(--fs-md)', fontWeight: task.important ? 700 : 500,
                 color: task.completat ? 'var(--text-muted)' : 'var(--text-primary)',
                 textDecoration: task.completat ? 'line-through' : 'none',
               }}>

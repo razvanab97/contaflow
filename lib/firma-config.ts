@@ -16,6 +16,8 @@ export interface TaskDef {
   key: string
   label: string
   descriere?: string
+  // Task scos in evidenta in lista (chenar + eticheta), ex. pasii ceruti de contabilitate
+  important?: boolean
   // Doar pentru obligatii-recurente: cui se trimite si in ce zi a lunii URMATOARE perioadei
   // raportate e scadenta implicita (estimata din istoricul de corespondenta, ajustabila din UI
   // pe fiecare luna in parte - vezi obligatii_stari.scadenta).
@@ -180,7 +182,7 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
       { key: 'emag.aviz_hu_inceput', label: 'Aviz plată Emag HU — început lună', descriere: 'Financiar → Soldul meu: selectează luna precedentă (ex: pe 02 ale lunii → luna anterioară; pe 17 → luna curentă), apoi descarcă avizul de plată (prima jumătate)' },
       { key: 'emag.aviz_hu_jumatate', label: 'Aviz plată Emag HU — jumătate lună', descriere: 'Financiar → Soldul meu: selectează luna precedentă (ex: pe 02 ale lunii → luna anterioară; pe 17 → luna curentă), apoi descarcă avizul de plată (a doua jumătate)' },
       { key: 'emag.facturi_hu', label: 'Facturi Emag HU descărcate', descriere: 'Deschide avizul de plată → în secțiunea Facturi pune numărul facturii + caută → descarcă documentul, pentru fiecare factură din aviz' },
-      { key: 'emag.ecap_desfasuratoare', label: 'Desfășurătoare de încasare încărcate în eCap', descriere: 'Pentru contabilitate: încarcă în eCap desfășurătoarele de încasare ale lunii — avizele de plată eMAG RO / BG / HU și notificările Heyblu (început + jumătate de lună)' },
+      { key: 'emag.ecap_desfasuratoare', label: 'Desfășurătoare de încasare încărcate în eCap', important: true, descriere: 'Pentru contabilitate: încarcă în eCap desfășurătoarele de încasare ale lunii — avizele de plată eMAG RO / BG / HU și notificările Heyblu (început + jumătate de lună)' },
     ],
   },
   trendyol: {
@@ -190,7 +192,7 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     tasks: [
       { key: 'trendyol.factura_incarcata', label: 'Factură Trendyol încărcată' },
       { key: 'trendyol.borderou_incarcat', label: 'Borderou Trendyol încărcat' },
-      { key: 'trendyol.ecap_desfasuratoare', label: 'Desfășurătoare de încasare încărcate în eCap', descriere: 'Pentru contabilitate: încarcă în eCap desfășurătoarele de încasare Trendyol ale lunii (borderourile / rapoartele de plată)' },
+      { key: 'trendyol.ecap_desfasuratoare', label: 'Desfășurătoare de încasare încărcate în eCap', important: true, descriere: 'Pentru contabilitate: încarcă în eCap desfășurătoarele de încasare Trendyol ale lunii (borderourile / rapoartele de plată)' },
     ],
   },
   'booking-facturi': {
