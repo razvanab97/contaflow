@@ -6,6 +6,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import CopyButton from '@/components/CopyButton'
 import { tint } from '@/lib/colors'
+import BorderouriEmag from './BorderouriEmag'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 interface ChecklistItem { id:string; completat:boolean; checklist_templates?:{ titlu:string; descriere?:string; modul:string; ordine:number } }
@@ -708,6 +709,9 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
           <AvizUploadRow key={t.key} taskKey={t.key} label={t.label} descriere={t.descriere} data={avizData[t.key]} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} onChange={loadAvize}/>
         ))}
       </div>
+
+      {/* Borderourile eMAG (DP cash/card, DC, extras de cont): data pentru eCap, descarcabile, verificate cu avizele */}
+      <BorderouriEmag firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} versiuneAvize={Object.values(avizData).filter(a => a.documentId).length}/>
 
       {/* Avize de plată din sistemul vechi (cu documente deja încărcate) */}
       {sortedItems.length > 0 && (

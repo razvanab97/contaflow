@@ -1,0 +1,102 @@
+'use client'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+interface Borderou {
+  id: string; tip: string; eticheta: string; nr: string | null; data: string | null; suma: number | null; fisier: string
+  verificare: { stare: 'ok' | 'diferenta' | 'fara_aviz'; text: string }
+}
+
+function bani(v: number) { return new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) }
+function zi(d: string | null) { if (!d) return '—'; const [y, m, z] = d.slice(0, 10).split('-'); return `${z}.${m}.${y}` }
+const CULOARE = { ok: 'var(--success)', diferenta: 'var(--danger)', fara_aviz: 'var(--warning)' } as const
+const SEMN = { ok: '✓', diferenta: '✕', fara_aviz: '⚠' } as const
+
+// Borderourile eMAG ale lunii: desfasuratoarele de plata (DP cash + DP card pe fiecare jumatate de luna),
+// decontul lunar de comision (DC) si extrasul de cont eMAG. Toate odata, tipul recunoscut din coloane,
+// data borderoului pentru eCap, descarcabile, fiecare verificat cu avizul lui.
+export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize = 0 }: { firmaId: string; lunaId: string; culoare: string; versiuneAvize?: number }) {
+  const [lista, setLista] = useState<Borderou[] | null>(null)
+  const [incarc, setIncarc] = useState(false)
+  const [drag, setDrag] = useState(false)
+  const [rez, setRez] = useState<{ fisier: string; ok: boolean; text: string }[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/emag/borderou?lunaId=${encodeURIComponent(lunaId)}`, { cache: 'no-store' })
+    const d = await res.json().catch(() => ({}))
+    setLista(d.borderouri || [])
+  }, [lunaId])
+  useEffect(() => { load() }, [load, versiuneAvize])
+
+  async function incarca(files: FileList) {
+    setIncarc(true); setRez([])
+    const fd = new FormData()
+    Array.from(files).forEach(f => fd.append('files', f))
+    fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
+    const res = await fetch('/api/emag/borderou', { method: 'POST', body: fd })
+    const d = await res.json().catch(() => ({}))
+    setRez(d.rezultate || [{ fisier: '', ok: false, text: d.error || 'Eroare la încărcare' }])
+    setIncarc(false)
+    await load()
+  }
+  async function sterge(b: Borderou) {
+    if (!confirm(`Ștergi borderoul ${b.nr || ''}?`)) return
+    await fetch(`/api/emag/borderou?id=${encodeURIComponent(b.id)}`, { method: 'DELETE' })
+    await load()
+  }
+
+  const celula = { padding: '6px 0', borderTop: '1px solid var(--border-subtle)' } as const
+  const verificate = (lista || []).filter(b => b.verificare.stare === 'ok').length
+
+  return (
+    <div className="card card-pad">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 650, color: 'var(--text-primary)' }}>Borderouri eMAG</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>Desfășurătoare de plată (cash + card), decont comision, extras de cont — cu data pentru eCap, verificate cu avizele</div>
+        </div>
+        {!!lista?.length && <a className="btn btn-sm" href={`/api/emag/borderou?zip=${encodeURIComponent(lunaId)}`}>↓ Descarcă toate (.zip)</a>}
+      </div>
+
+      {lista === null ? <div className="skeleton" style={{ height: '60px' }} /> : lista.length > 0 && (
+        <div style={{ marginBottom: '10px', overflowX: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(92px,auto) minmax(150px,1.2fr) auto minmax(180px,2fr) auto', gap: '0 14px', alignItems: 'start', fontSize: 'var(--fs-sm)', minWidth: '640px' }}>
+            <span className="eyebrow">Data borderou</span><span className="eyebrow">Tip · ID</span><span className="eyebrow" style={{ textAlign: 'right' }}>Sumă</span><span className="eyebrow">Verificare cu avizul</span><span />
+            {lista.map(b => (
+              <div key={b.id} style={{ display: 'contents' }}>
+                <span className="num" style={{ ...celula, fontWeight: 650, color: 'var(--text-primary)' }}>{zi(b.data)}</span>
+                <span style={{ ...celula, color: 'var(--text-secondary)', minWidth: 0 }} title={b.fisier}>{b.eticheta}<span style={{ color: 'var(--text-muted)' }}> · {b.nr || '—'}</span></span>
+                <span className="num" style={{ ...celula, textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{b.suma != null ? `${bani(b.suma)} RON` : '—'}</span>
+                <span style={{ ...celula, fontSize: 'var(--fs-xs)', color: CULOARE[b.verificare.stare] }}>{SEMN[b.verificare.stare]} {b.verificare.text}</span>
+                <span style={{ ...celula, display: 'flex', gap: '12px', justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>
+                  <a href={`/api/emag/borderou?download=${encodeURIComponent(b.id)}`} style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 'var(--fs-xs)' }}>↓ .xlsx</a>
+                  <button onClick={() => sterge(b)} aria-label="Șterge borderoul" style={{ color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'var(--fs-xs)' }}>✕</button>
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: '6px', fontSize: 'var(--fs-xs)', color: verificate === lista.length ? 'var(--success)' : 'var(--text-muted)' }}>
+            {verificate}/{lista.length} borderouri se potrivesc cu avizele
+          </div>
+        </div>
+      )}
+
+      <div
+        onClick={() => !incarc && fileRef.current?.click()}
+        onDragOver={e => { e.preventDefault(); setDrag(true) }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={e => { e.preventDefault(); setDrag(false); if (!incarc && e.dataTransfer.files.length) incarca(e.dataTransfer.files) }}
+        style={{ border: `1.5px dashed ${drag ? culoare : 'var(--border-hover)'}`, borderRadius: 'var(--r-md)', padding: '14px', textAlign: 'center', cursor: incarc ? 'default' : 'pointer', background: drag ? 'var(--accent-soft)' : 'transparent' }}
+      >
+        <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 650, color: incarc ? 'var(--text-muted)' : 'var(--accent)' }}>{incarc ? 'Se citesc borderourile…' : '+ Adaugă borderouri eMAG (.xlsx) — toate deodată'}</div>
+        {!incarc && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>…_dp_….xlsx (cash și card, pe fiecare jumătate de lună) · …_dc_….xlsx · account_statement_details_….xlsx — tipul se recunoaște singur</div>}
+      </div>
+      <input ref={fileRef} type="file" multiple accept=".xlsx" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} onChange={e => { if (e.target.files?.length) incarca(e.target.files); e.target.value = '' }} />
+      {rez.length > 0 && (
+        <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {rez.map((x, i) => <div key={i} style={{ fontSize: 'var(--fs-xs)', color: x.ok ? 'var(--text-muted)' : 'var(--danger)' }}>{x.ok ? '✓' : '✕'} {x.text}{x.fisier ? <span style={{ color: 'var(--text-muted)' }}> · {x.fisier}</span> : null}</div>)}
+        </div>
+      )}
+    </div>
+  )
+}
