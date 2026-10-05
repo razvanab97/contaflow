@@ -296,6 +296,7 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
   const [error, setError] = useState('')
   const [lista, setLista] = useState<Map<string, RandLista>>(new Map())
   const [eroareLista, setEroareLista] = useState('')
+  const [arataConfirmate, setArataConfirmate] = useState(false)
 
   const stergeRand = useCallback(async (tip: TipSters, id: string, eticheta: string) => {
     if (!confirm(tip === 'rezervare'
@@ -438,13 +439,15 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
           </div>
         )}
 
+        {/* Factura = borderou + comision Airbnb: corect, confirmat automat - restrans, doar la cerere. */}
         {result && result.discrepanteExplicateComision.length > 0 && (
-          <div>
-            <div style={{ marginBottom:'8px' }}>
-              <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--c-999999)', textTransform:'uppercase', letterSpacing:'.06em' }}>✓ Diferențe explicate de comisionul Airbnb</span>
-            </div>
-            <p style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)', marginTop:'-4px', marginBottom:'8px' }}>Factura clientului = suma din borderou + comisionul Airbnb al aceleiași rezervări — nu e o eroare, nu necesită acțiune.</p>
-            <ListaExplicate items={result.discrepanteExplicateComision} sectiune="Diferență explicată de comision"/>
+          <div style={{ padding:'8px 12px', borderRadius:'var(--r-sm)', background:'light-dark(rgba(5,150,105,.06), rgba(110,231,176,.05))', border:'1px solid light-dark(rgba(5,150,105,.25), rgba(110,231,176,.15))' }}>
+            <button type="button" onClick={() => setArataConfirmate(v => !v)} style={{ display:'flex', alignItems:'center', gap:'8px', width:'100%', background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left', color:'inherit' }}>
+              <span style={{ fontSize:'var(--fs-sm)', fontWeight:650, color:'var(--success)' }}>✓ {result.discrepanteExplicateComision.length} facturi confirmate automat</span>
+              <span style={{ flex:1, fontSize:'var(--fs-xs)', color:'var(--c-777777)' }}>factura = borderou + comisionul Airbnb al rezervării — corecte, fără acțiune</span>
+              <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--accent)', flexShrink:0 }}>{arataConfirmate ? 'Ascunde' : 'Arată'}</span>
+            </button>
+            {arataConfirmate && <div style={{ marginTop:'8px' }}><ListaExplicate items={result.discrepanteExplicateComision} sectiune="Diferență explicată de comision"/></div>}
           </div>
         )}
 
