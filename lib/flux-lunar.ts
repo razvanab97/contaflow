@@ -19,10 +19,22 @@ export function tipImprumut(t: { tip?: string | null; descriere?: string | null;
 }
 export interface Imprumut { primit: number; restituire: number; avansTrezorerie: number; net: number; numar: number }
 
+// Incasarile reale ale lunii (in lei, curs BNR): fara imprumuturi de la asociat si fara schimburi valutare
+// intre conturile proprii - pe surse: eMAG (inclusiv Heyblu, eMAG BG/HU, Dante), Trendyol, alte incasari.
+export interface IncasariReale { emag: number; trendyol: number; alte: number; total: number; alteLista: { data: string; suma: number; platitor: string }[] }
+const RE_EMAG = /emag|dante international|heyblu/i
+const RE_TRENDYOL = /trendyol/i
+function platitorDin(d: string) {
+  // extrasele BT: „...;NUME PLATITOR;IBAN;BIC;” - numele e campul dinaintea IBAN-ului
+  const parti = d.split(';').map(x => x.trim()).filter(Boolean)
+  const iIban = parti.findIndex(x => /^[A-Z]{2}\d{2}[A-Z0-9]{10,}$/.test(x))
+  return (iIban > 0 ? parti[iIban - 1] : parti[0] || '').slice(0, 60)
+}
+
 export interface FluxMoneda { incasari: number; plati: number; net: number; schimbIn: number; schimbOut: number; numar: number; cursMediu: number | null; imprumut: Imprumut }
 export interface FluxLunar {
   peMoneda: Record<string, FluxMoneda>          // miscarile reale din fiecare cont (ca in extras)
-  consolidat: { incasari: number; plati: number; net: number; schimbExclus: number; imprumut: Imprumut } // echivalent lei, fara schimburi valutare
+  consolidat: { incasari: number; plati: number; net: number; schimbExclus: number; imprumut: Imprumut; incasariReale: IncasariReale } // echivalent lei, fara schimburi valutare
   faraCurs: number                               // tranzactii in valuta pentru care nu s-a gasit curs
   cursIndisponibil: boolean
 }
@@ -50,6 +62,7 @@ export async function calculeazaFlux(txs: TxFlux[]): Promise<FluxLunar> {
   }
   const peMoneda: Record<string, FluxMoneda & { _lei: number; _val: number }> = {}
   const cons = { incasari: 0, plati: 0, schimbExclus: 0, imprumut: gol() }
+  const reale = { emag: 0, trendyol: 0, alte: 0, alteLista: [] as IncasariReale['alteLista'] }
   let faraCurs = 0
   for (const t of valide) {
     const v = (t.valuta || 'RON').toUpperCase()
@@ -65,7 +78,15 @@ export async function calculeazaFlux(txs: TxFlux[]): Promise<FluxLunar> {
     if (v !== 'RON') { m._lei += suma * k; m._val += suma }
     if (schimb) { cons.schimbExclus += suma * k; continue }
     if (imp) adauga(cons.imprumut, imp, suma * k)
-    if (t.tip === 'credit') cons.incasari += suma * k
+    if (t.tip === 'credit') {
+      cons.incasari += suma * k
+      if (!imp) {
+        const d = `${t.descriere_curatata || ''} ${t.descriere || ''}`
+        if (RE_EMAG.test(d)) reale.emag += suma * k
+        else if (RE_TRENDYOL.test(d)) reale.trendyol += suma * k
+        else { reale.alte += suma * k; reale.alteLista.push({ data: String(t.data_tranzactie), suma: r2(suma * k), platitor: platitorDin(t.descriere || t.descriere_curatata || '') }) }
+      }
+    }
     else cons.plati += suma * k
   }
   const finImp = (i: Imprumut): Imprumut => ({ primit: r2(i.primit), restituire: r2(i.restituire), avansTrezorerie: r2(i.avansTrezorerie), net: r2(i.primit - i.restituire - i.avansTrezorerie), numar: i.numar })
@@ -75,7 +96,10 @@ export async function calculeazaFlux(txs: TxFlux[]): Promise<FluxLunar> {
   }
   return {
     peMoneda: out,
-    consolidat: { incasari: r2(cons.incasari), plati: r2(cons.plati), net: r2(cons.incasari - cons.plati), schimbExclus: r2(cons.schimbExclus), imprumut: finImp(cons.imprumut) },
+    consolidat: {
+      incasari: r2(cons.incasari), plati: r2(cons.plati), net: r2(cons.incasari - cons.plati), schimbExclus: r2(cons.schimbExclus), imprumut: finImp(cons.imprumut),
+      incasariReale: { emag: r2(reale.emag), trendyol: r2(reale.trendyol), alte: r2(reale.alte), total: r2(reale.emag + reale.trendyol + reale.alte), alteLista: reale.alteLista },
+    },
     faraCurs, cursIndisponibil,
   }
 }

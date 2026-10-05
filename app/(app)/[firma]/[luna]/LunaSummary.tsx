@@ -4,6 +4,7 @@ import Sparkline from '@/components/ui/Sparkline'
 import CountUp from '@/components/ui/CountUp'
 import type { FluxLunar } from '@/lib/flux-lunar'
 import { getFirmaModules } from '@/lib/firma-config'
+import type { ConcluzieEmag } from '@/lib/emag-concluzie'
 
 interface Punct { luna: string; label: string; incasari: number; plati: number; pct: number; initializata: boolean }
 
@@ -15,7 +16,8 @@ function curs(v: number) { return new Intl.NumberFormat('ro-RO', { minimumFracti
 // intre conturile proprii nu intra in total (ar dubla aceiasi bani) - sunt aratate separat.
 export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { lunaId: string; culoare: string; firmaId: string; firmaSlug: string; luna: string }) {
   const [flux, setFlux] = useState<FluxLunar | null>(null)
-  const [emagNet, setEmagNet] = useState<number | null>(null)
+  // Costul net eMAG vine din „Concluzia eMAG” (avize + curierat + Dante); undefined = se calculeaza
+  const [emagC, setEmagC] = useState<ConcluzieEmag | null | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
   const [istoric, setIstoric] = useState<Punct[]>([])
   // "Cost net eMAG" are sens doar la firmele cu modulul eMAG (azi doar AB Homes Invest).
@@ -23,12 +25,10 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
 
   useEffect(() => {
     setLoaded(false)
-    Promise.all([
-      fetch(`/api/luna/flux?lunaId=${encodeURIComponent(lunaId)}`).then(r => r.ok ? r.json() : null).then(d => setFlux(d?.flux || null)).catch(() => {}),
-      areEmag
-        ? fetch(`/api/emag?lunaId=${encodeURIComponent(lunaId)}`).then(r => r.ok ? r.json() : null).then(d => setEmagNet(typeof d?.summary?.emagNetCost === 'number' ? d.summary.emagNetCost : null)).catch(() => {})
-        : Promise.resolve(setEmagNet(null)),
-    ]).finally(() => setLoaded(true))
+    setEmagC(areEmag ? undefined : null)
+    fetch(`/api/luna/flux?lunaId=${encodeURIComponent(lunaId)}`).then(r => r.ok ? r.json() : null).then(d => setFlux(d?.flux || null)).catch(() => {}).finally(() => setLoaded(true))
+    // separat: prima calculare a concluziei eMAG poate dura (citeste avizele) - nu tine pe loc restul
+    if (areEmag) fetch(`/api/emag/concluzie?lunaId=${encodeURIComponent(lunaId)}`).then(r => r.ok ? r.json() : null).then(d => setEmagC(d?.concluzie || null)).catch(() => setEmagC(null))
     fetch(`/api/luna/istoric?firmaId=${encodeURIComponent(firmaId)}&firmaSlug=${encodeURIComponent(firmaSlug)}&luna=${encodeURIComponent(luna)}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (Array.isArray(data?.istoric)) setIstoric(data.istoric) })
@@ -42,7 +42,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
       </div>
     )
   }
-  if (!flux && emagNet == null) return null
+  if (!flux && !emagC) return null
 
   const serie = istoric.filter(p => p.initializata)
   const spark = (key: 'incasari' | 'plati' | 'cashflow') => serie.map(p => key === 'cashflow' ? p.incasari - p.plati : p[key])
@@ -62,6 +62,18 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
     )
   }
   if (flux) {
+    // Incasarile reale: fara imprumuturi de la asociat si fara schimburi valutare intre conturile proprii
+    const r = flux.consolidat.incasariReale
+    tiles.push({
+      label: 'Încasări reale', value: r.total, color: 'var(--success)',
+      title: `Încasări din vânzări și de la clienți (toate conturile, lei la curs BNR), fără împrumuturi și schimburi valutare.${r.alteLista.length ? ` Alte încasări: ${r.alteLista.map(a => `${a.platitor} ${money(a.suma)}`).join(', ')}` : ''}`,
+      detalii: [
+        ...(areEmag || r.emag ? [{ label: 'eMAG', suma: r.emag, semn: '+' as const }] : []),
+        ...(r.trendyol || getFirmaModules(firmaSlug).some(m => m.slug === 'trendyol') ? [{ label: 'Trendyol', suma: r.trendyol, semn: '+' as const }] : []),
+        { label: r.alteLista.length === 1 ? `Alte · ${r.alteLista[0].platitor}` : `Alte încasări${r.alteLista.length ? ` (${r.alteLista.length})` : ''}`, suma: r.alte, semn: '+' },
+      ],
+      gol: 'Nicio încasare reală luna aceasta',
+    })
     // Imprumutul firmei de la asociat: intrari (imprumut primit) vs. iesiri (restituire + avans trezorerie).
     const i = flux.consolidat.imprumut
     tiles.push({
@@ -75,7 +87,25 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
       gol: 'Nicio mișcare de împrumut luna aceasta',
     })
   }
-  if (areEmag && emagNet != null) tiles.push({ label: 'Cost net eMAG', value: emagNet, color: 'var(--text-primary)' })
+  if (areEmag && emagC !== null) {
+    // cost net = tot ce s-a dus pe drum intre vanzari si rezultatul net (comisioane, transport + curierat, restul)
+    const c = emagC
+    const cost = c ? Math.round((c.vanzari - c.rezultat) * 100) / 100 : 0
+    const comision = c ? -c.retineri.comision : 0
+    const transport = c ? Math.round((-c.retineri.transport + c.curierat.total) * 100) / 100 : 0
+    const alte = Math.round((cost - comision - transport) * 100) / 100
+    tiles.push({
+      label: 'Cost net eMAG', value: cost, color: 'var(--danger)',
+      title: c ? `Din Concluzia eMAG: vânzări ${money(c.vanzari)} lei − cost ${money(cost)} lei = rezultat net ${money(c.rezultat)} lei (${c.vanzari ? Math.round((cost / c.vanzari) * 1000) / 10 : 0}% din vânzări).` : 'Se calculează din Concluzia eMAG…',
+      detalii: c && c.vanzari ? [
+        { label: 'Comisioane', suma: comision, semn: '−' },
+        { label: 'Transport + curierat', suma: transport, semn: '−' },
+        { label: 'Alte (vouchere, taxe, Dante)', suma: Math.abs(alte), semn: alte >= 0 ? '−' : '+' },
+        { label: `Rezultat net · ${Math.round((c.rezultat / c.vanzari) * 1000) / 10}%`, suma: c.rezultat, semn: '+' },
+      ] : undefined,
+      gol: c === undefined ? 'Se calculează din Concluzia eMAG…' : 'Niciun aviz eMAG luna aceasta',
+    })
+  }
 
   const schimburi = monede.filter(([, m]) => m.schimbIn || m.schimbOut)
 
@@ -108,7 +138,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
                 ))}
               </div>
             )}
-            {t.label === 'Împrumut firmă'
+            {t.gol !== undefined
               ? (!t.detalii && <div style={{ marginTop: '10px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{t.gol}</div>)
               : t.spark && t.spark.length > 1
               ? <Sparkline values={t.spark} color={t.sparkColor} title={`${t.label} pe ultimele luni`} />
