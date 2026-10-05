@@ -180,6 +180,7 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
       { key: 'emag.aviz_hu_inceput', label: 'Aviz plată Emag HU — început lună', descriere: 'Financiar → Soldul meu: selectează luna precedentă (ex: pe 02 ale lunii → luna anterioară; pe 17 → luna curentă), apoi descarcă avizul de plată (prima jumătate)' },
       { key: 'emag.aviz_hu_jumatate', label: 'Aviz plată Emag HU — jumătate lună', descriere: 'Financiar → Soldul meu: selectează luna precedentă (ex: pe 02 ale lunii → luna anterioară; pe 17 → luna curentă), apoi descarcă avizul de plată (a doua jumătate)' },
       { key: 'emag.facturi_hu', label: 'Facturi Emag HU descărcate', descriere: 'Deschide avizul de plată → în secțiunea Facturi pune numărul facturii + caută → descarcă documentul, pentru fiecare factură din aviz' },
+      { key: 'emag.ecap_desfasuratoare', label: 'Desfășurătoare de încasare încărcate în eCap', descriere: 'Pentru contabilitate: încarcă în eCap desfășurătoarele de încasare ale lunii — avizele de plată eMAG RO / BG / HU și notificările Heyblu (început + jumătate de lună)' },
     ],
   },
   trendyol: {
