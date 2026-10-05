@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ConcluzieTrendyol as Concluzie, TaxaTrendyol } from '@/lib/trendyol-concluzie'
 
 function lei(v: number, semn = false) {
@@ -50,15 +50,11 @@ function ListaTaxe({ titlu, lista }: { titlu: string; lista: TaxaTrendyol[] }) {
 // Concluzia Trendyol a lunii, ca o cascada (pe modelul eMAG): vanzari -> retururi / reduceri -> comision
 // Trendyol -> TRANSPORT (facturi TYD retinute din plata, aratat separat) -> alte taxe -> virat conform
 // borderourilor -> incasat in extras -> diferenta de curs -> rezultat net. In dreapta: fiecare incasare
-// Trendyol din extras cu borderoul ei (.xlsx) — se incarca aici, toate odata.
-export default function ConcluzieTrendyol({ firmaId, lunaId, culoare }: { firmaId: string; lunaId: string; culoare: string }) {
+// Trendyol din extras cu borderoul ei (.xlsx, incarcat in sectiunea Borderouri Trendyol).
+export default function ConcluzieTrendyol({ lunaId, versiune = 0 }: { lunaId: string; versiune?: number }) {
   const [c, setC] = useState<Concluzie | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [incarc, setIncarc] = useState(false)
-  const [drag, setDrag] = useState(false)
-  const [rez, setRez] = useState<{ fisier: string; ok: boolean; text: string }[]>([])
-  const fileRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -70,24 +66,9 @@ export default function ConcluzieTrendyol({ firmaId, lunaId, culoare }: { firmaI
     } catch { setError('Conexiunea s-a întrerupt') }
     setLoading(false)
   }, [lunaId])
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load() }, [load, versiune])
 
-  async function incarca(lista: FileList) {
-    setIncarc(true); setRez([])
-    const fd = new FormData()
-    Array.from(lista).forEach(f => fd.append('files', f))
-    fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
-    const res = await fetch('/api/trendyol/borderou', { method: 'POST', body: fd })
-    const d = await res.json().catch(() => ({ rezultate: [{ fisier: '', ok: false, text: 'Eroare la încărcare' }] }))
-    setRez(d.rezultate || [{ fisier: '', ok: false, text: d.error || 'Eroare la încărcare' }])
-    setIncarc(false)
-    await load()
-  }
-  async function sterge(id: string) {
-    if (!confirm('Ștergi borderoul?')) return
-    await fetch(`/api/trendyol/borderou?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
-    await load()
-  }
+
 
   const header = (
     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
@@ -96,27 +77,6 @@ export default function ConcluzieTrendyol({ firmaId, lunaId, culoare }: { firmaI
         <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>De la vânzări (borderouri) până la banii încasați în extras — cu transportul separat</div>
       </div>
       <button className="btn btn-sm" onClick={load} disabled={loading}>{loading ? 'Se calculează…' : 'Recalculează'}</button>
-    </div>
-  )
-
-  const zona = (
-    <div style={{ marginTop: '10px' }}>
-      <div
-        onClick={() => !incarc && fileRef.current?.click()}
-        onDragOver={e => { e.preventDefault(); setDrag(true) }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={e => { e.preventDefault(); setDrag(false); if (!incarc && e.dataTransfer.files.length) incarca(e.dataTransfer.files) }}
-        style={{ border: `1.5px dashed ${drag ? culoare : 'var(--border-hover)'}`, borderRadius: 'var(--r-md)', padding: '12px', textAlign: 'center', cursor: incarc ? 'default' : 'pointer', background: drag ? 'var(--accent-soft)' : 'transparent' }}
-      >
-        <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 650, color: incarc ? 'var(--text-muted)' : 'var(--accent)' }}>{incarc ? 'Se citesc borderourile…' : '+ Încarcă borderourile (.xlsx) — toate deodată'}</div>
-        {!incarc && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>Fișierele PaymentOrderDetail_….xlsx din Trendyol Seller Center → Plăți; fiecare se leagă singur de încasarea lui</div>}
-      </div>
-      <input ref={fileRef} type="file" multiple accept=".xlsx" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} onChange={e => { if (e.target.files?.length) incarca(e.target.files); e.target.value = '' }} />
-      {rez.length > 0 && (
-        <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {rez.map((x, i) => <div key={i} style={{ fontSize: 'var(--fs-xs)', color: x.ok ? 'var(--text-muted)' : 'var(--danger)' }}>{x.ok ? '✓' : '✕'} {x.text}{x.fisier ? <span style={{ color: 'var(--text-muted)' }}> · {x.fisier}</span> : null}</div>)}
-        </div>
-      )}
     </div>
   )
 
@@ -149,7 +109,7 @@ export default function ConcluzieTrendyol({ firmaId, lunaId, culoare }: { firmaI
             <Rand tare label="Rezultat net Trendyol" valoare={c.rezultat} ton="total" detaliu={c.vanzari ? `${Math.round((c.rezultat / c.vanzari) * 1000) / 10}% din vânzări rămân după comision, transport, taxe și curs (înainte de costul mărfii)` : undefined} />
             {c.incasariFaraBorderou > 0 && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--warning)', marginTop: '6px' }}>Neinclus încă: {lei(c.incasariFaraBorderou)} lei încasați fără borderou încărcat.</p>}
           </> : (
-            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Încarcă borderourile Trendyol (.xlsx) ale încasărilor din dreapta — concluzia se calculează din ele.</p>
+            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Adaugă borderourile Trendyol (.xlsx) în secțiunea de mai sus — concluzia se calculează din ele.</p>
           )}
         </div>
 
@@ -167,7 +127,6 @@ export default function ConcluzieTrendyol({ firmaId, lunaId, culoare }: { firmaI
                   {p.borderou ? <>
                     <span>borderou: {lei(p.borderou.totalVanzator)} lei</span>
                     <a href={`/api/trendyol/borderou?download=${encodeURIComponent(p.borderou.documentId)}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>↓ .xlsx</a>
-                    <button onClick={() => sterge(p.borderou!.documentId)} style={{ color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>✕</button>
                   </> : <span>lipsește borderoul {p.ordin ? `PaymentOrderDetail_${p.ordin}_….xlsx` : ''}</span>}
                 </div>
               </div>
@@ -175,10 +134,8 @@ export default function ConcluzieTrendyol({ firmaId, lunaId, culoare }: { firmaI
             {c.borderouriFaraIncasare.map(b => (
               <div key={b.documentId} style={{ padding: '6px 0', borderBottom: '1px solid var(--border-subtle)', fontSize: 'var(--fs-xs)', color: 'var(--warning)', display: 'flex', gap: '10px' }}>
                 <span>borderou {b.ordin} ({lei(b.totalVanzator)} lei) — fără încasare în extrasul lunii</span>
-                <button onClick={() => sterge(b.documentId)} style={{ color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>✕</button>
               </div>
             ))}
-            {zona}
           </div>
           <ListaTaxe titlu="🚚 Transport (facturi TYD)" lista={c.facturiTransport} />
           <ListaTaxe titlu="Alte taxe Trendyol" lista={c.facturiTaxe} />

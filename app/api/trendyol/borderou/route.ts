@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import JSZip from 'jszip'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { citesteBorderouTrendyol, ordinPlataDinNume } from '@/lib/trendyol-borderou'
 
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
     if (!ordin) { rezultate.push({ fisier: file.name, ok: false, text: 'numele trebuie să fie cel original de la Trendyol: PaymentOrderDetail_<nr. ordin>_….xlsx' }); continue }
     let b
     try { b = await citesteBorderouTrendyol(bytes, file.name) } catch (e) { rezultate.push({ fisier: file.name, ok: false, text: e instanceof Error ? e.message : String(e) }); continue }
-    const dataPlata = b.linii.map(l => l.dataPlata).filter(Boolean).sort().pop() || null
+    const dataPlata = (await dataIncasare(sb, lunaId, ordin)) || b.linii.map(l => l.dataPlata).filter(Boolean).sort().pop() || null
     const path = `${firmaId}/${lunaId}/trendyol-borderou/PaymentOrderDetail_${ordin}_${Date.now()}.xlsx`
     const { error: upErr } = await sb.storage.from('documente').upload(path, bytes, { contentType: XLSX_MIME })
     if (upErr) { rezultate.push({ fisier: file.name, ok: false, text: upErr.message }); continue }
@@ -49,11 +50,44 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ rezultate })
 }
 
-// Descarcare: GET ?download=<id> -> fisierul .xlsx original
+// Data borderoului (pentru eCap) = ziua in care Trendyol a platit, din extrasul lunii: incasarea are in
+// descriere numarul ordinului de plata („Incasare SEPA 1141353 - 76968338 - TRENDYOL ...”).
+async function dataIncasare(sb: ReturnType<typeof getServiceSupabase>, lunaId: string, ordin: string) {
+  const { data: extrase } = await sb.from('extrase').select('id').eq('luna_id', lunaId)
+  const ids = (extrase || []).map(e => e.id)
+  if (!ids.length) return null
+  const { data: tx } = await sb.from('tranzactii').select('data_tranzactie').in('extras_id', ids).eq('tip', 'credit')
+    .ilike('descriere', `%${ordin}%TRENDYOL%`).order('data_tranzactie').limit(1)
+  return tx?.[0]?.data_tranzactie || null
+}
+
+// GET ?lunaId=… -> lista borderourilor lunii · ?download=<id> -> un .xlsx · ?zip=<lunaId> -> toate, intr-un .zip
 export async function GET(req: NextRequest) {
+  const sb = getServiceSupabase()
+  const lunaLista = req.nextUrl.searchParams.get('lunaId')
+  if (lunaLista) {
+    const { data } = await sb.from('documente').select('id,numar_document,data_document,suma,valuta,fisier_nume')
+      .eq('luna_id', lunaLista).eq('modul', 'trendyol').eq('tip_document', 'borderou').order('data_document')
+    return NextResponse.json({ borderouri: (data || []).map(d => ({ id: d.id, ordin: d.numar_document, data: d.data_document, suma: d.suma == null ? null : Number(d.suma), valuta: d.valuta, fisier: d.fisier_nume })) })
+  }
+  const lunaZip = req.nextUrl.searchParams.get('zip')
+  if (lunaZip) {
+    const { data: docs } = await sb.from('documente').select('fisier_path,fisier_nume')
+      .eq('luna_id', lunaZip).eq('modul', 'trendyol').eq('tip_document', 'borderou').order('data_document')
+    if (!docs?.length) return NextResponse.json({ error: 'Niciun borderou încărcat' }, { status: 404 })
+    const zip = new JSZip()
+    for (const d of docs) {
+      const { data: f } = await sb.storage.from('documente').download(d.fisier_path)
+      if (f) zip.file(d.fisier_nume, new Uint8Array(await f.arrayBuffer()))
+    }
+    const buf = await zip.generateAsync({ type: 'uint8array' })
+    return new NextResponse(buf as unknown as BodyInit, { headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent('Borderouri Trendyol.zip')}`,
+    } })
+  }
   const id = req.nextUrl.searchParams.get('download')
   if (!id) return NextResponse.json({ error: 'Borderoul lipsește' }, { status: 400 })
-  const sb = getServiceSupabase()
   const { data: d } = await sb.from('documente').select('fisier_path,fisier_nume').eq('id', id).eq('modul', 'trendyol').eq('tip_document', 'borderou').single()
   if (!d) return NextResponse.json({ error: 'Borderoul nu a fost găsit' }, { status: 404 })
   const { data: file } = await sb.storage.from('documente').download(d.fisier_path)
