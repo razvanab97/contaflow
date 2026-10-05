@@ -37,8 +37,8 @@ function suma(v: number | string | null | undefined, valuta?: string | null) {
 export function furnizorAfisat(raw: string | null | undefined) {
   const prim = String(raw || '').split('|')[0].trim()
   if (!prim || /^(DP_DATA:|Ata(ș|s)ament |Categorie:|Sursa:|\{)/i.test(prim)) return ''
-  const aviz = prim.match(/^emag\.aviz_(ro|bg|hu)_(inceput|jumatate)/i)
-  if (aviz) return `eMAG ${aviz[1].toUpperCase()} ${aviz[2] === 'inceput' ? 'inceput de luna' : 'jumatate de luna'}`
+  const aviz = prim.match(/^emag\.aviz_(ro|bg|hu|heyblu)_(inceput|jumatate)/i)
+  if (aviz) return `${aviz[1].toLowerCase() === 'heyblu' ? 'eMAG Heyblu' : `eMAG ${aviz[1].toUpperCase()}`} ${aviz[2] === 'inceput' ? 'inceput de luna' : 'jumatate de luna'}`
   if (/^emag\.(facturi|aviz)/i.test(prim)) return 'eMAG'
   return prim
 }

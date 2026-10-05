@@ -175,6 +175,9 @@ export async function POST(req: NextRequest) {
       tip_document: 'aviz_plata',
       furnizor: taskKey,
       numar_document: avizNumber,
+      // moneda avizului e data de piata (BG=EUR, HU=HUF, rest RON) - altfel citirea generala putea lua
+      // „RON” din nota de subsol („the payment was made in RON”) si numele iesea „... 228,08 RON”
+      valuta: currencyForTaskKey(taskKey),
       fisier_path: path,
       fisier_nume: fileName,
       fisier_tip: 'application/pdf',

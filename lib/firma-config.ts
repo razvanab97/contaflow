@@ -172,6 +172,8 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
       { key: 'emag.aviz_ro_inceput', label: 'Aviz plată Emag RO — început lună', descriere: 'Financiar → Plăți: descarcă avizul de plată (prima jumătate)' },
       { key: 'emag.aviz_ro_jumatate', label: 'Aviz plată Emag RO — jumătate lună', descriere: 'Financiar → Plăți: descarcă avizul de plată (a doua jumătate)' },
       { key: 'emag.facturi_ro', label: 'Facturi Emag RO descărcate', descriere: 'Deschide avizul de plată → în secțiunea Facturi pune numărul facturii + caută → descarcă documentul, pentru fiecare factură din aviz' },
+      { key: 'emag.aviz_heyblu_inceput', label: 'Notificare plată Heyblu — început lună', descriere: 'Financiar → Plăți: descarcă notificarea de plată „Încasări Revolving” (Heyblu) — prima jumătate' },
+      { key: 'emag.aviz_heyblu_jumatate', label: 'Notificare plată Heyblu — jumătate lună', descriere: 'Financiar → Plăți: descarcă notificarea de plată „Încasări Revolving” (Heyblu) — a doua jumătate' },
       { key: 'emag.aviz_bg_inceput', label: 'Aviz plată Emag BG — început lună', descriere: 'Financiar → Plăți: descarcă avizul de plată (prima jumătate) — Bulgaria' },
       { key: 'emag.aviz_bg_jumatate', label: 'Aviz plată Emag BG — jumătate lună', descriere: 'Financiar → Plăți: descarcă avizul de plată (a doua jumătate) — Bulgaria' },
       { key: 'emag.facturi_bg', label: 'Facturi Emag BG descărcate', descriere: 'Deschide avizul de plată → în secțiunea Facturi pune numărul facturii + caută → descarcă documentul, pentru fiecare factură din aviz' },

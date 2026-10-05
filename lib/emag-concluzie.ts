@@ -13,6 +13,7 @@ const AVIZ_LABEL: Record<string, string> = {
   'emag.aviz_ro_inceput': 'RO · început de lună', 'emag.aviz_ro_jumatate': 'RO · jumătate de lună',
   'emag.aviz_bg_inceput': 'BG · început de lună', 'emag.aviz_bg_jumatate': 'BG · jumătate de lună',
   'emag.aviz_hu_inceput': 'HU · început de lună', 'emag.aviz_hu_jumatate': 'HU · jumătate de lună',
+  'emag.aviz_heyblu_inceput': 'Heyblu · început de lună', 'emag.aviz_heyblu_jumatate': 'Heyblu · jumătate de lună',
 }
 function valutaAviz(taskKey: string, citita: string | null) {
   const k = taskKey.toLowerCase()
