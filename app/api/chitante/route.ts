@@ -4,6 +4,7 @@ import { PDFDocument } from 'pdf-lib'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { isEonApartment99, isEonInvoice, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
+import { sumaRonDinPdf } from '@/lib/suma-ron-pdf'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 const ALLOWED_CSV_TYPES = new Set(['text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain', ''])
@@ -405,6 +406,10 @@ export async function POST(req: NextRequest) {
     genericExtractie = await analyzeGenericDoc(uploadBytes, file.type)
     effectiveSupplier = supplier || genericExtractie?.furnizor || effectiveSupplier
   }
+  // Totalul in lei scris explicit pe factura (Trendyol: „Total amount inc. VAT (RON)”) bate citirea AI,
+  // care lua uneori totalul in EUR de pe randul urmator
+  const sumaRonExplicita = !isAirbnbCsv && file.type === 'application/pdf' ? await sumaRonDinPdf(uploadBytes) : null
+  if (sumaRonExplicita != null && genericExtractie) genericExtractie = { ...genericExtractie, suma: sumaRonExplicita }
   const details = [effectiveDocumentTypeLabel, genericExtractie?.furnizor, genericExtractie?.numarDocument, supplier, description, reference].filter(Boolean).join(' ')
   const fileName = `${safeFilePart(details, effectiveType)}_${Date.now()}.${extension}`
   const path = `${firmaId}/${lunaId}/${effectiveSection}/${fileName}`
@@ -425,7 +430,8 @@ export async function POST(req: NextRequest) {
       tip_document: effectiveDocumentType,
       furnizor: [effectiveSupplier, description && `Descriere: ${description}`, reference && `Referinta: ${reference}`, `Categorie: ${category}`].filter(Boolean).join(' | '),
       numar_document: reference || genericExtractie?.numarDocument || null,
-      suma: genericExtractie?.suma ?? null,
+      suma: genericExtractie?.suma ?? sumaRonExplicita ?? null,
+      ...(sumaRonExplicita != null ? { valuta: 'RON' } : {}),
       data_document: genericExtractie?.dataDocument || null,
       cod_unitate_booking: genericExtractie?.codLocatie || null,
       fisier_path: path,
