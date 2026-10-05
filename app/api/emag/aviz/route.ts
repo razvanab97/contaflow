@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { finalizeazaDocument } from '@/lib/denumire-document'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { extractText, getDocumentProxy } from 'unpdf'
+import { clasificaAviz, esteAvizPlata, lunaAvizeAsteptata, ETICHETA_PIATA } from '@/lib/emag-aviz-clasificare'
+import { esteLunaCalendaristica } from '@/lib/firma-config'
 
 interface ExtractedInvoice {
   categorie?: string
@@ -149,13 +152,35 @@ export async function POST(req: NextRequest) {
     const file = fd.get('file') as File | null
     const firmaId = fd.get('firmaId') as string
     const lunaId = fd.get('lunaId') as string
-    const taskKey = fd.get('taskKey') as string
+    let taskKey = fd.get('taskKey') as string
     if (!file || !firmaId || !lunaId || !taskKey)
       return NextResponse.json({ error: 'Adaugă PDF-ul avizului, firma, luna și task-ul' }, { status: 400 })
 
     const bytes = Buffer.from(await file.arrayBuffer())
     if (file.type !== 'application/pdf' && !bytes.subarray(0, 5).equals(Buffer.from('%PDF-')))
       return NextResponse.json({ error: 'Este acceptat doar un fișier PDF' }, { status: 422 })
+
+    // „Încarcă tot”: categoria se alege din textul avizului (piata, Heyblu, jumatatea de luna)
+    if (taskKey === 'auto') {
+      let text = ''
+      try { text = String((await extractText(await getDocumentProxy(new Uint8Array(bytes)), { mergePages: true })).text || '') } catch {}
+      if (!esteAvizPlata(text)) return NextResponse.json({ nuEAviz: true })
+      const c = clasificaAviz(text)
+      if (!c) return NextResponse.json({ error: 'Aviz de plată nerecunoscut (lipsește numărul sau data)' }, { status: 422 })
+      const sbAuto = getServiceSupabase()
+      const [{ data: luna }, { data: firma }] = await Promise.all([
+        sbAuto.from('luni_contabile').select('luna').eq('id', lunaId).single(),
+        sbAuto.from('firme').select('slug').eq('id', firmaId).single(),
+      ])
+      const asteptata = luna?.luna ? lunaAvizeAsteptata(luna.luna, esteLunaCalendaristica(firma?.slug)) : null
+      if (asteptata && c.data.slice(0, 7) !== asteptata)
+        return NextResponse.json({ error: `Avizul ${c.numar} e din ${c.data.split('-').reverse().join('.')} — nu aparține acestei luni (avize din ${asteptata.split('-').reverse().join('.')})`, taskKey: c.taskKey }, { status: 422 })
+      // acelasi aviz deja incarcat in categoria lui -> nu se incarca din nou
+      const { data: deja } = await sbAuto.from('documente').select('id').eq('luna_id', lunaId).eq('modul', 'emag')
+        .eq('tip_document', 'aviz_plata').eq('furnizor', c.taskKey).eq('numar_document', c.numar).limit(1)
+      if (deja?.length) return NextResponse.json({ ok: true, existent: true, taskKey: c.taskKey, avizNumber: c.numar, eticheta: `${ETICHETA_PIATA[c.piata]} · ${c.jumatate === 'inceput' ? 'început' : 'jumătate'} lună` })
+      taskKey = c.taskKey
+    }
 
     let extracted: { numarAviz?:string; dataAviz?:string; facturi?:ExtractedInvoice[] } = {}
     try { extracted = await analyzeAviz(bytes) } catch {}
@@ -246,7 +271,7 @@ export async function POST(req: NextRequest) {
       if (oldPaths.length) await sb.storage.from('documente').remove(oldPaths)
     }
 
-    return NextResponse.json({ ok: true, documentId: doc.id, avizNumber, fisierNume: fileName, invoices: inserted })
+    return NextResponse.json({ ok: true, taskKey, documentId: doc.id, avizNumber, fisierNume: fileName, invoices: inserted })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

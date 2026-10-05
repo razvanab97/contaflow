@@ -267,6 +267,87 @@ function FacturaRow({ inv, firmaId, lunaId, culoare, currency, onChange }: {
   )
 }
 
+// „Încarcă tot”: avize + facturi amestecate, în orice ordine. Fiecare aviz e citit și pus singur în
+// categoria lui (RO / BG / HU / Heyblu × început / jumătate); apoi facturile se leagă de rândul lor
+// din avizul potrivit. La final: lista cu unde a ajuns fiecare fișier.
+type RezultatTot = { fisier:string; ok:boolean; text:string }
+function IncarcaTotZone({ firmaId, lunaId, culoare, etichete, onChange }: {
+  firmaId:string; lunaId:string; culoare:string; etichete:Record<string,string>; onChange:()=>void|Promise<void>
+}) {
+  const [stare, setStare] = useState<string | null>(null)
+  const [drag, setDrag] = useState(false)
+  const [rez, setRez] = useState<RezultatTot[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
+  const r = rgb(culoare)
+
+  async function incarca(lista: FileList) {
+    const files = Array.from(lista)
+    const out: RezultatTot[] = []
+    const facturi: File[] = []
+    setRez([])
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i]
+      if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') { facturi.push(f); continue }
+      setStare(`Citesc avizele… ${i + 1}/${files.length}`)
+      const fd = new FormData()
+      fd.append('file', f); fd.append('firmaId', firmaId); fd.append('lunaId', lunaId); fd.append('taskKey', 'auto')
+      const res = await fetch('/api/emag/aviz', { method:'POST', body:fd })
+      const d = await res.json().catch(() => ({ error:'Eroare la încărcare' }))
+      if (d.nuEAviz) { facturi.push(f); continue }
+      const unde = etichete[d.taskKey] || d.eticheta || d.taskKey || ''
+      if (d.existent) out.push({ fisier:f.name, ok:true, text:`aviz ${d.avizNumber} → ${unde} (era deja încărcat)` })
+      else if (d.ok) out.push({ fisier:f.name, ok:true, text:`aviz ${d.avizNumber} → ${unde}${d.invoices?.length ? ` · ${d.invoices.length} facturi de adăugat` : ''}` })
+      else out.push({ fisier:f.name, ok:false, text:d.error || 'nu s-a putut încărca' })
+      setRez([...out])
+    }
+    // facturile, dupa ce toate avizele sunt la locul lor - cate 5 pe cerere
+    for (let i = 0; i < facturi.length; i += 5) {
+      setStare(`Asociez facturile… ${Math.min(i + 5, facturi.length)}/${facturi.length}`)
+      const fd = new FormData()
+      facturi.slice(i, i + 5).forEach(f => fd.append('files', f))
+      fd.append('firmaId', firmaId); fd.append('lunaId', lunaId)
+      const res = await fetch('/api/emag/aviz/factura/bulk', { method:'POST', body:fd })
+      const d = await res.json().catch(() => ({ matched:[], unmatched:facturi.slice(i, i + 5).map(f => ({ fileName:f.name, reason:'Eroare la încărcare' })) }))
+      for (const m of d.matched || []) out.push({ fisier:m.fileName, ok:true, text:`factura ${m.numarCautare} → ${etichete[m.taskKey] || m.taskKey}` })
+      for (const u of d.unmatched || []) out.push({ fisier:u.fileName, ok:false, text:u.reason })
+      setRez([...out])
+    }
+    setStare(null)
+    await onChange()
+  }
+
+  const bune = rez.filter(x => x.ok).length
+  return (
+    <div style={{ marginBottom:'4px' }}>
+      <div
+        onClick={() => !stare && fileRef.current?.click()}
+        onDragOver={e => { e.preventDefault(); setDrag(true) }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={e => { e.preventDefault(); setDrag(false); if (!stare && e.dataTransfer.files.length) incarca(e.dataTransfer.files) }}
+        style={{ border:`1.5px dashed ${drag ? culoare : `rgba(${r},.45)`}`, borderRadius:'var(--r-md)', padding:'16px', textAlign:'center', cursor: stare ? 'default' : 'pointer', background: drag ? tint(r,.06) : tint(r,.025) }}
+      >
+        <p style={{ fontSize:'var(--fs-sm)', fontWeight:700, color: stare ? 'var(--c-777777)' : culoare }}>
+          {stare || '+ Încarcă tot — avize și facturi deodată'}
+        </p>
+        {!stare && <p style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', marginTop:'4px' }}>Fiecare aviz merge singur în categoria lui (RO / BG / HU / Heyblu, început sau jumătate de lună), iar facturile se leagă de avizul lor.</p>}
+      </div>
+      <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { if (e.target.files?.length) incarca(e.target.files); e.target.value = '' }}/>
+      {rez.length > 0 && (
+        <div style={{ marginTop:'8px', display:'flex', flexDirection:'column', gap:'3px' }}>
+          <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color: bune === rez.length ? 'var(--success)' : 'var(--c-888888)' }}>
+            {bune}/{rez.length} fișiere puse la locul lor{bune < rez.length ? ' — cele cu roșu trebuie verificate' : ''}
+          </span>
+          {rez.map((x, i) => (
+            <div key={i} style={{ fontSize:'var(--fs-xs)', color: x.ok ? 'var(--c-888888)' : 'var(--danger)' }}>
+              {x.ok ? '✓' : '✕'} {x.text} <span style={{ color:'var(--c-555555)' }}>· {x.fisier}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BulkUploadZone({ documentId, firmaId, lunaId, culoare, onChange }: {
   documentId:string; firmaId:string; lunaId:string; culoare:string; onChange:()=>void|Promise<void>
 }) {
@@ -615,6 +696,9 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
             {pdfBusy ? 'Se generează...' : 'Descarcă tot'}
           </button>
         </div>
+        <IncarcaTotZone firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare}
+          etichete={Object.fromEntries(moduleTasks.filter(t => t.key.startsWith('emag.aviz_')).map(t => [t.key, t.label.replace(/^Aviz plată |^Notificare plată /, '')]))}
+          onChange={loadAvize}/>
         {moduleTasks.filter(t => t.key.startsWith('emag.aviz_')).map(t => (
           <AvizUploadRow key={t.key} taskKey={t.key} label={t.label} descriere={t.descriere} data={avizData[t.key]} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} onChange={loadAvize}/>
         ))}

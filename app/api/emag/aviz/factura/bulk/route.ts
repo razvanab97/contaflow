@@ -38,16 +38,16 @@ export async function POST(req: NextRequest) {
   const documentId = fd.get('documentId') as string
   const firmaId = fd.get('firmaId') as string
   const lunaId = fd.get('lunaId') as string
-  if (!files.length || !documentId || !firmaId || !lunaId)
+  if (!files.length || !firmaId || !lunaId)
     return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
 
+  // Cu documentId: doar facturile acelui aviz; fara: facturile din toate avizele lunii („Încarcă tot”)
   const sb = getServiceSupabase()
-  const { data: facturi } = await sb.from('emag_avize_facturi')
-    .select('id,task_key,numar_cautare,factura_document_id')
-    .eq('document_id', documentId)
+  const q = sb.from('emag_avize_facturi').select('id,task_key,numar_cautare,factura_document_id')
+  const { data: facturi } = documentId ? await q.eq('document_id', documentId) : await q.eq('luna_id', lunaId)
   const available = (facturi || []).filter(f => !f.factura_document_id)
 
-  const matched: { fileName:string; numarCautare:string }[] = []
+  const matched: { fileName:string; numarCautare:string; taskKey:string }[] = []
   const unmatched: { fileName:string; reason:string }[] = []
 
   for (const file of files) {
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
     if (updError) { unmatched.push({ fileName: file.name, reason: updError.message }); continue }
 
     target.factura_document_id = doc.id
-    matched.push({ fileName: file.name, numarCautare: target.numar_cautare })
+    matched.push({ fileName: file.name, numarCautare: target.numar_cautare, taskKey: target.task_key })
   }
 
   return NextResponse.json({ matched, unmatched })
