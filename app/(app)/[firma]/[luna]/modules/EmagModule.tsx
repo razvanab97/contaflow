@@ -14,7 +14,7 @@ interface EmagSummary { bankReceipts:number; bankPayments:number; bankCashflow:n
 interface OldDoc { id:string; fisier_nume:string; tip_document?:string }
 interface AvizFactura { id:string; categorie:string; id_document:string; serie_document:string; numar_cautare:string; data_document:string; valoare:number; valuta?:string; copiat:boolean; factura_document_id:string|null; factura_fisier_nume:string|null }
 interface OrphanEmagInvoice { id:string; task_key:string; numar_document:string|null; fisier_nume:string }
-interface AvizData { documentId:string|null; avizNumber:string; fisierNume:string; invoices:AvizFactura[]; orphanInvoices?:OrphanEmagInvoice[] }
+interface AvizData { documentId:string|null; avizNumber:string; fisierNume:string; sumaAviz?:number|null; invoices:AvizFactura[]; orphanInvoices?:OrphanEmagInvoice[] }
 
 interface Props {
   firma: Firma
@@ -461,7 +461,11 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
           <div style={{ fontSize:'var(--fs-md)', fontWeight:600, color:'var(--c-e0e0e0)' }}>{label}</div>
           {descriere && <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', marginTop:'2px' }}>{descriere}</div>}
         </div>
-        {hasAviz && <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--success)', flexShrink:0 }}>{data!.invoices.length} factur{data!.invoices.length===1?'ă':'i'} · {moneyCurrency(avizTotal, currency)}</span>}
+        {/* totalul incasat din aviz (randul Total); facturile retinute din el, separat - la Heyblu nu sunt facturi */}
+        {hasAviz && <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--success)', flexShrink:0, textAlign:'right' }}>
+          {data!.sumaAviz != null && <>{moneyCurrency(data!.sumaAviz, currency)} încasat · </>}
+          {data!.invoices.length ? <>{data!.invoices.length} factur{data!.invoices.length===1?'ă':'i'} ({moneyCurrency(avizTotal, currency)})</> : 'fără facturi'}
+        </span>}
         {!hasAviz && orphanInvoices.length > 0 && <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--accent)', flexShrink:0 }}>{orphanInvoices.length} factur{orphanInvoices.length===1?'ă':'i'} fără aviz</span>}
         <svg width="14" height="14" fill="none" stroke="var(--c-555555)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0, transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s' }}>
           <path d="M6 9l6 6 6-6"/>
@@ -479,7 +483,8 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
                     defaultValue={data.avizNumber}
                     onBlur={e => renameAvizNumber(e.target.value.trim())}
                     placeholder="nr. aviz"
-                    style={{ width:'70px', fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
+                    size={Math.max(8, String(data.avizNumber || '').length + 2)}
+                    style={{ width:'auto', fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--c-cccccc)', background:'transparent', border:'none', outline:'none', padding:0 }}
                   />
                   <input
                     defaultValue={data.fisierNume}
@@ -495,7 +500,7 @@ function AvizUploadRow({ taskKey, label, descriere, data, firmaId, lunaId, culoa
               </div>
               {preview && <PreviewBox src={`/api/emag?docId=${encodeURIComponent(data!.documentId!)}&preview=1`} kind="pdf"/>}
               {data.invoices.length === 0 ? (
-                <p style={{ fontSize:'var(--fs-sm)', color:'var(--c-666666)' }}>Nicio factură detectată în aviz.</p>
+                <p style={{ fontSize:'var(--fs-sm)', color:'var(--c-666666)' }}>{data.sumaAviz != null ? `Fără facturi în aviz — doar încasarea de ${moneyCurrency(data.sumaAviz, currency)}.` : 'Nicio factură detectată în aviz.'}</p>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
                   {data.invoices.map(inv => (

@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 188, text: 'eMAG Facturi · Avize: antetul fiecărui aviz arată totalul încasat (ex. „812,98 RON încasat · fără facturi” la Heyblu, „6.188,04 RON încasat · 4 facturi (-1.333,03 RON)” la RO), nu doar suma facturilor, care la Heyblu era 0. Numărul avizului apare întreg, nu tăiat.' },
   { v: 187, text: 'eMAG Facturi: zonă nouă „Încarcă tot”. Pui deodată toate avizele și facturile, în orice ordine. Fiecare aviz e citit și pus singur în categoria lui (RO / BG / HU / Heyblu, început sau jumătate de lună) și devine capul listei de facturi de adăugat. Facturile se leagă apoi singure de rândul lor. Avizele din altă lună sunt refuzate cu mesaj, iar un aviz deja încărcat nu se dublează.' },
   { v: 186, text: 'eMAG Facturi: categorii noi „Notificare plată Heyblu — început lună / jumătate lună” pentru notificările „Încasări Revolving”, separat de avizele RO, ca să nu se mai înlocuiască unul pe altul. Avizele BG și HU primesc moneda corectă în nume (EUR / HUF), nu „RON” din nota de subsol.' },
   { v: 185, text: '5StarDesk: facturile egale cu borderoul plus comisionul Airbnb sunt confirmate automat. Nu mai apar ca listă lungă, ci ca un singur rând restrâns, „✓ 21 facturi confirmate automat”, care se poate deschide cu „Arată”. Vizibile rămân doar facturile care nu se potrivesc, în „Discrepanțe de preț”.' },

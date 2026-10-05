@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
 
   const { data: avize, error } = await sb.from('documente')
-    .select('id,furnizor,numar_document,fisier_nume,fisier_path,fisier_marime,created_at')
+    .select('id,furnizor,numar_document,fisier_nume,fisier_path,fisier_marime,suma,created_at')
     .eq('luna_id', lunaId)
     .eq('modul', 'emag')
     .eq('tip_document', 'aviz_plata')
@@ -123,12 +123,13 @@ export async function GET(req: NextRequest) {
     factura_fisier_nume: f.factura_document_id ? facturaDocById.get(f.factura_document_id) || null : null,
   }))
 
-  const result: Record<string, { documentId:string|null; avizNumber:string; fisierNume:string; invoices:typeof facturiEnriched; orphanInvoices?:OrphanInvoice[] }> = {}
+  const result: Record<string, { documentId:string|null; avizNumber:string; fisierNume:string; sumaAviz?:number|null; invoices:typeof facturiEnriched; orphanInvoices?:OrphanInvoice[] }> = {}
   for (const a of avize || []) {
     result[a.furnizor || ''] = {
       documentId: a.id,
       avizNumber: a.numar_document || '',
       fisierNume: a.fisier_nume,
+      sumaAviz: a.suma == null ? null : Number(a.suma),
       invoices: facturiEnriched.filter(f => f.document_id === a.id),
       orphanInvoices: orphanByTask[a.furnizor || ''] || [],
     }
