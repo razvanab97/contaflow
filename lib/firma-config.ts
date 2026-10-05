@@ -190,6 +190,7 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     tasks: [
       { key: 'trendyol.factura_incarcata', label: 'Factură Trendyol încărcată' },
       { key: 'trendyol.borderou_incarcat', label: 'Borderou Trendyol încărcat' },
+      { key: 'trendyol.ecap_desfasuratoare', label: 'Desfășurătoare de încasare încărcate în eCap', descriere: 'Pentru contabilitate: încarcă în eCap desfășurătoarele de încasare Trendyol ale lunii (borderourile / rapoartele de plată)' },
     ],
   },
   'booking-facturi': {
