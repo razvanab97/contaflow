@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 192, text: 'Trendyol: „Concluzia Trendyol”, ca la eMAG. Cascada merge de la vânzări la retururi, reduceri și comision, apoi transportul (facturi TYD) separat și evidențiat, alte taxe, virat conform borderourilor, încasat în extras, diferența de curs (EUR → lei) și rezultatul net. Fiecare încasare Trendyol din extras are borderoul ei (.xlsx PaymentOrderDetail), încărcat aici toate odată și legat automat după numărul ordinului de plată. Se văd borderourile lipsă și facturile TYD reținute dar neîncărcate.' },
   { v: 191, text: 'eMAG Facturi + Trendyol: task-ul „Desfășurătoare de încasare încărcate în eCap” e scos în evidență în listă, cu chenar portocaliu, fundal, titlu îngroșat și eticheta „⚠ Important · contabilitate”. După bifare devine discret.' },
   { v: 190, text: 'Trendyol: task nou „Desfășurătoare de încasare încărcate în eCap”, același reminder pentru contabilitate ca la eMAG.' },
   { v: 189, text: 'eMAG Facturi: task nou „Desfășurătoare de încasare încărcate în eCap”, cu reminder pentru contabilitate: încarcă în eCap avizele de plată eMAG RO / BG / HU și notificările Heyblu ale lunii.' },

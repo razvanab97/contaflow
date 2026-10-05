@@ -2,6 +2,7 @@
 import TaskSection, { TaskItem } from './TaskSection'
 import UploadPanel from './UploadPanel'
 import OldItemDocs, { ChecklistItem } from './OldItemDocs'
+import ConcluzieTrendyol from './ConcluzieTrendyol'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string; tasks: TaskItem[]; checklistItems: ChecklistItem[] }
@@ -12,6 +13,9 @@ export default function TrendyolModule({ firma, lunaId, tasks, checklistItems }:
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
+
+      {/* Concluzia Trendyol: vanzari -> comision -> transport separat -> taxe -> virat -> incasat in extras */}
+      <ConcluzieTrendyol firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare}/>
 
       {sorted.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
