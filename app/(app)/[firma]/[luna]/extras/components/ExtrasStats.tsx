@@ -2,13 +2,13 @@
 
 export default function ExtrasStats({
   total, documentate, neasociate, ignorate, pct,
-  finalizat, finalizing, onToggleFinalizat, overallGata,
+  finalizat, finalizing, onToggleFinalizat, overallGata, finalizeMsg,
   onExport, exportingDocs, exportError, culoare, deVerificat = 0, onShowDeVerificat, bonFizic = 0, onShowBonFizic,
 }: {
   deVerificat?: number; onShowDeVerificat?: () => void
   bonFizic?: number; onShowBonFizic?: () => void
   total: number; documentate: number; neasociate: number; ignorate: number; pct: number
-  finalizat: boolean; finalizing: boolean; onToggleFinalizat: (v: boolean) => void; overallGata: boolean
+  finalizat: boolean; finalizing: boolean; onToggleFinalizat: (v: boolean) => void; overallGata: boolean; finalizeMsg?: { ok: boolean; text: string } | null
   onExport: () => void; exportingDocs: boolean; exportError: string
   culoare: string
 }) {
@@ -54,6 +54,7 @@ export default function ExtrasStats({
           </button>
         ) : null}
       </div>
+      {finalizeMsg && <p role={finalizeMsg.ok ? 'status' : 'alert'} style={{ fontSize:'var(--fs-sm)', color: finalizeMsg.ok ? 'var(--success)' : 'var(--danger)', width:'100%', fontWeight:600 }}>{finalizeMsg.ok ? '✓ ' : '⚠ '}{finalizeMsg.text}</p>}
       {exportError && <p role="alert" style={{ fontSize:'var(--fs-sm)', color:'var(--danger)', width:'100%' }}>{exportError}</p>}
     </div>
   )

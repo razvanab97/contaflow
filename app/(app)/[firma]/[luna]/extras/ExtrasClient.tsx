@@ -29,6 +29,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   const [pageTab, setPageTab] = useState<'extras'|'facturi'|'note'|'pdf'>('extras')
   const [finalizat, setFinalizat] = useState(initFinalizat)
   const [finalizing, setFinalizing] = useState(false)
+  const [finalizeMsg, setFinalizeMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [txs, setTxs] = useState<Tx[]>([])
   const [extrase, setExtrase] = useState<Extras[]>(initExtrase)
   const [newSlots, setNewSlots] = useState(0)
@@ -253,17 +254,28 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
 
   async function toggleFinalizat(value: boolean) {
     setFinalizing(true)
+    setFinalizeMsg(null)
     const previous = finalizat
     setFinalizat(value)
     try {
-      // Daca marcam finalizat, extrasul e evident si incarcat (altfel n-ar exista tranzactii de documentat)
-      const taskKeys = value ? ['extras.tranzactii_documentate', 'extras.incarcat'] : ['extras.tranzactii_documentate']
-      const results = await Promise.all(taskKeys.map(taskKey =>
-        fetch('/api/tasks/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId, taskKey, completat:value }) })
-      ))
-      if (results.some(res => !res.ok)) setFinalizat(previous)
+      // Daca marcam finalizat, extrasul e evident si incarcat (altfel n-ar exista tranzactii de documentat).
+      // „Tranzactii documentate” se scrie ULTIMA: ea decide starea afisata la reincarcare, deci o scriere
+      // esuata la jumatate nu lasa extrasul „finalizat” fara ca omul sa fi vazut-o.
+      const taskKeys = value ? ['extras.incarcat', 'extras.tranzactii_documentate'] : ['extras.tranzactii_documentate']
+      for (const taskKey of taskKeys) {
+        const res = await fetch('/api/tasks/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId, taskKey, completat:value }) })
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          setFinalizat(previous)
+          setFinalizeMsg({ ok: false, text: `Nu s-a putut salva ${value ? 'finalizarea' : 'anularea'} (${res.status}${d?.error ? `: ${d.error}` : ''}). Încearcă din nou.` })
+          setFinalizing(false)
+          return
+        }
+      }
+      setFinalizeMsg({ ok: true, text: value ? 'Salvat: Extras de cont e finalizat și apare bifat în Rezumatul lunii.' : 'Finalizarea a fost anulată.' })
     } catch {
       setFinalizat(previous)
+      setFinalizeMsg({ ok: false, text: `Nu s-a putut salva ${value ? 'finalizarea' : 'anularea'}: conexiune întreruptă. Încearcă din nou.` })
     }
     setFinalizing(false)
   }
@@ -325,7 +337,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
         <>
           <ExtrasStats
             total={scopedTxs.length} documentate={counts.ok} neasociate={counts.lipsa} ignorate={counts.na} pct={pct}
-            finalizat={finalizat} finalizing={finalizing} onToggleFinalizat={toggleFinalizat} overallGata={overallGata}
+            finalizat={finalizat} finalizing={finalizing} onToggleFinalizat={toggleFinalizat} overallGata={overallGata} finalizeMsg={finalizeMsg}
             onExport={exportDocuments} exportingDocs={exportingDocs} exportError={exportError}
             deVerificat={scopedTxs.filter(t => ignorareDeVerificat(t)).length}
             onShowDeVerificat={() => { setFilter('na'); setFlowFilter('debit'); setActiveTxIndex(0) }}
