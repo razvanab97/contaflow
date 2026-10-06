@@ -8,7 +8,7 @@ import type { ConcluzieEmag } from '@/lib/emag-concluzie'
 import { areAchizitiiProduse } from '@/lib/achizitii-produse'
 import AchizitiiProduse from './AchizitiiProduse'
 
-interface Punct { luna: string; label: string; incasari: number; plati: number; pct: number; initializata: boolean }
+interface Punct { luna: string; label: string; incasari: number; imprumutPrimit?: number; plati: number; pct: number; initializata: boolean }
 
 function money(v: number, d = 2) { return new Intl.NumberFormat('ro-RO', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v || 0) }
 function curs(v: number) { return new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(v) }
@@ -51,7 +51,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna, lunaLabe
   if (!flux && !emagC) return null
 
   const serie = istoric.filter(p => p.initializata)
-  const spark = (key: 'incasari' | 'plati' | 'cashflow') => serie.map(p => key === 'cashflow' ? p.incasari - p.plati : p[key])
+  const spark = (key: 'incasari' | 'plati' | 'cashflow') => serie.map(p => key === 'cashflow' ? p.incasari + (p.imprumutPrimit || 0) - p.plati : p[key])
   const range = serie.length > 1 ? `${serie[0].label} – ${serie[serie.length - 1].label}` : ''
   const monede = flux ? Object.entries(flux.peMoneda).sort(([a], [b]) => (a === 'RON' ? -1 : b === 'RON' ? 1 : a.localeCompare(b))) : []
   const multiMoneda = monede.length > 1
@@ -63,11 +63,17 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna, lunaLabe
     // Dispozitiile de plata sunt plati in numerar (nu apar in extras): intra in Plati si scad din Cashflow,
     // ca toti banii care pleaca din firma sa fie numarati. Randurile pe monede raman cele din extras (se reconciliaza cu banca).
     const disp = c.dispozitii || { total: 0, numar: 0 }
+    // „Încasări” = doar incasarile reale: fara imprumutul primit de la asociat (apare in cardul Imprumut firma) si fara
+    // schimburile valutare intre conturile proprii. Cashflow ramane miscarea reala din conturi (include imprumutul).
+    const imprumutPrimit = c.imprumut?.primit || 0
     const platiTotal = Math.round((c.plati + disp.total) * 100) / 100
     const netTotal = Math.round((c.net - disp.total) * 100) / 100
     const rows = (fn: (m: FluxLunar['peMoneda'][string]) => number) => monede.map(([v, m]) => ({ v, suma: fn(m), curs: v !== 'RON' ? m.cursMediu : null }))
     tiles.push(
-      { label: 'Încasări', value: c.incasari, color: 'var(--success)', spark: spark('incasari'), sparkColor: 'var(--success)', rows: rows(m => m.incasari - m.schimbIn) },
+      {
+        label: 'Încasări', value: c.incasariReale.total, color: 'var(--success)', spark: spark('incasari'), sparkColor: 'var(--success)', rows: rows(m => m.incasari - m.schimbIn - m.imprumut.primit),
+        title: imprumutPrimit > 0 ? `Încasări din conturi, fără împrumutul de la asociat (${money(imprumutPrimit)} lei — vezi „Împrumut firmă”) și fără schimburile valutare între conturile proprii.` : undefined,
+      },
       {
         label: 'Plăți', value: platiTotal, color: 'var(--danger)', spark: spark('plati'), sparkColor: 'var(--danger)', rows: rows(m => m.plati - m.schimbOut),
         title: disp.numar ? `Plăți din extrasele bancare (${money(c.plati)} lei) + ${disp.numar} ${disp.numar === 1 ? 'dispoziție de plată' : 'dispoziții de plată'} în numerar (${money(disp.total)} lei).` : undefined,
@@ -76,7 +82,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna, lunaLabe
           { label: `Dispoziții de plată (${disp.numar})`, suma: disp.total, semn: '−' as const },
         ] : undefined,
       },
-      { label: 'Cashflow', value: netTotal, color: netTotal >= 0 ? 'var(--success)' : 'var(--danger)', spark: spark('cashflow'), sparkColor: 'var(--accent)', rows: rows(m => (m.incasari - m.schimbIn) - (m.plati - m.schimbOut)), title: disp.numar ? `Încasări − Plăți, după scăderea dispozițiilor de plată în numerar (${money(disp.total)} lei).` : undefined },
+      { label: 'Cashflow', value: netTotal, color: netTotal >= 0 ? 'var(--success)' : 'var(--danger)', spark: spark('cashflow'), sparkColor: 'var(--accent)', rows: rows(m => (m.incasari - m.schimbIn) - (m.plati - m.schimbOut)), title: [imprumutPrimit > 0 ? `Mișcarea reală din conturi: încasări + împrumut primit (${money(imprumutPrimit)} lei) − plăți.` : '', disp.numar ? `După scăderea dispozițiilor de plată în numerar (${money(disp.total)} lei).` : ''].filter(Boolean).join(' ') || undefined },
     )
   }
   if (flux) {
@@ -96,7 +102,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna, lunaLabe
     const i = flux.consolidat.imprumut
     tiles.push({
       label: 'Împrumut firmă', value: i.net, color: 'var(--text-primary)',
-      title: 'Împrumuturi de la asociat: intrări = „împrumut societate”; ieșiri = „restituire împrumut” și „avans trezorerie”. Echivalent lei la cursul BNR; incluse și în Încasări/Plăți.',
+      title: 'Împrumuturi de la asociat: intrări = „împrumut societate”; ieșiri = „restituire împrumut” și „avans trezorerie”. Echivalent lei la cursul BNR. Împrumutul primit nu intră în Încasări (dar apare în Cashflow); restituirile și avansul sunt incluse în Plăți.',
       detalii: i.numar ? [
         { label: 'Primit', suma: i.primit, semn: '+' },
         { label: 'Restituit', suma: i.restituire, semn: '−' },
