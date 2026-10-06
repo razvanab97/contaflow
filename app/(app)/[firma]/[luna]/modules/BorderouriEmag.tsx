@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface Borderou {
-  id: string; tip: string; eticheta: string; platforma: string | null; nr: string | null; data: string | null; suma: number | null; fisier: string
+  id: string; tip: string; eticheta: string; platforma: string | null; nr: string | null; data: string | null; suma: number | null; incasari: number | null; detalii: Record<string, number>; fisier: string
   verificare: { stare: 'ok' | 'diferenta' | 'fara_aviz'; text: string }
 }
 
@@ -59,16 +59,18 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
 
       {lista === null ? <div className="skeleton" style={{ height: '60px' }} /> : lista.length > 0 && (
         <div style={{ marginBottom: '10px', overflowX: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(92px,auto) minmax(220px,1.4fr) auto minmax(180px,2fr) auto', gap: '0 14px', alignItems: 'start', fontSize: 'var(--fs-sm)', minWidth: '640px' }}>
-            <span className="eyebrow">Data borderou</span><span className="eyebrow">Platformă · tip · ID</span><span className="eyebrow" style={{ textAlign: 'right' }}>Sumă</span><span className="eyebrow">Verificare cu avizul</span><span />
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(92px,auto) minmax(220px,1.4fr) auto auto minmax(180px,2fr) auto', gap: '0 14px', alignItems: 'start', fontSize: 'var(--fs-sm)', minWidth: '760px' }}>
+            <span className="eyebrow">Data borderou</span><span className="eyebrow">Platformă · tip · ID</span><span className="eyebrow" style={{ textAlign: 'right' }}>Total borderou</span><span className="eyebrow" style={{ textAlign: 'right' }}>Încasări (în aviz)</span><span className="eyebrow">Verificare cu avizul</span><span />
             {lista.map(b => (
               <div key={b.id} style={{ display: 'contents' }}>
                 <span className="num" style={{ ...celula, fontWeight: 650, color: 'var(--text-primary)' }}>{zi(b.data)}</span>
                 <span style={{ ...celula, color: 'var(--text-secondary)', minWidth: 0 }} title={b.fisier}>
                   <span className="badge" style={{ marginRight: '6px', fontWeight: 700, color: b.platforma ? 'var(--accent)' : 'var(--text-muted)' }}>{b.platforma || 'eMAG ?'}</span>
                   {b.eticheta}{b.nr ? <span style={{ color: 'var(--text-muted)' }}> · {b.nr}</span> : null}
+                  {Object.keys(b.detalii).length > 1 && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>{Object.entries(b.detalii).map(([k, v]) => `${k} ${bani(v)}`).join(' · ')}</div>}
                 </span>
-                <span className="num" style={{ ...celula, textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{b.suma != null ? `${bani(b.suma)} RON` : '—'}</span>
+                <span className="num" style={{ ...celula, textAlign: 'right', fontWeight: 650, whiteSpace: 'nowrap' }} title={Object.entries(b.detalii).map(([k, v]) => `${k}: ${bani(v)}`).join('\n')}>{b.suma != null ? `${bani(b.suma)} RON` : '—'}</span>
+                <span className="num" style={{ ...celula, textAlign: 'right', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{b.incasari != null ? bani(b.incasari) : '—'}</span>
                 <span style={{ ...celula, fontSize: 'var(--fs-xs)', color: CULOARE[b.verificare.stare] }}>{SEMN[b.verificare.stare]} {b.verificare.text}</span>
                 <span style={{ ...celula, display: 'flex', gap: '12px', justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>
                   <a href={`/api/emag/borderou?download=${encodeURIComponent(b.id)}`} style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 'var(--fs-xs)' }}>↓ .xlsx</a>

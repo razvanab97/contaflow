@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       await sb.from('documente').delete().in('id', vechi.map(v => v.id))
       await sb.storage.from('documente').remove(vechi.map(v => v.fisier_path).filter(Boolean))
     }
-    rezultate.push({ fisier: file.name, ok: true, text: `${ETICHETA_BORDEROU_EMAG[b.tip]} · ${b.id}${b.data ? ` · ${zi(b.data)}` : ''} · ${lei(b.total)} RON${vechi?.length ? ' (înlocuit)' : ''}` })
+    rezultate.push({ fisier: file.name, ok: true, text: `${ETICHETA_BORDEROU_EMAG[b.tip]} · ${b.id}${b.data ? ` · ${zi(b.data)}` : ''} · total ${lei(b.total)} RON${b.incasari != null && b.incasari !== b.total ? ` (încasări ${lei(b.incasari)})` : ''}${vechi?.length ? ' (înlocuit)' : ''}` })
   }
   return NextResponse.json({ rezultate })
 }
@@ -83,7 +83,8 @@ async function avizeLuna(sb: Sb, lunaId: string): Promise<AvizLuna[]> {
 const zile = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86400000
 const suma = (l: LinieCache[], re: RegExp) => Math.round(l.filter(x => x.tip === 'vanzare' && re.test(x.descriere)).reduce((s, x) => s + x.valoare, 0) * 100) / 100
 
-function verifica(b: { tip: TipBorderouEmag; id: string; data: string | null; total: number; peAviz?: Record<string, number> }, avize: AvizLuna[]) {
+function verifica(b: { tip: TipBorderouEmag; id: string; data: string | null; total: number; incasari?: number; peAviz?: Record<string, number> }, avize: AvizLuna[]) {
+  const inc = b.incasari ?? b.total
   const egal = (x: number, y: number) => Math.abs(x - y) < 0.05
   if (b.tip === 'dp_cash' || b.tip === 'dp_card') {
     const aproape = avize.filter(a => !/heyblu/.test(a.taskKey) && a.data && b.data && zile(a.data, b.data) <= 3 && a.linii.length)
@@ -91,18 +92,18 @@ function verifica(b: { tip: TipBorderouEmag; id: string; data: string | null; to
     for (const a of aproape) {
       if (b.tip === 'dp_cash') {
         const r = suma(a.linii, /ramburs|cash on delivery|наложен|utánvét/i)
-        if (egal(r, b.total)) return { stare: 'ok' as const, platforma: platformaDinTaskKey(a.taskKey), text: `= Încasări ramburs din avizul ${a.numar}` }
+        if (egal(r, inc)) return { stare: 'ok' as const, platforma: platformaDinTaskKey(a.taskKey), text: `= Încasări ramburs din avizul ${a.numar}` }
       } else {
         const card = suma(a.linii, /card|online/i)
         const jum = a.taskKey.endsWith('_inceput') ? 'inceput' : 'jumatate'
         const hey = avize.find(x => x.taskKey === `emag.aviz_heyblu_${jum}`)
         const h = /_ro_/.test(a.taskKey) && hey?.total ? hey.total : 0
-        if (egal(card + h, b.total)) return { stare: 'ok' as const, platforma: platformaDinTaskKey(a.taskKey), text: `= card online ${lei(card)} din avizul ${a.numar}${h ? ` + Heyblu ${lei(h)}` : ''}` }
+        if (egal(card + h, inc)) return { stare: 'ok' as const, platforma: platformaDinTaskKey(a.taskKey), text: `= card online ${lei(card)} din avizul ${a.numar}${h ? ` + Heyblu ${lei(h)}` : ''}` }
       }
     }
     const a = aproape.find(x => /_ro_/.test(x.taskKey)) || aproape[0]
     const asteptat = b.tip === 'dp_cash' ? suma(a.linii, /ramburs|cash on delivery/i) : suma(a.linii, /card|online/i)
-    return { stare: 'diferenta' as const, platforma: platformaDinTaskKey(a.taskKey), text: `avizul ${a.numar} are ${lei(asteptat)} — diferență ${lei(b.total - asteptat)}` }
+    return { stare: 'diferenta' as const, platforma: platformaDinTaskKey(a.taskKey), text: `avizul ${a.numar} are ${lei(asteptat)} — diferență ${lei(inc - asteptat)}` }
   }
   if (b.tip === 'dc') {
     for (const a of avize) {
@@ -134,14 +135,13 @@ export async function GET(req: NextRequest) {
     const avize = await avizeLuna(sb, lunaLista)
     const borderouri = await Promise.all((data || []).map(async d => {
       const tip = d.furnizor as TipBorderouEmag
-      let peAviz: Record<string, number> | undefined
-      if (tip === 'extras_cont') {
-        const { data: f } = await sb.storage.from('documente').download(d.fisier_path)
-        if (f) peAviz = (await citesteBorderouEmag(new Uint8Array(await f.arrayBuffer()), d.fisier_nume).catch(() => null))?.peAviz
-      }
-      const v = verifica({ tip, id: d.numar_document || '', data: d.data_document, total: Number(d.suma) || 0, peAviz }, avize)
+      // fisierul se citeste din nou: totalul borderoului (toate liniile), incasarile comparate cu avizul, detaliile
+      const { data: f } = await sb.storage.from('documente').download(d.fisier_path)
+      const citit = f ? await citesteBorderouEmag(new Uint8Array(await f.arrayBuffer()), d.fisier_nume).catch(() => null) : null
+      const total = citit?.total ?? (Number(d.suma) || 0)
+      const v = verifica({ tip, id: d.numar_document || '', data: d.data_document, total, incasari: citit?.incasari, peAviz: citit?.peAviz }, avize)
       const platforma = tip === 'extras_cont' ? (d.numar_document?.startsWith('eMAG') ? d.numar_document : null) : ('platforma' in v ? v.platforma : null) || null
-      return { id: d.id, tip, eticheta: ETICHETA_BORDEROU_EMAG[tip] || tip, platforma, nr: tip === 'extras_cont' ? null : d.numar_document, data: d.data_document, suma: d.suma == null ? null : Number(d.suma), fisier: d.fisier_nume, verificare: v }
+      return { id: d.id, tip, eticheta: ETICHETA_BORDEROU_EMAG[tip] || tip, platforma, nr: tip === 'extras_cont' ? null : d.numar_document, data: d.data_document, suma: total, incasari: citit?.incasari ?? null, detalii: citit?.detalii || {}, fisier: d.fisier_nume, verificare: v }
     }))
     const ordine: Record<string, number> = { dp_cash: 0, dp_card: 1, dc: 2, extras_cont: 3 }
     borderouri.sort((a, b) => String(a.data).localeCompare(String(b.data)) || (ordine[a.tip] ?? 9) - (ordine[b.tip] ?? 9))

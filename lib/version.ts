@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 199, text: 'Borderouri eMAG: „Total borderou” arată acum totalul documentului, din toate liniile lui, inclusiv reținerile și restituirile de curier la DP cash. De exemplu, 16119510 are 1.755,50 RON, nu 2.772,21. Coloana nouă „Încasări (în aviz)” arată partea comparată cu avizul. Sub fiecare borderou apar liniile din care se compune.' },
   { v: 198, text: 'Borderouri eMAG: secțiunea ține doar desfășurătoarele de plată (DP cash și card). Decontul de comision (DC) și extrasul de cont eMAG sunt refuzate aici, cu mesaj.' },
   { v: 197, text: 'Borderouri eMAG: fiecare rând arată platforma (eMAG RO / BG / HU). DP cash scade acum și rambursările ramburs (Refund COD), iar DP card adună și plățile eCredit, deci desfășurătoarele din 17.09 se potrivesc cu avizul (6/6). Un extras de cont nou al aceleiași platforme îl înlocuiește pe cel vechi, nu se mai dublează.' },
   { v: 196, text: 'eMAG Facturi: secțiune nouă „Borderouri eMAG”. Încarci toate fișierele odată: desfășurătoarele de plată cash și card (DP), decontul lunar de comision (DC) și extrasul de cont eMAG. Tipul se recunoaște singur, iar data borderoului se ia din fișier, pentru eCap. Se descarcă separat sau .zip. Fiecare e verificat automat cu avizul lui: DP cash = încasări ramburs, DP card = card online + Heyblu, DC = factura de comision (net + TVA), extras = totalul avizului.' },

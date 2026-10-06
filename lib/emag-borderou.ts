@@ -22,7 +22,8 @@ export interface BorderouEmag {
   id: string                       // DP ID / Sheet ID / data extrasului
   data: string | null              // data borderoului (pentru eCap)
   perioada: string | null          // ex. „16.08–31.08.2026” sau „august 2026”
-  total: number                    // suma relevanta: incasarile platite (DP), comisionul cu TVA (DC), totalul compensat (extras)
+  total: number                    // totalul documentului: suma tuturor liniilor (DP), comisionul cu TVA (DC), totalul compensat (extras)
+  incasari?: number                // doar DP: partea care apare in aviz (cash: ramburs - rambursari; card: card - rambursari + eCredit)
   detalii: Record<string, number>  // pe tip de linie
   linii: number
   // doar la extras: totalul compensat pe fiecare aviz
@@ -64,13 +65,15 @@ export async function citesteBorderouEmag(bytes: Uint8Array | ArrayBuffer, numeF
     // suma platita pentru vanzari (= randul din aviz): card = incasari card - rambursari card + eCredit
     // (+ Heyblu, platit separat); cash = incasari ramburs - rambursari ramburs. Retinerile curier din DP
     // cash nu intra aici - in aviz apar separat, ca „Retineri curier”.
-    const total = r2(tipuri.filter(t => (card ? RE_CARD : RE_CASH).test(t)).reduce((s, t) => s + detalii[t], 0))
+    const incasari = r2(tipuri.filter(t => (card ? RE_CARD : RE_CASH).test(t)).reduce((s, t) => s + detalii[t], 0))
+    // totalul borderoului = toate liniile lui (inclusiv retinerile / restituirile curier din DP cash)
+    const total = r2(tipuri.reduce((s, t) => s + detalii[t], 0))
     const r0 = date[0] || []
     const data = String(r0[ix('Payout date')] ?? '').slice(0, 10) || null
     const ps = String(r0[ix('Reference period start')] ?? '').slice(0, 10), pe = String(r0[ix('Reference period end')] ?? '').slice(0, 10)
     return {
       tip: card ? 'dp_card' : 'dp_cash', id: String(r0[ix('DP ID')] ?? numeFisier.match(/_dp_(\d+)/)?.[1] ?? ''),
-      data, perioada: ps && pe ? `${zi(ps).slice(0, 5)}–${zi(pe)}` : null, total, detalii, linii: date.length,
+      data, perioada: ps && pe ? `${zi(ps).slice(0, 5)}–${zi(pe)}` : null, total, incasari, detalii, linii: date.length,
     }
   }
 
