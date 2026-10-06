@@ -169,7 +169,9 @@ export default function InboxSearch({ tx, firmaId, onAssociated, multi = false, 
                   {c.suma == null && ' · sumă necunoscută'}
                   {c.monedaDiferita
                     ? c.suma_ron != null && c.curs_bnr != null
-                      ? ` · ≈ ${c.suma_ron.toFixed(2)} lei la cursul BNR ${c.curs_bnr.toFixed(4)}${c.diferentaSuma !== null ? ` (diferență ${c.diferentaSuma.toFixed(2)} lei față de plată)` : ''}`
+                      ? c.curs_efectiv != null
+                        ? ` · la plata aceasta: curs ${c.curs_efectiv.toFixed(4)} lei/${c.valuta} (BNR ${c.curs_bnr.toFixed(4)} · ${(c.curs_efectiv / c.curs_bnr - 1) >= 0 ? '+' : ''}${((c.curs_efectiv / c.curs_bnr - 1) * 100).toFixed(1)}%)`
+                        : ` · ≈ ${c.suma_ron.toFixed(2)} lei la cursul BNR ${c.curs_bnr.toFixed(4)}${c.diferentaSuma !== null ? ` (diferență ${c.diferentaSuma.toFixed(2)} lei față de plată)` : ''}`
                       : ` · monedă diferită de tranzacție (${tx.valuta}) - verifică manual`
                     : c.diferentaSuma !== null && c.diferentaSuma > 0.01 ? ` · diferență ${c.diferentaSuma.toFixed(2)} ${c.valuta}` : c.diferentaSuma !== null ? ' · ✓ aceeași sumă' : ''}
                 </div>

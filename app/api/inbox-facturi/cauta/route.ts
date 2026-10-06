@@ -108,6 +108,9 @@ export async function GET(req: NextRequest) {
         : null,
       suma_ron: conv?.sumaRon ?? null,
       curs_bnr: conv?.curs ?? null,
+      // Cursul real al platii (lei platiti / suma facturii in valuta): banca / curierul / marketplace-ul nu folosesc
+      // cursul BNR, deci cursul din plata e cel care conteaza; BNR ramane doar referinta.
+      curs_efectiv: monedaDiferita && valutaTx === 'RON' && target !== null && sumaDoc ? Math.round(target / Math.abs(Number(sumaDoc)) * 10000) / 10000 : null,
     }
   }
 

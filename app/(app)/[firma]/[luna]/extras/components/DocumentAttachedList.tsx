@@ -34,6 +34,17 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
   const acoperit = Math.round(docsForTx.reduce((s, d) => s + sumaInMonedaPlatii(d), 0) * 100) / 100
   const totalTx = Math.abs(tx.suma ?? 0)
   const ramas = Math.round((totalTx - acoperit) * 100) / 100
+  // Facturi in valuta (toate aceeasi) pe o plata in lei: plata e cea care le inchide, la cursul ei real (lei platiti /
+  // suma in valuta), nu la cursul BNR. BNR ramane referinta. Peste ±15% fata de BNR nu mai e curs, ci cel mai probabil
+  // o plata care nu corespunde facturii -> ramane afisajul clasic cu suma acoperita / ramasa.
+  const valutaStraina = (docsForTx[0]?.valuta || 'RON').toUpperCase()
+  const toateInValuta = valutaTx === 'RON' && docsForTx.length > 0 && valutaStraina !== 'RON' &&
+    docsForTx.every(d => (d.valuta || 'RON').toUpperCase() === valutaStraina && Number(d.suma) > 0 && Number(d.suma_ron) > 0)
+  const sumaValuta = toateInValuta ? docsForTx.reduce((s, d) => s + Number(d.suma), 0) : 0
+  const sumaBnr = toateInValuta ? docsForTx.reduce((s, d) => s + Number(d.suma_ron), 0) : 0
+  const cursEfectiv = toateInValuta && totalTx > 0 ? totalTx / sumaValuta : null
+  const fataDeBnr = toateInValuta && totalTx > 0 ? (totalTx / sumaBnr - 1) * 100 : null
+  const laCursulPlatii = cursEfectiv != null && fataDeBnr != null && Math.abs(fataDeBnr) <= 15
 
   function togglePreview(id: string) {
     // Vezi -> vizualizatorul pop-up global (rapid, direct din storage)
@@ -60,7 +71,9 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
       <div style={{ display:'inline-flex', alignItems:'center', gap:'8px', padding:'6px 10px', borderRadius:'var(--r-full)', background:'var(--surface-secondary)', border:'1px solid var(--border)', color:'var(--text-secondary)', fontSize:'var(--fs-xs)', fontWeight:700, marginBottom:'14px' }}>
         {orderRef ? `Comanda/ref. ${orderRef}` : 'Aceeași tranzacție'}
         <span style={{ color:'var(--success)' }}>· {docsForTx.length || 1} document{(docsForTx.length || 1) === 1 ? '' : 'e'}</span>
-        {acoperit > 0 && (Math.abs(ramas) < 0.02
+        {laCursulPlatii
+          ? <span style={{ color:'var(--success)' }}>· ✓ {sumaValuta.toFixed(2)} {valutaStraina} plătite cu {totalTx.toFixed(2)} lei · curs {cursEfectiv!.toFixed(4)} lei/{valutaStraina} (BNR {(sumaBnr / sumaValuta).toFixed(4)} · {fataDeBnr! >= 0 ? '+' : ''}{fataDeBnr!.toFixed(1)}%)</span>
+          : acoperit > 0 && (Math.abs(ramas) < 0.02
           ? <span style={{ color:'var(--success)' }}>· ✓ acoperă toată plata</span>
           : <span style={{ color: ramas > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>· acoperit {acoperit.toFixed(2)} din {totalTx.toFixed(2)} {tx.valuta}{ramas > 0 ? ` · rămas ${ramas.toFixed(2)}` : ''}</span>)}
       </div>

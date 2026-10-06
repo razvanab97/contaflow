@@ -22,7 +22,7 @@ export interface DocTx { id:string; tip_document:string; furnizor:string; numar_
 export type SursaInbox = 'local'|'gmail'|'oblio'|'bonuri'|'altele'|'module'|'deasociat'
 export interface InboxCandidat {
   id:string; tabel:'documente'|'bonuri'|'facturi_asteptate'; fisier_nume:string; furnizor:string|null; numar_document?:string|null
-  suma:number|null; valuta:string; monedaDiferita:boolean; data_document:string|null; diferentaSuma:number|null; suma_ron?:number|null; curs_bnr?:number|null
+  suma:number|null; valuta:string; monedaDiferita:boolean; data_document:string|null; diferentaSuma:number|null; suma_ron?:number|null; curs_bnr?:number|null; curs_efectiv?:number|null
   sursa:SursaInbox; sectiune?:string; docUrl?:string
   // Documentul e deja legat de o alta tranzactie (data/suma ei, cand se cunosc).
   deja?:{ data:string|null; suma:number|null; valuta:string|null }|null
