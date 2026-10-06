@@ -28,8 +28,17 @@ export interface BorderouEmag {
   linii: number
   // doar la extras: totalul compensat pe fiecare aviz
   peAviz?: Record<string, number>
-  platforma?: string | null        // eMAG RO / BG / HU (la extras scrie in fisier; la DP/DC reiese din avizul potrivit)
+  platforma?: string | null        // eMAG RO / BG / HU (DP: din Seller ID / moneda; extras: scris in fisier)
+  valuta?: string                  // DP: RON (RO), EUR (BG - coloana „Fraction value [EUR]”), HUF (HU)
 }
+
+// Contul de vanzator eMAG e diferit pe fiecare platforma (acelasi „Unique Identification Code” = CUI-ul firmei)
+const SELLER_PLATFORMA: Record<string, 'RO' | 'BG' | 'HU'> = { '172819': 'RO', '181912': 'BG', '181909': 'HU' }
+const VALUTA_PLATFORMA = { RO: 'RON', BG: 'EUR', HU: 'HUF' } as const
+
+// Recunoasterea liniilor din aviz (descrierile vin in RO / BG / HU / EN si citirea AI le traduce diferit)
+export const RE_AVIZ_CASH = /ramburs|cash on delivery|utánvét|доставка|livrare|наложен/i
+export const RE_AVIZ_CARD = /card|online|карта|kártya|cărți/i
 
 export function platformaDinTaskKey(taskKey: string) {
   const m = taskKey.match(/emag\.aviz_(ro|bg|hu|heyblu)_/)
@@ -51,12 +60,18 @@ export async function citesteBorderouEmag(bytes: Uint8Array | ArrayBuffer, numeF
   const { cap, ix, date } = tabel(await citesteFoaieXlsx(bytes))
 
   if (cap.includes('DP ID') && cap.includes('Fraction type')) {
+    // „Fraction value” (RO, HU) sau „Fraction value [EUR]” (BG)
+    const colValoare = cap.find(c => /^Fraction value/i.test(c)) || 'Fraction value'
     const detalii: Record<string, number> = {}
     for (const r of date) {
       const t = String(r[ix('Fraction type')] ?? '').trim()
       if (!t) continue
-      detalii[t] = r2((detalii[t] || 0) + num(r[ix('Fraction value')]))
+      detalii[t] = r2((detalii[t] || 0) + num(r[ix(colValoare)]))
     }
+    const sellerId = String(date[0]?.[ix('Seller ID')] ?? '').trim()
+    const valutaCol = colValoare.match(/\[([A-Z]{3})\]/)?.[1]
+    const pl = SELLER_PLATFORMA[sellerId] || (valutaCol === 'EUR' ? 'BG' : valutaCol === 'HUF' ? 'HU' : null)
+    const valuta = valutaCol || (pl ? VALUTA_PLATFORMA[pl] : 'RON')
     const tipuri = Object.keys(detalii)
     // CARD: CO Cashing, Refund CO, eCredit cashing (rate) · CASH: COD Cashing, Refund COD, Courier retain…
     const RE_CARD = /^CO Cashing$|^Refund CO$|eCredit/i
@@ -74,6 +89,7 @@ export async function citesteBorderouEmag(bytes: Uint8Array | ArrayBuffer, numeF
     return {
       tip: card ? 'dp_card' : 'dp_cash', id: String(r0[ix('DP ID')] ?? numeFisier.match(/_dp_(\d+)/)?.[1] ?? ''),
       data, perioada: ps && pe ? `${zi(ps).slice(0, 5)}–${zi(pe)}` : null, total, incasari, detalii, linii: date.length,
+      platforma: pl ? `eMAG ${pl}` : null, valuta,
     }
   }
 

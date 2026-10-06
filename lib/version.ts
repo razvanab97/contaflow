@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 200, text: 'Borderouri eMAG, pentru toate lunile: platforma se recunoaște din fișier (RO lei, BG EUR din coloana „Fraction value [EUR]”, HU HUF). BG și HU au și echivalentul în lei la cursul BNR din ziua plății. Tabelul e grupat pe platforme: RO, apoi BG, apoi HU. Fiecare desfășurător se compară doar cu avizele platformei lui. Dacă lipsește notificarea Heyblu, mesajul o spune direct. Avizele încă necitite se citesc singure. Am corectat cele 4 desfășurătoare BG salvate cu 0 RON. Trendyol: data borderoului se corectează singură când plata apare în extras.' },
   { v: 199, text: 'Borderouri eMAG: „Total borderou” arată acum totalul documentului, din toate liniile lui, inclusiv reținerile și restituirile de curier la DP cash. De exemplu, 16119510 are 1.755,50 RON, nu 2.772,21. Coloana nouă „Încasări (în aviz)” arată partea comparată cu avizul. Sub fiecare borderou apar liniile din care se compune.' },
   { v: 198, text: 'Borderouri eMAG: secțiunea ține doar desfășurătoarele de plată (DP cash și card). Decontul de comision (DC) și extrasul de cont eMAG sunt refuzate aici, cu mesaj.' },
   { v: 197, text: 'Borderouri eMAG: fiecare rând arată platforma (eMAG RO / BG / HU). DP cash scade acum și rambursările ramburs (Refund COD), iar DP card adună și plățile eCredit, deci desfășurătoarele din 17.09 se potrivesc cu avizul (6/6). Un extras de cont nou al aceleiași platforme îl înlocuiește pe cel vechi, nu se mai dublează.' },

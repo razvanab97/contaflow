@@ -66,8 +66,19 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
   const lunaLista = req.nextUrl.searchParams.get('lunaId')
   if (lunaLista) {
-    const { data } = await sb.from('documente').select('id,numar_document,data_document,suma,valuta,fisier_nume')
+    const { data: docs } = await sb.from('documente').select('id,numar_document,data_document,suma,valuta,fisier_nume')
       .eq('luna_id', lunaLista).eq('modul', 'trendyol').eq('tip_document', 'borderou').order('data_document')
+    // borderou incarcat inainte de extras: data se corecteaza singura cand plata apare in extras
+    const data = await Promise.all((docs || []).map(async d => {
+      const dinExtras = d.numar_document ? await dataIncasare(sb, lunaLista, d.numar_document) : null
+      if (dinExtras && dinExtras !== d.data_document) {
+        const fisier_nume = d.data_document ? d.fisier_nume.replace(d.data_document.split('-').reverse().join('.'), dinExtras.split('-').reverse().join('.')) : d.fisier_nume
+        await sb.from('documente').update({ data_document: dinExtras, fisier_nume }).eq('id', d.id)
+        return { ...d, data_document: dinExtras, fisier_nume }
+      }
+      return d
+    }))
+    data.sort((a, b) => String(a.data_document).localeCompare(String(b.data_document)))
     return NextResponse.json({ borderouri: (data || []).map(d => ({ id: d.id, ordin: d.numar_document, data: d.data_document, suma: d.suma == null ? null : Number(d.suma), valuta: d.valuta, fisier: d.fisier_nume })) })
   }
   const lunaZip = req.nextUrl.searchParams.get('zip')
