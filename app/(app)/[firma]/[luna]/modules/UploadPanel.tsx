@@ -15,7 +15,13 @@ interface Doc {
   data_document?: string | null
   platit?: boolean
   data_platii?: string|null
+  valuta?: string|null
+  asociere_detalii?: string|null
 }
+
+// Factura restanta marcata platita automat dupa Extras de cont (vezi lib/facturi-restante.ts)
+interface FacturaMarcataAuto { id: string; numar: string | null; suma: number; valuta: string; motiv: string; plata: { data: string; suma: number; valuta: string; descriere: string } }
+const platitaAutomat = (doc: { asociere_detalii?: string | null }) => String(doc.asociere_detalii || '').startsWith('Plătită automat')
 
 interface AirbnbExpectedInvoice {
   id: string
@@ -65,10 +71,6 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('ro-RO', { day:'2-digit', month:'2-digit', year:'numeric' })
 }
 
-function formatMoney(value?: number | null) {
-  return typeof value === 'number' ? `${value.toFixed(2)} RON` : ''
-}
-
 function formatCurrency(value?: number | null, currency?: string | null) {
   if (typeof value !== 'number') return ''
   return `${value.toFixed(2)} ${currency || 'RON'}`
@@ -79,7 +81,7 @@ function docLabel(doc: Doc) {
     doc.numar_document ? `Factura ${doc.numar_document}` : '',
     cleanSupplier(doc.furnizor),
     formatDate(doc.data_document),
-    formatMoney(doc.suma),
+    formatCurrency(doc.suma, doc.valuta),
   ].filter(Boolean)
   return parts.length ? parts.join(' - ') : doc.fisier_nume
 }
@@ -108,6 +110,9 @@ export default function UploadPanel({
   const [attachPickerFor, setAttachPickerFor] = useState<string | null>(null)
   const [attachPick, setAttachPick] = useState<Record<string, string>>({})
   const [attachBusy, setAttachBusy] = useState<string | null>(null)
+  const [autoPlatite, setAutoPlatite] = useState<FacturaMarcataAuto[]>([])
+  const [arataPlatite, setArataPlatite] = useState(false)
+  const restanteReconciliate = useRef('')
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
   const INP: React.CSSProperties = { fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', color: 'var(--c-bbbbbb)', outline: 'none', width: '100%' }
@@ -142,6 +147,22 @@ export default function UploadPanel({
   }, [lunaId, firmaId, section])
 
   useEffect(() => { load(); loadAirbnbExpected() }, [load, loadAirbnbExpected])
+
+  // Facturi restante se raporteaza la Extras de cont: la deschidere, facturile pentru care exista deja
+  // plata in extras se marcheaza singure platite (o plata anulata manual nu mai revine).
+  useEffect(() => {
+    if (section !== 'facturi-restante' || restanteReconciliate.current === firmaId) return
+    restanteReconciliate.current = firmaId
+    fetch('/api/facturi-restante/reconciliaza', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId }) })
+      .then(r => r.ok ? r.json() : null)
+      .then(async d => {
+        if (!d?.marcate?.length) return
+        setAutoPlatite(d.marcate)
+        await load()
+        onChange?.()
+      })
+      .catch(() => {})
+  }, [section, firmaId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fisierele se trimit in paralel (cate 4) - fiecare e citit cu AI pe server, deci in serie un lot
   // de 30 de facturi dura minute. Lista se reincarca pe parcurs, ca progresul sa se vada.
@@ -241,6 +262,16 @@ export default function UploadPanel({
     setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, platit: next } : d))
     const res = await fetch('/api/chitante/plata', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: doc.id, platit: next }) })
     if (!res.ok) setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, platit: doc.platit } : d))
+    else if (!next) setAutoPlatite(prev => prev.filter(a => a.id !== doc.id))
+  }
+
+  // Anuleaza o factura marcata automat platita (dupa id - poate fi dintr-o luna care nu e in lista curenta).
+  async function anuleazaAuto(id: string) {
+    const res = await fetch('/api/chitante/plata', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, platit: false }) })
+    if (!res.ok) { setError('Nu am putut anula marcarea'); return }
+    setAutoPlatite(prev => prev.filter(a => a.id !== id))
+    await load()
+    onChange?.()
   }
 
   async function renameDoc(doc: Doc, fisier_nume: string) {
@@ -321,6 +352,9 @@ export default function UploadPanel({
   const airbnbVisibleExpected = showOnlyMissing ? airbnbExpected.filter(i => !i.factura_document_id) : airbnbExpected
   // Facturile deja asociate unei rezervări nu mai apar în lista de jos — rămân vizibile doar prin rezervarea lor de mai sus.
   const visibleDocs = section === 'airbnb-facturi' ? docs.filter(d => !airbnbMatchedIds.has(d.id)) : docs
+  // La facturile restante lista arata implicit doar ce a ramas de platit; cele platite (manual sau dupa
+  // Extras de cont) se pot afisa cu un click, ca sa poata fi anulate daca e nevoie.
+  const platiteCount = showPaidToggle ? visibleDocs.filter(d => d.platit).length : 0
 
   return (
     <div className="card" style={{ overflow: 'hidden' }}>
@@ -428,13 +462,37 @@ export default function UploadPanel({
           </div>
         )}
 
+        {autoPlatite.length > 0 && (
+          <div role="status" style={{ marginBottom: '14px', padding: '10px 12px', borderRadius: 'var(--r-md)', background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+            <div style={{ fontWeight: 700, color: 'var(--success)', marginBottom: '6px' }}>
+              ✓ {autoPlatite.length} {autoPlatite.length === 1 ? 'factură marcată' : 'facturi marcate'} automat ca plătite, după plățile din Extras de cont
+            </div>
+            {autoPlatite.map(a => {
+              return (
+                <div key={a.id} style={{ display: 'flex', gap: '8px', alignItems: 'baseline', justifyContent: 'space-between', padding: '3px 0' }}>
+                  <span style={{ minWidth: 0 }}>
+                    <b style={{ color: 'var(--text-primary)' }}>{a.numar ? `Factura ${a.numar}` : 'Factură'}</b> · {formatCurrency(a.suma, a.valuta)} · plătită {formatDate(a.plata.data)} <span style={{ color: 'var(--text-muted)' }}>({a.motiv})</span>
+                  </span>
+                  <button onClick={() => anuleazaAuto(a.id)} className="btn btn-sm" style={{ flexShrink: 0 }} title="Nu e plătită — o scot din plătite și nu o mai marchez singură">Anulează</button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         {/* Document list */}
         {section === 'airbnb-facturi' && loaded && docs.length > 0 && visibleDocs.length === 0 && (
           <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--success)', marginBottom: '16px' }}>Toate facturile sunt deja asociate cu o rezervare din borderou.</div>
         )}
+        {loaded && showPaidToggle && platiteCount > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px', fontSize: 'var(--fs-sm)', color: 'var(--c-aaaaaa)' }}>
+            {visibleDocs.length - platiteCount === 0 && <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Toate facturile sunt plătite.</span>}
+            <button onClick={() => setArataPlatite(v => !v)} className="btn btn-sm">{arataPlatite ? 'Ascunde facturile plătite' : `Arată și cele plătite (${platiteCount})`}</button>
+          </div>
+        )}
         {loaded && visibleDocs.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
-            {(showPaidToggle ? [...visibleDocs].sort((a, b) => Number(!!a.platit) - Number(!!b.platit)) : visibleDocs).map(doc => {
+            {(showPaidToggle ? [...visibleDocs].sort((a, b) => Number(!!a.platit) - Number(!!b.platit)).filter(d => arataPlatite || !d.platit) : visibleDocs).map(doc => {
               const isPaid = showPaidToggle && !!doc.platit
               const kind = isPreviewable(doc.fisier_tip, doc.fisier_nume)
               const open = previewIds.has(doc.id)
@@ -450,6 +508,7 @@ export default function UploadPanel({
                         {doc.fisier_nume}
                       </div>
                     </div>
+                    {isPaid && platitaAutomat(doc) && <span className="badge badge-success" title={doc.asociere_detalii || undefined} style={{ flexShrink: 0 }}>din Extras</span>}
                     {doc.tip_document && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
                     {showPaidToggle && (
                       <button onClick={() => togglePaid(doc)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '4px 10px', borderRadius: 'var(--r-sm)', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}>

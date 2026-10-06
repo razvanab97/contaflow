@@ -12,6 +12,7 @@ interface Doc {
   furnizor?: string | null
   numar_document?: string | null
   suma?: number | null
+  valuta?: string | null
   data_document?: string | null
   platit?: boolean | null
   data_platii?: string | null
@@ -179,6 +180,9 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const [syncStartDate, setSyncStartDate] = useState(() => defaultSyncStart(luna))
   const [syncEndDate, setSyncEndDate] = useState(() => todayIso())
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set())
+  // Intervalul de date filtreaza si lista (dupa data facturii), nu doar sincronizarea Gmail - dar abia dupa
+  // ce omul alege o data, ca la deschidere sa se vada aceleasi facturi ca pana acum.
+  const [filtruData, setFiltruData] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [localFiles, setLocalFiles] = useState<LocalFile[]>([])
   const [localBusy, setLocalBusy] = useState(false)
@@ -195,6 +199,11 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   const fileRef = useRef<HTMLInputElement>(null)
   const localFileRef = useRef<HTMLInputElement>(null)
   const r = rgb(firma.culoare)
+  const dataInInterval = (d: Doc) => !d.data_document || ((!syncStartDate || d.data_document >= syncStartDate) && (!syncEndDate || d.data_document <= syncEndDate))
+  const docsVizibile = filtruData ? docs.filter(dataInInterval) : docs
+  // doar facturile vizibile pot fi bifate / sterse - o factura ascunsa de filtru nu se sterge din greseala
+  const idsVizibile = new Set(docsVizibile.map(d => d.id))
+  const selectateVizibile = [...selectedDocIds].filter(id => idsVizibile.has(id))
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/inbox-facturi?firmaId=${encodeURIComponent(firma.id)}&lunaId=${encodeURIComponent(lunaId)}`)
@@ -321,7 +330,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   }
 
   async function deleteSelectedDocs() {
-    const ids = [...selectedDocIds]
+    const ids = selectateVizibile
     if (!ids.length) return
     if (!confirm(`Ștergi ${ids.length} facturi selectate din Inbox Facturi?`)) return
     setDeleteBusy(true)
@@ -351,7 +360,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
   }
 
   function toggleAllDocs() {
-    setSelectedDocIds(prev => prev.size === docs.length ? new Set() : new Set(docs.map(doc => doc.id)))
+    setSelectedDocIds(prev => selectateVizibile.length === docsVizibile.length ? new Set([...prev].filter(id => !idsVizibile.has(id))) : new Set([...prev, ...docsVizibile.map(doc => doc.id)]))
   }
 
   async function togglePaid(doc: Doc) {
@@ -643,32 +652,41 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
           <div style={{ marginTop:'14px', display:'flex', flexWrap:'wrap', alignItems:'end', gap:'10px' }}>
             <label style={{ display:'flex', flexDirection:'column', gap:'4px', fontSize:'var(--fs-xs)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--c-777777)' }}>
               Sincronizează de la
-              <input type="date" value={syncStartDate} onChange={e => setSyncStartDate(e.target.value)} style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
+              <input type="date" value={syncStartDate} onChange={e => { setSyncStartDate(e.target.value); setFiltruData(true) }} style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
             </label>
             <label style={{ display:'flex', flexDirection:'column', gap:'4px', fontSize:'var(--fs-xs)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--c-777777)' }}>
               Până la
-              <input type="date" value={syncEndDate} onChange={e => setSyncEndDate(e.target.value)} style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
+              <input type="date" value={syncEndDate} onChange={e => { setSyncEndDate(e.target.value); setFiltruData(true) }} style={{ fontSize:'var(--fs-sm)', background:'var(--c-0f0f0f)', border:'1px solid var(--c-2a2a2a)', borderRadius:'var(--r-md)', padding:'8px 10px', color:'var(--c-dddddd)', outline:'none' }}/>
             </label>
             <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', lineHeight:1.45, paddingBottom:'8px' }}>
-              Intervalul se aplică la butonul „Sincronizează” de pe Gmail 1/Gmail 2.
+              Intervalul filtrează lista de mai jos (după data facturii) și se aplică la butonul „Sincronizează” de pe Gmail 1/Gmail 2.
             </div>
           </div>
         </div>
 
         <div style={{ padding:'18px 22px' }}>
-          {loaded && docs.length > 0 && (
+          {loaded && filtruData && docs.length > 0 && (
+            <div role="status" style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:'10px', marginBottom:'12px', fontSize:'var(--fs-sm)', color:'var(--c-aaaaaa)' }}>
+              <span>Se afișează <b>{docsVizibile.length}</b> din {docs.length} facturi (data facturii între {syncStartDate ? new Date(syncStartDate).toLocaleDateString('ro-RO') : 'început'} și {syncEndDate ? new Date(syncEndDate).toLocaleDateString('ro-RO') : 'azi'}; cele fără dată se arată mereu).</span>
+              <button onClick={() => setFiltruData(false)} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'5px 9px', borderRadius:'var(--r-md)', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--accent)', cursor:'pointer' }}>Arată toate</button>
+            </div>
+          )}
+          {loaded && filtruData && docs.length > 0 && docsVizibile.length === 0 && (
+            <div style={{ fontSize:'var(--fs-sm)', color:'var(--c-888888)', marginBottom:'16px' }}>Nicio factură în intervalul ales.</div>
+          )}
+          {loaded && docsVizibile.length > 0 && (
             <div style={{ display:'flex', flexDirection:'column', gap:'7px', marginBottom:'16px' }}>
               <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between', gap:'10px', marginBottom:'4px' }}>
                 <button onClick={toggleAllDocs} style={{ fontSize:'var(--fs-xs)', fontWeight:700, padding:'7px 10px', borderRadius:'var(--r-md)', border:'1px solid var(--c-2a2a2a)', background:'transparent', color:'var(--c-aaaaaa)', cursor:'pointer' }}>
-                  {selectedDocIds.size === docs.length ? 'Deselectează toate' : 'Selectează toate'}
+                  {selectateVizibile.length === docsVizibile.length ? 'Deselectează toate' : 'Selectează toate'}
                 </button>
-                {selectedDocIds.size > 0 && (
+                {selectateVizibile.length > 0 && (
                   <button onClick={deleteSelectedDocs} disabled={deleteBusy} style={{ fontSize:'var(--fs-xs)', fontWeight:800, padding:'7px 10px', borderRadius:'var(--r-md)', border:'1px solid rgba(239,68,68,.35)', background:'rgba(239,68,68,.08)', color:'var(--danger)', cursor:'pointer', opacity:deleteBusy ? .65 : 1 }}>
-                    Șterge selectate ({selectedDocIds.size})
+                    Șterge selectate ({selectateVizibile.length})
                   </button>
                 )}
               </div>
-              {docs.map(doc => {
+              {docsVizibile.map(doc => {
                 const kind = isPreviewable(doc.fisier_tip, doc.fisier_nume)
                 const open = previewIds.has(doc.id)
                 const selected = selectedDocIds.has(doc.id)
@@ -680,7 +698,7 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize:'var(--fs-sm)', fontWeight:700, color:'var(--c-dddddd)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.fisier_nume}</div>
                         <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', marginTop:'3px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                          {[doc.numar_document && `nr. ${doc.numar_document}`, doc.suma != null && `${doc.suma.toFixed(2)}`, doc.data_document].filter(Boolean).join(' · ') || doc.furnizor || 'fără detalii extrase'}
+                          {[doc.numar_document && `nr. ${doc.numar_document}`, doc.suma != null && `${doc.suma.toFixed(2)} ${doc.valuta || 'RON'}`, doc.data_document].filter(Boolean).join(' · ') || doc.furnizor || 'fără detalii extrase'}
                           {doc.tranzactie_id ? ' · legată de tranzacție' : ''}
                           {doc.platit ? ` · plătită${doc.data_platii ? ` ${doc.data_platii}` : ''}` : ' · neplătită'}
                         </div>

@@ -318,7 +318,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
   let query = sb
     .from('documente')
-    .select('id,fisier_nume,fisier_tip,tip_document,furnizor,modul,numar_document,suma,data_document,created_at,platit,data_platii,cod_unitate_booking')
+    .select('id,fisier_nume,fisier_tip,tip_document,furnizor,modul,numar_document,suma,valuta,data_document,created_at,platit,data_platii,asociere_detalii,cod_unitate_booking')
     .not('fisier_path', 'like', '%/tx/%')
     .not('fisier_path', 'like', '%/checklist/%')
     .order('created_at', { ascending: true })
@@ -328,7 +328,8 @@ export async function GET(req: NextRequest) {
     query = query
       .eq('firma_id', firmaId)
       .or('fisier_path.like.%/facturi-restante/%,fisier_path.like.%/inbox-facturi/%')
-      .or(`luna_id.eq.${lunaId},platit.eq.false`)
+      // + cele marcate automat platite dupa Extras de cont (din orice luna), ca decizia sa poata fi verificata/anulata
+      .or(`luna_id.eq.${lunaId},platit.eq.false,asociere_detalii.like.Plătită automat%`)
   } else {
     query = query.like('fisier_path', `%/${section}/%`).eq('luna_id', lunaId)
   }
