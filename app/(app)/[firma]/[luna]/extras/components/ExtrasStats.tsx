@@ -3,9 +3,10 @@
 export default function ExtrasStats({
   total, documentate, neasociate, ignorate, pct,
   finalizat, finalizing, onToggleFinalizat, overallGata,
-  onExport, exportingDocs, exportError, culoare, deVerificat = 0, onShowDeVerificat,
+  onExport, exportingDocs, exportError, culoare, deVerificat = 0, onShowDeVerificat, bonFizic = 0, onShowBonFizic,
 }: {
   deVerificat?: number; onShowDeVerificat?: () => void
+  bonFizic?: number; onShowBonFizic?: () => void
   total: number; documentate: number; neasociate: number; ignorate: number; pct: number
   finalizat: boolean; finalizing: boolean; onToggleFinalizat: (v: boolean) => void; overallGata: boolean
   onExport: () => void; exportingDocs: boolean; exportError: string
@@ -23,6 +24,12 @@ export default function ExtrasStats({
           <button onClick={onShowDeVerificat} title="Cheltuieli ignorate fără motiv justificat — probabil lipsește documentul" style={{ textAlign:'left', background:'var(--warning-soft)', border:'1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius:'var(--r-md)', padding:'4px 10px' }}>
             <div className="stat-label" style={{ color:'var(--warning)' }}>⚠ De verificat</div>
             <div style={{ fontSize:'var(--fs-lg)', fontWeight:650, color:'var(--warning)', marginTop:'2px' }}>{deVerificat}</div>
+          </button>
+        )}
+        {bonFizic > 0 && (
+          <button onClick={onShowBonFizic} title="Tranzacții cu bon / document fizic, pe hârtie — de predat contabilului. Click pentru a le vedea" style={{ textAlign:'left', background:'var(--surface-secondary)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'4px 10px', cursor:'pointer' }}>
+            <div className="stat-label">🧾 Bon fizic</div>
+            <div style={{ fontSize:'var(--fs-lg)', fontWeight:650, color:'var(--text-primary)', marginTop:'2px' }}>{bonFizic}</div>
           </button>
         )}
       </div>

@@ -24,7 +24,7 @@
 
 export type MotivIgnorare =
   | 'comision' | 'schimb_valutar' | 'incasare_platforma'
-  | 'transfer_propriu' | 'asociat' | 'impozit' | 'chirie' | 'salariu' | 'altul'
+  | 'transfer_propriu' | 'asociat' | 'impozit' | 'chirie' | 'salariu' | 'bon_fizic' | 'document_fizic' | 'altul'
 
 export const MOTIVE_IGNORARE: { key: MotivIgnorare; label: string; scurt: string }[] = [
   { key: 'comision', label: 'Comision bancar', scurt: 'Comision' },
@@ -35,12 +35,16 @@ export const MOTIVE_IGNORARE: { key: MotivIgnorare; label: string; scurt: string
   { key: 'impozit', label: 'Plată impozite / taxe (în Plată impozite)', scurt: 'Impozit' },
   { key: 'chirie', label: 'Chirie către persoană fizică', scurt: 'Chirie' },
   { key: 'salariu', label: 'Salariu / contribuții (în stat de plată)', scurt: 'Salariu' },
+  { key: 'bon_fizic', label: 'Bon fizic (păstrat pe hârtie)', scurt: 'Bon fizic' },
+  { key: 'document_fizic', label: 'Factură / chitanță fizică (pe hârtie)', scurt: 'Document fizic' },
   { key: 'altul', label: 'Altul — fără document', scurt: 'Altul' },
 ]
 export const MOTIV_LABEL: Record<string, string> = Object.fromEntries(MOTIVE_IGNORARE.map(m => [m.key, m.scurt]))
 
 // Motive care justifica o cheltuila fara factura. "altul" sau lipsa motivului => de verificat.
-const MOTIVE_JUSTIFICATE = new Set<string>(['comision', 'schimb_valutar', 'incasare_platforma', 'transfer_propriu', 'asociat', 'impozit', 'chirie', 'salariu'])
+const MOTIVE_JUSTIFICATE = new Set<string>(['comision', 'schimb_valutar', 'incasare_platforma', 'transfer_propriu', 'asociat', 'impozit', 'chirie', 'salariu', 'bon_fizic', 'document_fizic'])
+// „Bon fizic” / „document fizic”: exista documentul, dar pe hartie (nu e fisier in aplicatie) - se alege manual pe tranzactie.
+export const MOTIVE_FIZICE = new Set<string>(['bon_fizic', 'document_fizic'])
 
 // Explicatia afisata pe o tranzactie sarita automat - de ce nu are nevoie de document.
 export const EXPLICATIE_REGULA: Record<string, string> = {

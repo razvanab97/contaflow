@@ -11,7 +11,7 @@ import ExtrasImportPanel from './components/ExtrasImportPanel'
 import ExtrasPdfTab from './components/ExtrasPdfTab'
 import ExtrasWorkspace from './components/ExtrasWorkspace'
 import NextStepNav from '../NextStepNav'
-import { motivSugerat, ignorareDeVerificat, MOTIV_LABEL } from '@/lib/tranzactii-reguli'
+import { motivSugerat, ignorareDeVerificat, MOTIV_LABEL, MOTIVE_FIZICE } from '@/lib/tranzactii-reguli'
 import { areAchizitiiProduse } from '@/lib/achizitii-produse'
 
 const EXTRAS_UNLOCK_CODES: Record<string, string> = {
@@ -109,6 +109,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
     const matchesFlow = flowFilter === 'all' || t.tip === flowFilter
     const matchesSearch = !searchLower || [
       t.descriere, t.descriere_curatata, t.documente?.furnizor, t.suma?.toFixed(2), shortReference(t.referinta),
+      t.note === 'na' ? MOTIV_LABEL[t.motiv_ignorare || ''] : '',
     ].some(field => String(field || '').toLowerCase().includes(searchLower))
     return matchesStatus && matchesFlow && matchesSearch
   })
@@ -328,6 +329,8 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
             onExport={exportDocuments} exportingDocs={exportingDocs} exportError={exportError}
             deVerificat={scopedTxs.filter(t => ignorareDeVerificat(t)).length}
             onShowDeVerificat={() => { setFilter('na'); setFlowFilter('debit'); setActiveTxIndex(0) }}
+            bonFizic={scopedTxs.filter(t => t.note === 'na' && MOTIVE_FIZICE.has(t.motiv_ignorare || '')).length}
+            onShowBonFizic={() => { setFilter('na'); setFlowFilter('all'); setSearchValue('fizic'); setActiveTxIndex(0) }}
             culoare={c}
           />
 

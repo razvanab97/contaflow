@@ -6,7 +6,7 @@ import DocumentMatch from './DocumentMatch'
 import DocumentActions from './DocumentActions'
 import DocumentAttachedList from './DocumentAttachedList'
 import AchizitieProdusBar from './AchizitieProdusBar'
-import { MOTIVE_IGNORARE, EXPLICATIE_REGULA, ignorareDeVerificat, motivEfectiv } from '@/lib/tranzactii-reguli'
+import { MOTIVE_IGNORARE, MOTIVE_FIZICE, MOTIV_LABEL, EXPLICATIE_REGULA, ignorareDeVerificat, motivEfectiv } from '@/lib/tranzactii-reguli'
 
 export default function TransactionWorkspaceCard({
   tx, index, total, firmaId, lunaId, culoare,
@@ -27,6 +27,8 @@ export default function TransactionWorkspaceCard({
   const [editDoc, setEditDoc] = useState(false)
   const isNA = tx.note === 'na'
   const isDone = !!tx.document_id
+  const motivNA = isNA ? motivEfectiv(tx) : null
+  const fizic = !!motivNA && MOTIVE_FIZICE.has(motivNA)
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
@@ -52,9 +54,9 @@ export default function TransactionWorkspaceCard({
             <div style={{ width:'44px', height:'44px', borderRadius:'50%', background:'var(--surface-secondary)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
               <svg width="18" height="18" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </div>
-            <h3 style={{ fontSize:'var(--fs-lg)', fontWeight:700, color:'var(--text-primary)', marginBottom:'6px' }}>{tx.ignorat_auto ? 'Sărită automat' : 'Tranzacție ignorată'}</h3>
+            <h3 style={{ fontSize:'var(--fs-lg)', fontWeight:700, color:'var(--text-primary)', marginBottom:'6px' }}>{fizic ? `🧾 ${MOTIV_LABEL[motivNA!]}` : tx.ignorat_auto ? 'Sărită automat' : 'Tranzacție ignorată'}</h3>
             <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-secondary)', marginBottom:'14px' }}>
-              {tx.ignorat_auto ? `Regulă standard: ${EXPLICATIE_REGULA[motivEfectiv(tx) || ''] || 'nu are nevoie de document.'}` : 'Această tranzacție a fost marcată ca ignorată (nu necesită document).'}
+              {fizic ? 'Documentul există pe hârtie, nu ca fișier în aplicație — tranzacția e considerată justificată. Nu uita să predai bonul/documentul fizic contabilului.' : tx.ignorat_auto ? `Regulă standard: ${EXPLICATIE_REGULA[motivEfectiv(tx) || ''] || 'nu are nevoie de document.'}` : 'Această tranzacție a fost marcată ca ignorată (nu necesită document).'}
             </p>
             {ignorareDeVerificat(tx) && (
               <div role="alert" style={{ margin:'0 auto 14px', maxWidth:'440px', padding:'10px 12px', borderRadius:'var(--r-md)', background:'var(--warning-soft)', border:'1px solid color-mix(in srgb, var(--warning) 35%, transparent)', color:'var(--warning)', fontSize:'var(--fs-sm)', textAlign:'left' }}>
@@ -95,6 +97,13 @@ export default function TransactionWorkspaceCard({
                 initialNumDoc={editDoc ? tx.documente?.numar_document : undefined}
                 title={editDoc ? 'Schimbă documentul principal' : 'Nu este documentul potrivit?'}
               />
+              {onSetMotiv && !editDoc && (
+                <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap', marginTop:'16px', paddingTop:'14px', borderTop:'1px dashed var(--border)' }}>
+                  <span className="eyebrow">Nu ai fișier? Documentul e pe hârtie</span>
+                  <button onClick={() => onSetMotiv('bon_fizic')} className="btn btn-sm" title="Bonul fizic se păstrează pe hârtie și se predă contabilului">🧾 Bon fizic</button>
+                  <button onClick={() => onSetMotiv('document_fizic')} className="btn btn-sm" title="Factura sau chitanța există doar pe hârtie">📄 Factură / chitanță fizică</button>
+                </div>
+              )}
             </div>
           </div>
         )}
