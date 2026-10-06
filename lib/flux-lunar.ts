@@ -6,6 +6,24 @@ export interface TxFlux { data_tranzactie: string | null; tip: string | null; su
 
 // Achizitiile de produse (plati catre furnizorii de marfa, vezi lib/achizitii-produse.ts), in lei la
 // cursul BNR: o categorie peste Plati - sumele raman si in Plati, nimic altceva nu se schimba.
+// Dispozitiile de plata (plati in numerar, nu apar in extrasul bancar) ale lunii - se aduna la Plati si
+// scad din Cashflow in Rezumatul lunii, ca sa fie numarati toti banii care pleaca din firma.
+export interface Dispozitii { total: number; numar: number }
+type SbDisp = ReturnType<typeof import('@/lib/supabase/server').getServiceSupabase>
+export async function dispozitiiPeLuni(sb: SbDisp, lunaIds: string[]): Promise<Map<string, Dispozitii>> {
+  const out = new Map<string, Dispozitii>()
+  if (!lunaIds.length) return out
+  const { data } = await sb.from('documente').select('luna_id,suma')
+    .in('luna_id', lunaIds).eq('tip_document', 'dispozitie_plata').like('fisier_path', '%/dispozitii-plata/%')
+  for (const d of data || []) {
+    const cur = out.get(d.luna_id) || { total: 0, numar: 0 }
+    cur.total = Math.round((cur.total + (Number(d.suma) || 0)) * 100) / 100
+    cur.numar++
+    out.set(d.luna_id, cur)
+  }
+  return out
+}
+
 export interface AchizitiiProduse { total: number; numar: number; perFurnizor: { furnizor: string; suma: number; numar: number }[] }
 
 // Imprumuturile firmei de la asociat: intrari = imprumut primit (incasare cu "imprumut"), iesiri =
@@ -39,7 +57,7 @@ function platitorDin(d: string) {
 export interface FluxMoneda { incasari: number; plati: number; net: number; schimbIn: number; schimbOut: number; numar: number; cursMediu: number | null; imprumut: Imprumut }
 export interface FluxLunar {
   peMoneda: Record<string, FluxMoneda>          // miscarile reale din fiecare cont (ca in extras)
-  consolidat: { incasari: number; plati: number; net: number; schimbExclus: number; imprumut: Imprumut; incasariReale: IncasariReale; achizitiiProduse: AchizitiiProduse } // echivalent lei, fara schimburi valutare
+  consolidat: { incasari: number; plati: number; net: number; schimbExclus: number; imprumut: Imprumut; incasariReale: IncasariReale; achizitiiProduse: AchizitiiProduse; dispozitii: Dispozitii } // echivalent lei, fara schimburi valutare
   faraCurs: number                               // tranzactii in valuta pentru care nu s-a gasit curs
   cursIndisponibil: boolean
 }
@@ -115,6 +133,7 @@ export async function calculeazaFlux(txs: TxFlux[]): Promise<FluxLunar> {
       incasari: r2(cons.incasari), plati: r2(cons.plati), net: r2(cons.incasari - cons.plati), schimbExclus: r2(cons.schimbExclus), imprumut: finImp(cons.imprumut),
       incasariReale: { emag: r2(reale.emag), trendyol: r2(reale.trendyol), alte: r2(reale.alte), total: r2(reale.emag + reale.trendyol + reale.alte), alteLista: reale.alteLista },
       achizitiiProduse: { total: r2(perFurnizor.reduce((a, f) => a + f.suma, 0)), numar: perFurnizor.reduce((a, f) => a + f.numar, 0), perFurnizor },
+      dispozitii: { total: 0, numar: 0 }, // completat de /api/luna/flux (din documentele lunii)
     },
     faraCurs, cursIndisponibil,
   }

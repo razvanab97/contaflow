@@ -1,7 +1,7 @@
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { getFirmaTotalTasks } from '@/lib/firma-config'
 import { workMonthLabel } from '@/lib/accounting-period'
-import { calculeazaFlux, type TxFlux } from '@/lib/flux-lunar'
+import { calculeazaFlux, dispozitiiPeLuni, type TxFlux } from '@/lib/flux-lunar'
 
 export interface PunctIstoric {
   luna: string          // luna de lucru, YYYY-MM
@@ -59,6 +59,9 @@ export async function getIstoricLunar(firmaId: string, firmaSlug: string, luna: 
     }))
   }
 
+  // plati in numerar (dispozitii de plata) - ca ultimul punct al tendintei sa fie egal cu cardul „Plati”
+  const dispozitii = await dispozitiiPeLuni(sb, lunaIds)
+
   return luni.map(l => {
     const id = idByLuna.get(l)
     const bank = id ? bankByLuna.get(id) : undefined
@@ -67,7 +70,7 @@ export async function getIstoricLunar(firmaId: string, firmaSlug: string, luna: 
       luna: l,
       label: workMonthLabel(l, true),
       incasari: Math.round((bank?.in || 0) * 100) / 100,
-      plati: Math.round((bank?.out || 0) * 100) / 100,
+      plati: Math.round(((bank?.out || 0) + (id ? dispozitii.get(id)?.total || 0 : 0)) * 100) / 100,
       pct: totalTasks > 0 ? Math.min(100, Math.round((done / totalTasks) * 100)) : 0,
       initializata: !!id,
     }

@@ -60,11 +60,23 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna, lunaLabe
   const tiles: Tile[] = []
   if (flux) {
     const c = flux.consolidat
+    // Dispozitiile de plata sunt plati in numerar (nu apar in extras): intra in Plati si scad din Cashflow,
+    // ca toti banii care pleaca din firma sa fie numarati. Randurile pe monede raman cele din extras (se reconciliaza cu banca).
+    const disp = c.dispozitii || { total: 0, numar: 0 }
+    const platiTotal = Math.round((c.plati + disp.total) * 100) / 100
+    const netTotal = Math.round((c.net - disp.total) * 100) / 100
     const rows = (fn: (m: FluxLunar['peMoneda'][string]) => number) => monede.map(([v, m]) => ({ v, suma: fn(m), curs: v !== 'RON' ? m.cursMediu : null }))
     tiles.push(
       { label: 'Încasări', value: c.incasari, color: 'var(--success)', spark: spark('incasari'), sparkColor: 'var(--success)', rows: rows(m => m.incasari - m.schimbIn) },
-      { label: 'Plăți', value: c.plati, color: 'var(--danger)', spark: spark('plati'), sparkColor: 'var(--danger)', rows: rows(m => m.plati - m.schimbOut) },
-      { label: 'Cashflow', value: c.net, color: c.net >= 0 ? 'var(--success)' : 'var(--danger)', spark: spark('cashflow'), sparkColor: 'var(--accent)', rows: rows(m => (m.incasari - m.schimbIn) - (m.plati - m.schimbOut)) },
+      {
+        label: 'Plăți', value: platiTotal, color: 'var(--danger)', spark: spark('plati'), sparkColor: 'var(--danger)', rows: rows(m => m.plati - m.schimbOut),
+        title: disp.numar ? `Plăți din extrasele bancare (${money(c.plati)} lei) + ${disp.numar} ${disp.numar === 1 ? 'dispoziție de plată' : 'dispoziții de plată'} în numerar (${money(disp.total)} lei).` : undefined,
+        detalii: disp.numar ? [
+          { label: 'Din extras (bancă)', suma: c.plati, semn: '−' as const },
+          { label: `Dispoziții de plată (${disp.numar})`, suma: disp.total, semn: '−' as const },
+        ] : undefined,
+      },
+      { label: 'Cashflow', value: netTotal, color: netTotal >= 0 ? 'var(--success)' : 'var(--danger)', spark: spark('cashflow'), sparkColor: 'var(--accent)', rows: rows(m => (m.incasari - m.schimbIn) - (m.plati - m.schimbOut)), title: disp.numar ? `Încasări − Plăți, după scăderea dispozițiilor de plată în numerar (${money(disp.total)} lei).` : undefined },
     )
   }
   if (flux) {
@@ -98,7 +110,8 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna, lunaLabe
     const a = flux.consolidat.achizitiiProduse
     const top = a.perFurnizor.slice(0, 5)
     const altii = a.perFurnizor.slice(5)
-    const pondere = flux.consolidat.plati > 0 ? Math.round((a.total / flux.consolidat.plati) * 1000) / 10 : 0
+    const platiCuDispozitii = flux.consolidat.plati + (flux.consolidat.dispozitii?.total || 0)
+    const pondere = platiCuDispozitii > 0 ? Math.round((a.total / platiCuDispozitii) * 1000) / 10 : 0
     tiles.push({
       label: 'Achiziții produse', value: a.total, color: 'var(--text-primary)',
       title: `Plăți către furnizorii de marfă (Jumbo, Maxy, Verk, i-Want, Importio + ce marchezi manual), lei la curs BNR. Sunt incluse și în Plăți. Click pentru tranzacții și perioade.`,
@@ -179,6 +192,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna, lunaLabe
           {multiMoneda
             ? <>Totalurile includ toate conturile ({monede.map(([v]) => v).join(' + ')}); valuta e convertită la cursul BNR din ziua fiecărei tranzacții (sub sumă: cursul mediu folosit).</>
             : <>Totalurile includ contul {monede[0]?.[0] || 'RON'}.</>}
+          {flux.consolidat.dispozitii?.numar > 0 && <> Plățile includ și {flux.consolidat.dispozitii.numar} {flux.consolidat.dispozitii.numar === 1 ? 'dispoziție de plată' : 'dispoziții de plată'} în numerar ({money(flux.consolidat.dispozitii.total)} lei), care nu apar în extras.</>}
           {schimburi.length > 0 && <> Schimburile valutare între conturile proprii nu intră în total, ca banii să nu fie numărați de două ori: {schimburi.map(([v, m]) => `${v} ${m.schimbIn ? `+${money(m.schimbIn)}` : ''}${m.schimbIn && m.schimbOut ? ' / ' : ''}${m.schimbOut ? `−${money(m.schimbOut)}` : ''}`).join(' · ')}.</>}
           {(flux.cursIndisponibil || flux.faraCurs > 0) && <span style={{ color: 'var(--warning)' }}> ⚠ {flux.cursIndisponibil ? 'Cursul BNR nu a putut fi descărcat — tranzacțiile în valută nu sunt incluse în total.' : `${flux.faraCurs} tranzacții în valută fără curs BNR nu sunt incluse în total.`}</span>}
         </p>
