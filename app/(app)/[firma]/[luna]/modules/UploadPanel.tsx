@@ -22,6 +22,8 @@ interface Doc {
 // Factura restanta marcata platita automat dupa Extras de cont (vezi lib/facturi-restante.ts)
 interface FacturaMarcataAuto { id: string; numar: string | null; suma: number; valuta: string; motiv: string; plata: { data: string; suma: number; valuta: string; descriere: string } }
 const platitaAutomat = (doc: { asociere_detalii?: string | null }) => String(doc.asociere_detalii || '').startsWith('Plătită automat')
+// Document adaugat singur in Facturi + chitanta din fisierul local (vezi lib/recomandari-chitanta.ts)
+const adaugatAutomat = (doc: { asociere_detalii?: string | null }) => String(doc.asociere_detalii || '').startsWith('Adăugată automat')
 
 interface AirbnbExpectedInvoice {
   id: string
@@ -263,6 +265,14 @@ export default function UploadPanel({
     const res = await fetch('/api/chitante/plata', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: doc.id, platit: next }) })
     if (!res.ok) setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, platit: doc.platit } : d))
     else if (!next) setAutoPlatite(prev => prev.filter(a => a.id !== doc.id))
+  }
+
+  // Aduce inapoi in Inbox Facturi un document adaugat automat in Facturi + chitanta.
+  async function inapoiInInbox(doc: Doc) {
+    const res = await fetch('/api/chitante/recomandari', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anuleaza: true, docId: doc.id }) })
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error || 'Documentul nu a putut fi adus înapoi'); return }
+    await load()
+    onChange?.()
   }
 
   // Anuleaza o factura marcata automat platita (dupa id - poate fi dintr-o luna care nu e in lista curenta).
@@ -509,6 +519,12 @@ export default function UploadPanel({
                       </div>
                     </div>
                     {isPaid && platitaAutomat(doc) && <span className="badge badge-success" title={doc.asociere_detalii || undefined} style={{ flexShrink: 0 }}>din Extras</span>}
+                    {section === 'facturi-chitanta' && adaugatAutomat(doc) && (
+                      <>
+                        <span className="badge badge-success" title="Adăugată automat din fișierul local" style={{ flexShrink: 0 }}>din fișierul local</span>
+                        <button onClick={() => inapoiInInbox(doc)} className="btn btn-sm" style={{ flexShrink: 0 }} title="Nu e plătită cash — o aduc înapoi în Inbox Facturi">Înapoi în Inbox</button>
+                      </>
+                    )}
                     {doc.tip_document && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)' }}>{doc.tip_document}</span>}
                     {showPaidToggle && (
                       <button onClick={() => togglePaid(doc)} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '4px 10px', borderRadius: 'var(--r-sm)', border: `1px solid ${isPaid ? 'var(--c-2a2a2a)' : 'light-dark(rgba(5,150,105,.525), rgba(110,231,176,.35))'}`, background: isPaid ? 'var(--c-1a1a1a)' : 'light-dark(rgba(5,150,105,.2), rgba(110,231,176,.08))', color: isPaid ? 'var(--c-888888)' : 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}>

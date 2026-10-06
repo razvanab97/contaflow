@@ -4,6 +4,7 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 import { importInboxDocument, detecteazaDocumenteMultiple } from '@/lib/inbox-facturi'
 import { pdfPageCount, extractPageRange } from '@/lib/pdfBatch'
 import { currentWorkMonthKey } from '@/lib/accounting-period'
+import { autoAdaugaDinFisierLocal } from '@/lib/recomandari-chitanta'
 
 export const dynamic = 'force-dynamic'
 // Vercel Hobby opreste functia la 60s indiferent de valoarea declarata - lucram pe un buget de
@@ -84,7 +85,7 @@ async function proceseaza(sb: Sb, file: Rand, luna: string, firmaImplicita: stri
       synced_at: new Date().toISOString(),
     }).eq('id', file.id)
     if (status !== 'nedetectat') await sb.storage.from('documente').remove([file.fisier_path])
-    return { fisier: file.fisier_nume, status, firma: r.targetFirma, asociat: !!r.doc?.tranzactie_id }
+    return { fisier: file.fisier_nume, status, firma: r.targetFirma, asociat: !!r.doc?.tranzactie_id, firmaId: r.doc?.firma_id || null, lunaId: r.doc?.luna_id || null }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Import eșuat'
     await sb.from('inbox_watch_files').update({ status: 'eroare', error_message: message, synced_at: new Date().toISOString() }).eq('id', file.id)
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
   const { data: anyFirma } = await sb.from('firme').select('id').eq('activa', true).limit(1).single()
   if (!anyFirma) return NextResponse.json({ error: 'Nu există nicio firmă activă' }, { status: 400 })
 
-  const rezultate: { fisier: string; status: string; firma: string | null; asociat?: boolean; bucati?: number }[] = []
+  const rezultate: { fisier: string; status: string; firma: string | null; asociat?: boolean; bucati?: number; firmaId?: string | null; lunaId?: string | null }[] = []
   while (Date.now() - start < BUGET_MS) {
     const { data: next, error } = await sb.from('inbox_watch_files')
       .select('id,fisier_path,fisier_nume,fisier_tip')
@@ -123,8 +124,18 @@ export async function POST(req: NextRequest) {
     rezultate.push(await proceseaza(sb, file, luna, anyFirma.id))
   }
 
+  // „Cauta mereu in fisierul local”: dupa fiecare import, facturile sigur platite cash (cu chitanta / de la un
+  // furnizor platit cash) ale fiecarei firme atinse se adauga singure in Facturi + chitanta. Nu strica niciodata sincronizarea.
+  let cashAdaugate = 0
+  const perechi = new Map<string, { firmaId: string; lunaId: string }>()
+  for (const r of rezultate) if (r.status === 'imported' && r.firmaId && r.lunaId) perechi.set(`${r.firmaId}:${r.lunaId}`, { firmaId: r.firmaId, lunaId: r.lunaId })
+  for (const { firmaId, lunaId } of perechi.values()) {
+    try { cashAdaugate += (await autoAdaugaDinFisierLocal(sb, firmaId, lunaId)).adaugate.length } catch { /* se reia la urmatoarea sincronizare / deschidere */ }
+  }
+
   const { count } = await sb.from('inbox_watch_files').select('id', { count: 'exact', head: true }).eq('status', 'pending')
   return NextResponse.json({
+    cashAdaugate,
     total: rezultate.length,
     imported: rezultate.filter(r => r.status === 'imported').length,
     asociate: rezultate.filter(r => r.asociat).length,

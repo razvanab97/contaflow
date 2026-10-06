@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import VeziButon from '@/components/ui/VeziButon'
 
 interface Recomandare {
@@ -17,6 +17,8 @@ export default function RecomandariChitanta({ firmaId, lunaId, onAdaugat }: { fi
   const [arataPosibile, setArataPosibile] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [automate, setAutomate] = useState<Recomandare[]>([])
+  const autoRulat = useRef('')
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/chitante/recomandari?firmaId=${encodeURIComponent(firmaId)}&lunaId=${encodeURIComponent(lunaId)}`, { cache: 'no-store' }).catch(() => null)
@@ -24,7 +26,28 @@ export default function RecomandariChitanta({ firmaId, lunaId, onAdaugat }: { fi
     if (!r?.ok) { setError(d.error || 'Recomandările nu au putut fi încărcate'); setRec([]); return }
     setRec(d.recomandate || []); setPos(d.posibile || [])
   }, [firmaId, lunaId])
-  useEffect(() => { load() }, [load])
+  // La deschiderea sectiunii: facturile sigur platite cash din FISIERUL LOCAL ale acestei firme se adauga
+  // singure aici (cele doar „posibile” raman cu clic); apoi se incarca recomandarile ramase.
+  useEffect(() => {
+    const cheie = `${firmaId}:${lunaId}`
+    if (autoRulat.current === cheie) return
+    autoRulat.current = cheie
+    fetch('/api/chitante/recomandari', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auto: true, firmaId, lunaId }) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.adaugate?.length) { setAutomate(d.adaugate); onAdaugat() } })
+      .catch(() => {})
+      .finally(() => { load() })
+  }, [firmaId, lunaId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function inapoi(x: Recomandare) {
+    setBusy(x.id); setError('')
+    const r = await fetch('/api/chitante/recomandari', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anuleaza: true, docId: x.id }) }).catch(() => null)
+    const d = r ? await r.json().catch(() => ({})) : {}
+    setBusy(null)
+    if (!r?.ok) { setError(d.error || 'Documentul nu a putut fi adus înapoi'); return }
+    setAutomate(prev => prev.filter(y => y.id !== x.id))
+    onAdaugat(); load()
+  }
 
   async function adauga(x: Recomandare) {
     setBusy(x.id); setError('')
@@ -37,7 +60,7 @@ export default function RecomandariChitanta({ firmaId, lunaId, onAdaugat }: { fi
   }
 
   if (rec === null) return null
-  if (!rec.length && !pos.length && !error) return null
+  if (!rec.length && !pos.length && !error && !automate.length) return null
 
   const Rand = ({ x }: { x: Recomandare }) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '8px 10px', borderRadius: 'var(--r-md)', background: 'var(--surface)', border: '1px solid var(--border)' }}>
@@ -65,6 +88,21 @@ export default function RecomandariChitanta({ firmaId, lunaId, onAdaugat }: { fi
           Facturi din folderul local / Gmail / e-Factură, neasociate unei plăți bancare, care par plătite cash: au chitanță, furnizorul e plătit cash și în alte luni, sau extrasul nu are nicio plată cu acea sumă. „Adaugă aici” le mută din Inbox Facturi în Facturi + chitanță.
         </div>
       </div>
+      {automate.length > 0 && (
+        <div role="status" style={{ padding: '10px 12px', borderRadius: 'var(--r-md)', background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+          <div style={{ fontWeight: 700, color: 'var(--success)', marginBottom: '6px' }}>
+            ✓ {automate.length} {automate.length === 1 ? 'factură adăugată' : 'facturi adăugate'} automat din fișierul local, în Facturi + chitanță
+          </div>
+          {automate.map(x => (
+            <div key={x.id} style={{ display: 'flex', gap: '8px', alignItems: 'baseline', justifyContent: 'space-between', padding: '3px 0' }}>
+              <span style={{ minWidth: 0 }}>
+                <b style={{ color: 'var(--text-primary)' }}>{x.furnizor || x.fisierNume}</b>{x.numar ? ` · nr. ${x.numar}` : ''} · {zi(x.data)} · {lei(x.suma, x.valuta)} <span style={{ color: 'var(--text-muted)' }}>({x.motive.filter(m => !m.startsWith('nicio')).join(', ')})</span>
+              </span>
+              <button className="btn btn-sm" disabled={!!busy} onClick={() => inapoi(x)} title="Nu e plătită cash — o aduc înapoi în Inbox Facturi">{busy === x.id ? '…' : 'Înapoi în Inbox'}</button>
+            </div>
+          ))}
+        </div>
+      )}
       {error && <p role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-sm)', margin: 0 }}>{error}</p>}
       {rec.length === 0 && <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', margin: 0 }}>Nicio factură sigur plătită cash în această perioadă.</p>}
       {rec.map(x => <Rand key={x.id} x={x} />)}
