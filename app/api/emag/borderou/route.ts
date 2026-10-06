@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
       const efectiv = avizNr ? cursAviz.get(avizNr) : undefined
       const k = efectiv ?? (b.data && bnr ? bnr(b.data, b.valuta) : null)
       const lei = (v: number | null) => v != null && k ? Math.round(v * k * 100) / 100 : null
-      return { ...b, curs: k ? Math.round(k * 10000) / 10000 : null, sursaCurs: efectiv ? 'extras' as const : k ? 'bnr' as const : null, sumaLei: lei(b.suma), incasariLei: lei(b.incasari) }
+      return { ...b, curs: k ? Math.round(k * 1e6) / 1e6 : null, sursaCurs: efectiv ? 'extras' as const : k ? 'bnr' as const : null, sumaLei: lei(b.suma), incasariLei: lei(b.incasari) }
     })
     // grupat pe platforma (RO, apoi BG, apoi HU), apoi data, cash inaintea cardului
     const ordine: Record<string, number> = { dp_cash: 0, dp_card: 1, dc: 2, extras_cont: 3 }

@@ -87,7 +87,7 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
                 </span>
                 <span className="num" style={{ ...celula, textAlign: 'right', fontWeight: 650, whiteSpace: 'nowrap' }} title={Object.entries(b.detalii).map(([k, v]) => `${k}: ${bani(v)}`).join('\n')}>
                   {b.valuta === 'RON' ? (b.suma != null ? `${bani(b.suma)} RON` : '—') : (b.sumaLei != null ? `${bani(b.sumaLei)} RON` : 'fără curs')}
-                  {b.valuta !== 'RON' && <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: 'var(--text-muted)' }}>{b.suma != null ? `${bani(b.suma)} ${b.valuta}` : ''}{b.curs ? ` × ${b.curs.toFixed(4)} ${b.sursaCurs === 'extras' ? '(curs încasare)' : '(BNR)'}` : ''}</div>}
+                  {b.valuta !== 'RON' && <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: 'var(--text-muted)' }}>{b.suma != null ? `${bani(b.suma)} ${b.valuta}` : ''}{b.curs ? ` × ${b.curs.toFixed(b.valuta === 'HUF' ? 6 : 4)} ${b.sursaCurs === 'extras' ? '(curs încasare)' : '(BNR)'}` : ''}</div>}
                 </span>
                 <span className="num" style={{ ...celula, textAlign: 'right', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                   {b.valuta === 'RON' ? (b.incasari != null ? bani(b.incasari) : '—') : (b.incasariLei != null ? bani(b.incasariLei) : '—')}
