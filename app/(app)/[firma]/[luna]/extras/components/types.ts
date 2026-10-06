@@ -94,11 +94,13 @@ function daysBetween(a: string, b: string) {
 // Suma sugestiei poate diferi putin de suma tranzactiei (pana la SUMA_TOLERANTA din
 // api/tranzactii/list) - afisam diferenta explicit in loc sa marcam mereu "suma identica",
 // ca sa nu induca in eroare cand nu e chiar exacta.
-function sumaLabel(sumaDoc: number | null, sumaTx: number): { text: string | null; exacta: boolean } {
+// valuta = moneda comuna a documentului si a tranzactiei (suma se compara doar cand sunt in aceeasi
+// moneda) - fara ea, o factura in EUR platita in EUR aparea scrisa "961.59 RON" in banner.
+function sumaLabel(sumaDoc: number | null, sumaTx: number, valuta = 'RON'): { text: string | null; exacta: boolean } {
   if (sumaDoc == null) return { text: null, exacta: false }
   const diff = Math.abs(sumaDoc - sumaTx)
   const exacta = diff < 0.01
-  const text = exacta ? `${sumaDoc.toFixed(2)} RON` : `${sumaDoc.toFixed(2)} RON (diferență ${diff.toFixed(2)} RON)`
+  const text = exacta ? `${sumaDoc.toFixed(2)} ${valuta}` : `${sumaDoc.toFixed(2)} ${valuta} (diferență ${diff.toFixed(2)} ${valuta})`
   return { text, exacta }
 }
 
@@ -130,7 +132,7 @@ export function getActiveSuggestion(tx: Tx): ActiveSuggestion | null {
     const valuta = (s.valuta || 'RON').toUpperCase()
     const conv = sumaDocument(s)
     const suma = valuta === (tx.valuta || 'RON').toUpperCase() || !conv.principal
-      ? sumaLabel(s.suma, tx.suma)
+      ? sumaLabel(s.suma, tx.suma, valuta)
       : { text: `${conv.principal}${conv.lei ? ` (${conv.lei})` : ''}`, exacta: false }
     return {
       tip: 'inbox', id: s.id,
@@ -143,10 +145,12 @@ export function getActiveSuggestion(tx: Tx): ActiveSuggestion | null {
   if (tx.sugestieGrup) {
     const g = tx.sugestieGrup
     const furnizor = (f: string|null) => (f || '').split('|')[0].trim()
+    // facturile din grup au mereu aceeasi moneda ca plata (vezi matchGrupuriInbox)
+    const valutaGrup = (tx.valuta || 'RON').toUpperCase()
     return {
       tip: 'grup', id: g.ids[0], ids: g.ids,
       label: `Am găsit ${g.ids.length} facturi care împreună dau suma plății`,
-      detaliu: g.docs.map(d => [furnizor(d.furnizor), d.numar_document && `nr. ${d.numar_document}`, d.suma != null && `${Number(d.suma).toFixed(2)} RON`].filter(Boolean).join(' · ')).join('  +  ') + `  =  ${g.suma.toFixed(2)} RON`,
+      detaliu: g.docs.map(d => [furnizor(d.furnizor), d.numar_document && `nr. ${d.numar_document}`, d.suma != null && `${Number(d.suma).toFixed(2)} ${valutaGrup}`].filter(Boolean).join(' · ')).join('  +  ') + `  =  ${g.suma.toFixed(2)} ${valutaGrup}`,
       sumaPotrivita: Math.abs(g.suma - tx.suma) < 0.01,
       dataPotrivita: false,
     }

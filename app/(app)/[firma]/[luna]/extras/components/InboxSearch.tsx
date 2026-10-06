@@ -95,7 +95,14 @@ export default function InboxSearch({ tx, firmaId, onAssociated, multi = false, 
   function comuta(c: InboxCandidat) {
     setSelectate(prev => { const m = new Map(prev); if (m.has(c.id)) m.delete(c.id); else m.set(c.id, c); return m })
   }
-  const totalSelectat = [...selectate.values()].reduce((s, c) => s + (c.suma_ron ?? c.suma ?? 0), 0)
+  // Total in moneda PLATII (acelasi criteriu ca in DocumentAttachedList): acelasi tip de moneda -> suma
+  // documentului; echivalentul BNR in lei doar cand plata e in lei; altfel nu se poate compara -> 0.
+  const valutaTx = (tx.valuta || 'RON').toUpperCase()
+  const inMonedaPlatii = (c: InboxCandidat) => {
+    if ((c.valuta || 'RON').toUpperCase() === valutaTx) return c.suma ?? 0
+    return valutaTx === 'RON' ? (c.suma_ron ?? 0) : 0
+  }
+  const totalSelectat = [...selectate.values()].reduce((s, c) => s + inMonedaPlatii(c), 0)
 
   async function associate(c: InboxCandidat) {
     setAssocId(c.id); setEroare('')
@@ -179,8 +186,8 @@ export default function InboxSearch({ tx, firmaId, onAssociated, multi = false, 
       {multi && selectate.size > 0 && (
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', marginTop:'8px', padding:'8px 10px', borderRadius:'var(--r-md)', background:'var(--purple-soft)', border:'1px solid var(--purple)' }}>
           <span style={{ fontSize:'var(--fs-sm)', color:'var(--text-primary)' }}>
-            <b>{selectate.size}</b> selectate · total <b>{totalSelectat.toFixed(2)} lei</b>
-            {sumaTinta != null && sumaTinta > 0 && <span style={{ color: Math.abs(totalSelectat - sumaTinta) < 0.02 ? 'var(--success)' : 'var(--text-muted)' }}> {Math.abs(totalSelectat - sumaTinta) < 0.02 ? '· ✓ acoperă exact suma rămasă' : `· rămas ${(sumaTinta - totalSelectat).toFixed(2)} lei`}</span>}
+            <b>{selectate.size}</b> selectate · total <b>{totalSelectat.toFixed(2)} {valutaTx === 'RON' ? 'lei' : valutaTx}</b>
+            {sumaTinta != null && sumaTinta > 0 && <span style={{ color: Math.abs(totalSelectat - sumaTinta) < 0.02 ? 'var(--success)' : 'var(--text-muted)' }}> {Math.abs(totalSelectat - sumaTinta) < 0.02 ? '· ✓ acoperă exact suma rămasă' : `· rămas ${(sumaTinta - totalSelectat).toFixed(2)} ${valutaTx === 'RON' ? 'lei' : valutaTx}`}</span>}
           </span>
           <button onClick={asociazaSelectate} disabled={!!assocId} style={{ fontSize:'var(--fs-sm)', fontWeight:600, padding:'7px 14px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent-solid)', color:'#fff', cursor: assocId ? 'wait' : 'pointer' }}>
             {progres ? `Asociez ${progres}…` : `Asociază ${selectate.size === 1 ? 'documentul' : `toate ${selectate.size}`}`}

@@ -21,8 +21,17 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
 
   const docsForTx = tx.documenteToate?.length ? tx.documenteToate : tx.documente ? [tx.documente] : []
   const orderRef = shortReference(tx.referinta)
-  // Cat din plata e acoperit de documentele atasate (in lei; valuta prin echivalentul BNR).
-  const acoperit = Math.round(docsForTx.reduce((s, d) => s + Number((d.valuta && d.valuta !== 'RON' ? d.suma_ron : d.suma) ?? 0), 0) * 100) / 100
+  // Cat din plata e acoperit de documentele atasate, in moneda PLATII: un document in aceeasi moneda
+  // (ex. factura EUR pe o plata EUR) se numara cu suma lui; echivalentul BNR in lei se foloseste doar
+  // cand plata e in lei. Un document in alta valuta decat o plata in valuta nu se poate compara -> 0.
+  const valutaTx = (tx.valuta || 'RON').toUpperCase()
+  const sumaInMonedaPlatii = (d: { suma?: number | null; valuta?: string | null; suma_ron?: number | null }) => {
+    const valutaDoc = (d.valuta || 'RON').toUpperCase()
+    if (valutaDoc === valutaTx) return Number(d.suma ?? 0)
+    if (valutaTx === 'RON') return Number(d.suma_ron ?? 0)
+    return 0
+  }
+  const acoperit = Math.round(docsForTx.reduce((s, d) => s + sumaInMonedaPlatii(d), 0) * 100) / 100
   const totalTx = Math.abs(tx.suma ?? 0)
   const ramas = Math.round((totalTx - acoperit) * 100) / 100
 
