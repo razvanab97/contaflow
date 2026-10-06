@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import JSZip from 'jszip'
+import { finalizeazaDocument } from '@/lib/denumire-document'
 
 const SMALL = ['zero','unu','doi','trei','patru','cinci','sase','sapte','opt','noua','zece','unsprezece','doisprezece','treisprezece','paisprezece','cincisprezece','saisprezece','saptesprezece','optsprezece','nouasprezece']
 const TENS = ['','','douazeci','treizeci','patruzeci','cincizeci','saizeci','saptezeci','optzeci','nouazeci']
@@ -361,8 +362,10 @@ export async function POST(req: NextRequest) {
     // cea dedusă din facturile atașate — e mereu corectă, chiar dacă DP nu are nicio factură.
     const locatieEticheta = String(body.locatieEticheta || '').trim()
     if (locatieEticheta) {
-      const restul = (locatieAgregata || '').split(', ').filter(l => l && l !== locatieEticheta)
-      locatieAgregata = [locatieEticheta, ...restul].join(', ')
+      // eticheta poate fi deja o lista „A, B” (editorul retrimite locatia dispozitiei) - fara dubluri
+      const parti = locatieEticheta.split(', ').filter(Boolean)
+      const restul = (locatieAgregata || '').split(', ').filter(l => l && !parti.includes(l))
+      locatieAgregata = [...parti, ...restul].join(', ')
     }
 
     const dispositionData = JSON.stringify({ purpose:body.purpose, beneficiary:body.beneficiary, function:body.function, amount, date:body.date, identitySeries:body.identitySeries, identityNumber:body.identityNumber })
@@ -389,6 +392,9 @@ export async function POST(req: NextRequest) {
       if (!existing) await sb.storage.from('documente').remove([path])
       return NextResponse.json({ error: databaseError.message }, { status: 500 })
     }
+    // Numele descriptiv („Firma - dispozitie_plata 01 - 664,28 RON.pdf”) se recalculeaza la fiecare salvare,
+    // ca sa urmeze suma noua cand dispozitia e editata (nu se mai reseteaza la numele brut).
+    await finalizeazaDocument(sb, disposition.id, { extrage: false })
     if (attachmentIds.length) {
       const { data: attHashes } = await sb.from('documente').select('id,furnizor').in('id', attachmentIds).eq('firma_id', firmaId).eq('luna_id', lunaId)
       for (const att of attHashes || []) {

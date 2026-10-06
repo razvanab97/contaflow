@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import { Proprietar } from '@/lib/firma-config'
 import { legibil, rgb, tint } from '@/lib/colors'
+import EditorDispozitie from './EditorDispozitie'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:string; cui?:string|null; nrRegCom?:string|null; adresa?:string|null; judet?:string|null; tara?:string|null }
 interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[]; proprietari?: Proprietar[] }
@@ -122,6 +123,7 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
   const [identityNumber, setIdentityNumber] = useState('')
   const [preset, setPreset] = useState('')
   const [editId, setEditId] = useState('')
+  const [editorDoc, setEditorDoc] = useState<DispDoc | null>(null)
   const [attachedInvoices, setAttachedInvoices] = useState<AttachmentDoc[]>([])
   const [invoiceBusy, setInvoiceBusy] = useState(false)
   const [duplicateWarnings, setDuplicateWarnings] = useState<{ docId:string; text:string; existingDocumentId?:string|null }[]>([])
@@ -375,13 +377,14 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
             <div style={BLOCK_TITLE}>Dispoziții emise</div>
             {documents.length === 0 && <div style={{ fontSize:'var(--fs-sm)', color:'var(--c-777777)' }}>Nu există încă dispoziții generate pentru luna selectată.</div>}
             {documents.map(doc => (
-              <div key={doc.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', alignItems:'center', gap:'8px', padding:'9px 10px', marginBottom:'6px', background:'var(--c-161616)', borderRadius:'var(--r-md)' }}>
+              <div key={doc.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto auto', alignItems:'center', gap:'8px', padding:'9px 10px', marginBottom:'6px', background:'var(--c-161616)', borderRadius:'var(--r-md)' }}>
                 <div style={{ minWidth:0 }}>
                   <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>DP nr. {doc.numar_document} · {dpLabel(doc)}</div>
                   <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)', marginTop:'2px' }}>{doc.attachments?.length?`${doc.attachments.length} anexe`: 'fără anexe'}</div>
                 </div>
                 <a href={`/api/chitante/dispozitie?download=${encodeURIComponent(doc.id)}`} style={{ fontSize:'var(--fs-xs)', color:'var(--accent)', textDecoration:'none' }}>↓</a>
-                <button onClick={()=>editDisposition(doc)} style={{ fontSize:'var(--fs-xs)', color:'#8DB8FF', background:'transparent', border:'none', cursor:'pointer' }}>Modifică</button>
+                <button onClick={()=>setEditorDoc(doc)} className="btn btn-sm" title="Vezi facturile, modifică sumele sau șterge facturi">✎ Editează</button>
+                <button onClick={()=>editDisposition(doc)} style={{ fontSize:'var(--fs-xs)', color:'#8DB8FF', background:'transparent', border:'none', cursor:'pointer' }} title="Încarcă dispoziția în formularul de mai jos">Modifică</button>
                 <button onClick={()=>deleteDisposition(doc)} disabled={deletingId===doc.id} style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', background:'transparent', border:'none', cursor:'pointer' }}>{deletingId===doc.id?'...':'✕'}</button>
               </div>
             ))}
@@ -539,6 +542,16 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
           {error && <p style={{ fontSize:'var(--fs-xs)', color:'var(--danger)', marginTop:'8px' }}>{error}</p>}
         </div>
       </div>
+      {editorDoc && (
+        <EditorDispozitie
+          key={editorDoc.id}
+          dp={editorDoc}
+          firma={{ id:selectedFirma.id, nume:selectedFirma.nume, cif:legal.cif, nrRegCom:legal.nrRegCom, adresa:legal.adresa, judet:legal.judet, tara:legal.tara }}
+          lunaId={selectedLunaId}
+          onClose={()=>setEditorDoc(null)}
+          onSaved={()=>{ loadNumber() }}
+        />
+      )}
     </div>
   )
 }
