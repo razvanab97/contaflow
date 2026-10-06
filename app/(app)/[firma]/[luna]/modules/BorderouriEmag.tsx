@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface Borderou {
-  id: string; tip: string; eticheta: string; platforma: string | null; nr: string | null; data: string | null; suma: number | null; valuta: string; incasari: number | null; curs: number | null; sumaLei: number | null; incasariLei: number | null; detalii: Record<string, number>; fisier: string
+  id: string; tip: string; eticheta: string; platforma: string | null; nr: string | null; data: string | null; suma: number | null; valuta: string; incasari: number | null; curs: number | null; sursaCurs: 'extras' | 'bnr' | null; sumaLei: number | null; incasariLei: number | null; detalii: Record<string, number>; fisier: string
   verificare: { stare: 'ok' | 'diferenta' | 'fara_aviz'; text: string }
 }
 
@@ -38,6 +38,11 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
     setIncarc(false)
     await load()
   }
+  async function stergeToate() {
+    if (!lista?.length || !confirm(`Ștergi toate cele ${lista.length} desfășurătoare de plată din luna asta?`)) return
+    await fetch(`/api/emag/borderou?toate=${encodeURIComponent(lunaId)}`, { method: 'DELETE' })
+    setRez([]); await load()
+  }
   async function sterge(b: Borderou) {
     if (!confirm(`Ștergi borderoul ${b.nr || ''}?`)) return
     await fetch(`/api/emag/borderou?id=${encodeURIComponent(b.id)}`, { method: 'DELETE' })
@@ -54,7 +59,12 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
           <div style={{ fontSize: 'var(--fs-base)', fontWeight: 650, color: 'var(--text-primary)' }}>Borderouri eMAG</div>
           <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>Desfășurătoarele de plată (cash + card, pe fiecare jumătate de lună) — cu data pentru eCap, verificate cu avizele</div>
         </div>
-        {!!lista?.length && <a className="btn btn-sm" href={`/api/emag/borderou?zip=${encodeURIComponent(lunaId)}`}>↓ Descarcă toate (.zip)</a>}
+        {!!lista?.length && (
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <a className="btn btn-sm" href={`/api/emag/borderou?zip=${encodeURIComponent(lunaId)}`}>↓ Descarcă toate (.zip)</a>
+            <button className="btn btn-sm" onClick={stergeToate} style={{ color: 'var(--danger)' }}>✕ Șterge toate</button>
+          </div>
+        )}
       </div>
 
       {lista === null ? <div className="skeleton" style={{ height: '60px' }} /> : lista.length > 0 && (
@@ -66,7 +76,7 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
                 {(i === 0 || lista[i - 1].platforma !== b.platforma) && (
                   <div style={{ gridColumn: '1 / -1', padding: i === 0 ? '8px 0 4px' : '18px 0 4px', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', gap: '8px', alignItems: 'baseline' }}>
                     {b.platforma || 'eMAG — platformă necunoscută'}
-                    <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: 'var(--text-muted)' }}>{b.valuta === 'RON' ? 'lei' : `${b.valuta} · convertit în lei la cursul BNR din ziua plății`}</span>
+                    <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: 'var(--text-muted)' }}>{b.valuta === 'RON' ? 'lei' : `în lei — eMAG plătește în RON; sumele din fișier (${b.valuta}) convertite la cursul încasării din extras`}</span>
                   </div>
                 )}
                 <span className="num" style={{ ...celula, fontWeight: 650, color: 'var(--text-primary)' }}>{zi(b.data)}</span>
@@ -76,12 +86,12 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
                   {Object.keys(b.detalii).length > 1 && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>{Object.entries(b.detalii).map(([k, v]) => `${k} ${bani(v)}`).join(' · ')}</div>}
                 </span>
                 <span className="num" style={{ ...celula, textAlign: 'right', fontWeight: 650, whiteSpace: 'nowrap' }} title={Object.entries(b.detalii).map(([k, v]) => `${k}: ${bani(v)}`).join('\n')}>
-                  {b.suma != null ? `${bani(b.suma)} ${b.valuta || 'RON'}` : '—'}
-                  {b.valuta !== 'RON' && <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: 'var(--text-muted)' }}>{b.sumaLei != null ? `= ${bani(b.sumaLei)} RON` : 'fără curs BNR'}{b.curs ? ` · curs ${b.curs.toFixed(4)}` : ''}</div>}
+                  {b.valuta === 'RON' ? (b.suma != null ? `${bani(b.suma)} RON` : '—') : (b.sumaLei != null ? `${bani(b.sumaLei)} RON` : 'fără curs')}
+                  {b.valuta !== 'RON' && <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: 'var(--text-muted)' }}>{b.suma != null ? `${bani(b.suma)} ${b.valuta}` : ''}{b.curs ? ` × ${b.curs.toFixed(4)} ${b.sursaCurs === 'extras' ? '(curs încasare)' : '(BNR)'}` : ''}</div>}
                 </span>
                 <span className="num" style={{ ...celula, textAlign: 'right', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                  {b.incasari != null ? `${bani(b.incasari)}${b.valuta !== 'RON' ? ` ${b.valuta}` : ''}` : '—'}
-                  {b.valuta !== 'RON' && b.incasariLei != null && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>= {bani(b.incasariLei)} RON</div>}
+                  {b.valuta === 'RON' ? (b.incasari != null ? bani(b.incasari) : '—') : (b.incasariLei != null ? bani(b.incasariLei) : '—')}
+                  {b.valuta !== 'RON' && b.incasari != null && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{bani(b.incasari)} {b.valuta}</div>}
                 </span>
                 <span style={{ ...celula, fontSize: 'var(--fs-xs)', color: CULOARE[b.verificare.stare] }}>{SEMN[b.verificare.stare]} {b.verificare.text}</span>
                 <span style={{ ...celula, display: 'flex', gap: '12px', justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>

@@ -6,6 +6,7 @@ import { lunaAvizeAsteptata } from '@/lib/emag-aviz-clasificare'
 import { esteLunaCalendaristica } from '@/lib/firma-config'
 import { citesteAvizComplet } from '@/lib/emag-aviz-complet'
 import { cursuriBnrSigur } from '@/lib/curs-bnr'
+import { getConcluzieEmag } from '@/lib/emag-concluzie'
 
 export const maxDuration = 60
 
@@ -109,13 +110,13 @@ function verifica(b: { tip: TipBorderouEmag; id: string; data: string | null; to
     for (const a of aproape) {
       if (b.tip === 'dp_cash') {
         const r = suma(a.linii, RE_AVIZ_CASH)
-        if (egal(r, inc)) return { stare: 'ok' as const, platforma: platformaDinTaskKey(a.taskKey), text: `= Încasări ramburs din avizul ${a.numar}` }
+        if (egal(r, inc)) return { stare: 'ok' as const, aviz: a.numar, platforma: platformaDinTaskKey(a.taskKey), text: `= Încasări ramburs din avizul ${a.numar}` }
       } else {
         const card = suma(a.linii, RE_AVIZ_CARD, RE_AVIZ_CASH)
         const jum = a.taskKey.endsWith('_inceput') ? 'inceput' : 'jumatate'
         const hey = avize.find(x => x.taskKey === `emag.aviz_heyblu_${jum}`)
         const h = /_ro_/.test(a.taskKey) && hey?.total ? hey.total : 0
-        if (egal(card + h, inc)) return { stare: 'ok' as const, platforma: platformaDinTaskKey(a.taskKey), text: `= card ${lei(card)} din avizul ${a.numar}${h ? ` + Heyblu ${lei(h)}` : ''}` }
+        if (egal(card + h, inc)) return { stare: 'ok' as const, aviz: a.numar, platforma: platformaDinTaskKey(a.taskKey), text: `= card ${lei(card)} din avizul ${a.numar}${h ? ` + Heyblu ${lei(h)}` : ''}` }
       }
     }
     const a = aproape.find(x => /_ro_/.test(x.taskKey)) || aproape[0]
@@ -124,7 +125,7 @@ function verifica(b: { tip: TipBorderouEmag; id: string; data: string | null; to
     const jum = a.taskKey.endsWith('_inceput') ? 'inceput' : 'jumatate'
     const faraHeyblu = b.tip === 'dp_card' && /_ro_/.test(a.taskKey) && !avize.some(x => x.taskKey === `emag.aviz_heyblu_${jum}`) && inc - asteptat > 0
     return {
-      stare: 'diferenta' as const, platforma: platformaDinTaskKey(a.taskKey),
+      stare: 'diferenta' as const, aviz: a.numar, platforma: platformaDinTaskKey(a.taskKey),
       text: faraHeyblu
         ? `lipsește notificarea Heyblu (${jum === 'inceput' ? 'început' : 'jumătate'} de lună) — avizul ${a.numar} are card ${lei(asteptat)}, diferența de ${lei(inc - asteptat)} ar trebui să fie Heyblu`
         : `avizul ${a.numar} are ${lei(asteptat)} — diferență ${lei(inc - asteptat)}`,
@@ -168,11 +169,22 @@ export async function GET(req: NextRequest) {
       const platforma = citit?.platforma || ('platforma' in v ? v.platforma : null) || null
       return { id: d.id, tip, eticheta: ETICHETA_BORDEROU_EMAG[tip] || tip, platforma, nr: tip === 'extras_cont' ? null : d.numar_document, data: d.data_document, suma: total, valuta: citit?.valuta || 'RON', incasari: citit?.incasari ?? null, detalii: citit?.detalii || {}, fisier: d.fisier_nume, verificare: v }
     }))
-    // BG (EUR) / HU (HUF): echivalent in lei la cursul BNR din ziua platii
-    const curs = await cursuriBnrSigur(borderouri.filter(b => b.valuta !== 'RON').map(b => b.data))
+    // BG (EUR) / HU (HUF): eMAG plateste in LEI - conversia se face la cursul EFECTIV al incasarii avizului
+    // din extras (lei primiti / suma avizului, din Concluzia eMAG); daca incasarea nu e inca in extras, curs BNR
+    const straine = borderouri.filter(b => b.valuta !== 'RON')
+    const cursAviz = new Map<string, number>()
+    if (straine.length) {
+      const conc = await getConcluzieEmag(lunaLista).catch(() => null)
+      for (const a of conc?.avize || []) if (a.valuta !== 'RON' && a.sursaCurs === 'extras' && a.total) cursAviz.set(a.numar, a.totalLei / a.total)
+    }
+    const bnr = await cursuriBnrSigur(straine.map(b => b.data))
     const cuLei = borderouri.map(b => {
-      const k = b.valuta === 'RON' ? 1 : (b.data && curs ? curs(b.data, b.valuta) : null)
-      return { ...b, curs: b.valuta === 'RON' ? null : k, sumaLei: b.suma != null && k ? Math.round(b.suma * k * 100) / 100 : null, incasariLei: b.incasari != null && k ? Math.round(b.incasari * k * 100) / 100 : null }
+      if (b.valuta === 'RON') return { ...b, curs: null, sursaCurs: null, sumaLei: b.suma, incasariLei: b.incasari }
+      const avizNr = 'aviz' in b.verificare ? (b.verificare as { aviz?: string }).aviz : undefined
+      const efectiv = avizNr ? cursAviz.get(avizNr) : undefined
+      const k = efectiv ?? (b.data && bnr ? bnr(b.data, b.valuta) : null)
+      const lei = (v: number | null) => v != null && k ? Math.round(v * k * 100) / 100 : null
+      return { ...b, curs: k ? Math.round(k * 10000) / 10000 : null, sursaCurs: efectiv ? 'extras' as const : k ? 'bnr' as const : null, sumaLei: lei(b.suma), incasariLei: lei(b.incasari) }
     })
     // grupat pe platforma (RO, apoi BG, apoi HU), apoi data, cash inaintea cardului
     const ordine: Record<string, number> = { dp_cash: 0, dp_card: 1, dc: 2, extras_cont: 3 }
@@ -209,10 +221,20 @@ export async function GET(req: NextRequest) {
   } })
 }
 
+// DELETE ?id=<id> -> un borderou · ?toate=<lunaId> -> toate desfasuratoarele lunii (din baza + fisierele din stocare)
 export async function DELETE(req: NextRequest) {
+  const sb = getServiceSupabase()
+  const lunaToate = req.nextUrl.searchParams.get('toate')
+  if (lunaToate) {
+    const { data: docs } = await sb.from('documente').select('id,fisier_path').eq('luna_id', lunaToate).eq('modul', 'emag').eq('tip_document', 'borderou')
+    if (!docs?.length) return NextResponse.json({ ok: true, sterse: 0 })
+    const { error } = await sb.from('documente').delete().in('id', docs.map(d => d.id))
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await sb.storage.from('documente').remove(docs.map(d => d.fisier_path).filter(Boolean))
+    return NextResponse.json({ ok: true, sterse: docs.length })
+  }
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Borderoul lipsește' }, { status: 400 })
-  const sb = getServiceSupabase()
   const { data: d } = await sb.from('documente').select('id,fisier_path').eq('id', id).eq('modul', 'emag').eq('tip_document', 'borderou').single()
   if (!d) return NextResponse.json({ error: 'Borderoul nu a fost găsit' }, { status: 404 })
   const { error } = await sb.from('documente').delete().eq('id', id)

@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 201, text: 'Borderouri eMAG: buton „Șterge toate”, cu confirmare, care șterge toate desfășurătoarele lunii și fișierele lor. eMAG BG și HU apar în lei, la cursul efectiv al încasării din extras (eMAG plătește în RON), de exemplu 79,32 EUR × 5,2659 = 417,69 RON. Suma din fișier, în EUR sau HUF, apare dedesubt.' },
   { v: 200, text: 'Borderouri eMAG, pentru toate lunile: platforma se recunoaște din fișier (RO lei, BG EUR din coloana „Fraction value [EUR]”, HU HUF). BG și HU au și echivalentul în lei la cursul BNR din ziua plății. Tabelul e grupat pe platforme: RO, apoi BG, apoi HU. Fiecare desfășurător se compară doar cu avizele platformei lui. Dacă lipsește notificarea Heyblu, mesajul o spune direct. Avizele încă necitite se citesc singure. Am corectat cele 4 desfășurătoare BG salvate cu 0 RON. Trendyol: data borderoului se corectează singură când plata apare în extras.' },
   { v: 199, text: 'Borderouri eMAG: „Total borderou” arată acum totalul documentului, din toate liniile lui, inclusiv reținerile și restituirile de curier la DP cash. De exemplu, 16119510 are 1.755,50 RON, nu 2.772,21. Coloana nouă „Încasări (în aviz)” arată partea comparată cu avizul. Sub fiecare borderou apar liniile din care se compune.' },
   { v: 198, text: 'Borderouri eMAG: secțiunea ține doar desfășurătoarele de plată (DP cash și card). Decontul de comision (DC) și extrasul de cont eMAG sunt refuzate aici, cu mesaj.' },
