@@ -224,7 +224,61 @@ export async function potriviriSigure(firmaId: string, txs: any[]): Promise<Potr
   const out: PotrivireSigura[] = []
   for (const tx of deschise) {
     const p = docsPerTx.get(tx.id) || []
-    if (p.length === 1 && txPerDoc.get(p[0].id) === 1) out.push({ txId: tx.id, tip: p[0].tip, docId: p[0].id })
+    // Bonurile NU se leaga niciodata singure: apar ca sugestie cu confirmare (pagina Bonuri si Extras de
+    // cont - vezi potriviriBonuriDeConfirmat). Raman in calcul doar pentru ambiguitate: o plata care se
+    // potriveste si cu un bon, si cu o factura nu se leaga automat de factura.
+    if (p.length === 1 && txPerDoc.get(p[0].id) === 1 && p[0].tip !== 'bon') out.push({ txId: tx.id, tip: p[0].tip, docId: p[0].id })
+  }
+  return out
+}
+
+// Bonurile in asteptare ale firmei, fiecare cu plata din Extras de cont care i se potriveste (aceeasi
+// suma +/- SUMA_TOLERANTA, in lei, aceeasi zi sau pana la 7 zile de data de pe bon / 3 zile de data
+// incarcarii cand bonul nu are data) - ca la adaugarea unui bon sa fie propusa asocierea si omul sa
+// o confirme. O plata se propune unui singur bon (cel mai apropiat ca suma si data). Doar citiri.
+export interface PotrivireBon { bonId: string; tranzactie: { id: string; data: string; descriere: string; suma: number; valuta: string }; diferenta: number; zile: number }
+
+async function citestePaginat(url: string): Promise<any[]> {
+  const out: any[] = []
+  for (let de = 0; ; de += 1000) {
+    const r = await fetch(url, { headers: { ...H, Range: `${de}-${de + 999}`, 'Range-Unit': 'items' }, cache: 'no-store' })
+    if (!r.ok) return out
+    const rows: any[] = await r.json()
+    out.push(...rows)
+    if (rows.length < 1000) return out
+  }
+}
+
+export async function potriviriBonuriDeConfirmat(firmaId: string): Promise<PotrivireBon[]> {
+  const bonuri = await citestePaginat(`${SB}/bonuri?firma_id=eq.${firmaId}&status=eq.asteptare&suma=not.is.null&select=id,suma,data_bon,created_at`)
+  if (!bonuri.length) return []
+  const luni = await citestePaginat(`${SB}/luni_contabile?firma_id=eq.${firmaId}&select=id`)
+  if (!luni.length) return []
+  const extrase = await citestePaginat(`${SB}/extrase?luna_id=in.(${luni.map(l => l.id).join(',')})&select=id`)
+  if (!extrase.length) return []
+  const txs = (await citestePaginat(`${SB}/tranzactii?extras_id=in.(${extrase.map(e => e.id).join(',')})&tip=eq.debit&document_id=is.null&note=is.null&select=id,data_tranzactie,descriere,descriere_curatata,suma,valuta&order=id`))
+    .filter(t => t.suma != null && (t.valuta || 'RON').toUpperCase() === 'RON')
+
+  const perechi: { b: any; t: any; diff: number; zile: number }[] = []
+  for (const b of bonuri) {
+    for (const t of txs) {
+      const diff = Math.abs(Number(b.suma) - Math.abs(Number(t.suma)))
+      if (diff > SUMA_TOLERANTA) continue
+      const zile = daysBetween(dataReferintaDocument(b.data_bon, b.created_at), t.data_tranzactie)
+      if (zile > (b.data_bon ? 7 : 3)) continue
+      perechi.push({ b, t, diff, zile })
+    }
+  }
+  perechi.sort((x, y) => x.diff - y.diff || x.zile - y.zile)
+  const bonuriFolosite = new Set<string>(), platiFolosite = new Set<string>()
+  const out: PotrivireBon[] = []
+  for (const { b, t, diff, zile } of perechi) {
+    if (bonuriFolosite.has(b.id) || platiFolosite.has(t.id)) continue
+    bonuriFolosite.add(b.id); platiFolosite.add(t.id)
+    out.push({
+      bonId: b.id, diferenta: Math.round(diff * 100) / 100, zile,
+      tranzactie: { id: t.id, data: String(t.data_tranzactie).slice(0, 10), descriere: String(t.descriere || t.descriere_curatata || '').replace(/\s+/g, ' ').trim(), suma: Math.abs(Number(t.suma)), valuta: (t.valuta || 'RON').toUpperCase() },
+    })
   }
   return out
 }

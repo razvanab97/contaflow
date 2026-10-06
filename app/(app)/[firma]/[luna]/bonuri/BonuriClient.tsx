@@ -3,6 +3,7 @@ import { deschideDocument } from '@/lib/vizualizare'
 import { useEffect, useRef, useState } from 'react'
 import TaskSection, { TaskItem } from '../modules/TaskSection'
 import NextStepNav from '../NextStepNav'
+import { numeContraparte } from '@/lib/achizitii-produse'
 
 interface Bon {
   id: string; fisier_nume: string; fisier_tip: string | null
@@ -63,6 +64,9 @@ function bestGuessFirma(cuiClient: string | null, firmaCurentaId: string, firme:
   return apropiat ? apropiat.id : null
 }
 
+// Plata din Extras de cont care se potriveste cu un bon in asteptare (vezi /api/bonuri/potriviri) - propusa spre confirmare.
+interface PotrivireBon { bonId: string; tranzactie: { id: string; data: string; descriere: string; suma: number; valuta: string }; diferenta: number; zile: number }
+
 interface Props {
   firmaId: string; firmaSlug: string; firmaCui?: string | null; firmaNume: string; firme: { id: string; nume: string; cui?: string | null }[]
   culoare: string; luna: string; lunaId: string; tasks: TaskItem[]
@@ -81,11 +85,24 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
   const [movePick, setMovePick] = useState<Record<string, string>>({})
   const [movingId, setMovingId] = useState<string | null>(null)
   const [moveError, setMoveError] = useState('')
+  const [potriviri, setPotriviri] = useState<Record<string, PotrivireBon>>({})
+  const [respinse, setRespinse] = useState<Set<string>>(new Set())
+  const [confirmandId, setConfirmandId] = useState<string | null>(null)
+  const [mesajOk, setMesajOk] = useState('')
+  const [eroarePotrivire, setEroarePotrivire] = useState('')
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [stream, setStream] = useState<MediaStream | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  // Bonurile in asteptare cu plata gasita in extras: propuse, nu legate - omul confirma.
+  function incarcaPotriviri() {
+    fetch(`/api/bonuri/potriviri?firmaId=${encodeURIComponent(firmaId)}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.potriviri)) setPotriviri(Object.fromEntries((d.potriviri as PotrivireBon[]).map(p => [p.bonId, p]))) })
+      .catch(() => {})
+  }
 
   function load() {
     fetch(`/api/bonuri?firmaId=${encodeURIComponent(firmaId)}`)
@@ -95,10 +112,16 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
         setLoadError('')
         setBonuri(data.bonuri || [])
         setLoading(false)
+        incarcaPotriviri()
       }).catch(() => { setLoadError('Eroare la încărcare'); setLoading(false) })
   }
 
   useEffect(() => { load() }, [firmaId])
+
+  // "Nu e aceasta" se retine pe acest browser (bon + plata), ca aceeasi propunere sa nu revina la fiecare deschidere.
+  useEffect(() => {
+    try { setRespinse(new Set(JSON.parse(localStorage.getItem(`contaflow:bon-potriviri-respinse:${firmaId}`) || '[]'))) } catch {}
+  }, [firmaId])
 
   useEffect(() => {
     if (videoRef.current && stream) videoRef.current.srcObject = stream
@@ -233,6 +256,34 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
     await fetch('/api/bonuri', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...patch }) })
   }
 
+  const cheiePotrivire = (p: PotrivireBon) => `${p.bonId}:${p.tranzactie.id}`
+  function respinge(p: PotrivireBon) {
+    setRespinse(prev => {
+      const next = new Set(prev).add(cheiePotrivire(p))
+      try { localStorage.setItem(`contaflow:bon-potriviri-respinse:${firmaId}`, JSON.stringify([...next])) } catch {}
+      return next
+    })
+  }
+  // Confirma asocierea bonului cu plata din extras - aceeasi ruta ca butonul „Asociaza” din Extras de cont.
+  async function confirmaPotrivire(p: PotrivireBon): Promise<boolean> {
+    setConfirmandId(p.bonId); setEroarePotrivire('')
+    const res = await fetch('/api/bonuri/asociaza', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bonId: p.bonId, tranzactieId: p.tranzactie.id }) }).catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : {}
+    setConfirmandId(null)
+    if (!res?.ok) { setEroarePotrivire(d.error || 'Asocierea nu a reușit'); return false }
+    return true
+  }
+  async function confirmaUna(p: PotrivireBon) {
+    if (await confirmaPotrivire(p)) { setMesajOk('Bon asociat cu plata din extras ✓'); load() }
+  }
+  async function confirmaToate(lista: PotrivireBon[]) {
+    if (!lista.length || !confirm(`Asociezi ${lista.length} ${lista.length === 1 ? 'bon' : 'bonuri'} cu plățile găsite în extras?`)) return
+    let ok = 0
+    for (const p of lista) { if (await confirmaPotrivire(p)) ok++; else break }
+    if (ok) setMesajOk(`${ok} ${ok === 1 ? 'bon asociat' : 'bonuri asociate'} cu plățile din extras ✓`)
+    load()
+  }
+
   // Muta manual un bon pe alta firma - pentru cazul in care CUI-ul citit pe bon apartine altei
   // firme decat cea pe care a fost incarcat, dar auto-rutarea la upload nu l-a mutat (sau bonul
   // a fost adaugat inainte ca CUI-ul sa fie completat corect).
@@ -258,6 +309,7 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
 
   const asteptare = bonuri.filter(b => b.status === 'asteptare')
   const asociate = bonuri.filter(b => b.status === 'asociata')
+  const deConfirmat = asteptare.map(b => potriviri[b.id]).filter((p): p is PotrivireBon => !!p && !respinse.has(cheiePotrivire(p)))
 
   // Calcul rapid, direct pe pagina - fara sa mai fie nevoie sa descarci PDF-ul doar ca sa vezi
   // cat s-a cheltuit. Grupat dupa data reala de pe bon (nu dupa cand a fost incarcat).
@@ -368,7 +420,15 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
         <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '4px' }}>
           În așteptare ({asteptare.length})
         </div>
-        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', marginBottom: '14px' }}>Se sugerează automat la tranzacția potrivită din extras, după sumă și data la care ai încărcat bonul — max. 3 zile diferență față de tranzacția bancară.</p>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', marginBottom: '14px' }}>Când plata există în extras (aceeași sumă, cel mult 7 zile față de data bonului), o propun sub bon și aștept confirmarea ta — nimic nu se leagă fără ea.</p>
+        {mesajOk && <p role="status" style={{ fontSize: 'var(--fs-sm)', color: 'var(--success)', fontWeight: 600, marginBottom: '10px' }}>{mesajOk}</p>}
+        {eroarePotrivire && <p role="alert" style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)', marginBottom: '10px' }}>{eroarePotrivire}</p>}
+        {deConfirmat.length > 0 && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '12px', padding: '10px 12px', borderRadius: 'var(--r-md)', background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+            <span><b style={{ color: 'var(--success)' }}>{deConfirmat.length} {deConfirmat.length === 1 ? 'bon are' : 'bonuri au'} plata găsită în extras</b> — confirmă mai jos, la fiecare, sau toate odată.</span>
+            <button onClick={() => confirmaToate(deConfirmat)} disabled={!!confirmandId} className="btn btn-sm btn-primary">Confirmă toate ({deConfirmat.length})</button>
+          </div>
+        )}
 
         {asteptare.length === 0 ? (
           <p style={{ fontSize: 'var(--fs-md)', color: 'var(--c-555555)', padding: '4px 0' }}>Niciun bon în așteptare.</p>
@@ -457,6 +517,22 @@ export default function BonuriClient({ firmaId, firmaSlug, firmaCui, firmaNume, 
                     <a href={`/api/bonuri/download?id=${b.id}`} style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>↓</a>
                     <button onClick={() => deleteBon(b.id)} style={{ width: '22px', height: '22px', flexShrink: 0, background: 'var(--c-1a1a1a)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', cursor: 'pointer', color: 'var(--danger)', fontSize: 'var(--fs-sm)', lineHeight: 1 }}>×</button>
                   </div>
+                  {(() => {
+                    const pot = potriviri[b.id]
+                    if (!pot || respinse.has(cheiePotrivire(pot))) return null
+                    const t = pot.tranzactie
+                    return (
+                      <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '6px', padding: '8px 12px', borderRadius: 'var(--r-md)', background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', fontSize: 'var(--fs-sm)' }}>
+                        <span style={{ flex: '1 1 260px', minWidth: 0, color: 'var(--text-secondary)' }}>
+                          <b style={{ color: 'var(--success)' }}>Plata din extras:</b> {fmtData(t.data)} · {/^EPOS\b/i.test(t.descriere) ? numeContraparte({ descriere: t.descriere }) : t.descriere.slice(0, 70)} · <b style={{ color: 'var(--text-primary)' }}>{fmtRon(t.suma)} RON</b>
+                          {pot.diferenta > 0.009 && <span style={{ color: 'var(--warning)' }}> · diferență {fmtRon(pot.diferenta)} RON</span>}
+                          {pot.zile > 0 && <span style={{ color: 'var(--text-muted)' }}> · {pot.zile} {pot.zile === 1 ? 'zi' : 'zile'} după bon</span>}
+                        </span>
+                        <button onClick={() => confirmaUna(pot)} disabled={!!confirmandId} className="btn btn-sm btn-primary">{confirmandId === b.id ? '…' : 'Confirmă asocierea'}</button>
+                        <button onClick={() => respinge(pot)} disabled={!!confirmandId} className="btn btn-sm">Nu e aceasta</button>
+                      </div>
+                    )
+                  })()}
                   {open && kind === 'pdf' && (
                     <iframe src={`/api/bonuri/download?id=${b.id}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-262626)', borderRadius: 'var(--r-md)', marginTop: '8px', background: 'var(--c-ffffff)' }} />
                   )}
