@@ -190,6 +190,8 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
 
         {/* Subsol: aparenta + luna de lucru. Padding-ul de jos lasa loc widget-ului "Update N". */}
         <div style={{ flexShrink: 0, padding: '12px 14px 34px', borderTop: '1px solid var(--border-subtle)' }}>
+          {/* Cronometrul „Timp azi” se montează aici (vezi app/layout.tsx → time-tracking.js) */}
+          <div id="tt-mount" className="tt-mount" />
           <ThemeSelector />
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', padding: '0 4px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
             <Icon name="calendar" size={13} />

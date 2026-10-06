@@ -803,3 +803,25 @@ mark.hl { background: color-mix(in srgb, var(--brand) 26%, transparent); color: 
 .doc-viewer-body { position: relative; flex: 1; min-height: 0; display: flex; background: var(--surface-sunken); }
 .doc-viewer-loading { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); font-size: var(--fs-md); padding: 16px; }
 .spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent); border-top-color: transparent; animation: spin .7s linear infinite; display: inline-block; }
+
+/* Time tracking: cronometrul „Timp azi” (script partajat din gestiune-stoc: time-tracking.js).
+   Widget-ul își ia culorile din variabile generice (--surf, --b2, --t1, ...); aici le mapăm pe token-urile
+   ContaFlow, ca să urmeze tema (dark / light / glass) și accentul firmei active (--brand). */
+.tt-mount:empty { display: none; }
+.tt-mount { margin-bottom: 10px; }
+.tt-mount .tt-widget {
+  --surf: var(--surface-secondary); --surf2: var(--surface-sunken);
+  --b1: var(--border-subtle); --b2: var(--border); --b3: var(--border-strong);
+  --t1: var(--text-primary); --t2: var(--text-secondary); --t3: var(--text-muted);
+  --acc: var(--accent); --acc-light: var(--accent-soft);
+  --sh: var(--shadow-xs); --r2: var(--r-md);
+  --mono: var(--font-mono); --font: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.tt-mount .tt-btn { padding: 7px 12px 8px; }
+.tt-mount .tt-lbl { font-size: var(--fs-xs); }
+.tt-mount .tt-time { font-size: var(--fs-xl); letter-spacing: -0.01em; }
+.tt-mount .tt-st { color: var(--warning); }
+/* Pe ecran lat panoul de statistici se deschide în dreapta sidebar-ului (nu acoperă navigarea); pe mobil, deasupra cronometrului. */
+@media (min-width: 900px) {
+  .tt-mount .tt-panel { left: calc(100% + 18px); bottom: -4px; width: min(400px, calc(100vw - var(--sidebar-w) - 28px)); }
+}

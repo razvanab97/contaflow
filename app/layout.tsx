@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import { Inter, Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import UpdateWidget from '@/components/UpdateWidget'
@@ -41,6 +42,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <UpdateWidget />
         <Toaster />
         <DocViewer />
+        {/* Time tracking: cronometrul „Timp azi” (script partajat, servit de gestiune-stoc; vezi docs/time-tracking.md acolo).
+            Măsoară doar cât tabul ContaFlow e activ (vizibil + focus + input) și salvează în Supabase-ul comun, cu id-ul
+            propriu `contaflow`. Se montează în #tt-mount din subsolul sidebar-ului; lazyOnload = după hidratare. */}
+        <Script
+          src="https://gestiune-stoc-pi.vercel.app/time-tracking.js"
+          data-project="contaflow"
+          data-mount="#tt-mount"
+          data-mount-only="true"
+          strategy="lazyOnload"
+        />
       </body>
     </html>
   )
