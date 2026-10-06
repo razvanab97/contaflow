@@ -31,8 +31,13 @@ export default function DocumentAttachedList({ tx, firmaId, lunaId, culoare, onR
     if (valutaTx === 'RON') return Number(d.suma_ron ?? 0)
     return 0
   }
-  const acoperit = Math.round(docsForTx.reduce((s, d) => s + sumaInMonedaPlatii(d), 0) * 100) / 100
   const totalTx = Math.abs(tx.suma ?? 0)
+  // Documentele in moneda platii (ex. chitanta in lei) pot acoperi singure toata plata; atunci factura in valuta
+  // atasata alaturi e aceeasi plata si nu se aduna a doua oara (chitanta 750.67 + factura ≈701.44 lei != 1452.11).
+  const dinMonedaPlatii = Math.round(docsForTx.filter(d => (d.valuta || 'RON').toUpperCase() === valutaTx).reduce((s, d) => s + Number(d.suma ?? 0), 0) * 100) / 100
+  const acoperit = dinMonedaPlatii > 0 && Math.abs(totalTx - dinMonedaPlatii) < 0.02
+    ? dinMonedaPlatii
+    : Math.round(docsForTx.reduce((s, d) => s + sumaInMonedaPlatii(d), 0) * 100) / 100
   const ramas = Math.round((totalTx - acoperit) * 100) / 100
   // Facturi in valuta (toate aceeasi) pe o plata in lei: plata e cea care le inchide, la cursul ei real (lei platiti /
   // suma in valuta), nu la cursul BNR. BNR ramane referinta. Peste ±15% fata de BNR nu mai e curs, ci cel mai probabil
