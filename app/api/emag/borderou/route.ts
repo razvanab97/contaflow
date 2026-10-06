@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import JSZip from 'jszip'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { citesteBorderouEmag, ETICHETA_BORDEROU_EMAG, type BorderouEmag, type TipBorderouEmag } from '@/lib/emag-borderou'
+import { citesteBorderouEmag, ETICHETA_BORDEROU_EMAG, platformaDinTaskKey, type BorderouEmag, type TipBorderouEmag } from '@/lib/emag-borderou'
 import { lunaAvizeAsteptata } from '@/lib/emag-aviz-clasificare'
 import { esteLunaCalendaristica } from '@/lib/firma-config'
 
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     const path = `${firmaId}/${lunaId}/emag-borderou/${b.tip}_${b.id}_${Date.now()}.xlsx`
     const { error: upErr } = await sb.storage.from('documente').upload(path, bytes, { contentType: XLSX_MIME })
     if (upErr) { rezultate.push({ fisier: file.name, ok: false, text: upErr.message }); continue }
-    const fisierNume = `${numeFirma} - ${NUME_SCURT[b.tip]} ${b.id}${b.data ? ` - ${zi(b.data)}` : ''} - ${lei(b.total)} RON.xlsx`
+    const fisierNume = `${numeFirma} - ${NUME_SCURT[b.tip]}${b.tip === 'extras_cont' ? '' : ` ${b.id}`}${b.platforma && b.tip === 'extras_cont' ? ` ${b.platforma.replace('eMAG ', '')}` : ''}${b.data ? ` - ${zi(b.data)}` : ''} - ${lei(b.total)} RON.xlsx`
     const { data: doc, error } = await sb.from('documente').insert({
       firma_id: firmaId, luna_id: lunaId, modul: 'emag', tip_document: 'borderou',
       furnizor: b.tip, numar_document: b.id, data_document: b.data, suma: b.total, valuta: 'RON',
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       await sb.from('documente').delete().in('id', vechi.map(v => v.id))
       await sb.storage.from('documente').remove(vechi.map(v => v.fisier_path).filter(Boolean))
     }
-    rezultate.push({ fisier: file.name, ok: true, text: `${ETICHETA_BORDEROU_EMAG[b.tip]} ${b.id}${b.data ? ` · ${zi(b.data)}` : ''} · ${lei(b.total)} RON${vechi?.length ? ' (înlocuit)' : ''}` })
+    rezultate.push({ fisier: file.name, ok: true, text: `${ETICHETA_BORDEROU_EMAG[b.tip]} · ${b.id}${b.data ? ` · ${zi(b.data)}` : ''} · ${lei(b.total)} RON${vechi?.length ? ' (înlocuit)' : ''}` })
   }
   return NextResponse.json({ rezultate })
 }
@@ -89,23 +89,23 @@ function verifica(b: { tip: TipBorderouEmag; id: string; data: string | null; to
     for (const a of aproape) {
       if (b.tip === 'dp_cash') {
         const r = suma(a.linii, /ramburs|cash on delivery|наложен|utánvét/i)
-        if (egal(r, b.total)) return { stare: 'ok' as const, text: `= Încasări ramburs din avizul ${a.numar}` }
+        if (egal(r, b.total)) return { stare: 'ok' as const, platforma: platformaDinTaskKey(a.taskKey), text: `= Încasări ramburs din avizul ${a.numar}` }
       } else {
         const card = suma(a.linii, /card|online/i)
         const jum = a.taskKey.endsWith('_inceput') ? 'inceput' : 'jumatate'
         const hey = avize.find(x => x.taskKey === `emag.aviz_heyblu_${jum}`)
         const h = /_ro_/.test(a.taskKey) && hey?.total ? hey.total : 0
-        if (egal(card + h, b.total)) return { stare: 'ok' as const, text: `= card online ${lei(card)} din avizul ${a.numar}${h ? ` + Heyblu ${lei(h)}` : ''}` }
+        if (egal(card + h, b.total)) return { stare: 'ok' as const, platforma: platformaDinTaskKey(a.taskKey), text: `= card online ${lei(card)} din avizul ${a.numar}${h ? ` + Heyblu ${lei(h)}` : ''}` }
       }
     }
     const a = aproape.find(x => /_ro_/.test(x.taskKey)) || aproape[0]
     const asteptat = b.tip === 'dp_cash' ? suma(a.linii, /ramburs|cash on delivery/i) : suma(a.linii, /card|online/i)
-    return { stare: 'diferenta' as const, text: `avizul ${a.numar} are ${lei(asteptat)} — diferență ${lei(b.total - asteptat)}` }
+    return { stare: 'diferenta' as const, platforma: platformaDinTaskKey(a.taskKey), text: `avizul ${a.numar} are ${lei(asteptat)} — diferență ${lei(b.total - asteptat)}` }
   }
   if (b.tip === 'dc') {
     for (const a of avize) {
       const l = a.linii.find(x => x.tip === 'comision' && egal(Math.abs(x.valoare), b.total))
-      if (l) return { stare: 'ok' as const, text: `= factura de comision ${l.serie || ''} din avizul ${a.numar} (net + TVA 21%)` }
+      if (l) return { stare: 'ok' as const, platforma: platformaDinTaskKey(a.taskKey), text: `= factura de comision ${l.serie || ''} din avizul ${a.numar} (net + TVA 21%)` }
     }
     return { stare: avize.some(a => a.linii.length) ? 'diferenta' as const : 'fara_aviz' as const, text: 'nicio factură de comision cu această sumă în avizele lunii' }
   }
@@ -138,7 +138,8 @@ export async function GET(req: NextRequest) {
         if (f) peAviz = (await citesteBorderouEmag(new Uint8Array(await f.arrayBuffer()), d.fisier_nume).catch(() => null))?.peAviz
       }
       const v = verifica({ tip, id: d.numar_document || '', data: d.data_document, total: Number(d.suma) || 0, peAviz }, avize)
-      return { id: d.id, tip, eticheta: ETICHETA_BORDEROU_EMAG[tip] || tip, nr: d.numar_document, data: d.data_document, suma: d.suma == null ? null : Number(d.suma), fisier: d.fisier_nume, verificare: v }
+      const platforma = tip === 'extras_cont' ? (d.numar_document?.startsWith('eMAG') ? d.numar_document : null) : ('platforma' in v ? v.platforma : null) || null
+      return { id: d.id, tip, eticheta: ETICHETA_BORDEROU_EMAG[tip] || tip, platforma, nr: tip === 'extras_cont' ? null : d.numar_document, data: d.data_document, suma: d.suma == null ? null : Number(d.suma), fisier: d.fisier_nume, verificare: v }
     }))
     const ordine: Record<string, number> = { dp_cash: 0, dp_card: 1, dc: 2, extras_cont: 3 }
     borderouri.sort((a, b) => String(a.data).localeCompare(String(b.data)) || (ordine[a.tip] ?? 9) - (ordine[b.tip] ?? 9))

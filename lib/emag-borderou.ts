@@ -27,6 +27,12 @@ export interface BorderouEmag {
   linii: number
   // doar la extras: totalul compensat pe fiecare aviz
   peAviz?: Record<string, number>
+  platforma?: string | null        // eMAG RO / BG / HU (la extras scrie in fisier; la DP/DC reiese din avizul potrivit)
+}
+
+export function platformaDinTaskKey(taskKey: string) {
+  const m = taskKey.match(/emag\.aviz_(ro|bg|hu|heyblu)_/)
+  return m ? `eMAG ${m[1] === 'heyblu' ? 'RO' : m[1].toUpperCase()}` : null
 }
 
 const num = (v: Celula) => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : 0 }
@@ -51,11 +57,14 @@ export async function citesteBorderouEmag(bytes: Uint8Array | ArrayBuffer, numeF
       detalii[t] = r2((detalii[t] || 0) + num(r[ix('Fraction value')]))
     }
     const tipuri = Object.keys(detalii)
-    const card = tipuri.some(t => /^CO Cashing$|Refund CO/i.test(t)) && !tipuri.some(t => /COD/i.test(t))
-    // suma platita pentru vanzari: card = incasari card - rambursari card; cash = incasarile ramburs
-    const total = card
-      ? r2(tipuri.filter(t => /^CO Cashing$|Refund CO/i.test(t)).reduce((s, t) => s + detalii[t], 0))
-      : r2(tipuri.filter(t => /COD Cashing/i.test(t)).reduce((s, t) => s + detalii[t], 0))
+    // CARD: CO Cashing, Refund CO, eCredit cashing (rate) · CASH: COD Cashing, Refund COD, Courier retain…
+    const RE_CARD = /^CO Cashing$|^Refund CO$|eCredit/i
+    const RE_CASH = /^COD Cashing$|^Refund COD$/i
+    const card = tipuri.some(t => RE_CARD.test(t)) && !tipuri.some(t => /COD/i.test(t))
+    // suma platita pentru vanzari (= randul din aviz): card = incasari card - rambursari card + eCredit
+    // (+ Heyblu, platit separat); cash = incasari ramburs - rambursari ramburs. Retinerile curier din DP
+    // cash nu intra aici - in aviz apar separat, ca „Retineri curier”.
+    const total = r2(tipuri.filter(t => (card ? RE_CARD : RE_CASH).test(t)).reduce((s, t) => s + detalii[t], 0))
     const r0 = date[0] || []
     const data = String(r0[ix('Payout date')] ?? '').slice(0, 10) || null
     const ps = String(r0[ix('Reference period start')] ?? '').slice(0, 10), pe = String(r0[ix('Reference period end')] ?? '').slice(0, 10)
@@ -96,9 +105,12 @@ export async function citesteBorderouEmag(bytes: Uint8Array | ArrayBuffer, numeF
       if (cl && /compensare la payout/i.test(tipDoc)) peAviz[cl] = r2((peAviz[cl] || 0) + v)
     }
     const data = numeFisier.match(/(\d{4}-\d{2}-\d{2})/)?.[1] || null
+    // „MKTP eMAG RO” -> eMAG RO; ID-ul extrasului = platforma: un extras nou al aceleiasi platforme il inlocuieste pe cel vechi
+    const pl = String(date.find(r => r[ix('Marketplace Platform')])?.[ix('Marketplace Platform')] ?? '').match(/eMAG\s*(RO|BG|HU)/i)?.[1]?.toUpperCase()
+    const platforma = pl ? `eMAG ${pl}` : null
     return {
-      tip: 'extras_cont', id: data || 'extras', data, perioada: null,
-      total: r2(Object.values(peAviz).reduce((s, v) => s + v, 0)), detalii, linii: n, peAviz,
+      tip: 'extras_cont', id: platforma || 'eMAG', data, perioada: null,
+      total: r2(Object.values(peAviz).reduce((s, v) => s + v, 0)), detalii, linii: n, peAviz, platforma,
     }
   }
 
