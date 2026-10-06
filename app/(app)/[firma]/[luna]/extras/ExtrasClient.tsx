@@ -130,11 +130,19 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
 
   useEffect(() => {
     if (!restored.current || loading || positionRestored.current) return
-    const activeIndex = restoredActiveId.current ? filtered.findIndex(tx => tx.id === restoredActiveId.current) : -1
-    if (activeIndex >= 0) setActiveTxIndex(activeIndex)
+    // Filtrul salvat de data trecuta (ex. „De verificat" rezolvat pana la zero) poate sa nu mai dea
+    // niciun rezultat - la deschidere ar parea ca pagina e goala/blocata. Il resetam o singura data.
+    const staleFilter = filtered.length === 0 && scopedTxs.length > 0 && (filter !== 'all' || flowFilter !== 'all')
+    if (staleFilter) {
+      pendingFocusId.current = restoredActiveId.current
+      setFilter('all'); setFlowFilter('all')
+    } else {
+      const activeIndex = restoredActiveId.current ? filtered.findIndex(tx => tx.id === restoredActiveId.current) : -1
+      if (activeIndex >= 0) setActiveTxIndex(activeIndex)
+    }
     restoredActiveId.current = null
     positionRestored.current = true
-  }, [filtered, loading])
+  }, [filtered, loading, scopedTxs.length, filter, flowFilter])
 
   useEffect(() => {
     if (!pendingFocusId.current) return

@@ -10,7 +10,7 @@ type FlowFilter = 'all'|'debit'|'credit'
 
 export default function TransactionSidebar({
   txs, activeTxId, onSelect, search, onSearchChange,
-  filter, flowFilter, counts, flowCounts, onFilterChange, onFlowFilterChange,
+  filter, flowFilter, counts, flowCounts, onFilterChange, onFlowFilterChange, onResetFilters,
   onScroll, initialScrollTop,
 }: {
   txs: Tx[]; activeTxId: string | null; onSelect: (id: string) => void
@@ -18,6 +18,7 @@ export default function TransactionSidebar({
   filter: Filter; flowFilter: FlowFilter
   counts: Record<Filter, number>; flowCounts: Record<FlowFilter, number>
   onFilterChange: (f: Filter) => void; onFlowFilterChange: (f: FlowFilter) => void
+  onResetFilters?: () => void
   onScroll?: (scrollTop: number) => void; initialScrollTop?: number
 }) {
   const listRef = useRef<HTMLDivElement>(null)
@@ -50,7 +51,12 @@ export default function TransactionSidebar({
         style={{ flex:1, minHeight:0, overflowY:'auto', borderTop:'1px solid var(--border-subtle)' }}
       >
         {txs.length === 0 ? (
-          <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-muted)', padding:'20px 14px', textAlign:'center' }}>Nicio tranzacție găsită.</p>
+          <div style={{ padding:'20px 14px', textAlign:'center' }}>
+            <p style={{ fontSize:'var(--fs-sm)', color:'var(--text-muted)' }}>Nicio tranzacție găsită.</p>
+            {onResetFilters && (
+              <button onClick={onResetFilters} className="btn btn-sm" style={{ marginTop:'10px' }}>Arată toate tranzacțiile</button>
+            )}
+          </div>
         ) : (
           txs.map(tx => (
             <TransactionRow key={tx.id} tx={tx} isSelected={tx.id === activeTxId} onClick={() => onSelect(tx.id)} />

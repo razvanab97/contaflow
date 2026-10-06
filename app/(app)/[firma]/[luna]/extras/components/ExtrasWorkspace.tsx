@@ -52,23 +52,19 @@ export default function ExtrasWorkspace({
     return () => window.removeEventListener('keydown', handleKey)
   }, [activeTx, onNA, safeIndex, setActiveTxIndex, txs.length])
 
-  if (!activeTx) {
-    return (
-      <div className="empty-state" style={{ padding:'48px 16px' }}>
-        <strong>Nicio tranzacție în această categorie</strong>
-        <span>Schimbă filtrul sau golește căutarea.</span>
-      </div>
-    )
+  const filtersActive = filter !== 'all' || flowFilter !== 'all' || search.trim() !== ''
+  function resetFilters() {
+    onFilterChange('all'); onFlowFilterChange('all'); onSearchChange('')
   }
 
-  const activeSuggestion = getActiveSuggestion(activeTx)
-
   async function confirmSuggestion() {
-    if (!activeSuggestion) return
+    if (!activeTx) return
+    const suggestion = getActiveSuggestion(activeTx)
+    if (!suggestion) return
     setSugestieBusy(true)
-    const { url, idKey } = SUGGESTION_ENDPOINT[activeSuggestion.tip]
+    const { url, idKey } = SUGGESTION_ENDPOINT[suggestion.tip]
     // grup (ex. 3 facturi eMAG pe aceeasi plata): le atasam pe rand - prima devine documentul principal
-    for (const id of activeSuggestion.ids || [activeSuggestion.id]) {
+    for (const id of suggestion.ids || [suggestion.id]) {
       await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ [idKey]: id, tranzactieId: activeTx.id }) })
     }
     setSugestieBusy(false)
@@ -81,15 +77,45 @@ export default function ExtrasWorkspace({
     setMobileDetail(true)
   }
 
+  // Sidebar-ul (cu cautare + filtre) se randeaza MEREU, chiar si cand filtrul curent nu da niciun
+  // rezultat - filtrul e salvat in localStorage, iar fara aceste controale omul ramanea blocat intr-o
+  // lista goala, fara nicio cale de a-l schimba (nici dupa refresh).
   const sidebar = (
     <TransactionSidebar
-      txs={txs} activeTxId={activeTx.id} onSelect={selectTx}
+      txs={txs} activeTxId={activeTx?.id ?? null} onSelect={selectTx}
       search={search} onSearchChange={onSearchChange}
       filter={filter} flowFilter={flowFilter} counts={counts} flowCounts={flowCounts}
       onFilterChange={onFilterChange} onFlowFilterChange={onFlowFilterChange}
+      onResetFilters={filtersActive ? resetFilters : undefined}
       onScroll={onSidebarScroll} initialScrollTop={initialSidebarScrollTop}
     />
   )
+
+  if (!activeTx) {
+    return (
+      <div className="extras-workspace-grid" style={{ display:'grid', gridTemplateColumns:'minmax(0,32fr) minmax(0,68fr)', gridTemplateRows:'1fr', gap:'16px', height:'calc(100vh - 280px)', minHeight:'520px' }}>
+        <div className="extras-sidebar-col" style={{ minWidth:0, minHeight:0 }}>{sidebar}</div>
+        <div className="extras-detail-col empty-state" style={{ padding:'48px 16px', minWidth:0, minHeight:0 }}>
+          <strong>Nicio tranzacție în această categorie</strong>
+          <span>Schimbă filtrul din stânga sau golește căutarea.</span>
+          {filtersActive && (
+            <button onClick={resetFilters} className="btn btn-primary btn-sm" style={{ marginTop:'8px' }}>Arată toate tranzacțiile</button>
+          )}
+        </div>
+        <style>{`
+          @media (max-width: 1024px) {
+            .extras-workspace-grid { grid-template-columns: 260px minmax(0,1fr) !important; }
+          }
+          @media (max-width: 768px) {
+            .extras-workspace-grid { grid-template-columns: 1fr !important; height: auto !important; min-height: 0 !important; }
+            .extras-detail-col { display: none !important; }
+          }
+        `}</style>
+      </div>
+    )
+  }
+
+  const activeSuggestion = getActiveSuggestion(activeTx)
 
   const detail = (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0, minWidth:0 }}>
