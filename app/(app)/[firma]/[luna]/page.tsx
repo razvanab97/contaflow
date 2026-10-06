@@ -101,7 +101,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
       </section>
 
       {/* Concluzia financiara a lunii (din extrasele bancare), cu tendinta pe ultimele 6 luni */}
-      <LunaSummary lunaId={lunaData.id} culoare={firma.culoare} firmaId={firma.id} firmaSlug={firma.slug} luna={luna} />
+      <LunaSummary lunaId={lunaData.id} culoare={firma.culoare} firmaId={firma.id} firmaSlug={firma.slug} luna={luna} lunaLabel={ll} />
 
       {slug === 'proiect-ab-textile' && <ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} compact />}
 

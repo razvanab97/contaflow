@@ -20,15 +20,16 @@ export async function GET(req: NextRequest) {
   // Get all tranzactii for these extras
   // motiv_ignorare/ignorat_auto vin din supabase_tranzactii_motiv_ignorare.sql - daca migrarea nu a
   // fost rulata inca, citim fara ele (pagina functioneaza ca inainte).
+  // achizitie_produse (corectia manuala la Achizitii produse) vine din supabase_tranzactii_achizitie_produse.sql;
+  // se incearca pe rand cu cat mai multe coloane noi, ca o migrare lipsa sa nu strice restul.
   const BASE_COLS = 'id,extras_id,data_tranzactie,descriere,descriere_curatata,tip,suma,valuta,referinta,categorie,document_id,note,status_note'
-  let cols = `${BASE_COLS},motiv_ignorare,ignorat_auto`
+  const NIVELE = [`${BASE_COLS},motiv_ignorare,ignorat_auto,achizitie_produse`, `${BASE_COLS},motiv_ignorare,ignorat_auto`, BASE_COLS]
+  let nivel = 0
   let all: any[] = []
   for (const e of extrase) {
-    let r = await fetch(`${SB}/tranzactii?extras_id=eq.${e.id}&select=${cols}&order=data_tranzactie,id`, { headers: H })
-    if (!r.ok && cols !== BASE_COLS) {
-      cols = BASE_COLS
-      r = await fetch(`${SB}/tranzactii?extras_id=eq.${e.id}&select=${cols}&order=data_tranzactie,id`, { headers: H })
-    }
+    const cere = () => fetch(`${SB}/tranzactii?extras_id=eq.${e.id}&select=${NIVELE[nivel]}&order=data_tranzactie,id`, { headers: H })
+    let r = await cere()
+    while (!r.ok && nivel < NIVELE.length - 1) { nivel++; r = await cere() }
     if (!r.ok)
       return NextResponse.json({ error: await r.text() }, { status: 502 })
     const txs = await r.json()

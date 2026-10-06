@@ -10,7 +10,7 @@ type Filter = 'all'|'lipsa'|'ok'|'na'
 type FlowFilter = 'all'|'debit'|'credit'
 
 export default function ExtrasWorkspace({
-  txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, culoare,
+  txs, activeTxIndex, setActiveTxIndex, firmaId, lunaId, culoare, achizitiiProduse,
   onNA, onClearNA, onUploadSuccess, onRefresh, onSetMotiv,
   search, onSearchChange, filter, flowFilter, counts, flowCounts, onFilterChange, onFlowFilterChange,
   onSidebarScroll, initialSidebarScrollTop,
@@ -18,7 +18,7 @@ export default function ExtrasWorkspace({
   txs: Tx[]
   activeTxIndex: number
   setActiveTxIndex: (idx: number) => void
-  firmaId: string; lunaId: string; culoare: string
+  firmaId: string; lunaId: string; culoare: string; achizitiiProduse?: boolean
   onNA: (id: string) => void
   onClearNA: (id: string) => void
   onUploadSuccess: (id: string) => void
@@ -133,6 +133,7 @@ export default function ExtrasWorkspace({
           sugestieBusy={sugestieBusy}
           onConfirmSuggestion={confirmSuggestion}
           onSetMotiv={onSetMotiv ? (m: string) => onSetMotiv(activeTx.id, m) : undefined}
+          achizitiiProduse={achizitiiProduse}
           key={activeTx.id}
         />
       </div>

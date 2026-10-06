@@ -14,7 +14,11 @@ export async function GET(req: NextRequest) {
   const ids = (extrase || []).map(e => e.id)
   if (!ids.length) return NextResponse.json({ flux: null })
   try {
-    const txs = await collectPaged<any>((a, b) => sb.from('tranzactii').select('data_tranzactie,tip,suma,valuta,descriere,descriere_curatata').in('extras_id', ids).order('id').range(a, b) as any)
+    const COLS = 'data_tranzactie,tip,suma,valuta,descriere,descriere_curatata'
+    const incarca = (cols: string) => collectPaged<any>((a, b) => sb.from('tranzactii').select(cols).in('extras_id', ids).order('id').range(a, b) as any)
+    // achizitie_produse (corectia manuala la Achizitii produse) vine din supabase_tranzactii_achizitie_produse.sql;
+    // pana la migrare, fluxul se calculeaza doar cu regula automata.
+    const txs = await incarca(`${COLS},achizitie_produse`).catch(() => incarca(COLS))
     return NextResponse.json({ flux: await calculeazaFlux(txs) })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

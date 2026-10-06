@@ -5,14 +5,16 @@ import TransactionDetails from './TransactionDetails'
 import DocumentMatch from './DocumentMatch'
 import DocumentActions from './DocumentActions'
 import DocumentAttachedList from './DocumentAttachedList'
+import AchizitieProdusBar from './AchizitieProdusBar'
 import { MOTIVE_IGNORARE, EXPLICATIE_REGULA, ignorareDeVerificat, motivEfectiv } from '@/lib/tranzactii-reguli'
 
 export default function TransactionWorkspaceCard({
   tx, index, total, firmaId, lunaId, culoare,
   onClearNA, onRefresh, onUploadSuccess,
-  activeSuggestion, sugestieBusy, onConfirmSuggestion, onSetMotiv,
+  activeSuggestion, sugestieBusy, onConfirmSuggestion, onSetMotiv, achizitiiProduse,
 }: {
   onSetMotiv?: (motiv: string) => void
+  achizitiiProduse?: boolean
   tx: Tx; index: number; total: number
   firmaId: string; lunaId: string; culoare: string
   onClearNA: () => void
@@ -30,6 +32,7 @@ export default function TransactionWorkspaceCard({
     <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
       <div style={{ flex:1, minHeight:0, overflowY:'auto' }}>
         <TransactionDetails tx={tx} index={index} total={total} onRefresh={onRefresh} />
+        {achizitiiProduse && <AchizitieProdusBar tx={tx} onRefresh={onRefresh} />}
 
         {isDone && !editDoc ? (
           <div style={{ padding:'24px 28px' }}>

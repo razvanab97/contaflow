@@ -12,6 +12,7 @@ import ExtrasPdfTab from './components/ExtrasPdfTab'
 import ExtrasWorkspace from './components/ExtrasWorkspace'
 import NextStepNav from '../NextStepNav'
 import { motivSugerat, ignorareDeVerificat, MOTIV_LABEL } from '@/lib/tranzactii-reguli'
+import { areAchizitiiProduse } from '@/lib/achizitii-produse'
 
 const EXTRAS_UNLOCK_CODES: Record<string, string> = {
   'ab-homes-invest': '48867823',
@@ -349,7 +350,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           ) : (
             <ExtrasWorkspace
               txs={filtered} activeTxIndex={activeTxIndex} setActiveTxIndex={setActiveTxIndex}
-              firmaId={firma.id} lunaId={lunaId} culoare={c}
+              firmaId={firma.id} lunaId={lunaId} culoare={c} achizitiiProduse={areAchizitiiProduse(firma.slug)}
               onNA={markNA} onClearNA={clearNA} onSetMotiv={setMotiv} onUploadSuccess={onUploadSuccess} onRefresh={()=>load(true)}
               search={search} onSearchChange={setSearchValue}
               filter={filter} flowFilter={flowFilter} counts={counts} flowCounts={flowCounts}

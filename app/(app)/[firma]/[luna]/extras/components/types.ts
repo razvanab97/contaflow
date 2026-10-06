@@ -5,6 +5,7 @@ export interface Tx {
   referinta: string|null
   categorie: string; document_id: string|null; note: string|null; status_note: string|null
   motiv_ignorare?: string|null; ignorat_auto?: boolean
+  achizitie_produse?: boolean|null
   documente: DocTx|null
   documenteToate?: DocTx[]
   sugestieFactura?: { id:string; fisier_nume:string; furnizor:string|null; suma:number|null; data_factura:string|null; created_at?:string }|null

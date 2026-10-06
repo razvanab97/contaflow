@@ -5,6 +5,8 @@ import CountUp from '@/components/ui/CountUp'
 import type { FluxLunar } from '@/lib/flux-lunar'
 import { getFirmaModules } from '@/lib/firma-config'
 import type { ConcluzieEmag } from '@/lib/emag-concluzie'
+import { areAchizitiiProduse } from '@/lib/achizitii-produse'
+import AchizitiiProduse from './AchizitiiProduse'
 
 interface Punct { luna: string; label: string; incasari: number; plati: number; pct: number; initializata: boolean }
 
@@ -14,8 +16,9 @@ function curs(v: number) { return new Intl.NumberFormat('ro-RO', { minimumFracti
 // "Concluzia lunară" din TOATE conturile (RON, EUR, ...): totalul in lei (valuta convertita la cursul
 // BNR din ziua fiecarei tranzactii), defalcarea pe monede si tendinta pe 6 luni. Schimburile valutare
 // intre conturile proprii nu intra in total (ar dubla aceiasi bani) - sunt aratate separat.
-export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { lunaId: string; culoare: string; firmaId: string; firmaSlug: string; luna: string }) {
+export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna, lunaLabel }: { lunaId: string; culoare: string; firmaId: string; firmaSlug: string; luna: string; lunaLabel?: string }) {
   const [flux, setFlux] = useState<FluxLunar | null>(null)
+  const [achOpen, setAchOpen] = useState(false)
   // Costul net eMAG vine din „Concluzia eMAG” (avize + curierat + Dante); undefined = se calculeaza
   const [emagC, setEmagC] = useState<ConcluzieEmag | null | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
@@ -35,6 +38,9 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
       .catch(() => {})
   }, [lunaId, firmaId, firmaSlug, luna, areEmag])
 
+  // dupa o corectie manuala in fereastra Achizitii produse: doar fluxul se reciteste (fara skeleton)
+  const reloadFlux = () => { fetch(`/api/luna/flux?lunaId=${encodeURIComponent(lunaId)}`).then(r => r.ok ? r.json() : null).then(d => { if (d?.flux) setFlux(d.flux) }).catch(() => {}) }
+
   if (!loaded) {
     return (
       <div className="stat-grid" style={{ marginBottom: '28px' }} aria-busy="true">
@@ -50,7 +56,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
   const monede = flux ? Object.entries(flux.peMoneda).sort(([a], [b]) => (a === 'RON' ? -1 : b === 'RON' ? 1 : a.localeCompare(b))) : []
   const multiMoneda = monede.length > 1
 
-  type Tile = { label: string; value: number; color: string; spark?: number[]; sparkColor?: string; rows?: { v: string; suma: number; curs?: number | null }[]; detalii?: { label: string; suma: number; semn: '+' | '−' }[]; gol?: string; title?: string }
+  type Tile = { label: string; value: number; color: string; spark?: number[]; sparkColor?: string; rows?: { v: string; suma: number; curs?: number | null }[]; detalii?: { label: string; suma: number; semn: '+' | '−' }[]; gol?: string; title?: string; nota?: string; onClick?: () => void }
   const tiles: Tile[] = []
   if (flux) {
     const c = flux.consolidat
@@ -87,6 +93,24 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
       gol: 'Nicio mișcare de împrumut luna aceasta',
     })
   }
+  if (flux && areAchizitiiProduse(firmaSlug)) {
+    // Achizitii de produse: plati catre furnizorii de marfa (lib/achizitii-produse.ts), parte din Plati.
+    const a = flux.consolidat.achizitiiProduse
+    const top = a.perFurnizor.slice(0, 5)
+    const altii = a.perFurnizor.slice(5)
+    const pondere = flux.consolidat.plati > 0 ? Math.round((a.total / flux.consolidat.plati) * 1000) / 10 : 0
+    tiles.push({
+      label: 'Achiziții produse', value: a.total, color: 'var(--text-primary)',
+      title: `Plăți către furnizorii de marfă (Jumbo, Maxy, Verk, i-Want, Importio + ce marchezi manual), lei la curs BNR. Sunt incluse și în Plăți. Click pentru tranzacții și perioade.`,
+      detalii: a.numar ? [
+        ...top.map(f => ({ label: f.furnizor, suma: f.suma, semn: '−' as const })),
+        ...(altii.length ? [{ label: `Alți furnizori (${altii.length})`, suma: Math.round(altii.reduce((x, f) => x + f.suma, 0) * 100) / 100, semn: '−' as const }] : []),
+      ] : undefined,
+      nota: a.numar ? `${pondere}% din Plăți · ${a.numar} ${a.numar === 1 ? 'plată' : 'plăți'}` : undefined,
+      gol: 'Nicio achiziție de produse luna aceasta',
+      onClick: () => setAchOpen(true),
+    })
+  }
   if (areEmag && emagC !== null) {
     // cost net = tot ce s-a dus pe drum intre vanzari si rezultatul net (comisioane, transport + curierat, restul)
     const c = emagC
@@ -113,7 +137,8 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
     <div style={{ marginBottom: '28px' }}>
       <div className="stat-grid stagger">
         {tiles.map(t => (
-          <div key={t.label} className="stat" title={t.title || (t.rows ? `Toate conturile, total în lei la cursul BNR${range ? ` · tendință ${range}` : ''}` : 'Luna curentă')}>
+          <div key={t.label} className="stat" title={t.title || (t.rows ? `Toate conturile, total în lei la cursul BNR${range ? ` · tendință ${range}` : ''}` : 'Luna curentă')}
+            {...(t.onClick ? { role: 'button', tabIndex: 0, onClick: t.onClick, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.onClick?.() } }, style: { cursor: 'pointer' } } : {})}>
             <div className="stat-label">{t.label}</div>
             <div className="stat-value num" style={{ color: t.color, fontSize: 'var(--fs-lg)' }} title={`${money(t.value)} lei`}>
               <CountUp value={t.value} decimals={2} /> <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>lei</span>
@@ -138,6 +163,8 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
                 ))}
               </div>
             )}
+            {t.nota && <div style={{ marginTop: '4px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{t.nota}</div>}
+            {t.onClick && <div style={{ marginTop: '6px', fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--accent)' }}>Vezi tranzacțiile →</div>}
             {t.gol !== undefined
               ? (!t.detalii && <div style={{ marginTop: '10px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{t.gol}</div>)
               : t.spark && t.spark.length > 1
@@ -146,6 +173,7 @@ export default function LunaSummary({ lunaId, firmaId, firmaSlug, luna }: { luna
           </div>
         ))}
       </div>
+      {achOpen && <AchizitiiProduse firmaId={firmaId} lunaId={lunaId} lunaLabel={lunaLabel} onClose={() => setAchOpen(false)} onChanged={reloadFlux} />}
       {flux && (
         <p style={{ marginTop: '10px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', lineHeight: 1.55 }}>
           {multiMoneda

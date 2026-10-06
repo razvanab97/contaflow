@@ -1,7 +1,12 @@
 import { cursuriBnr } from '@/lib/curs-bnr'
 import { regulaAutomata } from '@/lib/tranzactii-reguli'
+import { claseazaAchizitie } from '@/lib/achizitii-produse'
 
-export interface TxFlux { data_tranzactie: string | null; tip: string | null; suma: number | string | null; valuta: string | null; descriere?: string | null; descriere_curatata?: string | null }
+export interface TxFlux { data_tranzactie: string | null; tip: string | null; suma: number | string | null; valuta: string | null; descriere?: string | null; descriere_curatata?: string | null; achizitie_produse?: boolean | null }
+
+// Achizitiile de produse (plati catre furnizorii de marfa, vezi lib/achizitii-produse.ts), in lei la
+// cursul BNR: o categorie peste Plati - sumele raman si in Plati, nimic altceva nu se schimba.
+export interface AchizitiiProduse { total: number; numar: number; perFurnizor: { furnizor: string; suma: number; numar: number }[] }
 
 // Imprumuturile firmei de la asociat: intrari = imprumut primit (incasare cu "imprumut"), iesiri =
 // restituire imprumut + avans trezorerie (plati cu aceste mentiuni). Platile catre Trezorerie pentru
@@ -34,7 +39,7 @@ function platitorDin(d: string) {
 export interface FluxMoneda { incasari: number; plati: number; net: number; schimbIn: number; schimbOut: number; numar: number; cursMediu: number | null; imprumut: Imprumut }
 export interface FluxLunar {
   peMoneda: Record<string, FluxMoneda>          // miscarile reale din fiecare cont (ca in extras)
-  consolidat: { incasari: number; plati: number; net: number; schimbExclus: number; imprumut: Imprumut; incasariReale: IncasariReale } // echivalent lei, fara schimburi valutare
+  consolidat: { incasari: number; plati: number; net: number; schimbExclus: number; imprumut: Imprumut; incasariReale: IncasariReale; achizitiiProduse: AchizitiiProduse } // echivalent lei, fara schimburi valutare
   faraCurs: number                               // tranzactii in valuta pentru care nu s-a gasit curs
   cursIndisponibil: boolean
 }
@@ -63,6 +68,7 @@ export async function calculeazaFlux(txs: TxFlux[]): Promise<FluxLunar> {
   const peMoneda: Record<string, FluxMoneda & { _lei: number; _val: number }> = {}
   const cons = { incasari: 0, plati: 0, schimbExclus: 0, imprumut: gol() }
   const reale = { emag: 0, trendyol: 0, alte: 0, alteLista: [] as IncasariReale['alteLista'] }
+  const achizitii = new Map<string, { suma: number; numar: number }>()
   let faraCurs = 0
   for (const t of valide) {
     const v = (t.valuta || 'RON').toUpperCase()
@@ -87,8 +93,17 @@ export async function calculeazaFlux(txs: TxFlux[]): Promise<FluxLunar> {
         else { reale.alte += suma * k; reale.alteLista.push({ data: String(t.data_tranzactie), suma: r2(suma * k), platitor: platitorDin(t.descriere || t.descriere_curatata || '') }) }
       }
     }
-    else cons.plati += suma * k
+    else {
+      cons.plati += suma * k
+      const achizitie = claseazaAchizitie(t)
+      if (achizitie) {
+        const a = achizitii.get(achizitie.furnizor) || { suma: 0, numar: 0 }
+        a.suma += suma * k; a.numar++
+        achizitii.set(achizitie.furnizor, a)
+      }
+    }
   }
+  const perFurnizor = [...achizitii.entries()].map(([furnizor, a]) => ({ furnizor, suma: r2(a.suma), numar: a.numar })).sort((a, b) => b.suma - a.suma)
   const finImp = (i: Imprumut): Imprumut => ({ primit: r2(i.primit), restituire: r2(i.restituire), avansTrezorerie: r2(i.avansTrezorerie), net: r2(i.primit - i.restituire - i.avansTrezorerie), numar: i.numar })
   const out: Record<string, FluxMoneda> = {}
   for (const [v, m] of Object.entries(peMoneda)) {
@@ -99,6 +114,7 @@ export async function calculeazaFlux(txs: TxFlux[]): Promise<FluxLunar> {
     consolidat: {
       incasari: r2(cons.incasari), plati: r2(cons.plati), net: r2(cons.incasari - cons.plati), schimbExclus: r2(cons.schimbExclus), imprumut: finImp(cons.imprumut),
       incasariReale: { emag: r2(reale.emag), trendyol: r2(reale.trendyol), alte: r2(reale.alte), total: r2(reale.emag + reale.trendyol + reale.alte), alteLista: reale.alteLista },
+      achizitiiProduse: { total: r2(perFurnizor.reduce((a, f) => a + f.suma, 0)), numar: perFurnizor.reduce((a, f) => a + f.numar, 0), perFurnizor },
     },
     faraCurs, cursIndisponibil,
   }
