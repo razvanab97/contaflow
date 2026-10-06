@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 198, text: 'Borderouri eMAG: secțiunea ține doar desfășurătoarele de plată (DP cash și card). Decontul de comision (DC) și extrasul de cont eMAG sunt refuzate aici, cu mesaj.' },
   { v: 197, text: 'Borderouri eMAG: fiecare rând arată platforma (eMAG RO / BG / HU). DP cash scade acum și rambursările ramburs (Refund COD), iar DP card adună și plățile eCredit, deci desfășurătoarele din 17.09 se potrivesc cu avizul (6/6). Un extras de cont nou al aceleiași platforme îl înlocuiește pe cel vechi, nu se mai dublează.' },
   { v: 196, text: 'eMAG Facturi: secțiune nouă „Borderouri eMAG”. Încarci toate fișierele odată: desfășurătoarele de plată cash și card (DP), decontul lunar de comision (DC) și extrasul de cont eMAG. Tipul se recunoaște singur, iar data borderoului se ia din fișier, pentru eCap. Se descarcă separat sau .zip. Fiecare e verificat automat cu avizul lui: DP cash = încasări ramburs, DP card = card online + Heyblu, DC = factura de comision (net + TVA), extras = totalul avizului.' },
   { v: 195, text: 'Facturi Trendyol: suma se ia din rândul „Total amount inc. VAT (RON)” al facturii, nu din totalul în EUR pe care citirea automată îl salva uneori ca RON. Am corectat 6 facturi existente (sumă și nume fișier), de exemplu TYD2026000270959: 18,11 → 95,10 RON.' },

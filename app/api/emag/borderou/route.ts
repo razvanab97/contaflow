@@ -13,10 +13,10 @@ const zi = (d: string) => d.split('-').reverse().join('.')
 const NUME_SCURT: Record<TipBorderouEmag, string> = { dp_cash: 'Desfasurator plata eMAG cash', dp_card: 'Desfasurator plata eMAG card', dc: 'Decont comision eMAG', extras_cont: 'Extras cont eMAG' }
 type Sb = ReturnType<typeof getServiceSupabase>
 
-// Borderourile eMAG (desfasuratoare de plata DP cash / card, decontul lunar de comision DC, extrasul de
-// cont eMAG): se incarca toate odata, tipul se recunoaste din coloane, data borderoului se ia din fisier
-// (pentru eCap). Fiecare e verificat cu avizul lui: DP cash = „Incasari ramburs”, DP card = „Incasari card
-// online” + notificarea Heyblu din aceeasi jumatate, DC = factura de comision, extras = totalul avizului.
+// Borderourile eMAG = DOAR desfasuratoarele de plata (DP cash / card, pe fiecare jumatate de luna): se
+// incarca toate odata, data borderoului = data platii (pentru eCap). Fiecare e verificat cu avizul lui:
+// DP cash = „Incasari ramburs”, DP card = „Incasari card online” + notificarea Heyblu din aceeasi jumatate.
+// (DC si extrasul de cont sunt recunoscute, dar refuzate aici.)
 export async function POST(req: NextRequest) {
   const fd = await req.formData()
   const files = fd.getAll('files') as File[]
@@ -37,13 +37,15 @@ export async function POST(req: NextRequest) {
     if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) { rezultate.push({ fisier: file.name, ok: false, text: 'nu e un fișier .xlsx' }); continue }
     let b: BorderouEmag
     try { b = await citesteBorderouEmag(bytes, file.name) } catch (e) { rezultate.push({ fisier: file.name, ok: false, text: e instanceof Error ? e.message : String(e) }); continue }
+    // sectiunea tine DOAR desfasuratoarele de plata (DP cash / card)
+    if (b.tip !== 'dp_cash' && b.tip !== 'dp_card') { rezultate.push({ fisier: file.name, ok: false, text: `${ETICHETA_BORDEROU_EMAG[b.tip]} — aici se adaugă doar desfășurătoarele de plată (…_dp_….xlsx)` }); continue }
     if ((b.tip === 'dp_cash' || b.tip === 'dp_card') && lunaPlati && b.data && b.data.slice(0, 7) !== lunaPlati) {
       rezultate.push({ fisier: file.name, ok: false, text: `plata din ${zi(b.data)} nu aparține acestei luni (plăți din ${lunaPlati.split('-').reverse().join('.')})` }); continue
     }
     const path = `${firmaId}/${lunaId}/emag-borderou/${b.tip}_${b.id}_${Date.now()}.xlsx`
     const { error: upErr } = await sb.storage.from('documente').upload(path, bytes, { contentType: XLSX_MIME })
     if (upErr) { rezultate.push({ fisier: file.name, ok: false, text: upErr.message }); continue }
-    const fisierNume = `${numeFirma} - ${NUME_SCURT[b.tip]}${b.tip === 'extras_cont' ? '' : ` ${b.id}`}${b.platforma && b.tip === 'extras_cont' ? ` ${b.platforma.replace('eMAG ', '')}` : ''}${b.data ? ` - ${zi(b.data)}` : ''} - ${lei(b.total)} RON.xlsx`
+    const fisierNume = `${numeFirma} - ${NUME_SCURT[b.tip]} ${b.id}${b.data ? ` - ${zi(b.data)}` : ''} - ${lei(b.total)} RON.xlsx`
     const { data: doc, error } = await sb.from('documente').insert({
       firma_id: firmaId, luna_id: lunaId, modul: 'emag', tip_document: 'borderou',
       furnizor: b.tip, numar_document: b.id, data_document: b.data, suma: b.total, valuta: 'RON',
@@ -128,7 +130,7 @@ export async function GET(req: NextRequest) {
   const lunaLista = req.nextUrl.searchParams.get('lunaId')
   if (lunaLista) {
     const { data } = await sb.from('documente').select('id,furnizor,numar_document,data_document,suma,fisier_nume,fisier_path')
-      .eq('luna_id', lunaLista).eq('modul', 'emag').eq('tip_document', 'borderou').order('data_document')
+      .eq('luna_id', lunaLista).eq('modul', 'emag').eq('tip_document', 'borderou').in('furnizor', ['dp_cash', 'dp_card']).order('data_document')
     const avize = await avizeLuna(sb, lunaLista)
     const borderouri = await Promise.all((data || []).map(async d => {
       const tip = d.furnizor as TipBorderouEmag
@@ -148,7 +150,7 @@ export async function GET(req: NextRequest) {
   const lunaZip = req.nextUrl.searchParams.get('zip')
   if (lunaZip) {
     const { data: docs } = await sb.from('documente').select('fisier_path,fisier_nume')
-      .eq('luna_id', lunaZip).eq('modul', 'emag').eq('tip_document', 'borderou').order('data_document')
+      .eq('luna_id', lunaZip).eq('modul', 'emag').eq('tip_document', 'borderou').in('furnizor', ['dp_cash', 'dp_card']).order('data_document')
     if (!docs?.length) return NextResponse.json({ error: 'Niciun borderou încărcat' }, { status: 404 })
     const zip = new JSZip()
     for (const d of docs) {

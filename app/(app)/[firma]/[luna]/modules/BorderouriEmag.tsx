@@ -11,9 +11,8 @@ function zi(d: string | null) { if (!d) return '—'; const [y, m, z] = d.slice(
 const CULOARE = { ok: 'var(--success)', diferenta: 'var(--danger)', fara_aviz: 'var(--warning)' } as const
 const SEMN = { ok: '✓', diferenta: '✕', fara_aviz: '⚠' } as const
 
-// Borderourile eMAG ale lunii: desfasuratoarele de plata (DP cash + DP card pe fiecare jumatate de luna),
-// decontul lunar de comision (DC) si extrasul de cont eMAG. Toate odata, tipul recunoscut din coloane,
-// data borderoului pentru eCap, descarcabile, fiecare verificat cu avizul lui.
+// Borderourile eMAG ale lunii = desfasuratoarele de plata (DP cash + DP card pe fiecare jumatate de luna):
+// toate odata, data borderoului pentru eCap, descarcabile, fiecare verificat cu avizul lui.
 export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize = 0 }: { firmaId: string; lunaId: string; culoare: string; versiuneAvize?: number }) {
   const [lista, setLista] = useState<Borderou[] | null>(null)
   const [incarc, setIncarc] = useState(false)
@@ -53,7 +52,7 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 'var(--fs-base)', fontWeight: 650, color: 'var(--text-primary)' }}>Borderouri eMAG</div>
-          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>Desfășurătoare de plată (cash + card), decont comision, extras de cont — cu data pentru eCap, verificate cu avizele</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>Desfășurătoarele de plată (cash + card, pe fiecare jumătate de lună) — cu data pentru eCap, verificate cu avizele</div>
         </div>
         {!!lista?.length && <a className="btn btn-sm" href={`/api/emag/borderou?zip=${encodeURIComponent(lunaId)}`}>↓ Descarcă toate (.zip)</a>}
       </div>
@@ -91,8 +90,8 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
         onDrop={e => { e.preventDefault(); setDrag(false); if (!incarc && e.dataTransfer.files.length) incarca(e.dataTransfer.files) }}
         style={{ border: `1.5px dashed ${drag ? culoare : 'var(--border-hover)'}`, borderRadius: 'var(--r-md)', padding: '14px', textAlign: 'center', cursor: incarc ? 'default' : 'pointer', background: drag ? 'var(--accent-soft)' : 'transparent' }}
       >
-        <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 650, color: incarc ? 'var(--text-muted)' : 'var(--accent)' }}>{incarc ? 'Se citesc borderourile…' : '+ Adaugă borderouri eMAG (.xlsx) — toate deodată'}</div>
-        {!incarc && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>…_dp_….xlsx (cash și card, pe fiecare jumătate de lună) · …_dc_….xlsx · account_statement_details_….xlsx — tipul se recunoaște singur</div>}
+        <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 650, color: incarc ? 'var(--text-muted)' : 'var(--accent)' }}>{incarc ? 'Se citesc borderourile…' : '+ Adaugă desfășurătoare de plată (.xlsx) — toate deodată'}</div>
+        {!incarc && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>Fișierele …_dp_….xlsx din eMAG → Financiar — cash și card, pe fiecare jumătate de lună; cash / card se recunoaște singur</div>}
       </div>
       <input ref={fileRef} type="file" multiple accept=".xlsx" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} onChange={e => { if (e.target.files?.length) incarca(e.target.files); e.target.value = '' }} />
       {rez.length > 0 && (
