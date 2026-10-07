@@ -817,9 +817,9 @@ mark.hl { background: color-mix(in srgb, var(--brand) 26%, transparent); color: 
   --sh: var(--shadow-xs); --r2: var(--r-md);
   --mono: var(--font-mono); --font: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
-.tt-mount .tt-btn { padding: 7px 12px 8px; }
-.tt-mount .tt-lbl { font-size: var(--fs-xs); }
-.tt-mount .tt-time { font-size: var(--fs-xl); letter-spacing: -0.01em; }
+.tt-mount .tt-btn { padding: 5px 10px 6px; gap: 1px; border-radius: var(--r-sm); }
+.tt-mount .tt-lbl { font-size: 10px; gap: 5px; }
+.tt-mount .tt-time { font-size: var(--fs-base); letter-spacing: -0.01em; }
 .tt-mount .tt-st { color: var(--warning); }
 /* Pe ecran lat panoul de statistici se deschide în dreapta sidebar-ului (nu acoperă navigarea); pe mobil, deasupra cronometrului. */
 @media (min-width: 900px) {
