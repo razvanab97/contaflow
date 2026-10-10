@@ -3,7 +3,7 @@ import VeziButon from '@/components/ui/VeziButon'
 import { useEffect, useState, useCallback } from 'react'
 import ProiectWorkflow from '@/components/ProiectWorkflow'
 import SincronizareProiectMail from './proiect-mail/SincronizareProiectMail'
-import { ProceduraAchizitii, BugetAchizitii, PasiAchizitie } from './SistemAchizitii'
+import { ProceduraAchizitii, BugetAchizitii, PasiAchizitie, AchizitieNoua, type AchizitieNouaDate } from './SistemAchizitii'
 import type { DocDosar, LinieBuget } from '@/lib/achizitii-procedura'
 
 interface Achizitie {
@@ -140,16 +140,23 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
   const [items, setItems] = useState<Achizitie[] | null>(null)
   const [sugestii, setSugestii] = useState<Sugestie[]>([])
   const [sugestieBusy, setSugestieBusy] = useState<string | null>(null)
-  const [denumire, setDenumire] = useState('')
-  const [valoare, setValoare] = useState('')
-  const [sursa, setSursa] = useState('cofinantare')
-  const [adding, setAdding] = useState(false)
   const [dosare, setDosare] = useState<Record<string, DocDosar[]>>({})
   const [pornesteBusy, setPornesteBusy] = useState<string | null>(null)
   const [eroare, setEroare] = useState('')
   // Formularul Word deschis din pasii unei achizitii (cerere / nota / receptie) + reimprospatare documente
   const [formular, setFormular] = useState<{ id: string; kind: 'oferta' | 'nota' | 'receptie' } | null>(null)
   const [versiuneDocs, setVersiuneDocs] = useState(0)
+  const [tab, setTab] = useState<'curs' | 'finalizate' | 'buget' | 'procedura'>('curs')
+  const [formNou, setFormNou] = useState(false)
+  const [creez, setCreez] = useState(false)
+
+  async function creeazaNoua(d: AchizitieNouaDate) {
+    setCreez(true); setEroare('')
+    const res = await fetch('/api/achizitii', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId: firma.id, lunaId, ...d }) }).catch(() => null)
+    setCreez(false)
+    if (!res?.ok) { setEroare('Achiziția nu a putut fi creată'); return }
+    setFormNou(false); setTab('curs'); load()
+  }
 
   const load = useCallback(() => {
     fetch(`/api/achizitii?firmaId=${firma.id}`).then(r => r.json()).then(d => setItems(Array.isArray(d) ? d : []))
@@ -167,7 +174,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
     }) }).catch(() => null)
     setPornesteBusy(null)
     if (!res?.ok) { setEroare('Achiziția nu a putut fi pornită'); return }
-    load()
+    setTab('curs'); load()
   }
   async function patch(id: string, body: Record<string, unknown>, local: Partial<Achizitie>) {
     setEroare('')
@@ -192,17 +199,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
     setSugestieBusy(null)
   }
 
-  async function addAchizitie() {
-    if (!denumire.trim()) return
-    setAdding(true)
-    await fetch('/api/achizitii', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firmaId: firma.id, lunaId, denumire: denumire.trim(), valoare: valoare ? Number(valoare) : null, sursa }),
-    })
-    setDenumire(''); setValoare('')
-    setAdding(false)
-    load()
-  }
+
 
   async function setStatus(id: string, status: string) {
     setItems(prev => prev ? prev.map(i => i.id === id ? { ...i, status } : i) : prev)
@@ -223,11 +220,20 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <SincronizareProiectMail firmaId={firma.id} culoare={firma.culoare} onSynced={load} />
 
-      <ProceduraAchizitii deschisInitial={items.length === 0} />
-      <BugetAchizitii items={items} onPorneste={porneste} busy={pornesteBusy} />
+      {/* Navigare: ce e în lucru, ce s-a terminat, bugetul, procedura - plus achiziție nouă */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        {([['curs', `În curs (${items.filter(i => i.status !== 'finalizat').length})`], ['finalizate', `Finalizate (${items.filter(i => i.status === 'finalizat').length})`], ['buget', 'Buget'], ['procedura', 'Procedura']] as const).map(([k, et]) => (
+          <button key={k} type="button" onClick={() => setTab(k)} style={{ height: '36px', padding: '0 16px', borderRadius: 'var(--r-full)', fontSize: 'var(--fs-md)', fontWeight: tab === k ? 700 : 550, cursor: 'pointer', border: `1px solid ${tab === k ? 'var(--accent-solid)' : 'var(--border)'}`, background: tab === k ? 'var(--accent-solid)' : 'var(--surface)', color: tab === k ? '#fff' : 'var(--text-secondary)' }}>{et}</button>
+        ))}
+        <button type="button" className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => { setFormNou(true); setTab('curs') }}>+ Achiziție nouă</button>
+      </div>
       {eroare && <div role="alert" style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>{eroare}</div>}
+      {formNou && <AchizitieNoua busy={creez} onCreeaza={creeazaNoua} onAnuleaza={() => setFormNou(false)} />}
 
-      {sugestiiNoi.length > 0 && (
+      {tab === 'procedura' && <ProceduraAchizitii deschisInitial />}
+      {tab === 'buget' && <BugetAchizitii items={items} onPorneste={porneste} busy={pornesteBusy} />}
+
+      {tab === 'curs' && sugestiiNoi.length > 0 && (
         <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
           <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--c-999999)', marginBottom: '4px' }}>Sugestii din email</div>
           {sugestiiNoi.map(s => (
@@ -237,28 +243,22 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
         </div>
       )}
 
-      <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <input value={denumire} onChange={e => setDenumire(e.target.value)} placeholder="Denumire achiziție (ex. Aparat cu aburi)" style={{ ...INP, flex: '2 1 220px' }} />
-        <input value={valoare} onChange={e => setValoare(e.target.value)} placeholder="Valoare (RON)" type="number" style={{ ...INP, flex: '1 1 120px' }} />
-        <select value={sursa} onChange={e => setSursa(e.target.value)} style={{ ...INP, flex: '1 1 140px' }}>
-          <option value="cofinantare">Cofinanțare</option>
-          <option value="grant">Grant</option>
-          <option value="altul">Altul</option>
-        </select>
-        <button onClick={addAchizitie} disabled={adding || !denumire.trim()} style={{ padding: '8px 16px', borderRadius: 'var(--r-md)', border: 'none', background:'var(--accent-solid)', color: '#fff', fontSize: 'var(--fs-md)', fontWeight: 600, cursor: 'pointer', opacity: adding || !denumire.trim() ? .5 : 1 }}>
-          + Adaugă
-        </button>
-      </div>
-
-      {items.length === 0 ? (
-        <div style={{ padding: '40px', textAlign: 'center', fontSize: 'var(--fs-md)', color: 'var(--c-777777)', background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)' }}>
-          Nicio achiziție încă.
+      {tab === 'curs' && !formNou && !items.some(i => i.status !== 'finalizat') && (
+        <div style={{ padding: '28px', textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 650, color: 'var(--text-primary)' }}>Nicio achiziție în curs</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', maxWidth: '560px' }}>Pornește una din bugetul planului de afaceri (liniile încă necumpărate) sau creează o achiziție nouă. Cele {items.filter(i => i.status === 'finalizat').length} finalizate sunt în tab-ul „Finalizate”.</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button type="button" className="btn btn-primary" onClick={() => setFormNou(true)}>+ Achiziție nouă</button>
+            <button type="button" className="btn" onClick={() => setTab('buget')}>Alege din buget</button>
+          </div>
         </div>
-      ) : [...items].sort((a, b) => Number(a.status === 'finalizat') - Number(b.status === 'finalizat')).map((item, poz, lista) => {
+      )}
+
+      {(tab === 'curs' || tab === 'finalizate') && items.filter(i => (i.status === 'finalizat') === (tab === 'finalizate')).map((item, poz, lista) => {
         const idx = STATUS_ORDER.indexOf(item.status as typeof STATUS_ORDER[number])
         // titlu de grup: "În curs" / "Finalizate", la prima achizitie din fiecare grup
         const grupNou = poz === 0 || (lista[poz - 1].status === 'finalizat') !== (item.status === 'finalizat')
-        const titluGrup = grupNou ? (item.status === 'finalizat' ? `Achiziții finalizate (${lista.filter(x => x.status === 'finalizat').length})` : `Achiziții în curs (${lista.filter(x => x.status !== 'finalizat').length})`) : null
+        const titluGrup = grupNou && poz === 0 && tab === 'finalizate' ? `${lista.length} achiziții finalizate — dosarele lor, cu ce mai lipsește pentru arhivă` : null
         const next = STATUS_ORDER[idx + 1]
         return (
           <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

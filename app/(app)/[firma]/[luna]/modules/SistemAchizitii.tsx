@@ -47,7 +47,7 @@ export function ProceduraAchizitii({ deschisInitial = false }: { deschisInitial?
 
 // --- Bugetul de achizitii: planificat vs. angajat, pe linii -----------------------------------
 export function BugetAchizitii({ items, onPorneste, busy }: { items: AchizitieSistem[]; onPorneste: (l: LinieBuget) => void; busy: string | null }) {
-  const [arata, setArata] = useState<'de_cumparat' | 'toate'>('de_cumparat')
+  const [arata, setArata] = useState<'de_cumparat' | 'cumparate' | 'toate'>('de_cumparat')
   const peLinie = (cod: string) => items.filter(i => coduriDin(i.linie_buget).includes(cod))
   const surse: { sursa: 'grant' | 'cofinantare'; titlu: string }[] = [{ sursa: 'grant', titlu: 'Subvenție (grant)' }, { sursa: 'cofinantare', titlu: 'Cofinanțare' }]
   const fara = items.filter(i => !coduriDin(i.linie_buget).length)
@@ -59,7 +59,10 @@ export function BugetAchizitii({ items, onPorneste, busy }: { items: AchizitieSi
           <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Liniile din bugetul planului de afaceri (Act adițional nr. 1), cu TVA. „Pornește achiziția” deschide achiziția precompletată (denumire, buget, sursă).</div>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
-          {(['de_cumparat', 'toate'] as const).map(k => <button key={k} type="button" className={arata === k ? 'btn btn-sm btn-primary' : 'btn btn-sm'} onClick={() => setArata(k)}>{k === 'toate' ? 'Toate liniile' : 'De cumpărat'}</button>)}
+          {(['de_cumparat', 'cumparate', 'toate'] as const).map(k => {
+            const n = k === 'toate' ? BUGET_ACHIZITII.length : BUGET_ACHIZITII.filter(l => (peLinie(l.cod).length > 0) === (k === 'cumparate')).length
+            return <button key={k} type="button" className={arata === k ? 'btn btn-sm btn-primary' : 'btn btn-sm'} onClick={() => setArata(k)}>{k === 'toate' ? 'Toate liniile' : k === 'cumparate' ? 'Cumpărate' : 'De cumpărat'} ({n})</button>
+          })}
         </div>
       </div>
       {surse.map(({ sursa, titlu }) => {
@@ -68,7 +71,7 @@ export function BugetAchizitii({ items, onPorneste, busy }: { items: AchizitieSi
         const achizitii = items.filter(i => coduriDin(i.linie_buget).some(c => linieDupaCod(c)?.sursa === sursa))
         const angajat = achizitii.reduce((s, i) => s + (i.valoare || 0), 0)
         const deCumparat = linii.filter(l => !peLinie(l.cod).length)
-        const vizibile = arata === 'toate' ? linii : deCumparat
+        const vizibile = arata === 'toate' ? linii : arata === 'cumparate' ? linii.filter(l => peLinie(l.cod).length) : deCumparat
         return (
           <div key={sursa}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
@@ -92,7 +95,7 @@ export function BugetAchizitii({ items, onPorneste, busy }: { items: AchizitieSi
                   </div>
                 )
               })}
-              {!vizibile.length && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--success)' }}>✓ Toate liniile au achiziție pornită.</div>}
+              {!vizibile.length && <div style={{ fontSize: 'var(--fs-sm)', color: arata === 'cumparate' ? 'var(--text-secondary)' : 'var(--success)' }}>{arata === 'cumparate' ? 'Nicio linie cumpărată încă pe această sursă.' : '✓ Toate liniile au achiziție pornită.'}</div>}
             </div>
           </div>
         )
@@ -279,6 +282,79 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
           {mesaj && <div role="status" style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{mesaj}</div>}
         </div>
       )}
+    </div>
+  )
+}
+
+// --- Achizitie noua: din buget sau in afara lui ------------------------------------------------
+export interface AchizitieNouaDate { denumire: string; valoare: number | null; sursa: string; linieBuget: string | null; nota: string }
+export function AchizitieNoua({ onCreeaza, onAnuleaza, busy }: { onCreeaza: (d: AchizitieNouaDate) => void; onAnuleaza: () => void; busy: boolean }) {
+  const [linie, setLinie] = useState('')
+  const [denumire, setDenumire] = useState('')
+  const [tip, setTip] = useState('Produse')
+  const [sursa, setSursa] = useState('cofinantare')
+  const [valoare, setValoare] = useState('')
+  const [specificatii, setSpecificatii] = useState('')
+  const l = linie && linie !== 'afara' ? linieDupaCod(linie) : null
+  function alegeLinie(cod: string) {
+    setLinie(cod)
+    const x = cod && cod !== 'afara' ? linieDupaCod(cod) : null
+    if (x) { setDenumire(x.denumire); setSursa(x.sursa); setValoare(String(x.valoare)) }
+  }
+  const valid = denumire.trim() && linie
+  const inp: React.CSSProperties = { width: '100%', fontSize: 'var(--fs-md)', padding: '9px 11px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface-sunken)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit', marginTop: '5px' }
+  const lab: React.CSSProperties = { fontSize: 'var(--fs-xs)', fontWeight: 650, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '.05em' }
+  function creeaza() {
+    const v = valoare ? Number(valoare.replace(',', '.')) : null
+    const faraTva = v ? Math.round((v / 1.21) * 100) / 100 : null
+    const parti = [
+      l ? `Linia de buget ${l.cod} (${l.sursa === 'grant' ? 'subvenție' : 'cofinanțare'}): ${l.valoare.toLocaleString('ro-RO')} lei cu TVA.` : 'ÎN AFARA BUGETULUI — necesită acordul PROSOCIAL / act adițional înainte de cumpărare.',
+      `Tip: ${tip}.`,
+      faraTva ? `Buget maxim pentru oferte: ≈ ${faraTva.toLocaleString('ro-RO')} lei fără TVA.` : '',
+      specificatii.trim() ? `Specificații tehnice minime: ${specificatii.trim()}` : '',
+    ].filter(Boolean)
+    onCreeaza({ denumire: denumire.trim(), valoare: v, sursa, linieBuget: l ? l.cod : null, nota: parti.join(' ') })
+  }
+  return (
+    <div style={{ ...card, borderColor: 'var(--accent)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div>
+        <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--text-primary)' }}>Achiziție nouă</div>
+        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Pasul 1 al procedurii: ce cumperi, din ce linie de buget și cu ce specificații. După creare urmezi pașii: cerere de ofertă → 3 oferte → notă → plată → factură → recepție → poze.</div>
+      </div>
+      <label style={lab}>Linia de buget *
+        <select value={linie} onChange={e => alegeLinie(e.target.value)} style={inp}>
+          <option value="">— alege —</option>
+          {BUGET_ACHIZITII.map(x => <option key={x.cod} value={x.cod}>{x.cod} · {x.denumire} · {lei(x.valoare)} lei ({x.sursa === 'grant' ? 'subvenție' : 'cofinanțare'})</option>)}
+          <option value="afara">Altceva — în afara bugetului aprobat</option>
+        </select>
+      </label>
+      {linie === 'afara' && (
+        <div role="alert" style={{ fontSize: 'var(--fs-sm)', padding: '9px 12px', borderRadius: 'var(--r-md)', background: 'var(--warning-soft)', color: 'var(--warning)', fontWeight: 600 }}>
+          Ce nu e în bugetul planului de afaceri nu e eligibil automat. Înainte de cumpărare cere acordul PROSOCIAL sau include achiziția printr-un act adițional (ex. realocare din altă linie).
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: '12px' }}>
+        <label style={{ ...lab, gridColumn: '1 / -1' }}>Denumire achiziție *
+          <input value={denumire} onChange={e => setDenumire(e.target.value)} placeholder="ex. Aer condiționat 12000 BTU" style={inp} />
+        </label>
+        <label style={lab}>Tip
+          <select value={tip} onChange={e => setTip(e.target.value)} style={inp}><option>Produse</option><option>Servicii</option><option>Lucrări</option></select>
+        </label>
+        <label style={lab}>Sursa
+          <select value={sursa} onChange={e => setSursa(e.target.value)} style={inp}><option value="grant">Subvenție (grant)</option><option value="cofinantare">Cofinanțare</option><option value="altul">Altul</option></select>
+        </label>
+        <label style={lab}>Valoare estimată (lei, cu TVA)
+          <input value={valoare} onChange={e => setValoare(e.target.value)} inputMode="decimal" placeholder="ex. 3099" style={inp} />
+        </label>
+        <label style={{ ...lab, gridColumn: '1 / -1' }}>Specificații tehnice minime
+          <textarea value={specificatii} onChange={e => setSpecificatii(e.target.value)} rows={3} placeholder="ex. putere minim 12000 BTU, clasă energetică A++, funcție de încălzire, montaj inclus" style={{ ...inp, resize: 'vertical' }} />
+        </label>
+      </div>
+      {l && valoare && Number(valoare) > l.valoare && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>Valoarea depășește bugetul liniei ({lei(l.valoare)} lei).</div>}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button type="button" className="btn btn-primary" disabled={!valid || busy} onClick={creeaza}>{busy ? 'Se creează…' : 'Creează achiziția și deschide pașii'}</button>
+        <button type="button" className="btn" onClick={onAnuleaza}>Renunță</button>
+      </div>
     </div>
   )
 }
