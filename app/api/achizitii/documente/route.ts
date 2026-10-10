@@ -21,7 +21,16 @@ export async function POST(req: NextRequest) {
   const fd = await req.formData()
   const file = fd.get('file') as File | null
   const achizitieId = String(fd.get('achizitieId') || '')
-  const etapa = String(fd.get('etapa') || 'document')
+  const tipDosar = String(fd.get('tipDosar') || '')
+  // Tipul ales la incarcare decide etapa si prefixul din nume (recunoscut de verificarea dosarului).
+  const TIP: Record<string, { eticheta: string; etapa: string }> = {
+    cerere: { eticheta: 'Cerere de oferta (Anexa 2)', etapa: 'oferta' }, oferta: { eticheta: 'Oferta', etapa: 'oferta' },
+    nota: { eticheta: 'Nota privind determinarea valorii (Anexa 1)', etapa: 'nota_semnata' }, contract: { eticheta: 'Contract', etapa: 'nota_semnata' },
+    proforma: { eticheta: 'Proforma', etapa: 'plata_initiata' }, factura: { eticheta: 'Factura fiscala', etapa: 'plata_initiata' },
+    plata: { eticheta: 'Dovada plata', etapa: 'plata_initiata' }, pv: { eticheta: 'PV receptie (Anexa 3)', etapa: 'dovada_trimisa' }, poza: { eticheta: 'Poza echipament', etapa: 'dovada_trimisa' },
+  }
+  const tip = TIP[tipDosar]
+  const etapa = tip?.etapa || String(fd.get('etapa') || 'document')
   if (!file || !achizitieId) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
   if (!ALLOWED_TYPES.has(file.type)) return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG și PNG' }, { status: 400 })
 
@@ -45,7 +54,8 @@ export async function POST(req: NextRequest) {
     tip_document: etapa,
     furnizor: achizitie.denumire,
     fisier_path: path,
-    fisier_nume: `${safeName}_${etapa}.${extension}`,
+    // numele original al fisierului (cu tipul ales in fata), ca sa se vada si sa fie recunoscut in dosar
+    fisier_nume: `${tip ? `${tip.eticheta} - ` : ''}${(file.name || `${safeName}_${etapa}.${extension}`).replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 150)}`,
     fisier_tip: file.type,
     fisier_marime: bytes.length,
     in_zip: true,

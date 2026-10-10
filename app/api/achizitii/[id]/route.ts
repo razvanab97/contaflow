@@ -15,10 +15,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.sursa !== undefined) patch.sursa = body.sursa
   if (body.scadenta !== undefined) patch.scadenta = body.scadenta
   if (body.nota !== undefined) patch.nota = body.nota
+  if (body.linieBuget !== undefined) patch.linie_buget = body.linieBuget ? String(body.linieBuget) : null
 
   const sb = getServiceSupabase()
   const { error } = await sb.from('proiect_achizitii').update(patch).eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: /linie_buget/.test(error.message) ? 'Rulează migrarea SQL (coloana linie_buget) ca să poți lega achiziția de buget.' : error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
 

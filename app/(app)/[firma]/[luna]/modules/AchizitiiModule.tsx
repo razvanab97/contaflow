@@ -3,6 +3,8 @@ import VeziButon from '@/components/ui/VeziButon'
 import { useEffect, useState, useCallback } from 'react'
 import ProiectWorkflow from '@/components/ProiectWorkflow'
 import SincronizareProiectMail from './proiect-mail/SincronizareProiectMail'
+import { ProceduraAchizitii, BugetAchizitii, DosarAchizitie } from './SistemAchizitii'
+import type { DocDosar, LinieBuget } from '@/lib/achizitii-procedura'
 
 interface Achizitie {
   id: string
@@ -13,6 +15,7 @@ interface Achizitie {
   scadenta: string | null
   nota: string | null
   created_at: string
+  linie_buget?: string | null
 }
 interface AchizitieDoc { id: string; fisier_nume: string; tip_document: string; created_at: string }
 interface Sugestie {
@@ -43,9 +46,14 @@ const STATUS_LABEL: Record<string, string> = {
 
 const INP: React.CSSProperties = { fontSize: 'var(--fs-md)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '8px 12px', color: 'var(--c-dddddd)', outline: 'none' }
 
-function AchizitieDocumente({ achizitieId, culoare, etapaCuranta }: { achizitieId: string; culoare: string; etapaCuranta: string }) {
+// Tipurile de documente din dosarul de achizitie (vezi lib/achizitii-procedura.ts) - numele ales intra
+// in numele fisierului, ca verificarea dosarului sa-l recunoasca.
+const TIPURI_DOSAR: Record<string, string> = { cerere: 'Cerere de ofertă (Anexa 2)', oferta: 'Ofertă', nota: 'Notă privind determinarea valorii (Anexa 1)', contract: 'Contract', proforma: 'Proformă / comandă', factura: 'Factură fiscală', plata: 'Dovadă plată (extras / OP)', pv: 'PV recepție (Anexa 3)', poza: 'Poză echipament' }
+
+function AchizitieDocumente({ achizitieId, culoare, etapaCuranta, onChange }: { achizitieId: string; culoare: string; etapaCuranta: string; onChange?: () => void }) {
   const [docs, setDocs] = useState<AchizitieDoc[]>([])
   const [busy, setBusy] = useState(false)
+  const [tipDosar, setTipDosar] = useState('')
 
   const load = useCallback(() => {
     fetch(`/api/achizitii/documente?achizitieId=${achizitieId}`).then(r => r.json()).then(d => setDocs(Array.isArray(d) ? d : []))
@@ -57,7 +65,9 @@ function AchizitieDocumente({ achizitieId, culoare, etapaCuranta }: { achizitieI
     setBusy(true)
     const fd = new FormData()
     fd.append('file', file); fd.append('achizitieId', achizitieId); fd.append('etapa', etapaCuranta)
+    if (tipDosar) fd.append('tipDosar', tipDosar)
     await fetch('/api/achizitii/documente', { method: 'POST', body: fd })
+    onChange?.()
     setBusy(false)
     load()
   }
@@ -78,11 +88,17 @@ function AchizitieDocumente({ achizitieId, culoare, etapaCuranta }: { achizitieI
           <button onClick={() => remove(d.id)} style={{ color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 'var(--fs-xs)' }}>✕</button>
         </div>
       ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      <select value={tipDosar} onChange={e => setTipDosar(e.target.value)} aria-label="Tipul documentului" style={{ fontSize: 'var(--fs-xs)', padding: '3px 6px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-sunken)', color: 'var(--text-primary)' }}>
+        <option value="">Tip document…</option>
+        {Object.entries(TIPURI_DOSAR).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </select>
       <label style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color:'var(--accent)', cursor: 'pointer', opacity: busy ? .5 : 1 }}>
-        {busy ? 'Se încarcă...' : `+ Adaugă document (${STATUS_LABEL[etapaCuranta]})`}
+        {busy ? 'Se încarcă...' : `+ Adaugă document${tipDosar ? ` (${TIPURI_DOSAR[tipDosar]})` : ` (${STATUS_LABEL[etapaCuranta]})`}`}
         <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} disabled={busy}
           onChange={e => { if (e.target.files?.[0]) upload(e.target.files[0]); e.target.value = '' }} />
       </label>
+      </div>
     </div>
   )
 }
@@ -128,11 +144,34 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
   const [valoare, setValoare] = useState('')
   const [sursa, setSursa] = useState('cofinantare')
   const [adding, setAdding] = useState(false)
+  const [dosare, setDosare] = useState<Record<string, DocDosar[]>>({})
+  const [pornesteBusy, setPornesteBusy] = useState<string | null>(null)
+  const [eroare, setEroare] = useState('')
 
   const load = useCallback(() => {
     fetch(`/api/achizitii?firmaId=${firma.id}`).then(r => r.json()).then(d => setItems(Array.isArray(d) ? d : []))
     fetch(`/api/achizitii/sugestii?firmaId=${firma.id}`).then(r => r.json()).then(d => setSugestii(Array.isArray(d) ? d : []))
+    fetch(`/api/achizitii/dosare?firmaId=${firma.id}`).then(r => r.json()).then(d => setDosare(d && !d.error ? d : {})).catch(() => {})
   }, [firma.id])
+
+  // Achizitie noua pornita dintr-o linie de buget: denumire, buget (cu TVA) si sursa precompletate.
+  async function porneste(l: LinieBuget) {
+    setPornesteBusy(l.cod); setEroare('')
+    const faraTva = Math.round((l.valoare / 1.21) * 100) / 100
+    const res = await fetch('/api/achizitii', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      firmaId: firma.id, lunaId, denumire: l.denumire, valoare: l.valoare, sursa: l.sursa, linieBuget: l.cod,
+      nota: `Linia de buget ${l.cod} (${l.sursa === 'grant' ? 'subvenție' : 'cofinanțare'}): ${l.valoare.toLocaleString('ro-RO')} lei cu TVA ≈ ${faraTva.toLocaleString('ro-RO')} lei fără TVA (buget maxim pentru oferte). Pasul 1: specificațiile minime + cererea de ofertă (Anexa 2) din „Formulare achiziție”.`,
+    }) }).catch(() => null)
+    setPornesteBusy(null)
+    if (!res?.ok) { setEroare('Achiziția nu a putut fi pornită'); return }
+    load()
+  }
+  async function patch(id: string, body: Record<string, unknown>, local: Partial<Achizitie>) {
+    setEroare('')
+    setItems(prev => prev ? prev.map(i => i.id === id ? { ...i, ...local } : i) : prev)
+    const res = await fetch(`/api/achizitii/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null)
+    if (!res?.ok) { const d = res ? await res.json().catch(() => ({})) : {}; setEroare(d.error || 'Salvarea a eșuat'); load() }
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -181,6 +220,10 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <SincronizareProiectMail firmaId={firma.id} culoare={firma.culoare} onSynced={load} />
 
+      <ProceduraAchizitii deschisInitial={items.length === 0} />
+      <BugetAchizitii items={items} onPorneste={porneste} busy={pornesteBusy} />
+      {eroare && <div role="alert" style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>{eroare}</div>}
+
       {sugestiiNoi.length > 0 && (
         <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
           <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--c-999999)', marginBottom: '4px' }}>Sugestii din email</div>
@@ -216,9 +259,10 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--c-eeeeee)' }}>{item.denumire}</div>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)', marginTop: '2px' }}>
-                  {item.valoare != null ? `${item.valoare.toLocaleString('ro-RO')} RON` : 'fără valoare'} · {item.sursa || '—'}
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  {item.valoare != null ? `${item.valoare.toLocaleString('ro-RO')} RON` : 'fără valoare'} · {item.sursa === 'grant' ? 'subvenție' : item.sursa === 'cofinantare' ? 'cofinanțare' : item.sursa || 'sursă nealeasă'}
                 </div>
+                {item.nota && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '820px', lineHeight: 1.5 }}>{item.nota}</div>}
               </div>
               <button onClick={() => remove(item.id)} style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Șterge</button>
             </div>
@@ -241,11 +285,15 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
               )}
             </div>
 
+            <DosarAchizitie item={item} docs={dosare[item.id] || []}
+              onLinie={v => patch(item.id, { linieBuget: v || null }, { linie_buget: v || null })}
+              onSursa={v => patch(item.id, { sursa: v || null }, { sursa: v || null })} />
+
             <details style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
               <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650, color: firma.culoare }}>Formulare achiziție: cerere ofertă, notă estimare, recepție</summary>
               <div style={{ marginTop: 16 }}><ProiectWorkflow firmaId={firma.id} purchaseId={item.id} /></div>
             </details>
-            <AchizitieDocumente achizitieId={item.id} culoare={firma.culoare} etapaCuranta={item.status} />
+            <AchizitieDocumente achizitieId={item.id} culoare={firma.culoare} etapaCuranta={item.status} onChange={load} />
 
             {sugestii.filter(s => s.achizitie_id === item.id).map(s => (
               <SugestieBanner key={s.id} s={s} culoare={firma.culoare} busy={sugestieBusy === s.id}
