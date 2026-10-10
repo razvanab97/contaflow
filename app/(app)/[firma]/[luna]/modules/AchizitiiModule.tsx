@@ -3,7 +3,7 @@ import VeziButon from '@/components/ui/VeziButon'
 import { useEffect, useState, useCallback } from 'react'
 import ProiectWorkflow from '@/components/ProiectWorkflow'
 import SincronizareProiectMail from './proiect-mail/SincronizareProiectMail'
-import { ProceduraAchizitii, BugetAchizitii, DosarAchizitie } from './SistemAchizitii'
+import { ProceduraAchizitii, BugetAchizitii, PasiAchizitie } from './SistemAchizitii'
 import type { DocDosar, LinieBuget } from '@/lib/achizitii-procedura'
 
 interface Achizitie {
@@ -147,6 +147,9 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
   const [dosare, setDosare] = useState<Record<string, DocDosar[]>>({})
   const [pornesteBusy, setPornesteBusy] = useState<string | null>(null)
   const [eroare, setEroare] = useState('')
+  // Formularul Word deschis din pasii unei achizitii (cerere / nota / receptie) + reimprospatare documente
+  const [formular, setFormular] = useState<{ id: string; kind: 'oferta' | 'nota' | 'receptie' } | null>(null)
+  const [versiuneDocs, setVersiuneDocs] = useState(0)
 
   const load = useCallback(() => {
     fetch(`/api/achizitii?firmaId=${firma.id}`).then(r => r.json()).then(d => setItems(Array.isArray(d) ? d : []))
@@ -251,11 +254,16 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
         <div style={{ padding: '40px', textAlign: 'center', fontSize: 'var(--fs-md)', color: 'var(--c-777777)', background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)' }}>
           Nicio achiziție încă.
         </div>
-      ) : items.map(item => {
+      ) : [...items].sort((a, b) => Number(a.status === 'finalizat') - Number(b.status === 'finalizat')).map((item, poz, lista) => {
         const idx = STATUS_ORDER.indexOf(item.status as typeof STATUS_ORDER[number])
+        // titlu de grup: "În curs" / "Finalizate", la prima achizitie din fiecare grup
+        const grupNou = poz === 0 || (lista[poz - 1].status === 'finalizat') !== (item.status === 'finalizat')
+        const titluGrup = grupNou ? (item.status === 'finalizat' ? `Achiziții finalizate (${lista.filter(x => x.status === 'finalizat').length})` : `Achiziții în curs (${lista.filter(x => x.status !== 'finalizat').length})`) : null
         const next = STATUS_ORDER[idx + 1]
         return (
-          <div key={item.id} style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
+          <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {titluGrup && <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--text-primary)', marginTop: poz ? '10px' : 0 }}>{titluGrup}</div>}
+          <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--c-eeeeee)' }}>{item.denumire}</div>
@@ -285,20 +293,27 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
               )}
             </div>
 
-            <DosarAchizitie item={item} docs={dosare[item.id] || []}
+            <PasiAchizitie item={item} docs={dosare[item.id] || []}
               onLinie={v => patch(item.id, { linieBuget: v || null }, { linie_buget: v || null })}
-              onSursa={v => patch(item.id, { sursa: v || null }, { sursa: v || null })} />
+              onSursa={v => patch(item.id, { sursa: v || null }, { sursa: v || null })}
+              onUploaded={() => { load(); setVersiuneDocs(v => v + 1) }}
+              onGenereaza={k => { setFormular({ id: item.id, kind: k }); setTimeout(() => document.getElementById(`formulare-${item.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80) }}
+              onStatus={st => setStatus(item.id, st)} />
 
-            <details style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650, color: firma.culoare }}>Formulare achiziție: cerere ofertă, notă estimare, recepție</summary>
-              <div style={{ marginTop: 16 }}><ProiectWorkflow firmaId={firma.id} purchaseId={item.id} /></div>
+            <details id={`formulare-${item.id}`} open={formular?.id === item.id || undefined} style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12, scrollMarginTop: '80px' }}>
+              <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650, color: firma.culoare }}>Formulare achiziție (Word): cerere ofertă, notă estimare, recepție</summary>
+              <div style={{ marginTop: 16 }}><ProiectWorkflow firmaId={firma.id} purchaseId={item.id} formKind={formular?.id === item.id ? formular.kind : undefined} /></div>
             </details>
-            <AchizitieDocumente achizitieId={item.id} culoare={firma.culoare} etapaCuranta={item.status} onChange={load} />
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>Toate documentele ({(dosare[item.id] || []).length})</summary>
+              <AchizitieDocumente key={versiuneDocs} achizitieId={item.id} culoare={firma.culoare} etapaCuranta={item.status} onChange={load} />
+            </details>
 
             {sugestii.filter(s => s.achizitie_id === item.id).map(s => (
               <SugestieBanner key={s.id} s={s} culoare={firma.culoare} busy={sugestieBusy === s.id}
                 onConfirm={() => confirmSugestie(s.id)} onReject={() => respingeSugestie(s.id)} />
             ))}
+          </div>
           </div>
         )
       })}

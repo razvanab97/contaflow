@@ -12,11 +12,13 @@ const hint:CSSProperties={fontSize:'var(--fs-sm)',color:'var(--text-secondary)',
 const common=new Set(['achizitie','tip','furnizor','adresa_furnizor','identificare_furnizor','reprezentant_furnizor','referinta'])
 async function response(res:Response){const data=await res.json();if(!res.ok)throw new Error(data.error||'Operația a eșuat');return data}
 function errorText(e:unknown){return e instanceof Error?e.message:'Operația a eșuat'}
-export default function ProiectWorkflow({firmaId,lunaId,luna,firmaSlug='proiect-ab-textile',purchaseId,compact=false,initialForm=false}:{firmaId:string;lunaId?:string;luna?:string;firmaSlug?:string;purchaseId?:string;compact?:boolean;initialForm?:boolean}){
+export default function ProiectWorkflow({firmaId,lunaId,luna,firmaSlug='proiect-ab-textile',purchaseId,compact=false,initialForm=false,formKind}:{firmaId:string;lunaId?:string;luna?:string;firmaSlug?:string;purchaseId?:string;compact?:boolean;initialForm?:boolean;formKind?:FormKind}){
  const scope=purchaseId?`purchase-${purchaseId}`:`month-${lunaId}`
  const [state,setState]=useState<Workflow|null>(null),[settings,setSettings]=useState<Workflow|null>(null)
  const [tab,setTab]=useState<'rutina'|'formulare'|'setari'>(purchaseId||initialForm?'formulare':'rutina')
- const [kind,setKind]=useState<FormKind>(purchaseId?'oferta':'raport')
+ const [kind,setKind]=useState<FormKind>(formKind||(purchaseId?'oferta':'raport'))
+ // Deschis din pasii achizitiei cu un formular anume (cerere / nota / receptie)
+ useEffect(()=>{if(formKind){setKind(formKind);setTab('formulare')}},[formKind])
  const [busy,setBusy]=useState(false),[dirty,setDirty]=useState(false),[settingsDirty,setSettingsDirty]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('')
  const url=`/api/proiect-workflow?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`
  const load=useCallback(async()=>{setError('');try{const data=await response(await fetch(url,{cache:'no-store'}));setState(data.state);setDirty(false)}catch(e){setError(errorText(e))}},[url])

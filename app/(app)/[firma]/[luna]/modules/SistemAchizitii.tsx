@@ -148,3 +148,137 @@ export function DosarAchizitie({ item, docs, onLinie, onSursa }: { item: Achizit
     </div>
   )
 }
+
+// --- Pasii achizitiei, interactivi: fiecare pas cu stare reala si actiune directa -----------------
+// Starea vine din dosar (documentele incarcate) + linia de buget; pasul curent e primul neindeplinit.
+// Etapa achizitiei (ofertă → notă → plată → dovadă) avanseaza singura pe masura ce apar documentele.
+type FormKindAch = 'oferta' | 'nota' | 'receptie'
+const ORDINE_STATUS = ['oferta', 'nota_semnata', 'plata_initiata', 'dovada_trimisa', 'finalizat']
+
+export function etapaDinDosar(dosar: ReturnType<typeof dosarAchizitie>): string {
+  const ok = (k: string) => dosar.find(e => e.cheie === k)?.ok
+  if (ok('pv') && ok('plata') && ok('poze')) return 'dovada_trimisa'
+  if (ok('plata') || ok('factura') || dosar.find(e => e.cheie === 'factura')?.partial) return 'plata_initiata'
+  if (ok('nota')) return 'nota_semnata'
+  return 'oferta'
+}
+
+export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGenereaza, onStatus }: {
+  item: AchizitieSistem; docs: DocDosar[]
+  onLinie: (v: string) => void; onSursa: (v: string) => void; onUploaded: () => void
+  onGenereaza: (k: FormKindAch) => void; onStatus: (s: string) => void
+}) {
+  const coduri = coduriDin(item.linie_buget)
+  const utilaj = coduri.some(c => /^4\.[1-7]$/.test(c))
+  const online = docs.some(d => /order_|dante|emag|altex|leroy|\.png$|\.jpe?g$/i.test(d.fisier_nume))
+  const dosar = dosarAchizitie(docs, { utilaj, online })
+  const el = (k: string) => dosar.find(e => e.cheie === k)
+  const finalizat = item.status === 'finalizat'
+  const [arata, setArata] = useState(!finalizat)
+  const [incarc, setIncarc] = useState<string | null>(null)
+  const [mesaj, setMesaj] = useState('')
+  const buget = coduri.reduce((s, c) => s + (linieDupaCod(c)?.valoare || 0), 0)
+
+  async function incarca(tip: string, files: FileList | null) {
+    if (!files?.length) return
+    setIncarc(tip); setMesaj('')
+    let erori = 0
+    for (const f of Array.from(files)) {
+      const fd = new FormData()
+      fd.append('file', f); fd.append('achizitieId', item.id); fd.append('etapa', item.status); fd.append('tipDosar', tip)
+      const r = await fetch('/api/achizitii/documente', { method: 'POST', body: fd }).catch(() => null)
+      if (!r?.ok) erori++
+    }
+    setIncarc(null)
+    setMesaj(erori ? `${erori} fișier(e) nu au putut fi încărcate (doar PDF, JPG, PNG)` : `${files.length} document${files.length > 1 ? 'e încărcate' : ' încărcat'}`)
+    onUploaded()
+  }
+  const Incarca = ({ tip, eticheta, multiplu = false, imagini = false }: { tip: string; eticheta: string; multiplu?: boolean; imagini?: boolean }) => (
+    <label className="btn btn-sm" style={{ cursor: incarc ? 'wait' : 'pointer' }}>
+      {incarc === tip ? 'Se încarcă…' : `↑ ${eticheta}`}
+      <input type="file" multiple={multiplu} accept={imagini ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png'} style={{ display: 'none' }} disabled={!!incarc} onChange={e => { incarca(tip, e.target.files); e.target.value = '' }} />
+    </label>
+  )
+  const Genereaza = ({ k, eticheta }: { k: FormKindAch; eticheta: string }) => <button type="button" className="btn btn-sm btn-primary" onClick={() => onGenereaza(k)}>✎ {eticheta}</button>
+
+  const pasi: { cheie: string; titlu: string; ok: boolean; partial?: boolean; detaliu: string; actiuni: React.ReactNode }[] = [
+    { cheie: 'buget', titlu: 'Linia de buget și sursa', ok: coduri.length > 0 && !!item.sursa, detaliu: coduri.length ? `${coduri.join(', ')} · buget ${lei(buget)} lei${item.valoare != null && buget ? (item.valoare > buget ? ` · depășit cu ${lei(item.valoare - buget)}` : ` · rămas ${lei(buget - item.valoare)}`) : ''}` : 'alege linia din bugetul planului de afaceri',
+      actiuni: <>
+        <select value={item.linie_buget || ''} onChange={e => onLinie(e.target.value)} style={{ fontSize: 'var(--fs-sm)', padding: '5px 8px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-sunken)', color: 'var(--text-primary)', maxWidth: '320px' }}>
+          <option value="">— linia de buget —</option>
+          {item.linie_buget && coduri.length > 1 && <option value={item.linie_buget}>{coduri.join(', ')} (mai multe linii)</option>}
+          {BUGET_ACHIZITII.map(l => <option key={l.cod} value={l.cod}>{l.cod} · {l.denumire.slice(0, 48)} ({l.sursa === 'grant' ? 'subvenție' : 'cofinanțare'})</option>)}
+        </select>
+        <select value={item.sursa || ''} onChange={e => onSursa(e.target.value)} style={{ fontSize: 'var(--fs-sm)', padding: '5px 8px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-sunken)', color: 'var(--text-primary)' }}>
+          <option value="">— sursa —</option><option value="grant">Subvenție</option><option value="cofinantare">Cofinanțare</option><option value="altul">Altul</option>
+        </select>
+      </> },
+    { cheie: 'cerere', titlu: 'Specificații + cerere de ofertă (Anexa 2)', ok: !!el('cerere')?.ok, partial: el('cerere')?.partial, detaliu: el('cerere')!.detaliu,
+      actiuni: <><Genereaza k="oferta" eticheta="Completează și generează cererea (Word)" /><Incarca tip="cerere" eticheta="Încarcă cererea semnată" /></> },
+    { cheie: 'oferte', titlu: '3 oferte de la furnizori diferiți', ok: !!el('oferte')?.ok, partial: el('oferte')?.partial, detaliu: el('oferte')!.detaliu,
+      actiuni: <Incarca tip="oferta" eticheta="Încarcă oferte (poți selecta mai multe)" multiplu /> },
+    { cheie: 'nota', titlu: 'Notă de estimare (Anexa 1), semnată', ok: !!el('nota')?.ok, detaliu: el('nota')!.detaliu,
+      actiuni: <><Genereaza k="nota" eticheta="Generează nota (Word) din cele 3 oferte" /><Incarca tip="nota" eticheta="Încarcă nota semnată" /></> },
+    ...(utilaj ? [{ cheie: 'contract', titlu: 'Contract cu furnizorul', ok: !!el('contract')?.ok, detaliu: el('contract')!.detaliu, actiuni: <Incarca tip="contract" eticheta="Încarcă contractul" /> }] : []),
+    { cheie: 'plata', titlu: 'Proformă / comandă + plata prin OP', ok: !!el('plata')?.ok, detaliu: el('plata')!.detaliu,
+      actiuni: <><Incarca tip="proforma" eticheta="Încarcă proforma / comanda" /><Incarca tip="plata" eticheta="Încarcă dovada plății (extras / OP)" /></> },
+    { cheie: 'factura', titlu: 'Factura fiscală', ok: !!el('factura')?.ok, partial: el('factura')?.partial, detaliu: el('factura')!.detaliu,
+      actiuni: <Incarca tip="factura" eticheta="Încarcă factura fiscală" /> },
+    { cheie: 'pv', titlu: 'Recepție — PV (Anexa 3), semnat', ok: !!el('pv')?.ok, detaliu: el('pv')!.detaliu,
+      actiuni: <><Genereaza k="receptie" eticheta="Generează PV-ul de recepție (Word)" /><Incarca tip="pv" eticheta="Încarcă PV-ul semnat" /></> },
+    { cheie: 'poze', titlu: 'Poze cu bunul, cu înscrisuri', ok: !!el('poze')?.ok, detaliu: el('poze')!.detaliu,
+      actiuni: <Incarca tip="poza" eticheta="Încarcă poze" multiplu imagini /> },
+  ]
+  const curent = pasi.find(p => !p.ok)
+  const facute = pasi.filter(p => p.ok).length
+
+  // Etapa avanseaza singura dupa dosar (nu coboara si nu atinge achizitiile finalizate).
+  const etapa = etapaDinDosar(dosar)
+  const deAvansat = !finalizat && ORDINE_STATUS.indexOf(etapa) > ORDINE_STATUS.indexOf(item.status)
+
+  return (
+    <div style={{ marginTop: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: finalizat ? 'var(--success)' : 'var(--text-primary)' }}>{finalizat ? '✓ Achiziție finalizată' : `Pașii achiziției · ${facute}/${pasi.length}`}</span>
+        <div style={{ flex: '1 1 120px', height: '6px', borderRadius: 'var(--r-full)', background: 'var(--surface-secondary)', overflow: 'hidden', maxWidth: '240px' }}>
+          <div style={{ width: `${(facute / pasi.length) * 100}%`, height: '100%', background: 'var(--success)' }} />
+        </div>
+        {finalizat && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>dosar {facute}/{pasi.length}{facute < pasi.length ? ' — documente de completat pentru arhivă' : ' complet'}</span>}
+        <button type="button" className="btn btn-sm btn-ghost" onClick={() => setArata(v => !v)}>{arata ? 'Ascunde pașii' : 'Arată pașii'}</button>
+      </div>
+      {deAvansat && (
+        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: 'var(--fs-sm)', padding: '8px 10px', borderRadius: 'var(--r-md)', background: 'var(--accent-soft)' }}>
+          Dosarul arată că achiziția a ajuns la etapa „{STATUS_LABEL[etapa]}”.
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => onStatus(etapa)}>Treci la „{STATUS_LABEL[etapa]}”</button>
+        </div>
+      )}
+      {arata && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
+          {pasi.map((p, i) => {
+            const esteCurent = !finalizat && curent?.cheie === p.cheie
+            return (
+              <div key={p.cheie} style={{ display: 'flex', gap: '12px', padding: '10px 12px', borderRadius: 'var(--r-md)', border: `1px solid ${esteCurent ? 'var(--accent)' : 'var(--border-subtle)'}`, background: esteCurent ? 'var(--accent-soft)' : 'var(--surface-secondary)' }}>
+                <span style={{ width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xs)', fontWeight: 750, background: p.ok ? 'var(--success-soft)' : p.partial ? 'var(--warning-soft)' : 'var(--surface)', color: p.ok ? 'var(--success)' : p.partial ? 'var(--warning)' : 'var(--text-secondary)', border: p.ok ? 'none' : '1px solid var(--border)' }}>{p.ok ? '✓' : i + 1}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 'var(--fs-md)', fontWeight: 650, color: 'var(--text-primary)' }}>{p.titlu}</span>
+                    {esteCurent && <span className="badge badge-accent">pasul curent</span>}
+                    <span style={{ fontSize: 'var(--fs-xs)', color: p.ok ? 'var(--success)' : p.partial ? 'var(--warning)' : 'var(--text-secondary)' }}>{p.detaliu}</span>
+                  </div>
+                  {(esteCurent || !p.ok || p.cheie === 'buget') && <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>{p.actiuni}</div>}
+                </div>
+              </div>
+            )
+          })}
+          {!finalizat && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '10px 12px', borderRadius: 'var(--r-md)', border: '1px dashed var(--border)' }}>
+              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', flex: 1 }}>{curent ? `Când dosarul e complet, achiziția se marchează finalizată. Acum lipsește: ${curent.titlu.toLowerCase()}.` : 'Dosarul e complet — poți finaliza achiziția.'}</span>
+              <button type="button" className={curent ? 'btn btn-sm' : 'btn btn-sm btn-primary'} onClick={() => { if (!curent || confirm('Dosarul nu e complet. Marchezi totuși achiziția ca finalizată?')) onStatus('finalizat') }}>✓ Marchează finalizată</button>
+            </div>
+          )}
+          {mesaj && <div role="status" style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{mesaj}</div>}
+        </div>
+      )}
+    </div>
+  )
+}
