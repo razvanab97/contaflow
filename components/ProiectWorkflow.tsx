@@ -1,13 +1,14 @@
 'use client'
-import {useCallback,useEffect,useState,type CSSProperties} from 'react'
+import {useCallback,useEffect,useRef,useState,type CSSProperties} from 'react'
+import RutinaLunii from '@/components/proiect/RutinaLunii'
 import Link from 'next/link'
 import {TASKS,STEP_LABELS,PROFILE_FIELDS,FORM_LABELS,FORM_FIELDS,activeTasks,blockedBy,nextTask,dueDate,defaultDraft,emptyLine,validateDraft,type Workflow,type FormKind,type Draft,type Step} from '@/lib/proiect-workflow'
 const box:CSSProperties={padding:20,border:'1px solid var(--border)',borderRadius:'var(--r-lg)',background:'var(--surface)'}
-const input:CSSProperties={width:'100%',padding:'9px 10px',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',background:'var(--c-0d0d0d)',color:'var(--text-primary)',fontSize:'var(--fs-md)'}
+const input:CSSProperties={width:'100%',padding:'9px 11px',border:'1px solid var(--border)',borderRadius:'var(--r-md)',background:'var(--surface-sunken)',color:'var(--text-primary)',fontSize:'var(--fs-md)',marginTop:5,fontFamily:'inherit'}
 const button:CSSProperties={padding:'0 12px',height:32,display:'inline-flex',alignItems:'center',gap:6,borderRadius:'var(--r-md)',border:'1px solid var(--border-strong)',background:'var(--surface)',color:'var(--text-primary)',cursor:'pointer',fontSize:'var(--fs-md)',fontWeight:550}
-const tabStyle=(active:boolean):CSSProperties=>active?{...button,background:'var(--accent-soft)',borderColor:'var(--accent)',color:'var(--accent)'}:button
+const tabStyle=(active:boolean):CSSProperties=>({...button,height:36,padding:'0 16px',borderRadius:'var(--r-full)',fontWeight:active?700:550,...(active?{background:'var(--accent-solid)',borderColor:'var(--accent-solid)',color:'#fff'}:{background:'var(--surface)',color:'var(--text-secondary)'})})
 const grid:CSSProperties={display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:12}
-const hint:CSSProperties={fontSize:'var(--fs-sm)',color:'var(--text-muted)',lineHeight:1.6}
+const hint:CSSProperties={fontSize:'var(--fs-sm)',color:'var(--text-secondary)',lineHeight:1.6}
 const common=new Set(['achizitie','tip','furnizor','adresa_furnizor','identificare_furnizor','reprezentant_furnizor','referinta'])
 async function response(res:Response){const data=await res.json();if(!res.ok)throw new Error(data.error||'Operația a eșuat');return data}
 function errorText(e:unknown){return e instanceof Error?e.message:'Operația a eșuat'}
@@ -21,7 +22,12 @@ export default function ProiectWorkflow({firmaId,lunaId,luna,firmaSlug='proiect-
  const load=useCallback(async()=>{setError('');try{const data=await response(await fetch(url,{cache:'no-store'}));setState(data.state);setDirty(false)}catch(e){setError(errorText(e))}},[url])
  useEffect(()=>{void load()},[load])
  useEffect(()=>{if(!dirty&&!settingsDirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault()};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn)},[dirty,settingsDirty])
- function edit(next:Workflow){setState(next);setDirty(true);setMessage('')}
+ const editSeq=useRef(0),[autoSaving,setAutoSaving]=useState(false)
+ function edit(next:Workflow){editSeq.current++;setState(next);setDirty(true);setMessage('')}
+ // Salvare automata la ~1,2s dupa ultima modificare (stari, termene, observatii, formulare) - nu se mai
+ // pierd modificari uitate nesalvate. Daca s-a mai editat intre timp, pastram editarile locale si
+ // preluam doar noua versiune (serverul respinge suprascrierile concurente).
+ useEffect(()=>{if(!dirty||!state||busy)return;const seq=editSeq.current;const timer=setTimeout(async()=>{setAutoSaving(true);try{const data=await response(await fetch('/api/proiect-workflow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({firmaId,scope,state})}));if(editSeq.current===seq){setState(data.state);setDirty(false)}else setState(prev=>prev?{...prev,version:data.state.version,updatedAt:data.state.updatedAt}:prev);if(data.warning)setError(data.warning)}catch(e){setError(errorText(e))}finally{setAutoSaving(false)}},1200);return()=>clearTimeout(timer)},[state,dirty,busy,firmaId,scope])
  async function save(next=state){if(!next)return null;const data=await response(await fetch('/api/proiect-workflow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({firmaId,scope,state:next})}));setState(data.state);setDirty(false);if(data.warning)setError(data.warning);return data.state as Workflow}
  async function run(action:()=>Promise<void>){setBusy(true);setError('');setMessage('');try{await action()}catch(e){setError(errorText(e))}finally{setBusy(false)}}
  async function openSettings(){if(settings){setTab('setari');return}await run(async()=>{const data=await response(await fetch(`/api/proiect-workflow?firmaId=${firmaId}&scope=settings`,{cache:'no-store'}));setSettings(data.state);setTab('setari')})}
@@ -37,43 +43,18 @@ export default function ProiectWorkflow({firmaId,lunaId,luna,firmaSlug='proiect-
  const sent=visible.filter(t=>state.tasks[t.key]?.status==='trimis').length
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Bucharest'}).format(new Date())
  const overdue=visible.filter(t=>state.tasks[t.key]?.due&&state.tasks[t.key].due!<today&&!['trimis','acceptat','neaplicabil'].includes(state.tasks[t.key].status)).length
- const salaryKeys=new Set(['stat','pontaj','reges','centralizator','creditare','salarii','extras','registru'])
- const salaryOrder=['stat','pontaj','reges','centralizator','creditare','extras','registru','salarii']
- const salaryTasks=visible.filter(t=>salaryKeys.has(t.key)).sort((a,b)=>salaryOrder.indexOf(a.key)-salaryOrder.indexOf(b.key))
- const taskDone=(key:string)=>['trimis','acceptat','neaplicabil'].includes(state.tasks[key]?.status)
- const salaryDue=salaryTasks.filter(t=>!taskDone(t.key)).map(t=>state.tasks[t.key]?.due||'9999').sort()[0]||salaryTasks.map(t=>state.tasks[t.key]?.due||'9999').sort()[0]||'9999'
- const displayRows=[
-  ...visible.filter(t=>!salaryKeys.has(t.key)).map(t=>({task:t as typeof TASKS[number]|null,due:state.tasks[t.key]?.due||'9999',done:taskDone(t.key)?1:0})),
-  ...(salaryTasks.length?[{task:null as typeof TASKS[number]|null,due:salaryDue,done:salaryTasks.every(t=>taskDone(t.key))?1:0}]:[])
- ].sort((a,b)=>a.done-b.done||a.due.localeCompare(b.due))
- function taskFields(t:typeof TASKS[number]){
-  const row=workflow.tasks[t.key];if(!row)return null
-  const blocked=blockedBy(t.key,workflow),assets=workflow.assets.filter(a=>a.task===t.key)
-  return <div style={{marginTop:14}}>
- <div style={{display:'flex',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}><div><h3 style={{fontWeight:650,fontSize:'var(--fs-lg)'}}>{t.key==='salarii'?'Confirmarea plății salariilor și contribuțiilor':t.title}</h3><p style={hint}>{t.source}</p></div><label style={hint}>Termen pentru această lună<input aria-label={`Termen ${t.title}`} type="date" value={row.due||''} style={input} onChange={e=>edit({...workflow,tasks:{...workflow.tasks,[t.key]:{...row,due:e.target.value||null}}})}/></label></div>
- <p style={{...hint,margin:'10px 0'}}>{t.action}</p>
- {blocked.length>0&&<p style={{...hint,color:'var(--danger)'}}>Mai întâi: {blocked.join(', ')}</p>}
- <div style={grid}><label style={hint}>Stare confirmată de tine<select style={input} value={row.status} aria-label={`Stare ${t.title}`} onChange={e=>edit({...workflow,tasks:{...workflow.tasks,[t.key]:{...row,status:e.target.value as Step}}})}>{Object.entries(STEP_LABELS).filter(([key])=>['creditare','salarii','chirie'].includes(t.key)||!['initiat','avizat','executat'].includes(key)).map(([key,label])=><option key={key} value={key} disabled={blocked.length>0&&['semnat','trimis','acceptat','initiat','avizat','executat'].includes(key)}>{label}</option>)}</select></label><label style={hint}>Observații / referință confirmare<input style={input} value={row.note} onChange={e=>edit({...workflow,tasks:{...workflow.tasks,[t.key]:{...row,note:e.target.value}}})}/></label></div>
- <div style={{display:'flex',gap:12,marginTop:12,alignItems:'center',flexWrap:'wrap'}}><label style={{...button,cursor:'pointer'}}>+ Adaugă document (max. 4 MB)<input type="file" accept=".pdf,.docx,.jpg,.jpeg,.png" style={{display:'none'}} onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)void upload(f,t.key)}}/></label>{t.key==='raport'&&<button style={button} onClick={()=>{setKind('raport');setTab('formulare')}}>Completează raportul →</button>}{assets.map(a=><a key={a.id} style={{fontSize:'var(--fs-sm)',color:'var(--accent)'}} href={assetUrl(a.id)}>{a.name} ↓</a>)}</div>
- </div>
- }
  if(compact)return <section style={{...box,marginBottom:24,borderLeft:'4px solid var(--accent)'}}><div style={hint}>RUTINA PROIECTULUI · {complete}/{visible.length} încheiate · {sent} trimise · {overdue} restante</div><h2 style={{fontSize:18,fontWeight:650,margin:'7px 0'}}>{next?`Următorul pas: ${next.title}`:'Documentele sunt trimise sau încheiate'}</h2><p style={hint}>{next?.action||'Verifică răspunsurile și marchează acceptările primite.'}</p><Link href={`/${firmaSlug}/${luna}/obligatii-recurente`} style={{color:'var(--accent)',fontSize:'var(--fs-md)',fontWeight:600}}>Deschide rutina lunii →</Link></section>
  return <section style={{display:'grid',gap:16}}>
  <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
- {!purchaseId&&<button style={tabStyle(tab==='rutina')} aria-pressed={tab==='rutina'} onClick={()=>setTab('rutina')}>Rutina lunii</button>}
+ {!purchaseId&&<button style={tabStyle(tab==='rutina')} aria-pressed={tab==='rutina'} onClick={()=>setTab('rutina')}>✓ Rutina lunii</button>}
  <button style={tabStyle(tab==='formulare')} aria-pressed={tab==='formulare'} onClick={()=>setTab('formulare')}>Formulare și versiuni</button>
  <button style={tabStyle(tab==='setari')} aria-pressed={tab==='setari'} disabled={busy} onClick={()=>void openSettings()}>Date permanente și termene</button>
- <span role="status" style={{...hint,marginLeft:'auto'}}>{busy?'Se salvează…':dirty||settingsDirty?'Modificări nesalvate':state.updatedAt?`Salvat · v${state.version}`:''}</span>
+ <span role="status" style={{...hint,marginLeft:'auto',fontWeight:600,color:busy||autoSaving?'var(--text-secondary)':dirty||settingsDirty?'var(--warning)':'var(--success)'}}>{busy||autoSaving?'Se salvează…':dirty?'Se salvează automat…':settingsDirty?'Setări nesalvate':state.updatedAt?'✓ Salvat automat':''}</span>
  {tab!=='setari'&&<button style={{...button,background:'var(--accent-solid)',color:'#fff'}} disabled={busy||!dirty} onClick={()=>void run(async()=>{await save();setMessage('Modificările au fost salvate.')})}>Salvează modificările</button>}
  </div>
  {err}{message&&<div role="status" style={{...hint,color:'var(--success)'}}>{message}</div>}
  <fieldset disabled={busy} style={{border:0,padding:0,minWidth:0,display:'grid',gap:16}}>
- {tab==='rutina'&&<>
- <div style={{...box,borderLeft:'4px solid var(--accent)'}}><div style={hint}>{complete}/{visible.length} încheiate · {sent} trimise, în așteptarea acceptării · {overdue} restante</div><h2 style={{fontSize:20,fontWeight:650,margin:'8px 0'}}>{next?`Următorul pas: ${next.title}`:'Totul este trimis sau încheiat'}</h2><p style={hint}>{next?.action||'Confirmă acceptările primite. Trimiterea nu confirmă acceptarea.'}</p>{next&&<a href={salaryKeys.has(next.key)?'#rutina-salarii':'#rutina-'+next.key} style={{fontSize:'var(--fs-md)',color:'var(--accent)'}}>Mergi la pas →</a>}</div>
- <p style={hint}>Documentele se referă la luna anterioară lunii de lucru. Termenele sunt orientative și pot fi corectate. Data încărcării nu confirmă semnarea, trimiterea sau executarea unei plăți.</p>
- {displayRows.map(item=>item.task?<details id={'rutina-'+item.task.key} key={item.task.key} style={box} open={next?.key===item.task.key||undefined}><summary style={{cursor:'pointer',fontSize:'var(--fs-base)',fontWeight:650}}>{item.task.title} <span style={{...hint,fontWeight:400}}> · {STEP_LABELS[state.tasks[item.task.key].status]} · {state.tasks[item.task.key].due||'Termen de stabilit'}</span></summary>{taskFields(item.task)}</details>:<details id="rutina-salarii" key="salary-group" style={box} open={!!next&&salaryKeys.has(next.key)||undefined}><summary style={{cursor:'pointer',fontSize:'var(--fs-base)',fontWeight:650}}>Plata salariilor și contribuțiilor <span style={{...hint,fontWeight:400}}> · {salaryTasks.filter(t=>['acceptat','neaplicabil'].includes(state.tasks[t.key]?.status)).length}/{salaryTasks.length} pași încheiați · {salaryDue==='9999'?'Termen de stabilit':salaryDue}</span></summary><p style={{...hint,marginTop:12}}>Documentele și confirmarea plății se gestionează aici, fiecare cu starea, termenul și fișierele sale.</p><div style={{display:'grid',gap:12}}>{salaryTasks.map(t=><section key={t.key} id={t.key==='salarii'?'rutina-salarii-plata':'rutina-'+t.key} style={{padding:'14px 0',borderTop:'1px solid var(--border)'}}><div style={hint}>{STEP_LABELS[state.tasks[t.key].status]} · {state.tasks[t.key].due||'Termen de stabilit'}</div>{taskFields(t)}</section>)}</div></details>)}
- <p style={hint}>Raportarea AJOFM apare în luna anuală configurată (implicit martie). Anexa 7 nu este inclusă. Documentele din vechiul flux rămân în „Documente anterioare”.</p>
- </>}
+ {tab==='rutina'&&<RutinaLunii state={state} month={month} next={next} onEdit={edit} onUpload={(f,k)=>void upload(f,k)} assetUrl={assetUrl} onRaport={()=>{setKind('raport');setTab('formulare')}}/>}
  {tab==='formulare'&&<>
  <div style={box}><label style={hint}>Alege formularul<select style={{...input,marginTop:5}} value={kind} onChange={e=>setKind(e.target.value as FormKind)}>{Object.entries(FORM_LABELS).filter(([k])=>purchaseId?['oferta','nota','receptie'].includes(k):['raport','restituire'].includes(k)).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>{selected?.fields._preluat&&<p style={hint}>Câmpuri preluate din {selected.fields._preluat}. Revizuiește activitățile și personalul pentru perioada curentă.</p>}<p style={{...hint,marginTop:10}}>Se generează un document Word editabil, pe modelul original. Fiecare generare păstrează o versiune separată. Verifică datele înainte de semnare. {purchaseId?'Datele comune despre achiziție sunt preluate automat; produsele pot fi copiate între formulare la cerere.':''}</p></div>
  <div style={box}><h3 style={{fontSize:'var(--fs-lg)',fontWeight:650,marginBottom:12}}>Beneficiar — datele acestui dosar</h3><div style={grid}>{Object.entries(PROFILE_FIELDS).map(([key,label])=><label key={key} style={hint}>{label}<input style={input} value={state.profile[key]||''} onChange={e=>edit({...state,profile:{...state.profile,[key]:e.target.value}})}/></label>)}</div><p style={{...hint,marginTop:8}}>Datele permanente precompletează dosarele noi. Corecțiile de aici afectează doar acest dosar.</p></div>
