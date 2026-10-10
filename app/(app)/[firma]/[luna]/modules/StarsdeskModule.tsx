@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, createContext, useContext } from 'rea
 import TaskSection, { TaskItem } from './TaskSection'
 import UploadPanel from './UploadPanel'
 import OldItemDocs, { ChecklistItem } from './OldItemDocs'
+import DeFacturatPanel from './DeFacturatPanel'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string; tasks: TaskItem[]; checklistItems: ChecklistItem[] }
@@ -508,6 +509,8 @@ export default function StarsdeskModule({ firma, lunaId, tasks, checklistItems }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
+
+      <DeFacturatPanel firmaId={firma.id}/>
 
       <VerificareRezervari firma={firma} lunaId={lunaId}/>
 

@@ -1,4 +1,5 @@
 'use client'
+import BookingLipsaAlert from './BookingLipsaAlert'
 import TaskSection, { TaskItem } from './TaskSection'
 import OldItemDocs, { ChecklistItem } from './OldItemDocs'
 import BookingLocatiiSummary from './BookingLocatiiSummary'
@@ -20,6 +21,8 @@ export default function BookingModule({ firma, lunaId, tasks, checklistItems }: 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
+
+      <BookingLipsaAlert lunaId={lunaId}/>
 
       {sorted.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

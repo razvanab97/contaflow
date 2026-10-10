@@ -237,3 +237,56 @@ export async function getStardeskDiscrepanteCount(lunaId: string): Promise<numbe
   const result = await computeVerification(sb, lunaId)
   return result.discrepanteClient.length
 }
+
+// ---------------------------------------------------------------------------------------------
+// "De facturat" - rezervarile (din borderourile TUTUROR lunilor) care nu au inca factura client
+// 5StarDesk, cu check-out-ul trecut, si pretul complet de facturat (Airbnb: suma neta din borderou +
+// comisionul Airbnb). Folosit ca lista de lucru saptamanala (facturare la check-out) si pe Dashboard.
+export interface DeFacturat {
+  ids: string[]; codRezervare: string; numeOaspete: string | null; platforma: string; luna: string | null
+  suma: number | null; comision: number | null; total: number | null; dataStart: string | null; dataSfarsit: string | null
+}
+
+export async function getDeFacturat(sb: ReturnType<typeof getServiceSupabase>, firmaId: string): Promise<DeFacturat[]> {
+  const [{ data: rez }, { data: fact }, { data: csv }, { data: com }, { data: docsCom }, { data: luni }] = await Promise.all([
+    sb.from('borderou_rezervari').select('id,luna_id,platforma,cod_rezervare,nume_oaspete,suma,rezolvat_client').eq('firma_id', firmaId).limit(5000),
+    sb.from('stardesk_facturi').select('id_rezervare,nume_client').eq('firma_id', firmaId).limit(5000),
+    sb.from('airbnb_facturi_asteptate').select('cod_confirmare,data_start,data_sfarsit,taxa_servicii').eq('firma_id', firmaId).limit(5000),
+    sb.from('comision_facturi').select('cod_rezervare,suma').eq('firma_id', firmaId).eq('platforma', 'airbnb').limit(5000),
+    sb.from('documente').select('cod_rezervare_airbnb,suma').eq('firma_id', firmaId).like('fisier_path', '%/airbnb-facturi/%').not('cod_rezervare_airbnb', 'is', null).limit(5000),
+    sb.from('luni_contabile').select('id,luna').eq('firma_id', firmaId),
+  ])
+  const facturi = fact || []
+  const csvDupaCod = new Map((csv || []).map(c => [normalizeCode(c.cod_confirmare), c]))
+  const comisioane = [...(com || []).map(c => ({ cod: c.cod_rezervare, suma: c.suma })), ...(docsCom || []).map(d => ({ cod: d.cod_rezervare_airbnb, suma: d.suma }))]
+  const lunaKey = new Map((luni || []).map(l => [l.id, String(l.luna).slice(0, 7)]))
+  const azi = new Date().toISOString().slice(0, 10)
+
+  // O rezervare poate avea mai multe randuri in borderou (ex. ajustare Booking cu minus) - pe cod.
+  const grupuri = new Map<string, NonNullable<typeof rez>>()
+  for (const r of rez || []) {
+    const k = normalizeCode(r.cod_rezervare) || `id:${r.id}`
+    grupuri.set(k, [...(grupuri.get(k) || []), r])
+  }
+  const out: DeFacturat[] = []
+  for (const [k, randuri] of grupuri) {
+    if (randuri.some(r => r.rezolvat_client)) continue
+    const r0 = randuri[0]
+    if (facturi.some(f => isStardeskCandidate(r0, f))) continue
+    const c = csvDupaCod.get(k)
+    if (c?.data_sfarsit && c.data_sfarsit > azi) continue  // inca nu a facut check-out
+    const suma = Math.round(randuri.reduce((s, r) => s + Number(r.suma || 0), 0) * 100) / 100
+    let comision: number | null = null
+    if (r0.platforma === 'airbnb') {
+      const x = c?.taxa_servicii != null ? Number(c.taxa_servicii) : comisioane.find(cm => codesMatch(cm.cod || '', r0.cod_rezervare))?.suma
+      comision = x != null ? Number(x) : null
+    }
+    const lunile = randuri.map(r => lunaKey.get(r.luna_id)).filter(Boolean).sort() as string[]
+    out.push({
+      ids: randuri.map(r => r.id), codRezervare: r0.cod_rezervare, numeOaspete: r0.nume_oaspete, platforma: r0.platforma,
+      luna: lunile[0] || null, suma, comision, total: comision != null ? Math.round((suma + comision) * 100) / 100 : r0.platforma === 'airbnb' ? null : suma,
+      dataStart: c?.data_start || null, dataSfarsit: c?.data_sfarsit || null,
+    })
+  }
+  return out.sort((a, b) => String(a.dataSfarsit || a.luna || '').localeCompare(String(b.dataSfarsit || b.luna || '')))
+}

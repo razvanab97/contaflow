@@ -210,7 +210,7 @@ export default function TransactionDetails({ tx, index, total, onRefresh }: { tx
           </div>
           {tx.referinta && (
             <div>
-              <div style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', marginBottom:'3px' }}>Referință bancară</div>
+              <div style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', marginBottom:'3px' }} title="Codul comenzii / numărul facturii din detaliile plății (nu codul REF al băncii — acela apare la „Vezi complet în extras”)">Referință comandă / detalii plată</div>
               <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                 <div style={{ fontSize:'var(--fs-md)', fontWeight:600, color:'var(--text-primary)', fontFamily:'monospace', wordBreak:'break-all' }}>{shortReference(tx.referinta)}</div>
                 <CopyButton value={shortReference(tx.referinta)} />

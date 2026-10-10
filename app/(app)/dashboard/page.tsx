@@ -122,6 +122,7 @@ export default async function Dashboard() {
       <div className="section-title">
         <h2>De făcut</h2>
         <span style={{ fontSize: 'var(--fs-sm)', color: urgente ? 'var(--warning)' : 'var(--text-muted)' }}>{deFacut.length ? `${deFacut.length} ${deFacut.length === 1 ? 'acțiune' : 'acțiuni'}${urgente ? ` · ${urgente} ${urgente === 1 ? 'urgentă' : 'urgente'}` : ''}` : ''}</span>
+        <Link href="/sistem-de-lucru" style={{ marginLeft: 'auto', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)' }}>Sistem de lucru — pașii în ordine →</Link>
       </div>
       <DeFacut items={deFacut} />
 

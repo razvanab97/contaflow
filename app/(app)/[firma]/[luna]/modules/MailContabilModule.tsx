@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import VeziButon from '@/components/ui/VeziButon'
 import { CATEGORII, draftRaspuns, type MailContabil, type Punct, type StatusPunct } from '@/lib/mail-contabil-tipuri'
+import PachetContabil from './PachetContabil'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 type Mail = MailContabil & { imaginiUrl?: string[] }
@@ -268,6 +269,7 @@ export default function MailContabilModule({ firma, lunaId }: { firma: Firma; lu
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <PachetContabil firma={firma} lunaId={lunaId} raspuns={mailuri?.length ? draftRaspuns(mailuri[0]) : null} />
       <MailNou firma={firma} lunaId={lunaId} onCreat={m => { setNou(m.id); setMailuri(prev => [m, ...(prev || [])]) }} />
       {error && <p role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-sm)' }}>{error}</p>}
       {mailuri === null && !error && <div className="skeleton" style={{ height: '120px' }} />}

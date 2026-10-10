@@ -2,6 +2,7 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
 import { workMonthLabel } from '@/lib/accounting-period'
 import { ignorareDeVerificat } from '@/lib/tranzactii-reguli'
+import { getStareFirma } from '@/lib/sistem-lucru'
 
 export interface ItemDeFacut {
   id: string
@@ -53,6 +54,20 @@ export async function getDeFacut(firme: { id: string; slug: string; nume: string
       sb.from('facturi_asteptate').select('id', { count: 'exact', head: true }).eq('firma_id', f.id).eq('status', 'asteptare'),
     ])
     const done = new Set((stari || []).filter(s => s.completat).map(s => s.task_key))
+    const stare = await getStareFirma(sb, f, luna).catch(() => null)
+    const lei = (v: number) => new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
+
+    // Sistemul de lucru (vezi /sistem-de-lucru): alertele care previn munca de la final de luna.
+    if (stare?.deFacturat?.n) items.push({ ...base, id: `defact-${f.id}`, titlu: `${stare.deFacturat.n} ${stare.deFacturat.n === 1 ? 'rezervare de facturat' : 'rezervări de facturat'} în 5StarDesk`,
+      detaliu: `${lei(stare.deFacturat.total)} lei, pe prețul complet (borderou + comision) · check-out trecut`, href: `/${f.slug}/${luna}/5stardesk`, icon: 'star', urgenta: stare.deFacturat.vechi ? 'curand' : 'normal' })
+    if (stare?.stardesk?.bookingLipsa) items.push({ ...base, id: `bklipsa-${f.id}`, titlu: `${stare.stardesk.bookingLipsa} rezervări Booking lipsă din borderou`,
+      detaliu: 'Au factură 5StarDesk cu check-out în perioadă, dar nu apar în borderoul Booking — verifică borderoul descărcat', href: `/${f.slug}/${luna}/5stardesk`, icon: 'bed', urgenta: 'curand' })
+    if (stare?.mailDeschise) items.push({ ...base, id: `mail-${f.id}`, titlu: `${stare.mailDeschise} ${stare.mailDeschise === 1 ? 'situație deschisă' : 'situații deschise'} din mailul contabilului`,
+      detaliu: stare.mailVechi ? `${stare.mailVechi} mai vechi de 14 zile — răspunde înainte de închiderea lunii` : 'Rezolvă și trimite răspunsul din Mail contabil', href: `/${f.slug}/${luna}/mail-contabil`, icon: 'mail', urgenta: stare.mailVechi ? 'curand' : 'normal' })
+    if (stare?.inboxNeasociateVechi) items.push({ ...base, id: `inboxv-${f.id}`, titlu: `${stare.inboxNeasociateVechi} ${stare.inboxNeasociateVechi === 1 ? 'factură neasociată' : 'facturi neasociate'} de peste 30 de zile`,
+      detaliu: 'Plătite cash → Facturi + chitanță · prin bancă → asociază în Extras · neplătite → Facturi restante', href: `/${f.slug}/${luna}/inbox-facturi`, icon: 'inbox', urgenta: 'normal' })
+    if (stare && stare.extrase > 0 && !stare.pachetTrimis && azi.getDate() >= 5) items.push({ ...base, id: `pachet-${f.id}`, titlu: 'Trimite pachetul lunii la contabil',
+      detaliu: 'ZIP + lista de discrepanțe + răspunsul la mailul contabilului', href: `/${f.slug}/${luna}/mail-contabil`, icon: 'send', urgenta: azi.getDate() >= 10 ? 'curand' : 'normal' })
     const off = new Set((moduleStari || []).filter(m => m.dezactivat).map(m => m.modul_slug))
     const active = modules.filter(m => !off.has(m.slug))
 
@@ -74,7 +89,8 @@ export async function getDeFacut(firme: { id: string; slug: string; nume: string
       const txs: any[] = txRes.data || []
       const deschise = txs.filter(t => !t.document_id && t.note !== 'na').length
       const deVerificat = 'motiv_ignorare' in (txs[0] || {}) ? txs.filter(t => ignorareDeVerificat(t)).length : 0
-      if (deschise) items.push({ ...base, id: `tx-${f.id}`, titlu: `${deschise} ${deschise === 1 ? 'tranzacție fără document' : 'tranzacții fără document'}`, detaliu: 'Extras de cont', href: `/${f.slug}/${luna}/extras`, icon: 'bank', urgenta: 'normal' })
+      const vechi = stare?.txFaraDocumentVechi || 0
+      if (deschise) items.push({ ...base, id: `tx-${f.id}`, titlu: `${deschise} ${deschise === 1 ? 'tranzacție fără document' : 'tranzacții fără document'}`, detaliu: vechi ? `Extras de cont · ${vechi} mai vechi de 14 zile` : 'Extras de cont', href: `/${f.slug}/${luna}/extras`, icon: 'bank', urgenta: vechi ? 'curand' : 'normal' })
       if (deVerificat) items.push({ ...base, id: `verif-${f.id}`, titlu: `${deVerificat} ${deVerificat === 1 ? 'cheltuială ignorată' : 'cheltuieli ignorate'} de verificat`, detaliu: 'Fără motiv justificat — probabil lipsește factura sau bonul', href: `/${f.slug}/${luna}/extras`, icon: 'alert', urgenta: 'curand' })
     } else if (active.some(m => m.slug === 'extras')) {
       items.push({ ...base, id: `ext-${f.id}`, titlu: 'Extrasul de cont nu e încărcat', href: `/${f.slug}/${luna}/extras`, icon: 'bank', urgenta: 'normal' })
