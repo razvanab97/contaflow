@@ -148,7 +148,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'impozite':
         return <ImpoziteModule firma={firmaForModule} lunaId={lunaData.id} luna={luna} tasks={modulDef.tasks} stari={impoziteStari}/>
       case 'raport-lunar-proiect':
-        return <div style={{display:'grid',gap:20}}><ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} initialForm /><details className="card card-pad"><summary style={{fontSize:'var(--fs-md)',fontWeight:600,color:'var(--text-secondary)'}}>Editor și document anterior (istoric)</summary><RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/></details></div>
+        return <div style={{display:'grid',gap:20,minWidth:0}}><RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/><details className="card card-pad"><summary style={{fontSize:'var(--fs-md)',fontWeight:600,color:'var(--text-secondary)'}}>Rutina lunii, date permanente și versiunile anterioare</summary><ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} initialForm /></details></div>
       case 'obligatii-recurente':
         return <ObligatiiModule firma={firmaForModule} lunaId={lunaData.id} luna={luna}/>
       case 'achizitii':
@@ -162,15 +162,13 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
 
   return (
     <main className={`page animate-in${modulSlug === 'raport-lunar-proiect' ? ' page-wide' : ''}`}>
-      {/* Antet comun pentru toate modulele. La raport-lunar-proiect, editorul vechi (ReportWorkspace,
-          cu propriul antet) e acum pliat in "istoric", deci pagina are nevoie de acest titlu. */}
-      <PageHeader
+      {modulSlug !== 'raport-lunar-proiect' && <PageHeader
         back={{ href: `/${slug}/${luna}`, label: 'Rezumatul lunii' }}
         culoare={firma.culoare}
         title={modulDef.label}
         description={modulDef.description}
         actions={<MonthNav slug={slug} luna={luna} suffix={`/${modulSlug}`} />}
-      />
+      />}
 
       {/* Module content */}
       {renderModule()}

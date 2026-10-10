@@ -15,6 +15,9 @@ interface Props {
   onToggleFullscreen?: () => void
   onDownload: () => void
   downloading: boolean
+  onInlineChange?: (key: string, value: string, line?: number) => void
+  onFieldFocus?: (key: string) => void
+  activeField?: string
 }
 
 const ZOOM_STEPS = [50, 75, 100, 125, 150]
@@ -22,8 +25,20 @@ const ZOOM_STEPS = [50, 75, 100, 125, 150]
 // Previzualizare cu selectie de text: selectezi o bucata din document, apare un buton mic
 // "Fa camp editabil" langa selectie - ii dai o eticheta si acea portiune (doar ea, restul
 // paragrafului ramane neschimbat) devine un camp nou in editor, in plus fata de cele fixe.
-function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated, zoom }: { firmaId: string; html: string; culoare: string; onFieldCreated: () => void; zoom: number }) {
+function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated, zoom, onInlineChange, onFieldFocus, activeField }: { firmaId: string; html: string; culoare: string; onFieldCreated: () => void; zoom: number; onInlineChange?: Props['onInlineChange']; onFieldFocus?: Props['onFieldFocus']; activeField?: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const htmlRef = useRef(html)
+  htmlRef.current = html
+  useEffect(() => {
+    const container = containerRef.current
+    if (container && !container.contains(document.activeElement)) container.innerHTML = html
+  }, [html])
+  useEffect(() => {
+    containerRef.current?.querySelectorAll<HTMLElement>('[data-report-field]').forEach(field => {
+      field.classList.toggle('report-field-active', field.dataset.reportField === activeField)
+      if (field.dataset.reportField === activeField && !containerRef.current?.contains(document.activeElement)) field.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    })
+  }, [activeField, html])
   const [sel, setSel] = useState<{ text: string; x: number; y: number } | null>(null)
   const [labeling, setLabeling] = useState(false)
   const [label, setLabel] = useState('')
@@ -36,6 +51,7 @@ function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated, zoom }:
     if (!selection || selection.isCollapsed || !container) return
     const text = selection.toString().trim()
     const anchorNode = selection.anchorNode
+    if (anchorNode?.parentElement?.closest('[contenteditable="true"]')) return
     if (!text || !anchorNode || !container.contains(anchorNode)) return
     const rect = selection.getRangeAt(0).getBoundingClientRect()
     const containerRect = container.getBoundingClientRect()
@@ -63,12 +79,41 @@ function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated, zoom }:
         ref={containerRef}
         className="report-page"
         onMouseUp={handleMouseUp}
+        onFocus={event => {
+          const field = (event.target as HTMLElement).closest<HTMLElement>('[data-report-field]')
+          if (field?.dataset.reportField) onFieldFocus?.(field.dataset.reportField)
+        }}
+        onInput={event => {
+          const field = (event.target as HTMLElement).closest<HTMLElement>('[data-report-field]')
+          if (field?.dataset.reportField) onInlineChange?.(field.dataset.reportField, field.innerText.replace(/\r/g, ''), field.dataset.reportLine === undefined ? undefined : Number(field.dataset.reportLine))
+        }}
+        onBlur={event => {
+          const container = containerRef.current
+          if (container && !container.contains(event.relatedTarget as Node | null)) container.innerHTML = htmlRef.current
+        }}
+        onKeyDown={event => {
+          if (event.key === 'Enter' && (event.target as HTMLElement).dataset.reportField !== undefined && !(event.target as HTMLElement).dataset.reportField?.endsWith(':content')) event.preventDefault()
+        }}
+        onPaste={event => {
+          const field = (event.target as HTMLElement).closest('[contenteditable="true"]')
+          if (!field) return
+          event.preventDefault()
+          const selection = window.getSelection()
+          if (!selection?.rangeCount) return
+          const range = selection.getRangeAt(0)
+          if (!field.contains(range.commonAncestorContainer)) return
+          range.deleteContents()
+          const text = document.createTextNode(event.clipboardData.getData('text/plain'))
+          range.insertNode(text)
+          range.setStartAfter(text); range.collapse(true)
+          selection.removeAllRanges(); selection.addRange(range)
+          field.dispatchEvent(new Event('input', { bubbles: true }))
+        }}
         style={{
           borderRadius: 'var(--r-sm)', userSelect: 'text',
           zoom: zoom / 100, margin: '0 auto',
           boxShadow: '0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.2)',
         }}
-        dangerouslySetInnerHTML={{ __html: html }}
       />
       {sel && (
         <div style={{ position: 'absolute', left: sel.x, top: Math.max(0, sel.y - 38), transform: 'translateX(-50%)', zIndex: 20 }}>
@@ -95,7 +140,7 @@ function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated, zoom }:
   )
 }
 
-export default function ReportPreview({ loading, error, isPdf, html, firmaId, culoare, downloadUrl, onFieldCreated, fullscreen, onToggleFullscreen, onDownload, downloading }: Props) {
+export default function ReportPreview({ loading, error, isPdf, html, firmaId, culoare, downloadUrl, onFieldCreated, fullscreen, onToggleFullscreen, onDownload, downloading, onInlineChange, onFieldFocus, activeField }: Props) {
   const [zoom, setZoom] = useState(100)
   const [fitZoom, setFitZoom] = useState(100)
   const [fit, setFit] = useState(true)
@@ -110,8 +155,9 @@ export default function ReportPreview({ loading, error, isPdf, html, firmaId, cu
   }, [])
 
   return (
-    <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: fullscreen ? '100%' : undefined }}>
+    <div style={{ minWidth: 0, width: '100%', maxWidth: '100%', background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: fullscreen ? '100%' : undefined }}>
       <style>{REPORT_PAGE_CSS}</style>
+      <style>{`.report-page [contenteditable="true"] { cursor: text; border-radius: 3px; outline: 1px dashed #b6d7cb; min-width: 12px; display: inline-block; } .report-page [contenteditable="true"]:focus, .report-page .report-field-active { outline: 2px solid #059669; background: #eaf8f1; } .report-page [contenteditable="true"]:empty::before { content: 'Completează…'; color: #888; }`}</style>
       {/* Card header: zoom, pagina, fullscreen, download */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid var(--c-1a1a1a)', flexShrink: 0 }}>
         <button onClick={() => setZoom(ZOOM_STEPS[Math.max(0, zoomIdx - 1)])} disabled={zoomIdx <= 0} title="Micșorează" style={{ width: '24px', height: '24px', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', color: 'var(--c-999999)', cursor: 'pointer', fontSize: 'var(--fs-md)', opacity: zoomIdx <= 0 ? .4 : 1 }}>−</button>
@@ -134,14 +180,14 @@ export default function ReportPreview({ loading, error, isPdf, html, firmaId, cu
 
       {/* Zona "mat" din jurul paginii - fixa, ca sa arate ca o coala reala indiferent de tema */}
       <div ref={viewportRef} style={{ flex: 1, background: '#1c1c1c', overflow: 'auto', padding: '24px 20px', maxHeight: fullscreen ? undefined : 'calc(100vh - 240px)', minHeight: '360px' }}>
-        {loading ? (
+        {loading && html == null ? (
           <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', textAlign: 'center' }}>Se randează previzualizarea...</p>
         ) : error ? (
           <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)', textAlign: 'center' }}>{error}</p>
         ) : isPdf ? (
           <iframe src={`${downloadUrl}&preview=1`} style={{ width: '100%', height: '100%', minHeight: '70vh', border: 'none', borderRadius: 'var(--r-sm)', background: '#fff' }}/>
         ) : html != null ? (
-          <SelectableDocxPreview firmaId={firmaId} html={html} culoare={culoare} onFieldCreated={onFieldCreated} zoom={fit ? fitZoom * zoom / 100 : zoom}/>
+          <SelectableDocxPreview firmaId={firmaId} html={html} culoare={culoare} onFieldCreated={onFieldCreated} zoom={fit ? fitZoom * zoom / 100 : zoom} onInlineChange={onInlineChange} onFieldFocus={onFieldFocus} activeField={activeField}/>
         ) : (
           <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', textAlign: 'center' }}>Nu există încă un document de previzualizat.</p>
         )}

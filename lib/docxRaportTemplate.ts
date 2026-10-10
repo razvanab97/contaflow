@@ -8,6 +8,8 @@
 // singur paragraf nou, construit de noi, cu un singur run - garantat nesplitat, deci gasibil
 // sigur mai tarziu cand generam documentul final.
 
+import type { ReportExtraSection } from './documentWorkspace/reportSections'
+
 export interface DetectedFields {
   perioada: { value: string }
   autorizatii: { values: string[] }
@@ -134,6 +136,7 @@ export interface RaportFieldValues {
   obiective: string[]
   activitati: string[]
   custom?: Record<string, string>
+  sections?: ReportExtraSection[]
 }
 
 /** Genereaza document.xml final dintr-un sablon (produs de buildTemplate) + valorile curente. */
@@ -142,7 +145,7 @@ export function generateFromTemplate(templateXml: string, values: RaportFieldVal
     const target = getParagraphs(xml).find(p => p.includes(`>${marker}<`))
     if (!target) throw new Error(`Marcaj ${marker} negăsit în șablon`)
     const safeLines = lines.filter(l => l.trim())
-    if (!safeLines.length) throw new Error('Cel puțin o linie e obligatorie pentru fiecare secțiune')
+    if (!safeLines.length) return xml.replace(target, buildParagraph(target, ''))
     return xml.replace(target, safeLines.map(l => buildParagraph(target, l)).join(''))
   }
 
@@ -153,6 +156,23 @@ export function generateFromTemplate(templateXml: string, values: RaportFieldVal
 
   for (const [key, value] of Object.entries(values.custom || {})) {
     xml = xml.split(customMarker(key)).join(xmlEscape(value))
+  }
+  if (values.sections?.length) {
+    const tables = xml.match(/<w:tbl\b[^>]*>[\s\S]*?<\/w:tbl>/g) || []
+    const table = tables.find(t => /4\.\s*In perioada|4\.\s*În perioada/i.test(paraText(t)))
+    const paragraphs = values.sections.map(section => {
+      const title = `<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${xmlEscape(section.title)}</w:t></w:r></w:p>`
+      const content = section.content.split('\n').map(line => `<w:p><w:r><w:t xml:space="preserve">${xmlEscape(line)}</w:t></w:r></w:p>`).join('')
+      return { title, content }
+    })
+    if (table) {
+      const rows = paragraphs.map(p => `<w:tr><w:tc><w:tcPr/>${p.title}${p.content}</w:tc></w:tr>`).join('')
+      xml = xml.replace(table, table.replace(/<\/w:tbl>$/, `${rows}</w:tbl>`))
+    } else {
+      const content = paragraphs.map(p => p.title + p.content).join('')
+      const signature = getParagraphs(xml).find(p => /reprezentant legal/i.test(paraText(p)))
+      xml = signature ? xml.replace(signature, content + signature) : xml.replace(/(<w:sectPr\b|<\/w:body>)/, `${content}$1`)
+    }
   }
   return xml
 }

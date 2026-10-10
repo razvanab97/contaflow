@@ -1,6 +1,7 @@
 import JSZip from 'jszip'
 import { getServiceSupabase } from './supabase/server'
 import { generateFromTemplate } from './docxRaportTemplate'
+import { parseReportSections, REPORT_SECTIONS_KEY } from './documentWorkspace/reportSections'
 
 export const SECTIUNE = 'raport_lunar'
 export const SECTIUNE_SABLON = 'raport_lunar_sablon'
@@ -38,7 +39,8 @@ export async function regenerateRaportLunar(sb: ReturnType<typeof getServiceSupa
     autorizatii: toLines(fixed.autorizatii || ''),
     obiective: toLines(fixed.obiective || ''),
     activitati: toLines(fixed.activitati || ''),
-    custom: Object.fromEntries((custom || []).map((c: { cheie: string; valoare: string }) => [c.cheie, c.valoare])),
+    custom: Object.fromEntries((custom || []).filter(c => c.cheie !== REPORT_SECTIONS_KEY).map((c: { cheie: string; valoare: string }) => [c.cheie, c.valoare])),
+    sections: parseReportSections(custom?.find(c => c.cheie === REPORT_SECTIONS_KEY)?.valoare || '[]'),
   })
 
   zip.file('word/document.xml', finalXml)

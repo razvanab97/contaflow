@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'id lipsește' }, { status: 400 })
 
   const sb = getServiceSupabase()
-  const { data: doc } = await sb.from('proiect_documente').select('fisier_path,fisier_tip').eq('id', id).single()
+  const { data: doc } = await sb.from('proiect_documente').select('fisier_path,fisier_tip,firma_id').eq('id', id).single()
   if (!doc) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
 
   if (doc.fisier_tip === 'application/pdf') return NextResponse.json({ pdf: true })
@@ -91,7 +91,16 @@ export async function GET(req: NextRequest) {
     ])
 
     const html = [...headerImgs, bodyResult.value, ...footerImgs].join('')
-    return NextResponse.json({ html })
+    let templateHtml: string | null = null
+    const { data: template } = await sb.from('proiect_documente').select('fisier_path').eq('firma_id', doc.firma_id).eq('sectiune', 'raport_lunar_sablon').maybeSingle()
+    if (template) {
+      const { data: templateFile } = await sb.storage.from('documente').download(template.fisier_path)
+      if (templateFile) {
+        const templateBody = await mammoth.convertToHtml({ buffer: Buffer.from(await templateFile.arrayBuffer()) })
+        templateHtml = [...headerImgs, templateBody.value, ...footerImgs].join('')
+      }
+    }
+    return NextResponse.json({ html, templateHtml })
   } catch (e) {
     return NextResponse.json({ error: 'Documentul nu a putut fi randat: ' + String(e) }, { status: 500 })
   }

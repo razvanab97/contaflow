@@ -8,7 +8,7 @@ export const RAPORT_LUNAR_TEMPLATE: DocumentTemplate = {
   id: 'raport-lunar-proiect',
   title: 'Raport lunar',
   description: 'Raport de implementare lunar pentru proiectul european',
-  allowCustomSections: false, // generatorul DOCX nu suporta inca sectiuni noi arbitrare
+  allowCustomSections: true,
   sections: [
     {
       id: 'perioada',
