@@ -288,7 +288,10 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
 
 // --- Achizitie noua: din buget sau in afara lui ------------------------------------------------
 export interface AchizitieNouaDate { denumire: string; valoare: number | null; sursa: string; linieBuget: string | null; nota: string }
-export function AchizitieNoua({ onCreeaza, onAnuleaza, busy }: { onCreeaza: (d: AchizitieNouaDate) => void; onAnuleaza: () => void; busy: boolean }) {
+export function AchizitieNoua({ items = [], onCreeaza, onAnuleaza, busy }: { items?: AchizitieSistem[]; onCreeaza: (d: AchizitieNouaDate) => void; onAnuleaza: () => void; busy: boolean }) {
+  // liniile care au deja achizitie (facuta sau pornita) nu mai apar in lista
+  const folosite = new Set(items.flatMap(i => coduriDin(i.linie_buget)))
+  const disponibile = BUGET_ACHIZITII.filter(x => !folosite.has(x.cod))
   const [linie, setLinie] = useState('')
   const [denumire, setDenumire] = useState('')
   const [tip, setTip] = useState('Produse')
@@ -324,9 +327,10 @@ export function AchizitieNoua({ onCreeaza, onAnuleaza, busy }: { onCreeaza: (d: 
       <label style={lab}>Linia de buget *
         <select value={linie} onChange={e => alegeLinie(e.target.value)} style={inp}>
           <option value="">— alege —</option>
-          {BUGET_ACHIZITII.map(x => <option key={x.cod} value={x.cod}>{x.cod} · {x.denumire} · {lei(x.valoare)} lei ({x.sursa === 'grant' ? 'subvenție' : 'cofinanțare'})</option>)}
+          {disponibile.map(x => <option key={x.cod} value={x.cod}>{x.cod} · {x.denumire} · {lei(x.valoare)} lei ({x.sursa === 'grant' ? 'subvenție' : 'cofinanțare'})</option>)}
           <option value="afara">Altceva — în afara bugetului aprobat</option>
         </select>
+        {folosite.size > 0 && <span style={{ display: 'block', marginTop: '4px', fontSize: 'var(--fs-xs)', fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--text-muted)' }}>{BUGET_ACHIZITII.length - disponibile.length} linii ascunse — au deja achiziție (vezi Finalizate / În curs).</span>}
       </label>
       {linie === 'afara' && (
         <div role="alert" style={{ fontSize: 'var(--fs-sm)', padding: '9px 12px', borderRadius: 'var(--r-md)', background: 'var(--warning-soft)', color: 'var(--warning)', fontWeight: 600 }}>

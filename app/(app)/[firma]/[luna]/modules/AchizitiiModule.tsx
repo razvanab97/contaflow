@@ -228,7 +228,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
         <button type="button" className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => { setFormNou(true); setTab('curs') }}>+ Achiziție nouă</button>
       </div>
       {eroare && <div role="alert" style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>{eroare}</div>}
-      {formNou && <AchizitieNoua busy={creez} onCreeaza={creeazaNoua} onAnuleaza={() => setFormNou(false)} />}
+      {formNou && <AchizitieNoua items={items} busy={creez} onCreeaza={creeazaNoua} onAnuleaza={() => setFormNou(false)} />}
 
       {tab === 'procedura' && <ProceduraAchizitii deschisInitial />}
       {tab === 'buget' && <BugetAchizitii items={items} onPorneste={porneste} busy={pornesteBusy} />}
