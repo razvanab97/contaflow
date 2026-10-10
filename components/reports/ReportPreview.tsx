@@ -1,5 +1,6 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { REPORT_PAGE_CSS } from '@/lib/documentWorkspace/reportPresentation'
 
 interface Props {
   loading: boolean
@@ -12,6 +13,8 @@ interface Props {
   onFieldCreated: () => void
   fullscreen?: boolean
   onToggleFullscreen?: () => void
+  onDownload: () => void
+  downloading: boolean
 }
 
 const ZOOM_STEPS = [50, 75, 100, 125, 150]
@@ -58,12 +61,11 @@ function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated, zoom }:
     <div style={{ position: 'relative' }}>
       <div
         ref={containerRef}
-        className="docx-preview"
+        className="report-page"
         onMouseUp={handleMouseUp}
         style={{
-          background: '#ffffff', color: '#1a1a1a', borderRadius: 'var(--r-sm)', padding: '32px 40px',
-          fontSize: 'var(--fs-base)', lineHeight: 1.6, userSelect: 'text',
-          width: `${zoom}%`, maxWidth: '760px', margin: '0 auto',
+          borderRadius: 'var(--r-sm)', userSelect: 'text',
+          zoom: zoom / 100, margin: '0 auto',
           boxShadow: '0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.2)',
         }}
         dangerouslySetInnerHTML={{ __html: html }}
@@ -93,17 +95,29 @@ function SelectableDocxPreview({ firmaId, html, culoare, onFieldCreated, zoom }:
   )
 }
 
-export default function ReportPreview({ loading, error, isPdf, html, firmaId, culoare, downloadUrl, onFieldCreated, fullscreen, onToggleFullscreen }: Props) {
+export default function ReportPreview({ loading, error, isPdf, html, firmaId, culoare, downloadUrl, onFieldCreated, fullscreen, onToggleFullscreen, onDownload, downloading }: Props) {
   const [zoom, setZoom] = useState(100)
+  const [fitZoom, setFitZoom] = useState(100)
+  const [fit, setFit] = useState(true)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const zoomIdx = ZOOM_STEPS.indexOf(zoom)
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const observer = new ResizeObserver(() => setFitZoom(Math.min(100, Math.max(25, (viewport.clientWidth - 40) / 794 * 100))))
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: fullscreen ? '100%' : undefined }}>
+      <style>{REPORT_PAGE_CSS}</style>
       {/* Card header: zoom, pagina, fullscreen, download */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid var(--c-1a1a1a)', flexShrink: 0 }}>
         <button onClick={() => setZoom(ZOOM_STEPS[Math.max(0, zoomIdx - 1)])} disabled={zoomIdx <= 0} title="Micșorează" style={{ width: '24px', height: '24px', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', color: 'var(--c-999999)', cursor: 'pointer', fontSize: 'var(--fs-md)', opacity: zoomIdx <= 0 ? .4 : 1 }}>−</button>
-        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)', minWidth: '36px', textAlign: 'center' }}>{zoom}%</span>
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)', minWidth: '36px', textAlign: 'center' }}>{Math.round(fit ? fitZoom * zoom / 100 : zoom)}%</span>
         <button onClick={() => setZoom(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, zoomIdx + 1)])} disabled={zoomIdx >= ZOOM_STEPS.length - 1} title="Mărește" style={{ width: '24px', height: '24px', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', color: 'var(--c-999999)', cursor: 'pointer', fontSize: 'var(--fs-md)', opacity: zoomIdx >= ZOOM_STEPS.length - 1 ? .4 : 1 }}>+</button>
+        <button onClick={() => { setFit(f => !f); setZoom(100) }} style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontSize: 'var(--fs-xs)', cursor: 'pointer' }}>{fit ? 'Mărime reală' : 'Încadrează'}</button>
         <div style={{ flex: 1 }}/>
         {onToggleFullscreen && (
           <button onClick={onToggleFullscreen} title={fullscreen ? 'Ieși din ecran complet' : 'Ecran complet'} style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', color: 'var(--c-999999)', cursor: 'pointer' }}>
@@ -112,13 +126,14 @@ export default function ReportPreview({ loading, error, isPdf, html, firmaId, cu
             </svg>
           </button>
         )}
-        <a href={downloadUrl} title="Descarcă" style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', color: 'var(--c-999999)' }}>
+        <button onClick={onDownload} disabled={downloading || loading || !!error || (!isPdf && html == null)} title="Salvează PDF din previzualizare" style={{ display: 'flex', gap: '6px', padding: '6px 10px', alignItems: 'center', justifyContent: 'center', background: 'var(--c-161616)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', color: 'var(--c-999999)', cursor: 'pointer', fontSize: 'var(--fs-xs)' }}>
           <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-        </a>
+          {downloading ? 'Se pregătește...' : 'Salvează PDF'}
+        </button>
       </div>
 
       {/* Zona "mat" din jurul paginii - fixa, ca sa arate ca o coala reala indiferent de tema */}
-      <div style={{ flex: 1, background: '#1c1c1c', overflowY: 'auto', padding: '24px 20px' }}>
+      <div ref={viewportRef} style={{ flex: 1, background: '#1c1c1c', overflow: 'auto', padding: '24px 20px', maxHeight: fullscreen ? undefined : 'calc(100vh - 240px)', minHeight: '360px' }}>
         {loading ? (
           <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', textAlign: 'center' }}>Se randează previzualizarea...</p>
         ) : error ? (
@@ -126,7 +141,7 @@ export default function ReportPreview({ loading, error, isPdf, html, firmaId, cu
         ) : isPdf ? (
           <iframe src={`${downloadUrl}&preview=1`} style={{ width: '100%', height: '100%', minHeight: '70vh', border: 'none', borderRadius: 'var(--r-sm)', background: '#fff' }}/>
         ) : html != null ? (
-          <SelectableDocxPreview firmaId={firmaId} html={html} culoare={culoare} onFieldCreated={onFieldCreated} zoom={zoom}/>
+          <SelectableDocxPreview firmaId={firmaId} html={html} culoare={culoare} onFieldCreated={onFieldCreated} zoom={fit ? fitZoom * zoom / 100 : zoom}/>
         ) : (
           <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-666666)', textAlign: 'center' }}>Nu există încă un document de previzualizat.</p>
         )}

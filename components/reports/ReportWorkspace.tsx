@@ -10,6 +10,7 @@ import ReportEditor, { CampCustom } from './ReportEditor'
 import ReportHistory from './ReportHistory'
 import ReportFiles from './ReportFiles'
 import { SaveStatus } from './ReportAutosaveStatus'
+import { printReport } from '@/lib/documentWorkspace/reportPresentation'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface ProiectDoc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; updated_at: string }
@@ -49,6 +50,8 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [generating, setGenerating] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
 
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -58,6 +61,12 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSaveRef = useRef<(() => Promise<void>) | null>(null)
   const customTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const customSaves = useRef<Record<string, () => Promise<void>>>({})
+  const activeCustomSaves = useRef(new Set<Promise<void>>())
+  const saveQueue = useRef<Promise<ProiectDoc | null>>(Promise.resolve(null))
+  const docRef = useRef<ProiectDoc | null>(null)
+  const saveFailed = useRef(false)
+  const previewRequest = useRef(0)
   const valuesRef = useRef(values)
   valuesRef.current = values
 
@@ -70,13 +79,19 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
   }, [])
 
   const loadPreview = useCallback(async (docId: string) => {
+    const request = ++previewRequest.current
     setPreviewLoading(true); setPreviewError('')
-    const res = await fetch(`/api/proiect-documente/preview?id=${docId}`)
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) setPreviewError(data.error || 'Previzualizarea a eșuat')
-    else if (data.pdf) { setPreviewIsPdf(true); setPreviewHtml(null) }
-    else { setPreviewHtml(data.html || ''); setPreviewIsPdf(false) }
-    setPreviewLoading(false)
+    try {
+      const res = await fetch(`/api/proiect-documente/preview?id=${docId}`, { cache: 'no-store' })
+      const data = await res.json().catch(() => ({}))
+      if (request !== previewRequest.current) return
+      if (!res.ok) setPreviewError(data.error || 'Previzualizarea a eșuat')
+      else if (data.pdf) { setPreviewIsPdf(true); setPreviewHtml(null) }
+      else { setPreviewHtml(data.html || ''); setPreviewIsPdf(false) }
+      setPreviewLoading(false)
+    } catch {
+      if (request === previewRequest.current) { setPreviewError('Previzualizarea nu a putut fi încărcată.'); setPreviewLoading(false) }
+    }
   }, [])
 
   const loadAll = useCallback(async () => {
@@ -87,6 +102,7 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
       fetch(`/api/proiect-documente/campuri-custom?firmaId=${encodeURIComponent(firma.id)}`).then(r => r.json()).catch(() => ({})),
     ])
     const newDoc: ProiectDoc | null = docData.doc || null
+    docRef.current = newDoc
     setDoc(newDoc)
     setSablonConfigurat(!!campuriData.sablonConfigurat)
     if (campuriData.campuri) {
@@ -104,8 +120,14 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
 
   useEffect(() => { loadAll() }, [loadAll])
 
-  async function doSave(v: typeof values): Promise<void> {
-    if (!sablonConfigurat) { setSaveStatus('idle'); return }
+  function doSave(v: typeof values): Promise<ProiectDoc | null> {
+    const next = saveQueue.current.then(() => saveValues(v))
+    saveQueue.current = next
+    return next
+  }
+
+  async function saveValues(v: typeof values): Promise<ProiectDoc | null> {
+    if (!sablonConfigurat) { setSaveStatus('idle'); return doc }
     setSaveStatus('saving')
     try {
       const body = {
@@ -117,19 +139,24 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
       }
       const res = await fetch('/api/proiect-documente/genereaza', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setSaveStatus('error'); return }
+      if (!res.ok) { saveFailed.current = true; setSaveStatus('error'); return null }
+      saveFailed.current = false
+      docRef.current = data.doc
       setDoc(data.doc)
       setSaveStatus('saved'); setSavedAt(new Date())
       loadPreview(data.doc.id)
+      return data.doc
     } catch {
+      saveFailed.current = true
       setSaveStatus('error')
+      return null
     }
   }
 
   function scheduleSave(nextValues: typeof values) {
     setSaveStatus('saving')
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    const run = () => doSave(nextValues)
+    const run = async () => { await doSave(nextValues) }
     pendingSaveRef.current = run
     debounceRef.current = setTimeout(async () => { pendingSaveRef.current = null; await run() }, AUTOSAVE_DELAY)
   }
@@ -191,13 +218,44 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
     setCustom(prev => prev.map(c => c.id === id ? { ...c, valoare } : c))
     setSaveStatus('saving')
     if (customTimers.current[id]) clearTimeout(customTimers.current[id])
-    customTimers.current[id] = setTimeout(async () => {
+    const run = async () => {
       const res = await fetch('/api/proiect-documente/campuri-custom', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId: firma.id, id, valoare }) })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setSaveStatus('error'); return }
+      if (!res.ok) { setSaveStatus('error'); throw new Error(data.error || 'Câmpul nu a putut fi salvat.') }
+      if (customSaves.current[id] === run) delete customSaves.current[id]
       setSaveStatus('saved'); setSavedAt(new Date())
-      if (data.doc) { setDoc(data.doc); loadPreview(data.doc.id) }
+      if (data.doc) { docRef.current = data.doc; setDoc(data.doc); loadPreview(data.doc.id) }
+    }
+    customSaves.current[id] = run
+    customTimers.current[id] = setTimeout(() => {
+      const job = run()
+      activeCustomSaves.current.add(job)
+      job.catch(() => setSaveStatus('error')).finally(() => activeCustomSaves.current.delete(job))
     }, AUTOSAVE_DELAY)
+  }
+
+  async function handleExport() {
+    if (!doc) return
+    setExporting(true); setExportError('')
+    try {
+      for (const timer of Object.values(customTimers.current)) clearTimeout(timer)
+      await Promise.all([...activeCustomSaves.current])
+      await Promise.all(Object.values(customSaves.current).map(run => run()))
+      await flushPendingSave()
+      await saveQueue.current
+      const currentDoc = docRef.current
+      if (saveFailed.current || !currentDoc) throw new Error('Salvarea a eșuat. Reîncearcă înainte de export.')
+      const res = await fetch(`/api/proiect-documente/preview?id=${currentDoc.id}`, { cache: 'no-store' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Exportul nu a putut fi pregătit.')
+      if (data.pdf) {
+        window.location.assign(`/api/proiect-documente/download?id=${currentDoc.id}`)
+      } else {
+        await printReport(data.html, currentDoc.fisier_nume)
+      }
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Exportul PDF a eșuat.')
+    } finally { setExporting(false) }
   }
 
   async function handleCustomLabelChange(id: string, eticheta: string) {
@@ -210,7 +268,7 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
     setCustom(prev => prev.filter(c => c.id !== id))
     const res = await fetch('/api/proiect-documente/campuri-custom', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId: firma.id, id }) })
     const data = await res.json().catch(() => ({}))
-    if (res.ok && data.doc) { setDoc(data.doc); loadPreview(data.doc.id) }
+    if (res.ok && data.doc) { docRef.current = data.doc; setDoc(data.doc); loadPreview(data.doc.id) }
     else loadAll()
   }
 
@@ -220,13 +278,13 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
     fd.append('file', file); fd.append('firmaId', firma.id); fd.append('sectiune', SECTIUNE)
     const res = await fetch('/api/proiect-documente', { method: 'POST', body: fd })
     const data = await res.json().catch(() => ({}))
-    if (res.ok) { setDoc(data.doc); loadPreview(data.doc.id) }
+    if (res.ok) { docRef.current = data.doc; setDoc(data.doc); loadPreview(data.doc.id) }
     setUploading(false)
   }
 
   async function handleRemoveDoc() {
     if (!doc || !confirm('Ștergi documentul curent? Va trebui reîncărcat de la zero.')) return
-    setDoc(null); setPreviewHtml(null)
+    docRef.current = null; setDoc(null); setPreviewHtml(null)
     await fetch(`/api/proiect-documente?firmaId=${encodeURIComponent(firma.id)}&sectiune=${SECTIUNE}`, { method: 'DELETE' })
   }
 
@@ -237,6 +295,7 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
       downloadUrl={doc ? `/api/proiect-documente/download?id=${doc.id}` : '#'}
       onFieldCreated={loadAll}
       fullscreen={fullscreen} onToggleFullscreen={() => setFullscreen(f => !f)}
+      onDownload={handleExport} downloading={exporting}
     />
   )
 
@@ -250,7 +309,15 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
 
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
 
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <p style={{ color: 'var(--c-777777)', fontSize: 'var(--fs-sm)', margin: 0 }}>Editează câmpurile și urmărește raportul. Modificările se salvează automat.</p>
+        <button onClick={handleExport} disabled={!doc || exporting || docLoading} style={{ padding: '10px 16px', background: 'var(--accent-solid)', color: '#fff', border: 'none', borderRadius: 'var(--r-md)', cursor: 'pointer', fontWeight: 600, opacity: !doc || exporting ? .6 : 1 }}>
+          {exporting ? 'Se pregătește PDF-ul...' : 'Salvează PDF'}
+        </button>
+      </div>
+
       <ReportTabs active={tab} onChange={setTab}/>
+      {exportError && <p role="alert" style={{ color: 'var(--danger)' }}>{exportError}</p>}
 
       {docLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -261,21 +328,31 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
         <ReportFiles doc={doc} culoare={firma.culoare} uploading={uploading} onUpload={handleUpload} onRemove={handleRemoveDoc}/>
       ) : tab === 'editare' ? (
         isNarrow ? (
+          <div style={{ display: 'grid', gap: '16px' }}>
+          <details style={{ border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '12px' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 600, marginBottom: '10px' }}>Vezi raportul</summary>
+            {previewNode}
+          </details>
+          <fieldset disabled={exporting} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <ReportEditor
             template={template} sablonConfigurat={sablonConfigurat} configuring={configuring} onConfigure={handleConfigure}
             values={values} onFieldChange={handleFieldChange}
             custom={custom} onCustomChange={handleCustomChange} onCustomLabelChange={handleCustomLabelChange} onCustomDelete={handleCustomDelete}
             onGenerate={handleGenerateClick} generating={generating} configureError={configureError}
           />
+          </fieldset>
+          </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 58%) minmax(0, 42%)', gap: '18px', alignItems: 'start' }}>
-            {previewNode}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)', gap: '22px', alignItems: 'start' }}>
+            <div style={{ position: 'sticky', top: '20px', minWidth: 0 }}>{previewNode}</div>
+            <fieldset disabled={exporting} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <ReportEditor
               template={template} sablonConfigurat={sablonConfigurat} configuring={configuring} onConfigure={handleConfigure}
               values={values} onFieldChange={handleFieldChange}
               custom={custom} onCustomChange={handleCustomChange} onCustomLabelChange={handleCustomLabelChange} onCustomDelete={handleCustomDelete}
               onGenerate={handleGenerateClick} generating={generating} configureError={configureError}
             />
+            </fieldset>
           </div>
         )
       ) : tab === 'previzualizare' ? (
