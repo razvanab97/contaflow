@@ -5,14 +5,14 @@ import { usePathname } from 'next/navigation'
 import { ACTIVITATI, INDICATORI, OBLIGATII, PERIOADA, STATUS_PLAN, etapaProiect, etichetaLuna, lunaProiect, statusImplicitActivitate, termenDepasit, type CategorieObligatie, type StarePlan, type StatusPlan } from '@/lib/proiect-plan'
 import { BUGET_ACHIZITII, VERSIUNE_BUGET, coduriDin } from '@/lib/achizitii-procedura'
 import { CATEGORII_MEMORIE, extrageMemorieDinRaspuns, type Memorie } from '@/lib/proiect-memorie'
+import Icon from '@/components/ui/Icon'
+import css from './PlanProiect.module.css'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string }
 interface Intrebare { id?: string; intrebare: string; raspuns: string; created_at?: string; inCurs?: boolean }
 type Tab = 'intreaba' | 'memorie' | 'plan' | 'indicatori'
 
-const card: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '18px 20px' }
-const MUTED: React.CSSProperties = { fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }
 const lei = (n: number) => `${n.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} lei`
 const dataRo = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('ro-RO')
 function toast(text: string, tip: 'ok' | 'err' = 'ok') { window.dispatchEvent(new CustomEvent('cf:toast', { detail: { text, tone: tip === 'ok' ? 'success' : 'error' } })) }
@@ -26,21 +26,21 @@ const SUGESTII = [
   'Ce trebuie să fac pentru statutul de întreprindere socială de inserție?',
 ]
 
-// Markdown minimal (titluri, liste, **bold**) -> React, fara HTML injectat.
+// Markdown minimal (titluri, liste, **bold**, tabele) -> React, fara HTML injectat.
 function inline(t: string) {
   return t.split(/(\*\*[^*]+\*\*)/g).map((p, i) => p.startsWith('**') && p.endsWith('**') ? <strong key={i}>{p.slice(2, -2)}</strong> : <Fragment key={i}>{p}</Fragment>)
 }
 function Markdown({ text }: { text: string }) {
   const blocuri: React.ReactNode[] = []
   let lista: { tip: 'ul' | 'ol'; items: string[] } | null = null
-  const flush = () => { if (lista) { const L = lista; blocuri.push(L.tip === 'ul' ? <ul key={blocuri.length} style={{ margin: '4px 0 8px', paddingLeft: 20 }}>{L.items.map((x, i) => <li key={i}>{inline(x)}</li>)}</ul> : <ol key={blocuri.length} style={{ margin: '4px 0 8px', paddingLeft: 22 }}>{L.items.map((x, i) => <li key={i}>{inline(x)}</li>)}</ol>); lista = null } }
+  const flush = () => { if (lista) { const L = lista; blocuri.push(L.tip === 'ul' ? <ul key={blocuri.length}>{L.items.map((x, i) => <li key={i}>{inline(x)}</li>)}</ul> : <ol key={blocuri.length}>{L.items.map((x, i) => <li key={i}>{inline(x)}</li>)}</ol>); lista = null } }
   let tabel: string[][] | null = null
   const flushTabel = () => {
     if (!tabel) return
     const [cap, ...rest] = tabel
-    blocuri.push(<div key={blocuri.length} style={{ overflowX: 'auto', margin: '4px 0 10px' }}><table style={{ borderCollapse: 'collapse', fontSize: 'var(--fs-sm)', minWidth: '60%' }}>
-      <thead><tr>{cap.map((c, i) => <th key={i} style={{ textAlign: 'left', padding: '5px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)', fontWeight: 600 }}>{inline(c)}</th>)}</tr></thead>
-      <tbody>{rest.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border)', verticalAlign: 'top' }}>{inline(c)}</td>)}</tr>)}</tbody>
+    blocuri.push(<div key={blocuri.length} className={css.tableWrap}><table>
+      <thead><tr>{cap.map((c, i) => <th key={i}>{inline(c)}</th>)}</tr></thead>
+      <tbody>{rest.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{inline(c)}</td>)}</tr>)}</tbody>
     </table></div>)
     tabel = null
   }
@@ -57,11 +57,24 @@ function Markdown({ text }: { text: string }) {
     const ul = l.match(/^\s*[-*•]\s+(.*)/), ol = l.match(/^\s*\d+[.)]\s+(.*)/), h = l.match(/^#{1,4}\s+(.*)/)
     if (ul || ol) { const tip = ul ? 'ul' : 'ol'; if (!lista || lista.tip !== tip) { flush(); lista = { tip, items: [] } } lista.items.push((ul || ol)![1]); continue }
     flush()
-    if (h) blocuri.push(<div key={blocuri.length} style={{ fontWeight: 700, margin: '10px 0 4px', color: 'var(--text-primary)' }}>{inline(h[1])}</div>)
-    else if (l.trim()) blocuri.push(<p key={blocuri.length} style={{ margin: '0 0 8px' }}>{inline(l)}</p>)
+    if (h) blocuri.push(<h4 key={blocuri.length}>{inline(h[1])}</h4>)
+    else if (l.trim()) blocuri.push(<p key={blocuri.length}>{inline(l)}</p>)
   }
   flush(); flushTabel()
-  return <div style={{ fontSize: 'var(--fs-md)', lineHeight: 1.6, color: 'var(--text-primary)' }}>{blocuri}</div>
+  return <div className={css.md}>{blocuri}</div>
+}
+
+function Intro({ icon, titlu, children, actiune }: { icon: Parameters<typeof Icon>[0]['name']; titlu: string; children: React.ReactNode; actiune?: React.ReactNode }) {
+  return (
+    <div className={css.intro}>
+      <div className={css.introIcon}><Icon name={icon} size={20} /></div>
+      <div className={css.introBody}>
+        <h2 className={css.h2}>{titlu}</h2>
+        <div className={css.lead}>{children}</div>
+      </div>
+      {actiune}
+    </div>
+  )
 }
 
 // --- Intreaba proiectul -------------------------------------------------------------------------
@@ -71,11 +84,14 @@ function Intreaba({ firma }: { firma: Firma }) {
   const [busy, setBusy] = useState(false)
   const [lipsaMigrare, setLipsaMigrare] = useState(false)
   const josRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     fetch(`/api/proiect/intreaba?firmaId=${firma.id}`).then(r => r.json()).then(d => { setLista(d.intrebari || []); setLipsaMigrare(!!d.lipsaMigrare) }).catch(() => {})
   }, [firma.id])
   useEffect(() => { josRef.current?.scrollIntoView({ block: 'nearest' }) }, [lista])
+  // Textarea creste odata cu textul (pana la max-height din CSS), fara bara de redimensionare.
+  useEffect(() => { const el = inputRef.current; if (!el) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px` }, [text])
 
   async function trimite(q?: string) {
     const intrebare = (q ?? text).trim()
@@ -94,10 +110,10 @@ function Intreaba({ firma }: { firma: Firma }) {
         acc += dec.decode(value, { stream: true })
         setLista(prev => prev.map((x, i) => i === prev.length - 1 ? { ...x, raspuns: acc } : x))
       }
-      setLista(prev => prev.map((x, i) => i === prev.length - 1 ? { ...x, raspuns: acc, inCurs: false } : x))
+      setLista(prev => prev.map((x, i) => i === prev.length - 1 ? { ...x, raspuns: acc, inCurs: false, created_at: new Date().toISOString() } : x))
     } catch (e) {
       setLista(prev => prev.map((x, i) => i === prev.length - 1 ? { ...x, raspuns: `⚠️ ${e instanceof Error ? e.message : 'Eroare'}`, inCurs: false } : x))
-    } finally { setBusy(false) }
+    } finally { setBusy(false); inputRef.current?.focus() }
   }
 
   async function sterge() {
@@ -105,55 +121,68 @@ function Intreaba({ firma }: { firma: Firma }) {
     await fetch(`/api/proiect/intreaba?firmaId=${firma.id}`, { method: 'DELETE' })
     setLista([])
   }
+  async function copiaza(t: string) {
+    try { await navigator.clipboard.writeText(t); toast('Răspuns copiat') } catch { toast('Nu s-a putut copia', 'err') }
+  }
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
-      <div style={{ ...card, display: 'flex', gap: 14, alignItems: 'flex-start', borderColor: 'var(--accent)' }}>
-        <div style={{ fontSize: 26, lineHeight: 1 }}>✦</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--text-primary)' }}>Întreabă proiectul</div>
-          <div style={MUTED}>Răspunde din planul de afaceri, bugetul, actul adițional și memoriul {VERSIUNE_BUGET.split(' ')[0]}, plus datele reale din ContaFlow (achiziții, stări, raport lunar), cu sursa citată. Ce nu reiese din documente îți spune clar și îți sugerează ce să întrebi la PROSOCIAL.</div>
-          {lipsaMigrare && <div style={{ ...MUTED, color: 'var(--warning)', marginTop: 6 }}>Istoricul nu se salvează încă — rulează migrarea SQL (tabelul proiect_intrebari). Răspunsurile funcționează oricum.</div>}
-        </div>
-        {lista.length > 0 && <button type="button" className="btn btn-sm" onClick={sterge} disabled={busy}>Șterge istoricul</button>}
+    <div className={css.chat}>
+      <div className={css.card}>
+        <Intro icon="sparkles" titlu="Întreabă proiectul" actiune={lista.length > 0 ? <button type="button" className="btn btn-sm btn-ghost" onClick={sterge} disabled={busy}><Icon name="history" size={14} /> Șterge istoricul</button> : undefined}>
+          Răspunde din planul de afaceri, buget, actul adițional și memoriul {VERSIUNE_BUGET.split(' ')[0]}, plus toate datele din ContaFlow, cu sursa citată. Ce nu reiese din documente îți spune clar.
+        </Intro>
+        {lipsaMigrare && <div className={css.warn}>Istoricul nu se salvează încă — rulează migrarea SQL (tabelul proiect_intrebari). Răspunsurile funcționează oricum.</div>}
       </div>
 
       {lista.length === 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {SUGESTII.map(s => <button key={s} type="button" className="btn btn-sm" onClick={() => trimite(s)} disabled={busy} style={{ textAlign: 'left', whiteSpace: 'normal' }}>{s}</button>)}
+        <div>
+          <div className={css.eyebrow} style={{ marginBottom: 10 }}>Începe cu o întrebare</div>
+          <div className={css.suggestions}>
+            {SUGESTII.map(q => <button key={q} type="button" className={css.suggestion} onClick={() => trimite(q)} disabled={busy}><Icon name="arrowRight" size={14} /><span>{q}</span></button>)}
+          </div>
         </div>
       )}
 
-      {lista.map((x, i) => (
-        <div key={x.id || i} style={{ display: 'grid', gap: 8 }}>
-          <div style={{ justifySelf: 'end', maxWidth: '85%', background: 'var(--accent)', color: 'var(--accent-contrast, #fff)', borderRadius: 'var(--r-lg)', padding: '10px 14px', fontSize: 'var(--fs-md)', whiteSpace: 'pre-wrap' }}>{x.intrebare}</div>
-          <div style={{ ...card, padding: '14px 18px' }}>
-            {(() => {
-              const { curat, fapte } = extrageMemorieDinRaspuns(x.raspuns)
-              return <>
-                {curat ? <Markdown text={curat} /> : <div style={MUTED}>Caut în documentele proiectului…</div>}
-                {!x.inCurs && fapte.length > 0 && <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 'var(--r-md)', background: 'var(--surface-sunken)', fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
-                  <strong style={{ color: 'var(--success)' }}>✓ Reținut în memoria proiectului</strong>
-                  <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{fapte.map((f, i) => <li key={i}>{f.data.split('-').reverse().join('.')} · {f.categorie}: {f.text}</li>)}</ul>
+      {lista.map((x, i) => {
+        const { curat, fapte } = extrageMemorieDinRaspuns(x.raspuns)
+        return (
+          <div key={x.id || i} className={css.turn}>
+            <div className={css.question}>{x.intrebare}</div>
+            <div className={css.answer}>
+              <div className={css.avatar} aria-hidden><Icon name="sparkles" size={16} /></div>
+              <div className={css.answerBody}>
+                {curat
+                  ? <Markdown text={curat} />
+                  : <span className={css.thinking}><span className={css.dots}><i /><i /><i /></span>Caut în documentele și datele proiectului…</span>}
+                {x.inCurs && curat && <span className={css.caret} aria-hidden />}
+                {!x.inCurs && fapte.length > 0 && <div className={css.remembered}>
+                  <strong><Icon name="check" size={14} strokeWidth={2.25} /> Reținut în memoria proiectului</strong>
+                  <ul>{fapte.map((f, j) => <li key={j}>{f.data.split('-').reverse().join('.')} · {f.categorie}: {f.text}</li>)}</ul>
                 </div>}
-              </>
-            })()}
-            {x.inCurs && x.raspuns && <span style={{ ...MUTED, display: 'inline-block', marginTop: 4 }}>▍</span>}
-            {x.created_at && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 6 }}>{new Date(x.created_at).toLocaleString('ro-RO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
+                {!x.inCurs && curat && (
+                  <div className={css.meta}>
+                    <span className={css.faint}>{x.created_at ? new Date(x.created_at).toLocaleString('ro-RO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                    <button type="button" className={css.copy} onClick={() => copiaza(curat)}>Copiază</button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
       <div ref={josRef} />
 
-      <div style={{ ...card, padding: 12, position: 'sticky', bottom: 12, boxShadow: 'var(--shadow-md, 0 4px 18px rgba(0,0,0,.08))' }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-          <textarea value={text} onChange={e => setText(e.target.value)} rows={2} placeholder="Ex.: Pot cumpăra un uscător mai scump decât în buget? Ce trebuie să am în dosar pentru tranșa 2?"
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); trimite() } }}
-            style={{ flex: 1, resize: 'vertical', fontSize: 'var(--fs-md)', background: 'var(--surface-sunken)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '10px 12px', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit' }} />
-          <button type="button" className="btn btn-primary" onClick={() => trimite()} disabled={busy || !text.trim()}>{busy ? 'Răspunde…' : 'Întreabă'}</button>
+      <div className={css.composer}>
+        <div className={css.composerRow}>
+          <textarea ref={inputRef} className={css.textarea} value={text} onChange={e => setText(e.target.value)} rows={1} aria-label="Întrebarea ta"
+            placeholder="Întreabă orice despre proiect — ex.: Ce trebuie să am în dosar pentru tranșa 2?"
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); trimite() } }} />
+          <button type="button" className={css.send} onClick={() => trimite()} disabled={busy || !text.trim()} aria-label={busy ? 'Se răspunde' : 'Trimite întrebarea'} title="Trimite (Enter)">
+            <Icon name="send" size={17} />
+          </button>
         </div>
-        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 6 }}>Enter trimite · Shift+Enter rând nou · poți pune întrebări de continuare</div>
       </div>
+      <p className={css.hint} style={{ marginTop: -18, textAlign: 'center' }}><kbd>Enter</kbd> trimite · <kbd>Shift</kbd>+<kbd>Enter</kbd> rând nou · poți pune întrebări de continuare</p>
     </div>
   )
 }
@@ -178,7 +207,7 @@ function MemorieProiect({ firma }: { firma: Firma }) {
     const d = await r.json().catch(() => ({}))
     setBusy(false)
     if (!r.ok) { toast(d.error || 'Nu s-a salvat', 'err'); return }
-    setText(''); incarca()
+    setText(''); incarca(); toast('Reținut în memorie')
   }
   async function sterge(id: string) {
     if (!confirm('Ștergi această intrare din memorie?')) return
@@ -188,40 +217,51 @@ function MemorieProiect({ firma }: { firma: Firma }) {
   const peLuni = lista.reduce<Record<string, Memorie[]>>((acc, m) => { (acc[m.data.slice(0, 7)] ||= []).push(m); return acc }, {})
   const LUNI = ['ianuarie', 'februarie', 'martie', 'aprilie', 'mai', 'iunie', 'iulie', 'august', 'septembrie', 'octombrie', 'noiembrie', 'decembrie']
   const SURSA: Record<string, string> = { manual: 'scris de tine', chat: 'din chat', plan: 'din plan' }
-  const inp: React.CSSProperties = { fontSize: 'var(--fs-md)', padding: '8px 10px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface-sunken)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit' }
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
-      <div style={{ ...card, display: 'grid', gap: 10, borderColor: 'var(--accent)' }}>
-        <div>
-          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--text-primary)' }}>Memoria proiectului</div>
-          <div style={MUTED}>Ce s-a întâmplat efectiv în proiect. Se completează din trei locuri: ce scrii aici, ce îi spui AI-ului în „Întreabă proiectul” (ex. „am primit autorizația de mediu azi”) și stările marcate în plan. De aici se completează raportul lunar („Completează din memoria proiectului”) și răspunsurile AI-ului.</div>
-          {lipsaMigrare && <div style={{ ...MUTED, color: 'var(--warning)', marginTop: 6 }}>Memoria nu se poate salva încă — rulează migrarea SQL (tabelul proiect_memorie).</div>}
-        </div>
-        <textarea value={text} onChange={e => setText(e.target.value)} rows={2} placeholder="Ce s-a întâmplat? Ex.: Am semnat contract de spălare lenjerii cu Pensiunea X (200 kg/lună). / Control APM la locație pe 08.10, fără observații."
-          style={{ ...inp, width: '100%', resize: 'vertical' }} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) adauga() }} />
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input type="date" value={data} onChange={e => setData(e.target.value)} style={inp} />
-          <select value={categorie} onChange={e => setCategorie(e.target.value)} style={inp}>{CATEGORII_MEMORIE.map(c => <option key={c}>{c}</option>)}</select>
-          <button type="button" className="btn btn-primary" onClick={adauga} disabled={busy || !text.trim()}>{busy ? 'Salvez…' : 'Reține'}</button>
+    <div style={{ display: 'grid', gap: 22 }}>
+      <div className={css.card}>
+        <Intro icon="history" titlu="Memoria proiectului">
+          Jurnalul cu ce s-a întâmplat efectiv — din ce scrii aici, ce îi spui AI-ului și stările marcate în plan. Din el se completează raportul lunar și răspunsurile AI-ului.
+        </Intro>
+        {lipsaMigrare && <div className={css.warn}>Memoria nu se poate salva încă — rulează migrarea SQL (tabelul proiect_memorie).</div>}
+        <div style={{ marginTop: 18 }}>
+          <textarea className={css.field} value={text} onChange={e => setText(e.target.value)} rows={2} aria-label="Ce s-a întâmplat"
+            placeholder="Ce s-a întâmplat? Ex.: Am semnat contract de spălare lenjerii cu Pensiunea X (200 kg/lună)."
+            style={{ resize: 'vertical' }} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) adauga() }} />
+          <div className={css.formRow}>
+            <input type="date" className={`${css.field} ${css.fieldSm}`} value={data} onChange={e => setData(e.target.value)} aria-label="Data" />
+            <select className={`${css.field} ${css.fieldSm}`} value={categorie} onChange={e => setCategorie(e.target.value)} aria-label="Categorie">{CATEGORII_MEMORIE.map(c => <option key={c}>{c}</option>)}</select>
+            <span className={css.grow} />
+            <span className={css.faint}>⌘ + Enter</span>
+            <button type="button" className="btn btn-primary" onClick={adauga} disabled={busy || !text.trim()}>{busy ? 'Salvez…' : 'Reține'}</button>
+          </div>
         </div>
       </div>
-      {Object.keys(peLuni).length === 0 && <div style={MUTED}>Nimic reținut încă.</div>}
-      {Object.entries(peLuni).map(([luna, items]) => (
-        <div key={luna} style={{ ...card, display: 'grid', gap: 2 }}>
-          <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, textTransform: 'capitalize' }}>{LUNI[Number(luna.slice(5, 7)) - 1]} {luna.slice(0, 4)} <span style={{ ...MUTED, fontWeight: 400, textTransform: 'none' }}>· L{lunaProiect(new Date(luna + '-15'))} · {items.length} {items.length === 1 ? 'intrare' : 'intrări'}</span></div>
-          {items.map(m => (
-            <div key={m.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '7px 0', borderTop: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', minWidth: 46 }}>{m.data.slice(8, 10)}.{m.data.slice(5, 7)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }}>{m.text}</div>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{m.categorie} · {SURSA[m.sursa] || m.sursa}</div>
-              </div>
-              <button type="button" className="btn btn-sm" onClick={() => sterge(m.id)} title="Șterge din memorie">×</button>
+
+      {Object.keys(peLuni).length === 0 && <div className={css.empty}>Nimic reținut încă. Primul fapt scris aici (sau spus AI-ului) apare în această listă.</div>}
+      <div className={css.timeline}>
+        {Object.entries(peLuni).map(([luna, items]) => (
+          <section key={luna}>
+            <div className={css.monthHead}>
+              <span className={css.monthName}>{LUNI[Number(luna.slice(5, 7)) - 1]} {luna.slice(0, 4)}</span>
+              <span className={css.faint}>L{lunaProiect(new Date(luna + '-15'))} · {items.length} {items.length === 1 ? 'intrare' : 'intrări'}</span>
             </div>
-          ))}
-        </div>
-      ))}
+            <ul className={css.entries}>
+              {items.map(m => (
+                <li key={m.id} className={css.entry}>
+                  <div className={css.day}>{m.data.slice(8, 10)}.{m.data.slice(5, 7)}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className={css.entryText}>{m.text}</div>
+                    <div className={css.tags}><span className={css.tag}>{m.categorie}</span><span className={css.tag}>{SURSA[m.sursa] || m.sursa}</span></div>
+                  </div>
+                  <button type="button" className={css.remove} onClick={() => sterge(m.id)} title="Șterge din memorie" aria-label="Șterge din memorie"><Icon name="close" size={14} /></button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
     </div>
   )
 }
@@ -229,8 +269,7 @@ function MemorieProiect({ firma }: { firma: Firma }) {
 // --- Plan: unde suntem, activitati, obligatii --------------------------------------------------
 function SelectStatus({ value, implicit, onChange }: { value?: StatusPlan; implicit: string; onChange: (s: StatusPlan) => void }) {
   return (
-    <select value={value || ''} onChange={e => e.target.value && onChange(e.target.value as StatusPlan)}
-      style={{ fontSize: 'var(--fs-sm)', padding: '5px 8px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface-sunken)', color: 'var(--text-primary)' }}>
+    <select className={css.select} value={value || ''} onChange={e => e.target.value && onChange(e.target.value as StatusPlan)} aria-label="Stare">
       <option value="">{implicit}</option>
       {(Object.keys(STATUS_PLAN) as StatusPlan[]).map(s => <option key={s} value={s}>{STATUS_PLAN[s]}</option>)}
     </select>
@@ -241,8 +280,7 @@ const BADGE: Record<StatusPlan, string> = { facut: 'badge badge-success', in_cur
 function Nota({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
   const [v, setV] = useState(initial)
   useEffect(() => setV(initial), [initial])
-  return <input value={v} onChange={e => setV(e.target.value)} onBlur={() => v !== initial && onSave(v)} placeholder="Notă (ex. depus la 12.05, nr. înregistrare…)"
-    style={{ width: '100%', fontSize: 'var(--fs-sm)', padding: '6px 9px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface-sunken)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit' }} />
+  return <input className={css.note} value={v} onChange={e => setV(e.target.value)} onBlur={() => v !== initial && onSave(v)} placeholder="+ Adaugă o notă (ex. depus la 12.05, nr. înregistrare…)" aria-label="Notă" />
 }
 
 function Plan({ firma, stari, salveaza, achizitii, lipsaMigrare }: { firma: Firma; stari: StarePlan[]; salveaza: (cheie: string, p: Partial<StarePlan>) => void; achizitii: { linie_buget?: string | null; status: string }[]; lipsaMigrare: boolean }) {
@@ -265,89 +303,103 @@ function Plan({ firma, stari, salveaza, achizitii, lipsaMigrare }: { firma: Firm
   const cumparate = BUGET_ACHIZITII.filter(l => folosite.has(l.cod)).length
   const pct = Math.max(0, Math.min(100, Math.round((Math.min(L, 18) / 18) * 100)))
   const categorii = [...new Set(OBLIGATII.map(o => o.categorie))] as CategorieObligatie[]
+  const facute = ACTIVITATI.filter(a => st(a.cheie)?.status === 'facut').length
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ ...card, display: 'grid', gap: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}>
-          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--text-primary)' }}>Unde suntem: {etapa.eticheta}</div>
-          <div style={MUTED}>Implementare {dataRo(PERIOADA.start)}–{dataRo(PERIOADA.sfarsitImplementare)} · sustenabilitate până la {dataRo(PERIOADA.sfarsitSustenabilitate)}</div>
+    <div style={{ display: 'grid', gap: 22 }}>
+      <div className={css.card}>
+        <div className={css.sectionHead}>
+          <h2 className={css.h2}>Unde suntem: {etapa.eticheta}</h2>
+          <span className={css.faint}>Implementare {dataRo(PERIOADA.start)} – {dataRo(PERIOADA.sfarsitImplementare)} · sustenabilitate până la {dataRo(PERIOADA.sfarsitSustenabilitate)}</span>
         </div>
-        <div style={{ height: 8, background: 'var(--surface-sunken)', borderRadius: 99, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)' }} /></div>
-        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', ...MUTED }}>
-          <span>Achiziții: <strong>{cumparate}</strong> din {BUGET_ACHIZITII.length} linii de buget pornite — <Link href={linkAchizitii}>deschide Achiziții →</Link></span>
-          <span>Activități marcate făcute: <strong>{ACTIVITATI.filter(a => st(a.cheie)?.status === 'facut').length}</strong> din {ACTIVITATI.length}</span>
-        </div>
-        {lipsaMigrare && <div style={{ ...MUTED, color: 'var(--warning)' }}>Stările nu se pot salva încă — rulează migrarea SQL (tabelul proiect_plan_stari).</div>}
+        <div className={css.progress}><div style={{ width: `${pct}%` }} /></div>
+        <div className={css.progressLabels}><span className={css.faint}>L1</span><span className={css.faint}>{pct}% din implementare</span><span className={css.faint}>L18</span></div>
+        {lipsaMigrare && <div className={css.warn}>Stările nu se pot salva încă — rulează migrarea SQL (tabelul proiect_plan_stari).</div>}
+      </div>
+
+      <div className={css.stats}>
+        <div className={css.stat}><div className={css.eyebrow}>Luna proiectului</div><div className={css.statValue}>L{Math.min(Math.max(L, 1), 18)}<small>/ 18</small></div><div className={css.statHint}>{etichetaLuna(Math.min(Math.max(L, 1), 18))}</div></div>
+        <div className={css.stat}><div className={css.eyebrow}>Achiziții pornite</div><div className={css.statValue}>{cumparate}<small>/ {BUGET_ACHIZITII.length}</small></div><div className={css.statHint}><Link href={linkAchizitii}>Deschide Achiziții →</Link></div></div>
+        <div className={css.stat}><div className={css.eyebrow}>Activități făcute</div><div className={css.statValue}>{facute}<small>/ {ACTIVITATI.length}</small></div><div className={css.statHint}>marcate „Făcut” în plan</div></div>
+        <div className={`${css.stat} ${deConfirmat.length ? css.statWarn : ''}`}><div className={css.eyebrow}>De confirmat</div><div className={css.statValue}>{deConfirmat.length}</div><div className={css.statHint}>{deConfirmat.length ? 'termen din plan trecut' : 'nimic restant'}</div></div>
       </div>
 
       {deConfirmat.length > 0 && (
-        <div style={{ ...card, borderColor: 'var(--warning)', display: 'grid', gap: 8 }}>
-          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>De confirmat ({deConfirmat.length}) — termenul din plan a trecut</div>
-          <div style={MUTED}>Marchează „Făcut” ce e rezolvat; ce nu e încă făcut e întârziere față de plan (de menționat în raportul lunar).</div>
-          {deConfirmat.map(d => (
-            <div key={d.cheie} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '6px 0', borderTop: '1px solid var(--border)' }}>
-              <div style={{ minWidth: 0 }}><div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }}>{d.titlu}</div><div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{d.detaliu}</div></div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button type="button" className="btn btn-sm btn-primary" onClick={() => salveaza(d.cheie, { status: 'facut' })}>✓ Făcut</button>
-                <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'in_curs' })}>În curs</button>
-                <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'amanat' })} title="Nu e necesar momentan — se mută la „Amânate”, de unde îl poți relua">Amână</button>
-              </div>
-            </div>
-          ))}
+        <div className={`${css.card} ${css.callout}`}>
+          <h3 className={css.h3}>De confirmat — termenul din plan a trecut</h3>
+          <p className={css.lead}>Marchează „Făcut” ce e rezolvat; ce nu e încă făcut e întârziere față de plan (de menționat în raportul lunar).</p>
+          <ul className={css.list}>
+            {deConfirmat.map(d => (
+              <li key={d.cheie} className={css.row}>
+                <div className={css.rowMain}><div className={css.rowTitle}>{d.titlu}</div><div className={css.faint} style={{ marginTop: 3 }}>{d.detaliu}</div></div>
+                <div className={css.rowActions}>
+                  <button type="button" className="btn btn-sm btn-primary" onClick={() => salveaza(d.cheie, { status: 'facut' })}><Icon name="check" size={13} strokeWidth={2.25} /> Făcut</button>
+                  <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'in_curs' })}>În curs</button>
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={() => salveaza(d.cheie, { status: 'amanat' })} title="Nu e necesar momentan — se mută la „Amânate”, de unde îl poți relua">Amână</button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
       {inLucru.length > 0 && (
-        <div style={{ ...card, display: 'grid', gap: 8 }}>
-          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>În lucru, peste termenul din plan ({inLucru.length})</div>
-          <div style={MUTED}>Confirmate ca „În curs” — încă întârziate față de plan. Marchează „Făcut” când se încheie.</div>
-          {inLucru.map(d => (
-            <div key={d.cheie} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '6px 0', borderTop: '1px solid var(--border)' }}>
-              <div style={{ minWidth: 0 }}><div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }}>{d.titlu} <span className="badge badge-warning" style={{ marginLeft: 4 }}>În curs</span></div><div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{d.detaliu}</div></div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button type="button" className="btn btn-sm btn-primary" onClick={() => salveaza(d.cheie, { status: 'facut' })}>✓ Făcut</button>
-                <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'urmeaza' })} title="Scoate din „În curs” (revine la „De confirmat”)">Anulează</button>
-              </div>
-            </div>
-          ))}
+        <div className={css.card}>
+          <h3 className={css.h3}>În lucru, peste termenul din plan <span className="badge badge-warning" style={{ marginLeft: 6 }}>{inLucru.length}</span></h3>
+          <p className={css.lead}>Confirmate ca „În curs” — încă întârziate față de plan. Marchează „Făcut” când se încheie.</p>
+          <ul className={css.list}>
+            {inLucru.map(d => (
+              <li key={d.cheie} className={css.row}>
+                <div className={css.rowMain}><div className={css.rowTitle}>{d.titlu}</div><div className={css.faint} style={{ marginTop: 3 }}>{d.detaliu}</div></div>
+                <div className={css.rowActions}>
+                  <button type="button" className="btn btn-sm btn-primary" onClick={() => salveaza(d.cheie, { status: 'facut' })}><Icon name="check" size={13} strokeWidth={2.25} /> Făcut</button>
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={() => salveaza(d.cheie, { status: 'urmeaza' })} title="Scoate din „În curs” (revine la „De confirmat”)">Anulează</button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
       {amanate.length > 0 && (
-        <details style={{ ...card, display: 'grid', gap: 8 }}>
-          <summary style={{ fontWeight: 700, color: 'var(--text-primary)', cursor: 'pointer' }}>Amânate — nu sunt necesare momentan ({amanate.length})</summary>
-          {amanate.map(d => (
-            <div key={d.cheie} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '6px 0', borderTop: '1px solid var(--border)', marginTop: 6 }}>
-              <div style={{ minWidth: 0 }}><div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-secondary)' }}>{d.titlu}</div><div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{d.detaliu}</div></div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'urmeaza' })} title="Revine la „De confirmat”">Reia</button>
-                <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'facut' })}>✓ Făcut</button>
-              </div>
-            </div>
-          ))}
+        <details className={`${css.card} ${css.details}`}>
+          <summary><h3 className={css.h3}>Amânate — nu sunt necesare momentan <span className="badge" style={{ marginLeft: 6 }}>{amanate.length}</span></h3><Icon name="chevronDown" size={16} /></summary>
+          <ul className={css.list}>
+            {amanate.map(d => (
+              <li key={d.cheie} className={css.row}>
+                <div className={css.rowMain}><div className={css.rowTitle} style={{ color: 'var(--text-secondary)' }}>{d.titlu}</div><div className={css.faint} style={{ marginTop: 3 }}>{d.detaliu}</div></div>
+                <div className={css.rowActions}>
+                  <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'urmeaza' })} title="Revine la „De confirmat”">Reia</button>
+                  <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'facut' })}><Icon name="check" size={13} strokeWidth={2.25} /> Făcut</button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </details>
       )}
 
-      <div style={{ ...card, display: 'grid', gap: 4 }}>
-        <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>Activitățile din graficul de implementare (A1–A18)</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(18, 1fr)', gap: 2, marginLeft: 0, fontSize: 10, color: 'var(--text-muted)', textAlign: 'center' }}>
-          {Array.from({ length: 18 }, (_, i) => <div key={i} style={{ fontWeight: i + 1 === L ? 700 : 400, color: i + 1 === L ? 'var(--accent)' : undefined }}>L{i + 1}</div>)}
+      <div className={css.card}>
+        <div className={css.sectionHead} style={{ marginBottom: 14 }}>
+          <h3 className={css.h3}>Graficul de implementare</h3>
+          <span className={css.faint}>A1–A18 · luna curentă evidențiată</span>
+        </div>
+        <div className={css.gantt}>
+          {Array.from({ length: 18 }, (_, i) => <div key={i} className={css.ganttHead} data-now={i + 1 === L}>L{i + 1}</div>)}
         </div>
         {ACTIVITATI.map(a => {
           const s = st(a.cheie), impl = statusImplicitActivitate(a, L)
           return (
-            <div key={a.cheie} style={{ display: 'grid', gap: 6, padding: '10px 0', borderTop: '1px solid var(--border)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(18, 1fr)', gap: 2 }}>
+            <div key={a.cheie} className={css.activity}>
+              <div className={css.gantt}>
                 {Array.from({ length: 18 }, (_, i) => {
                   const inPlan = i + 1 >= a.luni[0] && i + 1 <= a.luni[1]
-                  return <div key={i} style={{ height: 6, borderRadius: 3, background: inPlan ? (s?.status === 'facut' ? 'var(--success)' : 'var(--accent)') : 'var(--surface-sunken)', opacity: inPlan ? 1 : .6, outline: i + 1 === L ? '1px solid var(--text-muted)' : undefined }} />
+                  return <div key={i} className={css.cell} data-plan={inPlan} data-done={inPlan && s?.status === 'facut'} data-now={i + 1 === L} />
                 })}
               </div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 320px', minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }}><strong>{a.cod}</strong> · {a.titlu} {s && <span className={BADGE[s.status]} style={{ marginLeft: 6 }}>{STATUS_PLAN[s.status]}</span>}{!s && impl.intarziere && <span className="badge badge-warning" style={{ marginLeft: 6 }}>termen trecut</span>}</div>
-                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{etichetaLuna(a.luni[0])} – {etichetaLuna(a.luni[1])} · rezultat: {a.rezultat}</div>
+              <div className={css.row} style={{ padding: 0 }}>
+                <div className={css.rowMain}>
+                  <div className={css.rowTitle}><span className={css.code}>{a.cod}</span>{a.titlu} {s && <span className={BADGE[s.status]} style={{ marginLeft: 6 }}>{STATUS_PLAN[s.status]}</span>}{!s && impl.intarziere && <span className="badge badge-warning" style={{ marginLeft: 6 }}>termen trecut</span>}</div>
+                  <div className={css.rowSub}>{etichetaLuna(a.luni[0])} – {etichetaLuna(a.luni[1])} · rezultat: {a.rezultat}</div>
                 </div>
                 <SelectStatus value={s?.status} implicit={`— ${impl.intarziere ? 'de confirmat' : STATUS_PLAN[impl.status].toLowerCase()} —`} onChange={v => salveaza(a.cheie, { status: v })} />
               </div>
@@ -358,17 +410,17 @@ function Plan({ firma, stari, salveaza, achizitii, lipsaMigrare }: { firma: Firm
       </div>
 
       {categorii.map(c => (
-        <div key={c} style={{ ...card, display: 'grid', gap: 4 }}>
-          <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>{c}</div>
+        <div key={c} className={css.card}>
+          <h3 className={css.h3}>{c}</h3>
           {OBLIGATII.filter(o => o.categorie === c).map(o => {
             const s = st(o.cheie), dep = termenDepasit(o, azi)
             return (
-              <div key={o.cheie} style={{ display: 'grid', gap: 6, padding: '10px 0', borderTop: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1 1 320px', minWidth: 0 }}>
-                    <div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)', fontWeight: 600 }}>{o.titlu} {s && <span className={BADGE[s.status]} style={{ marginLeft: 6, fontWeight: 400 }}>{STATUS_PLAN[s.status]}</span>}{!s && dep && <span className="badge badge-warning" style={{ marginLeft: 6, fontWeight: 400 }}>termen depășit</span>}</div>
-                    <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: 2 }}>{o.ce}</div>
-                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 2 }}>{o.termen ? `Termen: ${dataRo(o.termen)} · ` : o.anual ? 'Anual · ' : ''}Sursa: {o.sursa}</div>
+              <div key={o.cheie} className={css.activity}>
+                <div className={css.row} style={{ padding: 0, alignItems: 'flex-start' }}>
+                  <div className={css.rowMain}>
+                    <div className={css.rowTitle}><strong>{o.titlu}</strong> {s && <span className={BADGE[s.status]} style={{ marginLeft: 6 }}>{STATUS_PLAN[s.status]}</span>}{!s && dep && <span className="badge badge-warning" style={{ marginLeft: 6 }}>termen depășit</span>}</div>
+                    <div className={css.rowSub}>{o.ce}</div>
+                    <div className={css.faint} style={{ marginTop: 4 }}>{o.termen ? `Termen: ${dataRo(o.termen)} · ` : o.anual ? 'Anual · ' : ''}Sursa: {o.sursa}</div>
                   </div>
                   <SelectStatus value={s?.status} implicit="— nemarcat —" onChange={v => salveaza(o.cheie, { status: v })} />
                 </div>
@@ -378,53 +430,55 @@ function Plan({ firma, stari, salveaza, achizitii, lipsaMigrare }: { firma: Firm
           })}
         </div>
       ))}
-      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>Proiect: {firma.nume} · documente în vigoare: {VERSIUNE_BUGET}</div>
+      <div className={css.faint} style={{ textAlign: 'center' }}>Proiect: {firma.nume} · documente în vigoare: {VERSIUNE_BUGET}</div>
     </div>
   )
 }
 
 function Indicatori() {
-  const th: React.CSSProperties = { textAlign: 'left', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 600, padding: '6px 8px', borderBottom: '1px solid var(--border)' }
-  const td: React.CSSProperties = { fontSize: 'var(--fs-md)', color: 'var(--text-primary)', padding: '7px 8px', borderBottom: '1px solid var(--border)' }
   const t2 = INDICATORI.transe2, t3 = INDICATORI.transe3
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div style={card}>
-        <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Indicatori economici asumați</div>
-        <div style={MUTED}>{INDICATORI.locuriMunca} locuri de muncă noi, din care {INDICATORI.vulnerabili} pentru persoane vulnerabile din mediul rural · cofinanțare {INDICATORI.cofinantareProcent}%</div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 10 }}>
-          <thead><tr><th style={th}>An</th><th style={th}>Venituri încasate (plan)</th><th style={th}>Profit (plan)</th></tr></thead>
-          <tbody>{INDICATORI.profit.map(p => { const v = INDICATORI.venituri.find(x => x.an === p.an); return <tr key={p.an}><td style={td}>{p.an}</td><td style={td}>{v ? lei(v.valoare) + (v.nota ? ` (${v.nota})` : '') : '—'}</td><td style={td}>{lei(p.valoare)}</td></tr> })}</tbody>
-        </table>
-        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 6 }}>Sursa: Plan AA3, I.1.3 (pag. 5); Buget AA3, foaia 4_grafic tranșe</div>
+    <div style={{ display: 'grid', gap: 22 }}>
+      <div className={css.stats}>
+        <div className={css.stat}><div className={css.eyebrow}>Locuri de muncă noi</div><div className={css.statValue}>{INDICATORI.locuriMunca}</div><div className={css.statHint}>din care {INDICATORI.vulnerabili} pentru persoane vulnerabile din mediul rural</div></div>
+        <div className={css.stat}><div className={css.eyebrow}>Cofinanțare</div><div className={css.statValue}>{INDICATORI.cofinantareProcent}<small>%</small></div><div className={css.statHint}>contribuție proprie asumată</div></div>
+        <div className={css.stat}><div className={css.eyebrow}>Tranșa 1</div><div className={css.statValue} style={{ fontSize: 20 }}>{lei(t2.transa1)}</div><div className={css.statHint}>varianta în 2 tranșe (70%)</div></div>
       </div>
-      <div style={card}>
-        <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Indicatori sociali (pe an, 2026–2028)</div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Indicator</th><th style={th}>Țintă / an</th></tr></thead>
-          <tbody>{INDICATORI.sociali.map(s => <tr key={s.titlu}><td style={td}>{s.titlu}</td><td style={td}>{s.pe_an} {s.um}</td></tr>)}</tbody>
+      <div className={css.card}>
+        <h3 className={css.h3}>Indicatori economici asumați</h3>
+        <table className={css.table}>
+          <thead><tr><th>An</th><th>Venituri încasate (plan)</th><th>Profit (plan)</th></tr></thead>
+          <tbody>{INDICATORI.profit.map(p => { const v = INDICATORI.venituri.find(x => x.an === p.an); return <tr key={p.an}><td>{p.an}</td><td>{v ? lei(v.valoare) + (v.nota ? ` (${v.nota})` : '') : '—'}</td><td>{lei(p.valoare)}</td></tr> })}</tbody>
         </table>
-        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 6 }}>Sursa: Plan AA3, I.2.3 (pag. 7)</div>
+        <div className={css.source}>Sursa: Plan AA3, I.1.3 (pag. 5); Buget AA3, foaia 4_grafic tranșe</div>
       </div>
-      <div style={card}>
-        <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Tranșe de finanțare</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
-          <div>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Varianta în 2 tranșe (70% / 30%)</div>
-            <ul style={{ ...MUTED, paddingLeft: 18, margin: '6px 0 0' }}>
+      <div className={css.card}>
+        <h3 className={css.h3}>Indicatori sociali (pe an, 2026–2028)</h3>
+        <table className={css.table}>
+          <thead><tr><th>Indicator</th><th>Țintă / an</th></tr></thead>
+          <tbody>{INDICATORI.sociali.map(x => <tr key={x.titlu}><td>{x.titlu}</td><td>{x.pe_an} {x.um}</td></tr>)}</tbody>
+        </table>
+        <div className={css.source}>Sursa: Plan AA3, I.2.3 (pag. 7)</div>
+      </div>
+      <div className={css.card}>
+        <h3 className={css.h3}>Tranșe de finanțare</h3>
+        <div className={css.tranches}>
+          <div className={css.tranche}>
+            <div className={css.rowTitle}><strong>2 tranșe</strong> <span className={css.faint}>70% / 30%</span></div>
+            <ul>
               <li>Tranșa 1: <strong>{lei(t2.transa1)}</strong></li>
               <li>Pentru tranșa 2 ({lei(t2.transa2)}): cheltuit minimum {lei(t2.minCheltuitDinT1)} din tranșa 1, cofinanțare minimum {lei(t2.minCofinantare)}, venituri generate minimum {lei(t2.minVenituri)}</li>
             </ul>
           </div>
-          <div>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Varianta în 3 tranșe (50% / 40% / 10%)</div>
-            <ul style={{ ...MUTED, paddingLeft: 18, margin: '6px 0 0' }}>
+          <div className={css.tranche}>
+            <div className={css.rowTitle}><strong>3 tranșe</strong> <span className={css.faint}>50% / 40% / 10%</span></div>
+            <ul>
               <li>Tranșa 1: <strong>{lei(t3.transa1)}</strong>; pentru tranșa 2 ({lei(t3.transa2)}): cheltuit minimum {lei(t3.minCheltuitDinT1)} din tranșa 1 și cofinanțare minimum {lei(t3.minCofinantare)}</li>
               <li>Pentru tranșa 3 ({lei(t3.transa3)}): cheltuit minimum {lei(t3.minCheltuitT1T2)} din tranșele 1+2</li>
             </ul>
           </div>
         </div>
-        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 8 }}>Sursa: Buget AA3, foaia 4_grafic tranșe. Varianta se alege la prima cerere de plată.</div>
+        <div className={css.source}>Sursa: Buget AA3, foaia 4_grafic tranșe. Varianta se alege la prima cerere de plată.</div>
       </div>
     </div>
   )
@@ -455,16 +509,20 @@ export default function PlanProiectModule({ firma }: Props) {
     return ACTIVITATI.filter(a => statusImplicitActivitate(a, L).intarziere && !ok(a.cheie)).length + OBLIGATII.filter(o => termenDepasit(o) && !ok(o.cheie)).length
   }, [stari])
 
-  const TABURI: { k: Tab; label: string }[] = [
-    { k: 'intreaba', label: '✦ Întreabă proiectul' },
-    { k: 'memorie', label: 'Memoria proiectului' },
-    { k: 'plan', label: `Plan și obligații${deConfirmat ? ` (${deConfirmat} de confirmat)` : ''}` },
-    { k: 'indicatori', label: 'Indicatori și tranșe' },
+  const TABURI: { k: Tab; label: string; icon: Parameters<typeof Icon>[0]['name']; count?: number }[] = [
+    { k: 'intreaba', label: 'Întreabă proiectul', icon: 'sparkles' },
+    { k: 'memorie', label: 'Memoria proiectului', icon: 'history' },
+    { k: 'plan', label: 'Plan și obligații', icon: 'calendar', count: deConfirmat },
+    { k: 'indicatori', label: 'Indicatori și tranșe', icon: 'chart' },
   ]
   return (
-    <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {TABURI.map(t => <button key={t.k} type="button" className={tab === t.k ? 'btn btn-primary' : 'btn'} onClick={() => setTab(t.k)}>{t.label}</button>)}
+    <div className={css.root}>
+      <div className={css.tabs} role="tablist" aria-label="Secțiuni proiect">
+        {TABURI.map(t => (
+          <button key={t.k} type="button" role="tab" aria-selected={tab === t.k} className={css.tab} onClick={() => setTab(t.k)}>
+            <Icon name={t.icon} size={15} />{t.label}{t.count ? <span className={css.count} title={`${t.count} de confirmat`}>{t.count}</span> : null}
+          </button>
+        ))}
       </div>
       {tab === 'intreaba' && <Intreaba firma={firma} />}
       {tab === 'memorie' && <MemorieProiect firma={firma} />}
