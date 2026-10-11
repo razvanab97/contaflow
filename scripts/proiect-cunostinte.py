@@ -14,6 +14,9 @@ ap.add_argument('--buget', required=True)
 ap.add_argument('--act')
 ap.add_argument('--memoriu')
 ap.add_argument('--out', default='lib/proiect-cunostinte-date.ts')
+# Documente locale suplimentare (rapoarte lunare, cereri de transa, AJOFM, contracte, note): "Titlu|cale"
+# (PDF, DOCX sau TXT). Nu include acte personale (CI, medicale, anchete sociale) - textul ajunge la AI.
+ap.add_argument('--extra', action='append', default=[])
 a = ap.parse_args()
 
 ZGOMOT = re.compile(r'^(PROSOCIAL - PROgres prin antreprenoriat.*|ASOCIATIA CLUBUL SPORTIV|SMART ATLETIC|ASOCIATIA INSTITUTUL PENTRU|ORASE VIZIONARE|2BE GROUP S\.R\.L\.|\d{1,3})$')
@@ -31,6 +34,21 @@ def pdf_tot(cale):
         linii = [l for l in linii if l.strip() and not ZGOMOT.match(l.strip())]
         if linii: out.append(f'[pag. {i}]\n' + '\n'.join(linii))
     return '\n\n'.join(out)
+
+# Date personale mascate inainte sa ajunga in baza de cunostinte.
+def mascheaza(t):
+    t = re.sub(r'\b[1-9]\d{12}\b', '[CNP]', t)
+    t = re.sub(r'(?i)(seria?\s*[A-Z]{2}\s*(?:nr\.?|num[aă]r)?\s*)\d{6,7}\b', r'\1[nr. CI]', t)
+    t = re.sub(r'\bRO\d{2}[A-Z]{4}[0-9A-Z]{16}\b', lambda m: m.group(0) if m.group(0).startswith(('RO61BTRL', 'RO92RNCB')) else '[IBAN]', t)
+    return t
+
+def text_local(cale):
+    c = cale.lower()
+    if c.endswith('.pdf'): return pdf_tot(cale)
+    if c.endswith(('.docx', '.doc')):
+        r = subprocess.run(['textutil', '-convert', 'txt', '-stdout', cale], capture_output=True, text=True)
+        return '\n'.join(l.rstrip() for l in r.stdout.split('\n') if l.strip())
+    return open(cale, encoding='utf-8').read()
 
 def xlsx(cale):
     wb = openpyxl.load_workbook(cale, data_only=True)
@@ -54,6 +72,13 @@ docs = [
 ]
 if a.act: docs.append({'id': 'act', 'titlu': f'Actul adițional ({a.versiune})', 'text': pdf_tot(a.act)})
 if a.memoriu: docs.append({'id': 'memoriu', 'titlu': f'Memoriul justificativ ({a.versiune})', 'text': pdf_tot(a.memoriu)})
+
+for i, e in enumerate(a.extra):
+    titlu, cale = e.split('|', 1)
+    txt = text_local(cale).strip()
+    if txt: docs.append({'id': f'local{i+1}', 'titlu': titlu.strip(), 'text': txt})
+    else: print('FARA TEXT (scanare?):', cale)
+for d in docs: d['text'] = mascheaza(d['text'])
 
 with open(a.out, 'w', encoding='utf-8') as f:
     f.write('// GENERAT de scripts/proiect-cunostinte.py - nu edita manual. Documentele oficiale ale proiectului\n')

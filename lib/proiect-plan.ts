@@ -74,6 +74,11 @@ export const INDICATORI = {
   transe3: { transa1: 153821.35, minCheltuitDinT1: 76910.68, minCofinantare: 23106.99, transa2: 123057.08, minCheltuitT1T2: 193814.90, transa3: 30764.27 },
 }
 
+// Planul lunar (Buget AA3): veniturile incasate planificate L1-L31 (foaia 3_venituri-cheltuieli, randul
+// "total") si cheltuielile bugetate din proiect L1-L18 (foaia 2.0_buget integral, randul TOTAL).
+export const VENITURI_PLAN_LUNAR = [0, 0, 0, 3145, 3965, 6690, 12585, 15130, 15450, 17020, 19740, 18970, 16945, 17240, 19350, 14520, 15090, 26510, 30500, 29490, 24490, 24700, 24520, 26400, 23040, 24740, 27200, 26460, 28130, 29080, 32960]
+export const CHELTUIELI_BUGET_LUNAR = [0, 1000, 2684, 11985, 135574.41, 49002.50, 22446, 21446, 21446, 21446, 18186, 16502, 11335, 13402, 3280.29, 1000, 1000, 1000]
+
 // --- Obligatii care decurg din plan si contract ---------------------------------------------------
 export type CategorieObligatie = 'Autorizații' | 'Personal' | 'Social (anual)' | 'Financiar și tranșe' | 'Sustenabilitate'
 export interface ObligatiePlan { cheie: string; categorie: CategorieObligatie; titlu: string; ce: string; termen?: string; sursa: string; anual?: boolean }

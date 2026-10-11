@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DOCUMENTE_PROIECT, VERSIUNE_DOCUMENTE } from '@/lib/proiect-cunostinte-date'
 import { BUGET_ACHIZITII, PASI_PROCEDURA, PROIECT, coduriDin } from '@/lib/achizitii-procedura'
-import { ACTIVITATI, OBLIGATII, STATUS_PLAN, etapaProiect, etichetaLuna, lunaProiect, statusImplicitActivitate, termenDepasit, type StarePlan } from '@/lib/proiect-plan'
+import { ACTIVITATI, CHELTUIELI_BUGET_LUNAR, OBLIGATII, STATUS_PLAN, VENITURI_PLAN_LUNAR, etapaProiect, etichetaLuna, lunaProiect, statusImplicitActivitate, termenDepasit, type StarePlan } from '@/lib/proiect-plan'
 
 // "Intreaba proiectul": AI-ul proiectului PROSOCIAL (AB TEXTILE). Raspunde DOAR pe baza documentelor
 // oficiale (plan de afaceri, buget, act aditional, memoriu - generate in proiect-cunostinte-date.ts) si
@@ -18,14 +18,16 @@ export function promptFix(): string {
   return `Ești asistentul proiectului european al firmei AB TEXTILE S.R.L. — schema de minimis PROSOCIAL (${PROIECT.program}), ${PROIECT.contract}, reprezentant legal ${PROIECT.reprezentant}. Răspunzi utilizatorului (administratorul firmei) în limba română, practic și la obiect.
 
 REGULI
-1. Sursa de adevăr sunt documentele oficiale de mai jos, versiunea în vigoare: ${VERSIUNE_DOCUMENTE} (Act adițional nr. 3 din 01.07.2026). Versiunile anterioare (AA1, AA2) nu mai contează decât istoric.
+1. Sursa de adevăr sunt documentele de mai jos: cele oficiale (plan, buget, act adițional, memoriu) și documentele locale ale proiectului (rapoartele lunare trimise, cererile de tranșă, dosarul AJOFM, contracte, constatările din scanări) — din cele locale afli CE S-A FĂCUT DEJA. Planul oficial e în versiunea în vigoare: ${VERSIUNE_DOCUMENTE} (Act adițional nr. 3 din 01.07.2026). Versiunile anterioare (AA1, AA2) nu mai contează decât istoric.
 2. Citează sursa după fiecare afirmație importantă, scurt, în paranteză: (Plan ${VERSIUNE_DOCUMENTE}, pag. N), (Buget ${VERSIUNE_DOCUMENTE}, linia 4.6), (Act adițional ${VERSIUNE_DOCUMENTE}), (Memoriu ${VERSIUNE_DOCUMENTE}), (Date ContaFlow) sau (Procedura internă ContaFlow). Paginile planului sunt marcate în text cu [pag. N].
 3. Nu inventa reguli, sume sau termene. Dacă ceva nu reiese din documente sau din date, spune clar „nu reiese din documentele proiectului” și recomandă să fie întrebat administratorul schemei (PROSOCIAL — Asociația Institutul pentru Orașe Vizionare, prosocial@iov.ro; manager de proiect Păunică Ionela), eventual cu textul exact al întrebării.
 4. Sumele din buget sunt cu TVA inclus. Calculele le faci explicit (ex. „38.522,77 − 37.000 = 1.522,77 lei”).
 5. Când întrebarea cere o acțiune (ex. „pot cumpăra X?”, „ce am de făcut luna asta?”), răspunde cu: verdict scurt → de ce (cu surse) → pașii concreți, în ordine.
 6. O cheltuială în afara bugetului aprobat sau peste valoarea liniei necesită acordul PROSOCIAL / act adițional înainte de cumpărare (cum s-a făcut prin AA3 la manechin și chirie).
 7. Procedura internă de achiziții (de mai jos) e reconstituită în ContaFlow din dosarele reale — nu e document oficial; spune asta când te bazezi pe ea.
-8. Formatare: paragrafe scurte și liste; fără tabele mari; maximum ~250 de cuvinte, dacă nu se cere detaliu.
+8. Răspunsuri DEZVOLTATE și LA SUBIECT, nu generale. Pentru fiecare punct spune concret, în cazul AB TEXTILE: ce prevede planul (cu cifre: sume, cantități, termene, luni L), ce s-a făcut deja (din rapoartele lunare, documentele locale, achizițiile și stările din ContaFlow — cu date, nume, numere de document), ce lipsește sau e întârziat față de plan, și ce ai de făcut concret (pași, documente doveditoare de pregătit, cui se trimit, până când). Folosește numele reale (angajați, furnizori, instituții) și cifrele lunii întrebate (venituri și cheltuieli planificate). Nu reformula doar titlurile activităților din plan; nu încheia cu oferte generice de tipul „dacă ai nevoie, pot…” — dă direct conținutul util.
+10. Când citezi un document local, folosește titlul lui (ex. „Raport lunar — iunie 2026”), niciodată id-ul intern (local1, local2…). Ultimul raport lunar completat în ContaFlow (secțiunea DATE CONTAFLOW) e o sursă separată de rapoartele din dosarul local — spune „(Raport lunar în ContaFlow, perioada …)”.
+9. Formatare: titluri scurte (##), liste și **bold** pentru cifre/termene; tabele doar mici (max. 5 coloane). Lungimea după cât cere întrebarea — la „ce am de făcut / ce mi-am propus” e de așteptat un răspuns detaliat, structurat pe teme.
 
 PROCEDURA INTERNĂ DE ACHIZIȚII (ContaFlow)
 ${procedura}
@@ -66,8 +68,16 @@ export async function contextLive(sb: SupabaseClient, firmaId: string, stari: St
   const r = (raport || [])[0] as Record<string, unknown> | undefined
   const rap = r ? Object.entries(r).filter(([k, v]) => v && !['id', 'firma_id', 'updated_at'].includes(k)).map(([k, v]) => `${k}: ${String(v).slice(0, 600)}`).join('\n') : '(niciun raport completat)'
 
+  const planLuna = (l: number) => l >= 1 && l <= 31
+    ? `L${l} (${etichetaLuna(l)}): venituri încasate planificate ${lei(VENITURI_PLAN_LUNAR[l - 1] || 0)} lei; cheltuieli bugetate din proiect ${l <= 18 ? lei(CHELTUIELI_BUGET_LUNAR[l - 1] || 0) + ' lei' : '— (sustenabilitate)'}; activități programate: ${ACTIVITATI.filter(a => l >= a.luni[0] && l <= a.luni[1]).map(a => a.cod).join(', ') || '—'}`
+    : ''
+  const luniPlan = [L - 1, L, L + 1].map(planLuna).filter(Boolean).join('\n')
+
   return `DATE CONTAFLOW (live, ${azi.toLocaleDateString('ro-RO')})
 Azi: ${azi.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })} — proiectul e în ${etapa.eticheta}. Implementare: 01.10.2025–31.03.2027 (L1–L18); sustenabilitate: 01.04.2027–30.04.2028.
+
+PLANUL PE LUNI (luna trecută, curentă, următoare — Buget AA3, foile 3_venituri-cheltuieli și 2.0)
+${luniPlan}
 
 ACHIZIȚII ÎNREGISTRATE (din modulul Achiziții)
 ${linieAch}
