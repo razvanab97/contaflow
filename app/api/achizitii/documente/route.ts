@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import {randomUUID} from 'node:crypto'
 import {nextOfferNumber,supplierKey as normalizeSupplier} from '@/lib/achizitii-offer-number'
+import { offerPrice } from '@/lib/achizitii-offer-price'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
   const { data, error } = await sb
     .from('documente')
-    .select('id,fisier_nume,fisier_tip,tip_document,created_at,furnizor')
+    .select('id,fisier_nume,fisier_tip,tip_document,created_at,furnizor,suma,valuta')
     .eq('achizitie_id', achizitieId)
     .order('created_at', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -26,6 +27,12 @@ export async function POST(req: NextRequest) {
   const tipDosar = String(fd.get('tipDosar') || '')
   const supplier = String(fd.get('furnizorOferta') || '').trim()
   const supplierKey = normalizeSupplier(supplier)
+  let price: { suma: number; valuta: string } | null = null
+  if (fd.get('pretOferta')) {
+    if (tipDosar !== 'oferta') return NextResponse.json({ error: 'Prețul se aplică doar ofertelor.' }, { status: 400 })
+    try { price = offerPrice(String(fd.get('pretOferta')), String(fd.get('valutaOferta') || 'RON')) }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Preț invalid.' }, { status: 400 }) }
+  }
   if(supplier && (tipDosar!=='oferta'||supplier.length>120||!supplierKey))return NextResponse.json({error:'Furnizorul ofertei este invalid.'},{status:400})
   // Tipul ales la incarcare decide etapa si prefixul din nume (recunoscut de verificarea dosarului).
   const TIP: Record<string, { eticheta: string; etapa: string }> = {
@@ -66,6 +73,7 @@ export async function POST(req: NextRequest) {
     modul: 'achizitii',
     tip_document: etapa,
     furnizor: supplier || achizitie.denumire,
+    ...(price || {}),
     fisier_path: path,
     // numele original al fisierului (cu tipul ales in fata), ca sa se vada si sa fie recunoscut in dosar
     fisier_nume: offerNumber ? `Oferta ${offerNumber}.pdf` : `${tip ? `${tip.eticheta} - ` : ''}${(file.name || `${safeName}_${etapa}.${extension}`).replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 150)}`,

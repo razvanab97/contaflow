@@ -2,8 +2,10 @@
 import { useEffect, useState } from 'react'
 import VeziButon from '@/components/ui/VeziButon'
 import { isOfferPdf } from '@/lib/achizitii-offer-number'
+import OfferPrice from '@/components/proiect/OfferPrice'
+import { offerPrice } from '@/lib/achizitii-offer-price'
 
-interface SavedOffer { id: string; fisier_nume: string; fisier_tip?: string | null; furnizor?: string | null }
+interface SavedOffer { id: string; fisier_nume: string; fisier_tip?: string | null; furnizor?: string | null; suma?: number | null; valuta?: string | null }
 
 function FilePreview({ file }: { file: File }) {
   const [url, setUrl] = useState('')
@@ -13,6 +15,8 @@ function FilePreview({ file }: { file: File }) {
 
 export default function OfferUpload({ purchaseId, status, onUploaded, complete = false, revision = '' }: { purchaseId: string; status: string; onUploaded: () => void; complete?: boolean; revision?: string }) {
   const [supplier, setSupplier] = useState('')
+  const [price, setPrice] = useState('')
+  const [currency, setCurrency] = useState('RON')
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -47,16 +51,18 @@ export default function OfferUpload({ purchaseId, status, onUploaded, complete =
     if (busy || !supplier.trim() || !files.length) return
     setBusy(true); setMessage('')
     try {
+      if (price.trim()) offerPrice(price, currency)
       const { mergeOfferFiles } = await import('@/lib/achizitii-offer-files')
       const inputs = await Promise.all(files.map(async file=>({type:file.type,bytes:new Uint8Array(await file.arrayBuffer())})))
       const bytes = await mergeOfferFiles(inputs)
       const form = new FormData()
       form.append('file',new Blob([new Uint8Array(bytes)],{type:'application/pdf'}),'Oferta.pdf')
       form.append('achizitieId',purchaseId);form.append('etapa',status);form.append('tipDosar','oferta');form.append('furnizorOferta',supplier.trim())
+      if (price.trim()) { form.append('pretOferta',price); form.append('valutaOferta',currency) }
       const response = await fetch('/api/achizitii/documente',{method:'POST',body:form})
       const result = await response.json()
       if (!response.ok) throw new Error(result.error||'Oferta nu a putut fi salvată.')
-      setFiles([]);setSupplier('');setMessage(`${result.fisier_nume} a fost salvat ca un singur PDF.`);setRefresh(value=>value+1);onUploaded()
+      setFiles([]);setSupplier('');setPrice('');setCurrency('RON');setMessage(`${result.fisier_nume} a fost salvat ca un singur PDF.`);setRefresh(value=>value+1);onUploaded()
     } catch(error) { setMessage(error instanceof Error?error.message:'Oferta nu a putut fi salvată.') }
     finally { setBusy(false) }
   }
@@ -66,7 +72,9 @@ export default function OfferUpload({ purchaseId, status, onUploaded, complete =
     {loadError && <p role="alert">{loadError} <button type="button" className="btn btn-sm" onClick={()=>setRefresh(value=>value+1)}>Reîncearcă</button></p>}
     {!loading && !loadError && !offers.length && <p>Nu există încă oferte PDF salvate în acest dosar.</p>}
     {offers.map(offer => <div key={offer.id} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:8,padding:10,border:'1px solid var(--border)',borderRadius:'var(--r-md)'}}>
-      <span style={{flex:'1 1 200px',overflowWrap:'anywhere'}}>{offer.fisier_nume}{offer.furnizor ? ` · ${offer.furnizor}` : ''}</span>
+      <div style={{flex:'1 1 200px',overflowWrap:'anywhere'}}>{offer.fisier_nume}{offer.furnizor ? ` · ${offer.furnizor}` : ''}
+        <OfferPrice id={offer.id} suma={offer.suma} valuta={offer.valuta} onSaved={()=>{setRefresh(value=>value+1);onUploaded()}}/>
+      </div>
       <VeziButon url={`/api/chitante/document?id=${encodeURIComponent(offer.id)}`} nume={offer.fisier_nume}/>
       <a className="btn btn-sm" href={`/api/chitante/document?id=${encodeURIComponent(offer.id)}`} download={offer.fisier_nume} aria-label={`Descarcă ${offer.fisier_nume}${offer.furnizor ? ` · ${offer.furnizor}` : ''}`}>Descarcă PDF</a>
     </div>)}
@@ -75,6 +83,10 @@ export default function OfferUpload({ purchaseId, status, onUploaded, complete =
     <label style={{display:'block',marginTop:8}}>Furnizorul ofertei
       <input value={supplier} maxLength={120} disabled={busy} onChange={e=>setSupplier(e.target.value)} placeholder="ex. Furnizorul A" style={{display:'block',padding:8,width:'100%',marginTop:4,border:'1px solid var(--border)',borderRadius:'var(--r-md)',background:'var(--surface-sunken)',color:'var(--text-primary)'}}/>
     </label>
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+      <label>Total ofertă cu TVA (opțional) <input aria-label="Total ofertă nouă cu TVA" inputMode="decimal" value={price} disabled={busy} onChange={event=>setPrice(event.target.value)} placeholder="ex. 1210,00" style={{padding:8,width:160}}/></label>
+      <label>Monedă <select value={currency} disabled={busy} onChange={event=>setCurrency(event.target.value)}>{['RON','EUR','USD'].map(code=><option key={code}>{code}</option>)}</select></label>
+    </div>
     <div role="region" aria-label="Lipește pozele ofertei din clipboard" tabIndex={0} onPaste={event=>{const images=Array.from(event.clipboardData.items).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);if(images.length){event.preventDefault();add(images)}}} style={{marginTop:10,padding:14,border:'1px dashed var(--border-strong)',borderRadius:'var(--r-md)'}}>
       Click aici și lipește pozele pe rând cu Cmd+V / Ctrl+V. Ordinea de mai jos va fi ordinea paginilor în PDF.
       <label className="btn btn-sm" style={{display:'inline-flex',marginTop:8,cursor:'pointer'}}>Selectează poze / PDF

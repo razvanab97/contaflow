@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 238, text: 'Oferte achiziții: descrierea afișează totalul cu TVA, baza calculată și TVA 21%, în moneda ofertei. Prețul poate fi completat la încărcare sau ulterior, inclusiv printr-o propunere AI citită din PDF și confirmată înainte de salvare. Nu se inventează totaluri pentru pagini cu produse alternative.' },
   { v: 237, text: 'Achiziții: ofertele PDF salvate au o listă separată în pasul ofertelor, cu furnizor, Vezi și Descarcă PDF individual. Lista rămâne accesibilă după completarea celor trei oferte și se actualizează la salvare.' },
   { v: 236, text: 'Oferte achiziții: prețurile noi sunt implicit cu TVA inclus (21%), cu opțiune fără TVA. Formularul și Word-ul separă baza, TVA și totalul, fără dublă taxare. Pozițiile vechi își păstrează interpretarea fără TVA; sunt acceptate și valori cu virgulă.' },
   { v: 235, text: 'Oferte achiziții: pozele unui furnizor se salvează într-un singur PDF, numit automat Oferta 1.pdf, Oferta 2.pdf sau Oferta 3.pdf. Furnizorul este păstrat separat și afișat lângă fișier. Nu se suprascriu oferte existente și nu se dublează furnizorii; numerotarea este pe fiecare dosar.' },
