@@ -185,6 +185,7 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
   const [arata, setArata] = useState(!finalizat)
   const [incarc, setIncarc] = useState<string | null>(null)
   const [mesaj, setMesaj] = useState('')
+  const [pasEditat, setPasEditat] = useState<string | null>(null)
   const buget = coduri.reduce((s, c) => s + (linieDupaCod(c)?.valoare || 0), 0)
 
   async function incarca(tip: string, files: FileList | null) {
@@ -270,16 +271,22 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
           {pasi.map((p, i) => {
             const esteCurent = !finalizat && curent?.cheie === p.cheie
+            const esteEditat = pasEditat === `${item.id}:${p.cheie}`
+            const actiuniVizibile = esteEditat || esteCurent || !p.ok || p.cheie === 'buget' || p.cheie === 'oferte'
             return (
-              <div key={p.cheie} style={{ display: 'flex', gap: '12px', padding: '10px 12px', borderRadius: 'var(--r-md)', border: `1px solid ${esteCurent ? 'var(--accent)' : 'var(--border-subtle)'}`, background: esteCurent ? 'var(--accent-soft)' : 'var(--surface-secondary)' }}>
+              <div key={p.cheie} style={{ display: 'flex', gap: '12px', padding: '10px 12px', borderRadius: 'var(--r-md)', border: `1px solid ${esteCurent || esteEditat ? 'var(--accent)' : 'var(--border-subtle)'}`, background: esteCurent || esteEditat ? 'var(--accent-soft)' : 'var(--surface-secondary)' }}>
                 <span style={{ width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xs)', fontWeight: 750, background: p.ok ? 'var(--success-soft)' : p.partial ? 'var(--warning-soft)' : 'var(--surface)', color: p.ok ? 'var(--success)' : p.partial ? 'var(--warning)' : 'var(--text-secondary)', border: p.ok ? 'none' : '1px solid var(--border)' }}>{p.ok ? '✓' : i + 1}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 'var(--fs-md)', fontWeight: 650, color: 'var(--text-primary)' }}>{p.titlu}</span>
                     {esteCurent && <span className="badge badge-accent">pasul curent</span>}
                     <span style={{ fontSize: 'var(--fs-xs)', color: p.ok ? 'var(--success)' : p.partial ? 'var(--warning)' : 'var(--text-secondary)' }}>{p.detaliu}</span>
+                    {p.ok && <button type="button" className="btn btn-sm" aria-expanded={esteEditat} aria-controls={`pas-${item.id}-${p.cheie}`} aria-label={`${esteEditat ? 'Închide editarea' : 'Editează pasul'}: ${p.titlu}`} onClick={()=>setPasEditat(esteEditat ? null : `${item.id}:${p.cheie}`)}>{esteEditat ? 'Închide editarea' : 'Editează pasul'}</button>}
                   </div>
-                  {(esteCurent || !p.ok || p.cheie === 'buget' || p.cheie === 'oferte') && <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>{p.actiuni}</div>}
+                  {esteEditat && <p role="status" style={{fontSize:'var(--fs-sm)',margin:'8px 0',color:'var(--text-secondary)'}}>Editezi un pas deja completat. Folosește acțiunile de mai jos pentru a salva modificările; documentele existente și etapa achiziției sunt păstrate.</p>}
+                  <div id={`pas-${item.id}-${p.cheie}`} hidden={!actiuniVizibile}>
+                    {actiuniVizibile && <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>{p.actiuni}</div>}
+                  </div>
                 </div>
               </div>
             )
