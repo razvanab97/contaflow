@@ -1,12 +1,13 @@
 'use client'
 import { useState } from 'react'
+import {purchaseFlow,withPurchaseFlow,type PurchaseFlow} from '@/lib/achizitii-flow'
 import { BUGET_ACHIZITII, PASI_PROCEDURA, PROIECT, coduriDin, linieDupaCod, dosarAchizitie, urmatorulPas, type DocDosar, type LinieBuget } from '@/lib/achizitii-procedura'
 
 const lei = (v: number) => new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
 const card: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }
 const STATUS_LABEL: Record<string, string> = { oferta: 'Ofertă', nota_semnata: 'Notă semnată', plata_initiata: 'Plată inițiată', dovada_trimisa: 'Dovadă trimisă', finalizat: 'Finalizat' }
 
-export interface AchizitieSistem { id: string; denumire: string; valoare: number | null; sursa: string | null; status: string; linie_buget?: string | null }
+export interface AchizitieSistem { id: string; denumire: string; valoare: number | null; sursa: string | null; status: string; linie_buget?: string | null; nota?: string | null }
 
 // --- Procedura de achizitii, pas cu pas (ghid) ---------------------------------------------------
 export function ProceduraAchizitii({ deschisInitial = false }: { deschisInitial?: boolean }) {
@@ -166,11 +167,13 @@ export function etapaDinDosar(dosar: ReturnType<typeof dosarAchizitie>): string 
   return 'oferta'
 }
 
-export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGenereaza, onStatus }: {
+export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGenereaza, onStatus, onFlux }: {
   item: AchizitieSistem; docs: DocDosar[]
   onLinie: (v: string) => void; onSursa: (v: string) => void; onUploaded: () => void
   onGenereaza: (k: FormKindAch) => void; onStatus: (s: string) => void
+  onFlux: (flow: PurchaseFlow) => void
 }) {
+  const flux=purchaseFlow(item.nota)
   const coduri = coduriDin(item.linie_buget)
   const utilaj = coduri.some(c => /^4\.[1-7]$/.test(c))
   const online = docs.some(d => /order_|dante|emag|altex|leroy|\.png$|\.jpe?g$/i.test(d.fisier_nume))
@@ -216,12 +219,12 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
           <option value="">— sursa —</option><option value="grant">Subvenție</option><option value="cofinantare">Cofinanțare</option><option value="altul">Altul</option>
         </select>
       </> },
-    { cheie: 'cerere', titlu: 'Specificații + cerere de ofertă (Anexa 2)', ok: !!el('cerere')?.ok, partial: el('cerere')?.partial, detaliu: el('cerere')!.detaliu,
-      actiuni: <><Genereaza k="oferta" eticheta="Completează și generează cererea (Word)" /><Incarca tip="cerere" eticheta="Încarcă cererea semnată" /></> },
+    ...(flux==='trei_oferte'?[]:[{ cheie: 'cerere', titlu: 'Specificații + cerere de ofertă (Anexa 2)', ok: !!el('cerere')?.ok, partial: el('cerere')?.partial, detaliu: el('cerere')!.detaliu,
+      actiuni: <><Genereaza k="oferta" eticheta="Completează cererea către furnizor (Word)" /><Incarca tip="cerere" eticheta="Încarcă cererea semnată" /></> }]),
     { cheie: 'oferte', titlu: '3 oferte de la furnizori diferiți', ok: !!el('oferte')?.ok, partial: el('oferte')?.partial, detaliu: el('oferte')!.detaliu,
       actiuni: <Incarca tip="oferta" eticheta="Încarcă oferte (poți selecta mai multe)" multiplu /> },
     { cheie: 'nota', titlu: 'Notă de estimare (Anexa 1), semnată', ok: !!el('nota')?.ok, detaliu: el('nota')!.detaliu,
-      actiuni: <><Genereaza k="nota" eticheta="Generează nota (Word) din cele 3 oferte" /><Incarca tip="nota" eticheta="Încarcă nota semnată" /></> },
+      actiuni: <><Genereaza k="nota" eticheta="Completează Anexa 1 din ofertele primite" /><Incarca tip="nota" eticheta="Încarcă nota semnată" /></> },
     ...(utilaj ? [{ cheie: 'contract', titlu: 'Contract cu furnizorul', ok: !!el('contract')?.ok, detaliu: el('contract')!.detaliu, actiuni: <Incarca tip="contract" eticheta="Încarcă contractul" /> }] : []),
     { cheie: 'plata', titlu: 'Proformă / comandă + plata prin OP', ok: !!el('plata')?.ok, detaliu: el('plata')!.detaliu,
       actiuni: <><Incarca tip="proforma" eticheta="Încarcă proforma / comanda" /><Incarca tip="plata" eticheta="Încarcă dovada plății (extras / OP)" /></> },
@@ -241,6 +244,12 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
 
   return (
     <div style={{ marginTop: '12px' }}>
+      <label style={{display:'block',fontSize:'var(--fs-sm)',marginBottom:12}}>Fluxul acestei achiziții
+        <select aria-label="Fluxul acestei achiziții" value={flux||''} onChange={e=>{if(e.target.value)onFlux(e.target.value as PurchaseFlow)}} style={{display:'block',marginTop:6,padding:8,maxWidth:'100%',background:'var(--surface-sunken)',color:'var(--text-primary)',border:'1px solid var(--border)',borderRadius:'var(--r-md)'}}>
+          <option value="">Alege fluxul — dosarul existent este păstrat</option><option value="cerere">1. Cerere de ofertă — furnizor cunoscut</option><option value="trei_oferte">2. Trei oferte → Anexa 1 — nota de determinare</option>
+        </select>
+      </label>
+      {flux&&<p style={{fontSize:'var(--fs-sm)',color:'var(--text-secondary)',marginBottom:12}}>{flux==='cerere'?'Începi cu cererea de ofertă către furnizorul cunoscut. Datele furnizorului se completează în formular.':'Începi prin încărcarea celor trei oferte, apoi completezi Anexa 1 din datele lor. Cererea de ofertă nu este pasul de pornire în acest flux.'} Schimbarea fluxului nu șterge documente și nu confirmă eligibilitatea sau semnarea lor.</p>}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: finalizat ? 'var(--success)' : 'var(--text-primary)' }}>{finalizat ? '✓ Achiziție finalizată' : `Pașii achiziției · ${facute}/${pasi.length}`}</span>
         <div style={{ flex: '1 1 120px', height: '6px', borderRadius: 'var(--r-full)', background: 'var(--surface-secondary)', overflow: 'hidden', maxWidth: '240px' }}>
@@ -298,6 +307,7 @@ export function AchizitieNoua({ items = [], onCreeaza, onAnuleaza, busy }: { ite
   const [sursa, setSursa] = useState('cofinantare')
   const [valoare, setValoare] = useState('')
   const [specificatii, setSpecificatii] = useState('')
+  const [flux,setFlux]=useState<PurchaseFlow>('cerere')
   const l = linie && linie !== 'afara' ? linieDupaCod(linie) : null
   function alegeLinie(cod: string) {
     setLinie(cod)
@@ -321,14 +331,17 @@ export function AchizitieNoua({ items = [], onCreeaza, onAnuleaza, busy }: { ite
       faraTva ? `Buget maxim pentru oferte: ≈ ${faraTva.toLocaleString('ro-RO')} lei fără TVA.` : '',
       specificatii.trim() ? `Specificații tehnice minime: ${specificatii.trim()}` : '',
     ].filter(Boolean)
-    onCreeaza({ denumire: denumire.trim(), valoare: v, sursa, linieBuget: l ? l.cod : null, nota: parti.join(' ') })
+    onCreeaza({ denumire: denumire.trim(), valoare: v, sursa, linieBuget: l ? l.cod : null, nota: withPurchaseFlow(parti.join(' '),flux) })
   }
   return (
     <div style={{ ...card, borderColor: 'var(--accent)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div>
         <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--text-primary)' }}>Achiziție nouă</div>
-        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Pasul 1 al procedurii: ce cumperi, din ce linie de buget și cu ce specificații. După creare urmezi pașii: cerere de ofertă → 3 oferte → notă → plată → factură → recepție → poze.</div>
+        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Alege cum începi achiziția, ce cumperi și linia de buget. Documentele și pașii ulteriori rămân în același dosar.</div>
       </div>
+      <label style={lab}>Cum începi achiziția?
+        <select value={flux} onChange={e=>setFlux(e.target.value as PurchaseFlow)} style={inp}><option value="cerere">1. Cerere de ofertă — furnizor cunoscut</option><option value="trei_oferte">2. Încărcare trei oferte → Anexa 1</option></select>
+      </label>
       <label style={lab}>Linia de buget *
         <select value={linie} onChange={e => alegeLinie(e.target.value)} style={inp}>
           <option value="">— alege —</option>

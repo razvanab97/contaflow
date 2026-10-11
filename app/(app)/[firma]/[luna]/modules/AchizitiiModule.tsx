@@ -2,6 +2,7 @@
 import VeziButon from '@/components/ui/VeziButon'
 import { useEffect, useState, useCallback } from 'react'
 import ProiectWorkflow from '@/components/ProiectWorkflow'
+import {purchaseFlow,withPurchaseFlow} from '@/lib/achizitii-flow'
 import SincronizareProiectMail from './proiect-mail/SincronizareProiectMail'
 import { ProceduraAchizitii, BugetAchizitii, PasiAchizitie, AchizitieNoua, type AchizitieNouaDate } from './SistemAchizitii'
 import type { DocDosar, LinieBuget } from '@/lib/achizitii-procedura'
@@ -294,6 +295,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
             </div>
 
             <PasiAchizitie item={item} docs={dosare[item.id] || []}
+              onFlux={flow=>{const nota=withPurchaseFlow(item.nota,flow);void patch(item.id,{nota},{nota});setFormular({id:item.id,kind:flow==='trei_oferte'?'nota':'oferta'})}}
               onLinie={v => patch(item.id, { linieBuget: v || null }, { linie_buget: v || null })}
               onSursa={v => patch(item.id, { sursa: v || null }, { sursa: v || null })}
               onUploaded={() => { load(); setVersiuneDocs(v => v + 1) }}
@@ -302,7 +304,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
 
             <details id={`formulare-${item.id}`} open={formular?.id === item.id || undefined} style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12, scrollMarginTop: '80px' }}>
               <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650, color: firma.culoare }}>Formulare achiziție (Word): cerere ofertă, notă estimare, recepție</summary>
-              <div style={{ marginTop: 16 }}><ProiectWorkflow firmaId={firma.id} purchaseId={item.id} formKind={formular?.id === item.id ? formular.kind : undefined} /></div>
+              <div style={{ marginTop: 16 }}><ProiectWorkflow firmaId={firma.id} purchaseId={item.id} formKind={formular?.id === item.id ? formular.kind : purchaseFlow(item.nota)==='trei_oferte'?'nota':'oferta'} /></div>
             </details>
             <details style={{ marginTop: 8 }}>
               <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>Toate documentele ({(dosare[item.id] || []).length})</summary>

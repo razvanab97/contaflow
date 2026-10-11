@@ -1,0 +1,15 @@
+const assert = require('node:assert/strict')
+async function main() {
+  const { purchaseFlow, withPurchaseFlow } = await import('../lib/achizitii-flow.ts')
+  assert.equal(purchaseFlow(null), null)
+  assert.equal(purchaseFlow('Specificații vechi'), null)
+  const initial = withPurchaseFlow('Tip: Produse. Specificații tehnice minime: 12000 BTU', 'cerere')
+  assert.equal(purchaseFlow(initial), 'cerere')
+  const changed = withPurchaseFlow(initial, 'trei_oferte')
+  assert.equal(purchaseFlow(changed), 'trei_oferte')
+  assert.match(changed, /12000 BTU/)
+  assert.equal(changed.match(/flux-achizitie/g).length, 1)
+  assert.equal(withPurchaseFlow(changed, 'trei_oferte'), changed)
+  console.log('OK: alegere flux, schimbare fără pierdere de note, compatibilitate dosare vechi.')
+}
+main().catch(error => { console.error(error); process.exitCode = 1 })
