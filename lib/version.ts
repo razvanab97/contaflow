@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 237, text: 'Achiziții: ofertele PDF salvate au o listă separată în pasul ofertelor, cu furnizor, Vezi și Descarcă PDF individual. Lista rămâne accesibilă după completarea celor trei oferte și se actualizează la salvare.' },
   { v: 236, text: 'Oferte achiziții: prețurile noi sunt implicit cu TVA inclus (21%), cu opțiune fără TVA. Formularul și Word-ul separă baza, TVA și totalul, fără dublă taxare. Pozițiile vechi își păstrează interpretarea fără TVA; sunt acceptate și valori cu virgulă.' },
   { v: 235, text: 'Oferte achiziții: pozele unui furnizor se salvează într-un singur PDF, numit automat Oferta 1.pdf, Oferta 2.pdf sau Oferta 3.pdf. Furnizorul este păstrat separat și afișat lângă fișier. Nu se suprascriu oferte existente și nu se dublează furnizorii; numerotarea este pe fiecare dosar.' },
   { v: 234, text: 'Oferte achiziții: selectează sau lipește din clipboard mai multe poze pentru același furnizor, verifică ordinea și salvează-le într-un singur PDF. O ofertă cu mai multe pagini se numără o singură dată; ofertele noi de la același furnizor nu umflă contorul celor trei furnizori.' },

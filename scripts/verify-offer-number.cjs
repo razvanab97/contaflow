@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict')
 async function main() {
-  const { nextOfferNumber, offerGroup } = await import('../lib/achizitii-offer-number.ts')
+  const { nextOfferNumber, offerGroup, isOfferPdf } = await import('../lib/achizitii-offer-number.ts')
   const { dosarAchizitie } = await import('../lib/achizitii-procedura.ts')
   const doc=(n,supplier)=>({fisier_nume:`Oferta ${n}.pdf`,furnizor:supplier,tip_document:'oferta'})
   assert.equal(nextOfferNumber([], 'A'),1)
@@ -10,6 +10,13 @@ async function main() {
   assert.throws(()=>nextOfferNumber([doc(1,'A'),doc(2,'B'),doc(3,'C')],'D'))
   assert.throws(()=>nextOfferNumber([doc(1,'Furnizor A')],' furnizor a '))
   const old={fisier_nume:'Oferta [furnizor=a] - A.pdf'}
+  assert.equal(isOfferPdf(doc(1,'A')),true)
+  assert.equal(isOfferPdf(old),true)
+  assert.equal(isOfferPdf({fisier_nume:'Cerere de oferta (Anexa 2).pdf'}),false)
+  assert.equal(isOfferPdf({fisier_nume:'Oferta - Anexa 2.pdf'}),false)
+  assert.equal(isOfferPdf({fisier_nume:'Oferta.png'}),false)
+  assert.equal(isOfferPdf({fisier_nume:'Factura.pdf'}),false)
+  assert.equal(isOfferPdf({...doc(1,'A'),fisier_tip:'image/png'}),false)
   assert.equal(nextOfferNumber([old,old],'B'),2)
   assert.equal(offerGroup(doc(1,'Ștefan SRL')),'stefan_srl')
   const offers=dosarAchizitie([doc(1,'A'),doc(2,'B'),doc(3,'C')]).find(x=>x.cheie==='oferte')

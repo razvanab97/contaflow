@@ -1,4 +1,8 @@
 export interface OfferDocument { fisier_nume: string; furnizor?: string | null }
+export function isOfferPdf(doc: OfferDocument & { fisier_tip?: string | null }): boolean {
+  return /ofert/i.test(doc.fisier_nume) && !/cerere|anexa\s*2/i.test(doc.fisier_nume)
+    && /\.pdf$/i.test(doc.fisier_nume) && (!doc.fisier_tip || doc.fisier_tip === 'application/pdf')
+}
 export function supplierKey(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 }

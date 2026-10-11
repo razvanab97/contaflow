@@ -224,7 +224,7 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
     ...(flux==='trei_oferte'?[]:[{ cheie: 'cerere', titlu: 'Specificații + cerere de ofertă (Anexa 2)', ok: !!el('cerere')?.ok, partial: el('cerere')?.partial, detaliu: el('cerere')!.detaliu,
       actiuni: <><Genereaza k="oferta" eticheta="Completează cererea către furnizor (Word)" /><Incarca tip="cerere" eticheta="Încarcă cererea semnată" /></> }]),
     { cheie: 'oferte', titlu: '3 oferte de la furnizori diferiți', ok: !!el('oferte')?.ok, partial: el('oferte')?.partial, detaliu: el('oferte')!.detaliu,
-      actiuni: <OfferUpload purchaseId={item.id} status={item.status} onUploaded={onUploaded}/> },
+      actiuni: <OfferUpload purchaseId={item.id} status={item.status} onUploaded={onUploaded} complete={!!el('oferte')?.ok} revision={JSON.stringify(docs)}/> },
     { cheie: 'nota', titlu: 'Notă de estimare (Anexa 1), semnată', ok: !!el('nota')?.ok, detaliu: el('nota')!.detaliu,
       actiuni: <><Genereaza k="nota" eticheta="Completează Anexa 1 din ofertele primite" /><Incarca tip="nota" eticheta="Încarcă nota semnată" /></> },
     ...(utilaj ? [{ cheie: 'contract', titlu: 'Contract cu furnizorul', ok: !!el('contract')?.ok, detaliu: el('contract')!.detaliu, actiuni: <Incarca tip="contract" eticheta="Încarcă contractul" /> }] : []),
@@ -279,7 +279,7 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
                     {esteCurent && <span className="badge badge-accent">pasul curent</span>}
                     <span style={{ fontSize: 'var(--fs-xs)', color: p.ok ? 'var(--success)' : p.partial ? 'var(--warning)' : 'var(--text-secondary)' }}>{p.detaliu}</span>
                   </div>
-                  {(esteCurent || !p.ok || p.cheie === 'buget') && <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>{p.actiuni}</div>}
+                  {(esteCurent || !p.ok || p.cheie === 'buget' || p.cheie === 'oferte') && <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>{p.actiuni}</div>}
                 </div>
               </div>
             )
