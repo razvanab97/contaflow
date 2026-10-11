@@ -40,7 +40,13 @@ export async function GET(req:NextRequest){try{
   for(const key of ['creditare','salarii'])if(corrected.tasks[key]?.note==='Preluat din checklistul anterior; acceptarea nu este confirmată.')corrected.tasks[key]={...corrected.tasks[key],status:'primit',note:'Bifa veche confirma pachetul transmis, nu executarea plății. Verifică extrasul bancar și dovada.'}
   try{state=await writeWorkflow(prefix,corrected,state.version)}catch(e){if(e instanceof WorkflowError&&e.status===409)state=await readWorkflow(prefix);else throw e}
  }
- return NextResponse.json({state,month},{headers:{'Cache-Control':'no-store'}})
+ let purchase=null
+ if(scope.startsWith('purchase-')){
+  const {data,error}=await sb.from('proiect_achizitii').select('denumire,nota,valoare').eq('firma_id',firmaId).eq('id',scope.slice(9)).single()
+  if(error)throw new WorkflowError('Nu pot citi datele achiziției',503)
+  purchase=data
+ }
+ return NextResponse.json({state,month,purchase},{headers:{'Cache-Control':'no-store'}})
  }catch(e){return failure(e)}}
 export async function POST(req:NextRequest){try{
  sameOrigin(req)
