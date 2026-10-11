@@ -68,7 +68,7 @@ export function validateDraft(kind:FormKind,draft:Draft,profile:Record<string,st
  for(const k of ['beneficiar','reprezentant',...(kind==='restituire'?['cui','onrc','adresa','contract_subventie']:[]),...(kind==='raport'?['caen']:[])])if(!profile[k]?.trim())missing.push(PROFILE_FIELDS[k as keyof typeof PROFILE_FIELDS])
  if(['nota','oferta','receptie'].includes(kind)) {
  if(!draft.lines.length)missing.push('Cel puțin un produs / serviciu')
- draft.lines.forEach((l,i)=>{if(!l.product.trim()||!l.specs.trim()||!Number.isFinite(purchaseNumber(l.qty))||purchaseNumber(l.qty)<=0)missing.push(`Poziția ${i+1}: produs, specificații și cantitate pozitivă`);if((kind!=='oferta'||l.price.trim())&&!purchaseAmounts(l.price,l.qty,l.rate,l.priceMode||'net'))missing.push(`Poziția ${i+1}: preț și curs valide`);if(kind==='nota'&&(!l.supplier.trim()||!l.source.trim()||!l.date.trim()))missing.push(`Poziția ${i+1}: furnizor, sursă și dată ofertă`)})
+ draft.lines.forEach((l,i)=>{if(!l.product.trim()||!l.specs.trim()||!Number.isFinite(purchaseNumber(l.qty))||purchaseNumber(l.qty)<=0)missing.push(`Poziția ${i+1}: produs, specificații și cantitate pozitivă`);if((kind!=='oferta'||l.price.trim())&&!purchaseAmounts(l.price,l.qty,l.rate,l.priceMode||'net'))missing.push(`Poziția ${i+1}: preț și curs valide`);if(kind==='nota'&&(!l.supplier.trim()||!l.source.trim()))missing.push(`Poziția ${i+1}: furnizor și sursă ofertă`)})
  }
  if(kind==='restituire'&&(!Number.isFinite(Number(draft.fields.suma))||Number(draft.fields.suma)<=0))missing.push('Suma trebuie să fie pozitivă')
  return missing

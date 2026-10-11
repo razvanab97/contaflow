@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 242, text: 'Generare Word Anexa 1: data fiecărei oferte devine opțională, conform tabelului model; data notei și datele esențiale rămân obligatorii. După generare apare Descarcă Word direct lângă confirmare, iar versiunile rămân păstrate. Generarea este blocată doar cât timp salvarea automată este în curs, pentru a evita conflictele de versiune.' },
   { v: 241, text: 'Anexa 1 adaptată exemplului: furnizor și site în coloana operatorului, denumire generică, 3–4 specificații comune, cantitate 1 și prețuri fără TVA. Prețul cu TVA 21% se împarte la 1,21. AI-ul păstrează minimul tehnic salvat, iar justificarea celui mai mic preț net poate fi preluată după verificarea celor trei oferte comparabile. Tabelul Word nu mai încarcă descrierea cu URL-uri interne și calcule TVA.' },
   { v: 240, text: 'Anexa 1: AI-ul poate citi ofertele PDF ale achiziției și propune poziții cu furnizor, produs, specificații, cantitate, preț, TVA, dată și sursă. Preluarea este confirmată, fără suprascriere sau dublare; datele lipsă și cursul valutar rămân de completat. Furnizorul se selectează explicit pentru o justificare editabilă, fără alegere automată sau folosirea bugetului drept preț.' },
   { v: 239, text: 'Achiziții: fiecare pas completat poate fi redeschis cu Editează pasul, inclusiv în dosarele finalizate. Acțiunile pentru formular și încărcare reapar, iar pasul editat este evidențiat; revenirea nu șterge documente și nu schimbă etapa achiziției.' },
