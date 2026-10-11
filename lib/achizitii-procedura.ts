@@ -2,7 +2,7 @@
 // PIDS/83/PIDS_P3/OP4/ESO4.1/PIDS_A12 - schema PROSOCIAL, cod SMIS 316148), reconstituita din
 // documentele standard folosite in achizitiile deja facute (Anexa 2 cerere de oferta, Anexa 1 nota de
 // estimare, Anexa 3 proces-verbal de receptie, Anexa 4 restituire) si din bugetul planului de afaceri
-// (Act aditional nr. 1). Date pure, fara dependinte de server - folosite si in componente client.
+// (Act aditional nr. 3). Date pure, fara dependinte de server - folosite si in componente client.
 
 export const PROIECT = {
   beneficiar: 'AB TEXTILE S.R.L.',
@@ -20,38 +20,47 @@ export const PROIECT = {
 export type SursaBuget = 'grant' | 'cofinantare'
 export interface LinieBuget { cod: string; denumire: string; sursa: SursaBuget; categorie: string; cantitate: number; um: string; valoare: number }
 
-// Bugetul planului de afaceri (AA1) - doar liniile care se cumpara prin procedura de achizitii (fara
-// salarii, chirie, leasing - acelea sunt obligatii lunare). Valorile sunt cu TVA inclus, ca in buget.
+// Bugetul planului de afaceri in vigoare (Act aditional nr. 3 din 01.07.2026, sheet 2.0_buget integral) -
+// doar liniile care se cumpara prin procedura de achizitii (fara salarii, contabilitate, chirie - acelea
+// sunt obligatii lunare). Codurile sunt cele din bugetul AA3. Valorile sunt cu TVA inclus, ca in buget.
 const CAT3 = '3. Servicii specializate'
 const CAT4 = '4. Active fixe, obiecte de inventar, materiale'
-const CAT15 = '15. Alte cheltuieli de funcționare'
+const CAT6 = '6. Leasing operațional'
+export const VERSIUNE_BUGET = 'AA3 (01.07.2026)'
 export const BUGET_ACHIZITII: LinieBuget[] = [
-  { cod: '3.2', denumire: 'Servicii de marketing și publicitate (concept, web, pliante, publicitate online)', sursa: 'cofinantare', categorie: CAT3, cantitate: 1, um: 'serv', valoare: 5670 },
+  { cod: '3.2', denumire: 'Site prezentare întreprindere', sursa: 'cofinantare', categorie: CAT3, cantitate: 1, um: 'buc', valoare: 3300 },
   { cod: '3.3', denumire: 'Montare aer condiționat', sursa: 'cofinantare', categorie: CAT3, cantitate: 1, um: 'buc', valoare: 1000 },
-  { cod: '4.1', denumire: 'Mașină profesională de spălat rufe (LG Giant C Max)', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 23432 },
-  { cod: '4.2', denumire: 'Uscător profesional rufe (LG Giant C)', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 15621 },
-  { cod: '4.3', denumire: 'Calandru industrial (BW GMP e2 140/25)', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 18630 },
-  { cod: '4.4', denumire: 'Manechin (S/AV)', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 28738 },
-  { cod: '4.5', denumire: 'Masă de scos pete la rece (S/F)', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 20241 },
-  { cod: '4.6', denumire: 'Masă de călcat aspirantă încălzită electric (S/AAR)', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 20428 },
-  { cod: '4.7', denumire: 'Fier de călcat cu abur (New Iron Prof Open)', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 1318.70 },
-  { cod: '4.8', denumire: 'Birou FrontDesk', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 703 },
-  { cod: '4.9', denumire: 'Scaun birou', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 325 },
-  { cod: '4.10', denumire: 'Set 4 scaune zonă așteptare', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'set', valoare: 476 },
+  { cod: '4.1', denumire: 'Mașină de spălat profesională', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 38522.77 },
+  { cod: '4.2', denumire: 'Uscător profesional', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 17985.44 },
+  { cod: '4.3', denumire: 'Calandru', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 23270.72 },
+  { cod: '4.4', denumire: 'Masă de călcat', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 22783.09 },
+  { cod: '4.5', denumire: 'Masă de scos pete', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 11566.39 },
+  { cod: '4.6', denumire: 'Manechin (AA3: diferența peste buget o suportă antreprenorul)', sursa: 'grant', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 2280.29 },
+  { cod: '4.7', denumire: 'Compresor', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 649.98 },
+  { cod: '4.8', denumire: 'Birou FrontDesk', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 399.99 },
+  { cod: '4.9', denumire: 'Scaun birou', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 329 },
+  { cod: '4.10', denumire: 'Set 4 scaune zonă așteptare', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 476 },
   { cod: '4.11', denumire: 'Etajeră documente + decorațiuni', sursa: 'cofinantare', categorie: CAT4, cantitate: 2, um: 'buc', valoare: 370 },
   { cod: '4.12', denumire: 'Suport depozitare haine', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 169 },
   { cod: '4.13', denumire: 'Kit alarmă', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 741.99 },
   { cod: '4.14', denumire: 'Casă de marcat', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 525 },
-  { cod: '4.15', denumire: 'Imprimantă', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 1099.90 },
+  { cod: '4.15', denumire: 'Imprimantă', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 971.91 },
   { cod: '4.16', denumire: 'Laptop', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 4299.99 },
   { cod: '4.17', denumire: 'Masă de lucru', sursa: 'cofinantare', categorie: CAT4, cantitate: 2, um: 'buc', valoare: 890 },
   { cod: '4.18', denumire: 'Cărucior transport', sursa: 'cofinantare', categorie: CAT4, cantitate: 2, um: 'buc', valoare: 998 },
   { cod: '4.19', denumire: 'Cărucior rufe curate', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 759 },
   { cod: '4.20', denumire: 'Umerașe', sursa: 'cofinantare', categorie: CAT4, cantitate: 2, um: 'set', valoare: 452 },
   { cod: '4.21', denumire: 'Huse transparente haine', sursa: 'cofinantare', categorie: CAT4, cantitate: 2, um: 'set', valoare: 155.80 },
-  { cod: '4.22', denumire: 'Aer condiționat', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 3099 },
+  { cod: '4.22', denumire: 'Aer condiționat', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 1338.08 },
   { cod: '4.23', denumire: 'Set detergenți profesionali', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'set', valoare: 2944.30 },
-  { cod: '15.2', denumire: 'Reamenajare spațiu + dotare', sursa: 'cofinantare', categorie: CAT15, cantitate: 1, um: 'set', valoare: 5000 },
+  { cod: '4.24', denumire: 'Pachet materiale instalație electrică', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 4887.96 },
+  { cod: '4.25', denumire: 'Boiler', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 498 },
+  { cod: '4.26', denumire: 'Covor cauciuc', sursa: 'cofinantare', categorie: CAT4, cantitate: 16, um: 'ml', valoare: 1180.96 },
+  { cod: '4.27', denumire: 'Pachet elemente decorative polistiren interior', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 388.89 },
+  { cod: '4.28', denumire: 'Vopsea lavabilă', sursa: 'cofinantare', categorie: CAT4, cantitate: 15, um: 'l', valoare: 264 },
+  { cod: '4.29', denumire: 'Aspirator cu spălare', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 566.65 },
+  { cod: '4.30', denumire: 'Aparat de curățat cu abur', sursa: 'cofinantare', categorie: CAT4, cantitate: 1, um: 'buc', valoare: 1121.48 },
+  { cod: '6.1', denumire: 'Autoturism — leasing operațional (6 luni × 3.260 lei)', sursa: 'grant', categorie: CAT6, cantitate: 6, um: 'luni', valoare: 19560 },
 ]
 export const linieDupaCod = (cod: string) => BUGET_ACHIZITII.find(l => l.cod === cod)
 export const coduriDin = (v: string | null | undefined) => String(v || '').split(',').map(x => x.trim()).filter(c => linieDupaCod(c))

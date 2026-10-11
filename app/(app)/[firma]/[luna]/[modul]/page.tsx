@@ -30,6 +30,7 @@ const RaportLunarProiectModule = nextDynamic(() => import('../modules/RaportLuna
 const ObligatiiModule = nextDynamic(() => import('../modules/ObligatiiModule'))
 const AchizitiiModule = nextDynamic(() => import('../modules/AchizitiiModule'))
 const MailContabilModule = nextDynamic(() => import('../modules/MailContabilModule'))
+const PlanProiectModule = nextDynamic(() => import('../modules/PlanProiectModule'))
 
 export const dynamic = 'force-dynamic'
 
@@ -153,6 +154,8 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
         return <ObligatiiModule firma={firmaForModule} lunaId={lunaData.id} luna={luna}/>
       case 'achizitii':
         return <AchizitiiModule firma={firmaForModule} lunaId={lunaData.id}/>
+      case 'plan-proiect':
+        return <PlanProiectModule firma={firmaForModule} lunaId={lunaData.id}/>
       case 'mail-contabil':
         return <MailContabilModule firma={firmaForModule} lunaId={lunaData.id}/>
       default:

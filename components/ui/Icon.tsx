@@ -85,4 +85,5 @@ export const MODULE_ICONS: Record<string, string> = {
   'obligatii-recurente': 'repeat',
   'achizitii': 'briefcase',
   'mail-contabil': 'mail',
+  'plan-proiect': 'sparkles',
 }

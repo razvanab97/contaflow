@@ -11,6 +11,7 @@ export type ModuleSlug =
   | 'obligatii-recurente'
   | 'achizitii'
   | 'mail-contabil'
+  | 'plan-proiect'
 
 export interface TaskDef {
   key: string
@@ -269,6 +270,12 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
     description: 'Aparate, materiale și servicii cumpărate din proiect — ofertă → notă semnată → plată → dovadă',
     tasks: [],
   },
+  'plan-proiect': {
+    slug: 'plan-proiect',
+    label: 'Plan & AI proiect',
+    description: 'Întreabă proiectul (AI pe planul de afaceri și bugetul în vigoare), activitățile și obligațiile din plan, indicatori și tranșe',
+    tasks: [],
+  },
   'mail-contabil': {
     slug: 'mail-contabil',
     label: 'Mail contabil',
@@ -325,7 +332,7 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
     slug: 'proiect-ab-textile',
     // Nu e o firmă reală (fără CUI/ONRC) - e un proiect european derulat de AB Textile SRL,
     // cu propriile documente lunare de raportat, distincte de contabilitatea firmei.
-    module: ['raport-lunar-proiect', 'obligatii-recurente', 'achizitii'],
+    module: ['plan-proiect', 'raport-lunar-proiect', 'obligatii-recurente', 'achizitii'],
     lunaCalendaristica: true,
     legal: {
       nrRegCom: '',
