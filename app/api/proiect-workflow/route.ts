@@ -13,7 +13,7 @@ function validate(state:Workflow) {
  }
  for(const [key,d]of Object.entries(state.forms)){
  if(![...Object.keys(FORM_FIELDS),'dosar'].includes(key)||!d?.fields||!Array.isArray(d.lines)||d.lines.length>100||Object.values(d.fields).some(v=>typeof v!=='string'||v.length>30000))throw new WorkflowError('Formular invalid')
- for(const l of d.lines)if(!l||(['supplier','product','specs','unit','qty','price','currency','rate','source','date'] as const).some(k=>typeof l[k]!=='string'||l[k].length>10000)||(l.priceMode!==undefined&&!['gross','net'].includes(l.priceMode)))throw new WorkflowError('Poziție invalidă')
+ for(const l of d.lines)if(!l||(['supplier','product','specs','unit','qty','price','currency','rate','source','date'] as const).some(k=>typeof l[k]!=='string'||l[k].length>10000)||(l.priceMode!==undefined&&!['gross','net'].includes(l.priceMode))||(l.website!==undefined&&(typeof l.website!=='string'||l.website.length>2000)))throw new WorkflowError('Poziție invalidă')
  }
 }
 export async function GET(req:NextRequest){try{

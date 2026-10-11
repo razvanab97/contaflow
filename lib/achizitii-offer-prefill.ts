@@ -3,10 +3,20 @@ import { purchaseAmounts } from './achizitii-vat'
 
 export interface PrefillOfferSource { id: string; fisier_nume: string; furnizor?: string | null; suma?: number | null; valuta?: string | null }
 export interface OfferProposal { id: string; name: string; lines: Line[]; warnings: string[]; savedTotal?: number; savedCurrency?: string }
+export interface NoteOfferFormat { product: string; quantity: '1' }
 
-export function parseOfferProposals(raw: string, docs: PrefillOfferSource[], origin: string): OfferProposal[] {
+export function offerWebsite(value: unknown): string {
+  if (typeof value !== 'string' || value.length > 2000) return ''
+  try {
+    const url = new URL(/^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`)
+    return ['https:', 'http:'].includes(url.protocol) && url.hostname.includes('.') && !url.username && !url.password ? url.href : ''
+  } catch { return '' }
+}
+
+export function parseOfferProposals(raw: string, docs: PrefillOfferSource[], origin: string, format?: NoteOfferFormat): OfferProposal[] {
   const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim())
   if (!Array.isArray(parsed.offers) || parsed.offers.length > 3) throw new Error('Răspuns AI invalid.')
+  const common = Array.isArray(parsed.commonSpecs) && parsed.commonSpecs.length >= 3 && parsed.commonSpecs.length <= 4 && parsed.commonSpecs.every((value: unknown) => typeof value === 'string' && value.trim() && value.length <= 500) ? parsed.commonSpecs.map((value: string) => `- ${value.trim().replace(/^[-•]\s*/, '')}`).join('\n') : ''
   const seen = new Set<string>()
   let count = 0
   const text = (value: unknown, max = 2000) => typeof value === 'string' ? value.trim().slice(0, max) : ''
@@ -28,7 +38,11 @@ export function parseOfferProposals(raw: string, docs: PrefillOfferSource[], ori
       const date = /^\d{2}\.\d{2}\.\d{4}$/.test(row.date) ? row.date : ''
       const page = Number.isInteger(row.page) && row.page > 0 && row.page <= 100 ? ` · pagina ${row.page}` : ''
       if (!price || !currency || !number(row.qty, true) || !date || !text(row.specs)) warnings.push(`${text(row.product)}: verifică și completează datele lipsă; nu au fost presupuse.`)
-      return { supplier: text(doc.furnizor || row.supplier), product: text(row.product), specs: text(row.specs, 4000), unit: text(row.unit, 30), qty: number(row.qty, true), price, priceMode: mode || 'gross', currency, rate: currency === 'RON' ? '1' : '', source: `${doc.fisier_nume}${page} · ${origin}/api/chitante/document?id=${encodeURIComponent(doc.id)}`, date }
+      const website = offerWebsite(row.website)
+      const netPrice = format && price && mode === 'gross' ? purchaseAmounts(price, '1', '1', 'gross')?.netUnit.toFixed(2) || '' : price
+      if (format && !website) warnings.push('Site-ul furnizorului nu apare clar în ofertă; completează-l după verificare.')
+      if (format && !common) warnings.push('Nu există 3–4 specificații comune confirmate. Revizuiește descrierile înainte de generare.')
+      return { supplier: text(doc.furnizor || row.supplier), website, product: text(format?.product || row.product), specs: format && common ? common : text(row.specs, 4000), unit: text(row.unit, 30) || (format ? 'buc' : ''), qty: format?.quantity || number(row.qty, true), price: netPrice, priceMode: format && mode ? 'net' : mode || 'gross', currency, rate: currency === 'RON' ? '1' : '', source: `${doc.fisier_nume}${page}${format ? ` · ${text(row.product)}` : ''} · ${origin}/api/chitante/document?id=${encodeURIComponent(doc.id)}`, date }
     })
     if (!lines.length) warnings.push('Nu au fost identificate produse clare în acest PDF.')
     const savedTotal = typeof doc.suma === 'number' && Number.isFinite(doc.suma) && doc.suma > 0 ? doc.suma : undefined
@@ -53,4 +67,17 @@ export function offerSelectionText(proposal: OfferProposal): string {
   const complete = priced.length === 1 && priced.every(row => !!row.amount && !!row.line.currency) && currencies.size === 1
   const total = complete ? priced.reduce((sum, row) => sum + row.amount!.netTotal, 0).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ` ${proposal.lines[0].currency} fără TVA` : '[valoarea fără TVA de verificat]'
   return `Oferta selectată: ${proposal.lines[0]?.supplier || '[furnizor de completat]'}, conform ${proposal.name}. Valoarea: ${total}. Motivul alegerii: [completează după compararea specificațiilor, prețului și condițiilor ofertelor]. Nu se presupune că oferta cea mai ieftină este automat comparabilă sau eligibilă.`
+}
+
+export function lowestNoteOffer(draft: Draft): { index: number; amount: number; text: string } | null {
+  if (draft.lines.length !== 3 || new Set(draft.lines.map(line => line.supplier.trim().toLocaleLowerCase('ro-RO'))).size !== 3 || draft.lines.some(line => !line.supplier.trim() || !line.source.trim() || !line.product.trim() || !line.specs.trim() || line.currency !== 'RON' || Number(line.qty) !== 1)) return null
+  if (new Set(draft.lines.map(line => line.product.trim().toLocaleLowerCase('ro-RO'))).size !== 1 || new Set(draft.lines.map(line => line.specs.trim())).size !== 1) return null
+  const values = draft.lines.map(line => purchaseAmounts(line.price, line.qty, line.rate, line.priceMode || 'net'))
+  if (values.some(value => !value)) return null
+  const minimum = Math.min(...values.map(value => value!.netTotal))
+  const indexes = values.map((value, index) => value!.netTotal === minimum ? index : -1).filter(index => index >= 0)
+  if (indexes.length !== 1) return null
+  const index = indexes[0]
+  const amount = minimum.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return { index, amount: minimum, text: `În urma analizei celor trei oferte consultate, am ales oferta nr. ${index + 1}, de la ${draft.lines[index].supplier}, în valoare de ${amount} lei fără TVA, deoarece are prețul cel mai mic fără TVA.` }
 }

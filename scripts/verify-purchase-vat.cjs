@@ -26,11 +26,12 @@ async function main() {
   const { emptyLine, FORM_FIELDS } = localModule('proiect-workflow')
   assert.equal(emptyLine().priceMode, 'gross')
   for (const kind of ['nota','receptie','oferta']) {
-    const draft = { fields: Object.fromEntries(Object.keys(FORM_FIELDS[kind]).map(key=>[key,'Test'])), lines: [{ ...emptyLine(), supplier: 'Furnizor', product: 'Produs', specs: 'Specificații', price: '1210,00', source: 'Ofertă', date: '11.10.2026' }] }
+    const draft = { fields: Object.fromEntries(Object.keys(FORM_FIELDS[kind]).map(key=>[key,'Test'])), lines: [{ ...emptyLine(), supplier: 'Furnizor', website: 'https://altex.ro/', product: 'Aer condiționat', specs: 'Alimentare electrică\nCapacitate minimum 12000 BTU\nFuncție de răcire și încălzire', price: '1210,00', source: 'https://contaflow.xyz/api/chitante/document?id=test', date: '11.10.2026' }] }
     const bytes = await generateProjectDoc(kind,draft,{beneficiar:'Beneficiar',reprezentant:'Reprezentant'})
     const zip = await JSZip.loadAsync(bytes)
     const xml = await zip.file('word/document.xml').async('string')
-    assert.match(xml,/TVA 21%/);assert.match(xml,/210,00/);assert.match(xml,/1[.\s\u00a0]210,00/)
+    if (kind === 'nota') { assert.match(xml,/1[.\s\u00a0]000,00/); assert.doesNotMatch(xml,/TVA 21%:/); assert.match(xml,/Furnizor/); assert.match(xml,/https:\/\/altex.ro\//); assert.match(xml,/Aer condiționat/); assert.match(xml,/w:br/); assert.doesNotMatch(xml,/contaflow.xyz\/api\/chitante/) }
+    else { assert.match(xml,/TVA 21%/);assert.match(xml,/210,00/);assert.match(xml,/1[.\s\u00a0]210,00/) }
     assert.doesNotMatch(xml,/1[.\s\u00a0]464,10/)
   }
   console.log('OK: TVA inclus/fără TVA, virgule, cantități, curs, compatibilitate și Word fără dublă TVA.')

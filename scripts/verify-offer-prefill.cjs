@@ -14,7 +14,7 @@ function local(name) {
   return module.exports
 }
 async function main() {
-  const {parseOfferProposals,appendOfferProposal,offerSelectionText}=local('achizitii-offer-prefill')
+  const {parseOfferProposals,appendOfferProposal,offerSelectionText,lowestNoteOffer,offerWebsite}=local('achizitii-offer-prefill')
   const {emptyLine}=local('proiect-workflow')
   const doc={id:'a',fisier_nume:'Oferta 1.pdf',furnizor:'Furnizor confirmat',suma:1210,valuta:'RON'}
   const row={supplier:'AI supplier',product:'Aer condiționat model A',specs:'12000 BTU',unit:'buc',qty:'1',price:'1210',priceMode:'gross',currency:'RON',date:'12.10.2026',page:2}
@@ -40,6 +40,18 @@ async function main() {
   assert.ok(mismatch.warnings.some(w=>w.includes('diferă')))
   assert.throws(()=>parseOfferProposals(raw,[{...doc,id:'other'}],'https://contaflow.xyz'))
   assert.throws(()=>appendOfferProposal({...original,lines:Array.from({length:20},(_,i)=>({...emptyLine(),product:String(i)}))},proposal))
+  const formattedRaw=JSON.stringify({commonSpecs:['Alimentare electrică','Capacitate minimă 12000 BTU','Funcție de răcire și încălzire'],offers:[{id:'a',lines:[{...row,website:'altex.ro'}],warnings:[]}]})
+  const formatted=parseOfferProposals(formattedRaw,[doc],'https://contaflow.xyz',{product:'Aer condiționat',quantity:'1'})[0]
+  const formattedLine=formatted.lines[0]
+  assert.equal(formattedLine.product,'Aer condiționat');assert.equal(formattedLine.qty,'1');assert.equal(formattedLine.website,'https://altex.ro/')
+  assert.equal(formattedLine.specs.split('\n').length,3);assert.equal(formattedLine.price,'1000.00');assert.equal(formattedLine.priceMode,'net')
+  assert.equal(offerWebsite('javascript:alert(1)'),'');assert.equal(offerWebsite('https://user:password@example.com'),'')
+  const comparison={fields:{},lines:['A','B','C'].map((supplier,index)=>({...formattedLine,supplier,price:String(1000+index*100)}))}
+  const winner=lowestNoteOffer(comparison);assert.equal(winner.index,0);assert.equal(winner.amount,1000);assert.match(winner.text,/prețul cel mai mic fără TVA/)
+  assert.equal(lowestNoteOffer({...comparison,lines:comparison.lines.slice(0,2)}),null)
+  assert.equal(lowestNoteOffer({...comparison,lines:comparison.lines.map(line=>({...line,price:'1000'}))}),null)
+  assert.equal(lowestNoteOffer({...comparison,lines:comparison.lines.map((line,index)=>index===1?{...line,currency:'EUR'}:line)}),null)
+  assert.equal(lowestNoteOffer({...comparison,lines:comparison.lines.map((line,index)=>index===1?{...line,specs:'Alte specificații'}:line)}),null)
 
   const filename=path.resolve(__dirname,'../app/api/achizitii/oferte/precompletare/route.ts')
   const id='11111111-1111-1111-1111-111111111111'
@@ -47,7 +59,8 @@ async function main() {
   let calls=0
   const filters=[]
   const query={eq:(key,value)=>{filters.push([key,value]);return query},order:async()=>({data:docs})}
-  const sb={from:()=>({select:()=>query}),storage:{from:()=>({download:async name=>{assert.equal(name,'original.pdf');return {data:new Blob(['%PDF-original'])}}})}}
+  const purchaseQuery={eq:()=>purchaseQuery,single:async()=>({data:{denumire:'Aer condiționat',nota:'Minimum 12000 BTU'}})}
+  const sb={from:table=>({select:()=>table==='proiect_achizitii'?purchaseQuery:query}),storage:{from:()=>({download:async name=>{assert.equal(name,'original.pdf');return {data:new Blob(['%PDF-original'])}}})}}
   class WorkflowError extends Error{constructor(message,status=400){super(message);this.status=status}}
   class Anthropic{constructor(){this.messages={create:async request=>{calls++;assert.equal(request.messages[0].content.filter(item=>item.type==='document').length,1);return {content:[{type:'text',text:JSON.stringify({offers:[{id,lines:[row],warnings:[]}]})}]}}}}}
   const module={exports:{}}
