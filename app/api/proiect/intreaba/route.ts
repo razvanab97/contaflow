@@ -4,6 +4,7 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 import { MODEL_PROIECT, contextLive, promptFix } from '@/lib/proiect-intreaba'
 import type { StarePlan } from '@/lib/proiect-plan'
 import { adaugaMemorie, extrageMemorieDinRaspuns } from '@/lib/proiect-memorie'
+import { contextPlatforma } from '@/lib/proiect-context-platforma'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // raspuns in timp real, cu gandire - poate depasi 60s la intrebari complexe
@@ -35,7 +36,10 @@ export async function POST(req: NextRequest) {
 
   const sb = getServiceSupabase()
   const { data: st, error: eSt } = await sb.from('proiect_plan_stari').select('cheie,status,nota,data_realizare').eq('firma_id', firmaId)
-  const live = await contextLive(sb, firmaId, eSt ? [] : (st || []) as StarePlan[])
+  const [live, platforma] = await Promise.all([
+    contextLive(sb, firmaId, eSt ? [] : (st || []) as StarePlan[]),
+    contextPlatforma(sb, firmaId).catch(e => `DATE DIN PLATFORMA CONTAFLOW: indisponibile momentan (${e instanceof Error ? e.message : e})`),
+  ])
 
   // Ultimele schimburi, ca sa se poata pune intrebari de continuare ("si la cofinantare?").
   const messages: Anthropic.MessageParam[] = []
@@ -59,6 +63,8 @@ export async function POST(req: NextRequest) {
           output_config: { effort: (process.env.PROIECT_AI_EFFORT as 'low' | 'medium' | 'high') || 'medium' },
           system: [
             { type: 'text', text: promptFix(), cache_control: { type: 'ephemeral' } },
+            // Datele din toate modulele - stabile intre intrebarile unei conversatii, deci cache-uite si ele.
+            { type: 'text', text: platforma, cache_control: { type: 'ephemeral' } },
             { type: 'text', text: live },
           ],
           messages,
