@@ -55,9 +55,13 @@ function AchizitieDocumente({ achizitieId, culoare, etapaCuranta, onChange }: { 
   const [docs, setDocs] = useState<AchizitieDoc[]>([])
   const [busy, setBusy] = useState(false)
   const [tipDosar, setTipDosar] = useState('')
+  const [error, setError] = useState('')
 
   const load = useCallback(() => {
-    fetch(`/api/achizitii/documente?achizitieId=${achizitieId}`).then(r => r.json()).then(d => setDocs(Array.isArray(d) ? d : []))
+    return fetch(`/api/achizitii/documente?achizitieId=${achizitieId}`).then(r => {
+      if (!r.ok) throw new Error('Documentele nu au putut fi citite.')
+      return r.json()
+    }).then(d => { setDocs(Array.isArray(d) ? d : []); setError('') }).catch(() => setError('Documentele nu au putut fi citite. Reîncearcă.'))
   }, [achizitieId])
 
   useEffect(() => { load() }, [load])
@@ -67,26 +71,37 @@ function AchizitieDocumente({ achizitieId, culoare, etapaCuranta, onChange }: { 
     const fd = new FormData()
     fd.append('file', file); fd.append('achizitieId', achizitieId); fd.append('etapa', etapaCuranta)
     if (tipDosar) fd.append('tipDosar', tipDosar)
-    await fetch('/api/achizitii/documente', { method: 'POST', body: fd })
-    onChange?.()
-    setBusy(false)
-    load()
+    setError('')
+    try {
+      const response = await fetch('/api/achizitii/documente', { method: 'POST', body: fd })
+      if (!response.ok) throw new Error('Documentul nu a putut fi încărcat.')
+      onChange?.()
+      await load()
+    } catch { setError('Documentul nu a putut fi încărcat. Reîncearcă.') }
+    finally { setBusy(false) }
   }
 
   async function remove(id: string) {
     if (!confirm('Ștergi documentul?')) return
-    await fetch(`/api/chitante/document?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
-    load()
+    setBusy(true); setError('')
+    try {
+      const response = await fetch(`/api/chitante/document?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Documentul nu a putut fi șters.')
+      onChange?.()
+      await load()
+    } catch { setError('Documentul nu a putut fi șters. Reîncearcă.') }
+    finally { setBusy(false) }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+      {error && <div role="alert" style={{ color: 'var(--danger)' }}>{error} <button type="button" className="btn btn-sm" disabled={busy} onClick={load}>Reîncearcă</button></div>}
       {docs.map(d => (
         <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-xs)', color: 'var(--c-999999)' }}>
           <span style={{ padding: '1px 6px', borderRadius: 'var(--r-full)', background: 'var(--c-1a1a1a)', fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)' }}>{STATUS_LABEL[d.tip_document] || d.tip_document}</span>
           <VeziButon url={`/api/chitante/document?id=${d.id}`} />
-          <a href={`/api/chitante/document?id=${d.id}`} style={{ color:'var(--accent)', textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}{/^Oferta [1-3]\.pdf$/i.test(d.fisier_nume)&&d.furnizor?` · ${d.furnizor}`:''}</a>
-          <button onClick={() => remove(d.id)} style={{ color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 'var(--fs-xs)' }}>✕</button>
+          <a href={`/api/chitante/document?id=${d.id}`} download={d.fisier_nume} title={d.fisier_nume} style={{ color:'var(--accent)', textDecoration: 'none', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}{/^Oferta [1-3]\.pdf$/i.test(d.fisier_nume)&&d.furnizor?` · ${d.furnizor}`:''}</a>
+          <button type="button" disabled={busy} aria-label={`Șterge ${d.fisier_nume}`} onClick={() => remove(d.id)} style={{ color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 'var(--fs-xs)' }}>Șterge</button>
         </div>
       ))}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -203,8 +218,7 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
 
 
   async function setStatus(id: string, status: string) {
-    setItems(prev => prev ? prev.map(i => i.id === id ? { ...i, status } : i) : prev)
-    await fetch(`/api/achizitii/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+    await patch(id, { status }, { status })
   }
 
   async function remove(id: string) {
@@ -264,18 +278,21 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
         return (
           <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {titluGrup && <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--text-primary)', marginTop: poz ? '10px' : 0 }}>{titluGrup}</div>}
-          <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--c-eeeeee)' }}>{item.denumire}</div>
+                <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--text-primary)' }}>{item.denumire}</div>
                 <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>
                   {item.valoare != null ? `${item.valoare.toLocaleString('ro-RO')} RON` : 'fără valoare'} · {item.sursa === 'grant' ? 'subvenție' : item.sursa === 'cofinantare' ? 'cofinanțare' : item.sursa || 'sursă nealeasă'}
                 </div>
-                {item.nota && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '820px', lineHeight: 1.5 }}>{item.nota}</div>}
+                <span className="badge badge-accent" style={{ marginTop: 8 }}>{STATUS_LABEL[item.status] || item.status}</span>
               </div>
               <button onClick={() => remove(item.id)} style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Șterge</button>
             </div>
 
+            <details style={{ marginTop: 12, fontSize: 'var(--fs-sm)' }}>
+              <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}>Descriere și schimbare manuală a etapei</summary>
+              {item.nota && <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{item.nota.replace(/\[flux-achizitie:[^\]]+\]\s*/g, '')}</p>}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', flexWrap: 'wrap' }}>
               {STATUS_ORDER.map((s, i) => (
                 <span key={s} style={{
@@ -293,8 +310,10 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
                 </button>
               )}
             </div>
+            </details>
 
             <PasiAchizitie item={item} docs={dosare[item.id] || []}
+              documents={<AchizitieDocumente key={versiuneDocs} achizitieId={item.id} culoare={firma.culoare} etapaCuranta={item.status} onChange={() => { load(); setVersiuneDocs(v => v + 1) }} />}
               onFlux={flow=>{const nota=withPurchaseFlow(item.nota,flow);void patch(item.id,{nota},{nota});setFormular({id:item.id,kind:flow==='trei_oferte'?'nota':'oferta'})}}
               onLinie={v => patch(item.id, { linieBuget: v || null }, { linie_buget: v || null })}
               onSursa={v => patch(item.id, { sursa: v || null }, { sursa: v || null })}
@@ -305,10 +324,6 @@ export default function AchizitiiModule({ firma, lunaId }: Props) {
             <details id={`formulare-${item.id}`} open={formular?.id === item.id || undefined} style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12, scrollMarginTop: '80px' }}>
               <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650, color: firma.culoare }}>Formulare achiziție (Word): cerere ofertă, notă estimare, recepție</summary>
               <div style={{ marginTop: 16 }}><ProiectWorkflow firmaId={firma.id} purchaseId={item.id} formKind={formular?.id === item.id ? formular.kind : purchaseFlow(item.nota)==='trei_oferte'?'nota':'oferta'} /></div>
-            </details>
-            <details style={{ marginTop: 8 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>Toate documentele ({(dosare[item.id] || []).length})</summary>
-              <AchizitieDocumente key={versiuneDocs} achizitieId={item.id} culoare={firma.culoare} etapaCuranta={item.status} onChange={load} />
             </details>
 
             {sugestii.filter(s => s.achizitie_id === item.id).map(s => (

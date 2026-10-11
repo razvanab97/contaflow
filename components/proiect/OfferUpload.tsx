@@ -72,7 +72,8 @@ export default function OfferUpload({ purchaseId, status, onUploaded, complete =
     {loadError && <p role="alert">{loadError} <button type="button" className="btn btn-sm" onClick={()=>setRefresh(value=>value+1)}>Reîncearcă</button></p>}
     {!loading && !loadError && !offers.length && <p>Nu există încă oferte PDF salvate în acest dosar.</p>}
     {offers.map(offer => <div key={offer.id} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:8,padding:10,border:'1px solid var(--border)',borderRadius:'var(--r-md)'}}>
-      <div style={{flex:'1 1 200px',overflowWrap:'anywhere'}}>{offer.fisier_nume}{offer.furnizor ? ` · ${offer.furnizor}` : ''}
+      <div style={{flex:'1 1 200px',minWidth:0,overflowWrap:'anywhere'}}><strong>{offer.furnizor || offer.fisier_nume}</strong>
+        {offer.furnizor && <div title={offer.fisier_nume} style={{fontSize:'var(--fs-xs)',color:'var(--text-secondary)',marginTop:4}}>{offer.fisier_nume}</div>}
         <OfferPrice id={offer.id} suma={offer.suma} valuta={offer.valuta} onSaved={()=>{setRefresh(value=>value+1);onUploaded()}}/>
       </div>
       <VeziButon url={`/api/chitante/document?id=${encodeURIComponent(offer.id)}`} nume={offer.fisier_nume}/>

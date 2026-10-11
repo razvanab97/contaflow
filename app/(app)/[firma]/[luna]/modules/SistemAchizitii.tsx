@@ -3,6 +3,7 @@ import { useState } from 'react'
 import {purchaseFlow,withPurchaseFlow,type PurchaseFlow} from '@/lib/achizitii-flow'
 import SpecificationAiExpander from '@/components/proiect/SpecificationAiExpander'
 import OfferUpload from '@/components/proiect/OfferUpload'
+import PurchaseWorkspace from '@/components/proiect/PurchaseWorkspace'
 import { BUGET_ACHIZITII, PASI_PROCEDURA, PROIECT, coduriDin, linieDupaCod, dosarAchizitie, urmatorulPas, type DocDosar, type LinieBuget } from '@/lib/achizitii-procedura'
 
 const lei = (v: number) => new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
@@ -169,8 +170,9 @@ export function etapaDinDosar(dosar: ReturnType<typeof dosarAchizitie>): string 
   return 'oferta'
 }
 
-export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGenereaza, onStatus, onFlux }: {
+export function PasiAchizitie({ item, docs, documents, onLinie, onSursa, onUploaded, onGenereaza, onStatus, onFlux }: {
   item: AchizitieSistem; docs: DocDosar[]
+  documents?: React.ReactNode
   onLinie: (v: string) => void; onSursa: (v: string) => void; onUploaded: () => void
   onGenereaza: (k: FormKindAch) => void; onStatus: (s: string) => void
   onFlux: (flow: PurchaseFlow) => void
@@ -182,10 +184,8 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
   const dosar = dosarAchizitie(docs, { utilaj, online })
   const el = (k: string) => dosar.find(e => e.cheie === k)
   const finalizat = item.status === 'finalizat'
-  const [arata, setArata] = useState(!finalizat)
   const [incarc, setIncarc] = useState<string | null>(null)
   const [mesaj, setMesaj] = useState('')
-  const [pasEditat, setPasEditat] = useState<string | null>(null)
   const buget = coduri.reduce((s, c) => s + (linieDupaCod(c)?.valoare || 0), 0)
 
   async function incarca(tip: string, files: FileList | null) {
@@ -245,63 +245,26 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
   const etapa = etapaDinDosar(dosar)
   const deAvansat = !finalizat && ORDINE_STATUS.indexOf(etapa) > ORDINE_STATUS.indexOf(item.status)
 
-  return (
-    <div style={{ marginTop: '12px' }}>
-      <label style={{display:'block',fontSize:'var(--fs-sm)',marginBottom:12}}>Fluxul acestei achiziții
-        <select aria-label="Fluxul acestei achiziții" value={flux||''} onChange={e=>{if(e.target.value)onFlux(e.target.value as PurchaseFlow)}} style={{display:'block',marginTop:6,padding:8,maxWidth:'100%',background:'var(--surface-sunken)',color:'var(--text-primary)',border:'1px solid var(--border)',borderRadius:'var(--r-md)'}}>
-          <option value="">Alege fluxul — dosarul existent este păstrat</option><option value="cerere">1. Cerere de ofertă — furnizor cunoscut</option><option value="trei_oferte">2. Trei oferte → Anexa 1 — nota de determinare</option>
+  return <PurchaseWorkspace id={item.id} steps={pasi} documents={documents} finished={finalizat}
+    onFinish={() => { if (!curent || confirm('Dosarul nu e complet. Marchezi totuși achiziția ca finalizată?')) onStatus('finalizat') }}
+    settings={<>
+      <label style={{ display: 'block', marginTop: 8 }}>Fluxul acestei achiziții
+        <select aria-label="Fluxul acestei achiziții" value={flux || ''} onChange={e => { if (e.target.value) onFlux(e.target.value as PurchaseFlow) }} style={{ display: 'block', marginTop: 6, padding: 8, maxWidth: '100%', background: 'var(--surface-sunken)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)' }}>
+          <option value="">Alege fluxul — dosarul existent este păstrat</option>
+          <option value="cerere">1. Cerere de ofertă — furnizor cunoscut</option>
+          <option value="trei_oferte">2. Trei oferte — Anexa 1</option>
         </select>
       </label>
-      {flux&&<p style={{fontSize:'var(--fs-sm)',color:'var(--text-secondary)',marginBottom:12}}>{flux==='cerere'?'Începi cu cererea de ofertă către furnizorul cunoscut. Datele furnizorului se completează în formular.':'Începi prin încărcarea celor trei oferte, apoi completezi Anexa 1 din datele lor. Cererea de ofertă nu este pasul de pornire în acest flux.'} Schimbarea fluxului nu șterge documente și nu confirmă eligibilitatea sau semnarea lor.</p>}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: finalizat ? 'var(--success)' : 'var(--text-primary)' }}>{finalizat ? '✓ Achiziție finalizată' : `Pașii achiziției · ${facute}/${pasi.length}`}</span>
-        <div style={{ flex: '1 1 120px', height: '6px', borderRadius: 'var(--r-full)', background: 'var(--surface-secondary)', overflow: 'hidden', maxWidth: '240px' }}>
-          <div style={{ width: `${(facute / pasi.length) * 100}%`, height: '100%', background: 'var(--success)' }} />
-        </div>
-        {finalizat && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>dosar {facute}/{pasi.length}{facute < pasi.length ? ' — documente de completat pentru arhivă' : ' complet'}</span>}
-        <button type="button" className="btn btn-sm btn-ghost" onClick={() => setArata(v => !v)}>{arata ? 'Ascunde pașii' : 'Arată pașii'}</button>
-      </div>
-      {deAvansat && (
-        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: 'var(--fs-sm)', padding: '8px 10px', borderRadius: 'var(--r-md)', background: 'var(--accent-soft)' }}>
-          Dosarul arată că achiziția a ajuns la etapa „{STATUS_LABEL[etapa]}”.
-          <button type="button" className="btn btn-sm btn-primary" onClick={() => onStatus(etapa)}>Treci la „{STATUS_LABEL[etapa]}”</button>
-        </div>
-      )}
-      {arata && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
-          {pasi.map((p, i) => {
-            const esteCurent = !finalizat && curent?.cheie === p.cheie
-            const esteEditat = pasEditat === `${item.id}:${p.cheie}`
-            const actiuniVizibile = esteEditat || esteCurent || !p.ok || p.cheie === 'buget' || p.cheie === 'oferte'
-            return (
-              <div key={p.cheie} style={{ display: 'flex', gap: '12px', padding: '10px 12px', borderRadius: 'var(--r-md)', border: `1px solid ${esteCurent || esteEditat ? 'var(--accent)' : 'var(--border-subtle)'}`, background: esteCurent || esteEditat ? 'var(--accent-soft)' : 'var(--surface-secondary)' }}>
-                <span style={{ width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xs)', fontWeight: 750, background: p.ok ? 'var(--success-soft)' : p.partial ? 'var(--warning-soft)' : 'var(--surface)', color: p.ok ? 'var(--success)' : p.partial ? 'var(--warning)' : 'var(--text-secondary)', border: p.ok ? 'none' : '1px solid var(--border)' }}>{p.ok ? '✓' : i + 1}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 'var(--fs-md)', fontWeight: 650, color: 'var(--text-primary)' }}>{p.titlu}</span>
-                    {esteCurent && <span className="badge badge-accent">pasul curent</span>}
-                    <span style={{ fontSize: 'var(--fs-xs)', color: p.ok ? 'var(--success)' : p.partial ? 'var(--warning)' : 'var(--text-secondary)' }}>{p.detaliu}</span>
-                    {p.ok && <button type="button" className="btn btn-sm" aria-expanded={esteEditat} aria-controls={`pas-${item.id}-${p.cheie}`} aria-label={`${esteEditat ? 'Închide editarea' : 'Editează pasul'}: ${p.titlu}`} onClick={()=>setPasEditat(esteEditat ? null : `${item.id}:${p.cheie}`)}>{esteEditat ? 'Închide editarea' : 'Editează pasul'}</button>}
-                  </div>
-                  {esteEditat && <p role="status" style={{fontSize:'var(--fs-sm)',margin:'8px 0',color:'var(--text-secondary)'}}>Editezi un pas deja completat. Folosește acțiunile de mai jos pentru a salva modificările; documentele existente și etapa achiziției sunt păstrate.</p>}
-                  <div id={`pas-${item.id}-${p.cheie}`} hidden={!actiuniVizibile}>
-                    {actiuniVizibile && <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>{p.actiuni}</div>}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-          {!finalizat && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '10px 12px', borderRadius: 'var(--r-md)', border: '1px dashed var(--border)' }}>
-              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', flex: 1 }}>{curent ? `Când dosarul e complet, achiziția se marchează finalizată. Acum lipsește: ${curent.titlu.toLowerCase()}.` : 'Dosarul e complet — poți finaliza achiziția.'}</span>
-              <button type="button" className={curent ? 'btn btn-sm' : 'btn btn-sm btn-primary'} onClick={() => { if (!curent || confirm('Dosarul nu e complet. Marchezi totuși achiziția ca finalizată?')) onStatus('finalizat') }}>✓ Marchează finalizată</button>
-            </div>
-          )}
-          {mesaj && <div role="status" style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{mesaj}</div>}
-        </div>
-      )}
-    </div>
-  )
+      <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>{flux === 'cerere' ? 'Începi cu cererea către furnizor, apoi compari ofertele.' : flux === 'trei_oferte' ? 'Încarci trei oferte, apoi completezi nota de estimare din datele lor.' : 'Alege fluxul potrivit pentru această achiziție.'} Schimbarea fluxului păstrează documentele. Existența documentelor nu confirmă semnarea sau eligibilitatea lor.</p>
+    </>}
+    notice={<>
+      {deAvansat && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 10, borderRadius: 'var(--r-md)', background: 'var(--accent-soft)', fontSize: 'var(--fs-sm)' }}>
+        Etapă sugerată din documente: {STATUS_LABEL[etapa]}.
+        <button type="button" className="btn btn-sm" onClick={() => onStatus(etapa)}>Confirmă etapa</button>
+      </div>}
+      {mesaj && <p role="status" style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{mesaj}</p>}
+    </>}
+  />
 }
 
 // --- Achizitie noua: din buget sau in afara lui ------------------------------------------------
