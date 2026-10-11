@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 240, text: 'Anexa 1: AI-ul poate citi ofertele PDF ale achiziției și propune poziții cu furnizor, produs, specificații, cantitate, preț, TVA, dată și sursă. Preluarea este confirmată, fără suprascriere sau dublare; datele lipsă și cursul valutar rămân de completat. Furnizorul se selectează explicit pentru o justificare editabilă, fără alegere automată sau folosirea bugetului drept preț.' },
   { v: 239, text: 'Achiziții: fiecare pas completat poate fi redeschis cu Editează pasul, inclusiv în dosarele finalizate. Acțiunile pentru formular și încărcare reapar, iar pasul editat este evidențiat; revenirea nu șterge documente și nu schimbă etapa achiziției.' },
   { v: 238, text: 'Oferte achiziții: descrierea afișează totalul cu TVA, baza calculată și TVA 21%, în moneda ofertei. Prețul poate fi completat la încărcare sau ulterior, inclusiv printr-o propunere AI citită din PDF și confirmată înainte de salvare. Nu se inventează totaluri pentru pagini cu produse alternative.' },
   { v: 237, text: 'Achiziții: ofertele PDF salvate au o listă separată în pasul ofertelor, cu furnizor, Vezi și Descarcă PDF individual. Lista rămâne accesibilă după completarea celor trei oferte și se actualizează la salvare.' },
