@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import {purchaseFlow,withPurchaseFlow,type PurchaseFlow} from '@/lib/achizitii-flow'
+import SpecificationAiExpander from '@/components/proiect/SpecificationAiExpander'
 import { BUGET_ACHIZITII, PASI_PROCEDURA, PROIECT, coduriDin, linieDupaCod, dosarAchizitie, urmatorulPas, type DocDosar, type LinieBuget } from '@/lib/achizitii-procedura'
 
 const lei = (v: number) => new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
@@ -297,7 +298,7 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
 
 // --- Achizitie noua: din buget sau in afara lui ------------------------------------------------
 export interface AchizitieNouaDate { denumire: string; valoare: number | null; sursa: string; linieBuget: string | null; nota: string }
-export function AchizitieNoua({ items = [], onCreeaza, onAnuleaza, busy }: { items?: AchizitieSistem[]; onCreeaza: (d: AchizitieNouaDate) => void; onAnuleaza: () => void; busy: boolean }) {
+export function AchizitieNoua({ firmaId, items = [], onCreeaza, onAnuleaza, busy }: { firmaId: string; items?: AchizitieSistem[]; onCreeaza: (d: AchizitieNouaDate) => void; onAnuleaza: () => void; busy: boolean }) {
   // liniile care au deja achizitie (facuta sau pornita) nu mai apar in lista
   const folosite = new Set(items.flatMap(i => coduriDin(i.linie_buget)))
   const disponibile = BUGET_ACHIZITII.filter(x => !folosite.has(x.cod))
@@ -369,8 +370,9 @@ export function AchizitieNoua({ items = [], onCreeaza, onAnuleaza, busy }: { ite
           <input value={valoare} onChange={e => setValoare(e.target.value)} inputMode="decimal" placeholder="ex. 3099" style={inp} />
         </label>
         <label style={{ ...lab, gridColumn: '1 / -1' }}>Specificații tehnice minime
-          <textarea value={specificatii} onChange={e => setSpecificatii(e.target.value)} rows={3} placeholder="ex. putere minim 12000 BTU, clasă energetică A++, funcție de încălzire, montaj inclus" style={{ ...inp, resize: 'vertical' }} />
+          <textarea value={specificatii} onChange={e => setSpecificatii(e.target.value)} rows={3} placeholder="ex. 12000 BTU, montaj inclus — scrie pe scurt și folosește AI pentru redactare" style={{ ...inp, resize: 'vertical' }} />
         </label>
+        <SpecificationAiExpander firmaId={firmaId} product={denumire} type={tip} keywords={specificatii} disabled={busy} onApply={setSpecificatii}/>
       </div>
       {!valoareValida && <div role="alert" style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>Introdu o valoare validă, mai mare decât zero.</div>}
       {l && depasire > 0 && <div role="status" style={{ fontSize: 'var(--fs-sm)', padding: '9px 12px', borderRadius: 'var(--r-md)', background: 'var(--warning-soft)', color: 'var(--warning)' }}>Poți crea achiziția peste buget. Buget aprobat: {lei(l.valoare)} lei · Diferență: +{lei(depasire)} lei (cu TVA). Bugetul aprobat nu se modifică automat; verifică separat eligibilitatea și finanțarea diferenței.</div>}
