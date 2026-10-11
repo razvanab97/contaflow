@@ -82,6 +82,7 @@ export function dosarAchizitie(docs: DocDosar[], opts: { utilaj?: boolean; onlin
   const are = (re: RegExp) => n.filter(d => re.test(d.n))
   const cerere = are(/cerere (de )?oferta|anexa 2/)
   const oferte = n.filter(d => /ofert|discutie oferta/.test(d.n) && !/cerere (de )?oferta|anexa 2/.test(d.n))
+  const nrOferte = new Set(oferte.map((d,index)=>d.n.match(/\[furnizor=([a-z0-9_]+)\]/)?.[1]||`legacy-${index}`)).size
   const nota = are(/anexa 1|nota privind|determinare|nota de estimare/)
   const factura = are(/factur|dante|sdsis-f/).filter(d => !/proforma/.test(d.n))  // facturile eMAG/Dante nu au "factura" in nume
   const proforma = are(/proforma|order_|comanda|deviz/)
@@ -92,8 +93,8 @@ export function dosarAchizitie(docs: DocDosar[], opts: { utilaj?: boolean; onlin
   const out: ElementDosar[] = [
     // Cererea de ofertă s-a folosit la achizițiile mari (utilaje, servicii, rețea electrică); la cele mici,
     // cele 3 oferte de pe site-uri au fost suficiente - fără cerere nu e o lipsă dacă există 3 oferte.
-    { cheie: 'cerere', titlu: 'Cerere de ofertă (Anexa 2)', ok: cerere.length > 0 || oferte.length >= 3 || !!opts.online, partial: !cerere.length, detaliu: cerere.length ? `${cerere.length} document${cerere.length > 1 ? 'e' : ''}` : oferte.length >= 3 || opts.online ? 'nu e în dosar — la achizițiile mici, ofertele de pe site-uri au fost suficiente' : 'lipsește' },
-    { cheie: 'oferte', titlu: '3 oferte', ok: oferte.length >= 3, partial: oferte.length > 0 && oferte.length < 3, detaliu: `${oferte.length} din 3` },
+    { cheie: 'cerere', titlu: 'Cerere de ofertă (Anexa 2)', ok: cerere.length > 0 || nrOferte >= 3 || !!opts.online, partial: !cerere.length, detaliu: cerere.length ? `${cerere.length} document${cerere.length > 1 ? 'e' : ''}` : nrOferte >= 3 || opts.online ? 'nu e în dosar — la achizițiile mici, ofertele de pe site-uri au fost suficiente' : 'lipsește' },
+    { cheie: 'oferte', titlu: '3 oferte', ok: nrOferte >= 3, partial: nrOferte > 0 && nrOferte < 3, detaliu: `${nrOferte} din 3 oferte · ${oferte.length} documente${oferte.some(d=>!d.n.includes('[furnizor='))?' (fișiere vechi negrupate; verifică furnizorii)':''}` },
     { cheie: 'nota', titlu: 'Notă de estimare (Anexa 1)', ok: nota.length > 0, detaliu: nota.length ? 'există' : 'lipsește' },
     ...(opts.utilaj ? [{ cheie: 'contract', titlu: 'Contract', ok: contract.length > 0, detaliu: contract.length ? 'există' : 'lipsește (necesar la echipamente cu montaj)' }] : []),
     { cheie: 'factura', titlu: 'Factură fiscală', ok: factura.length > 0, partial: !factura.length && proforma.length > 0, detaliu: factura.length ? `${factura.length} factur${factura.length > 1 ? 'i' : 'ă'}` : proforma.length ? 'doar proformă / comandă — cere factura fiscală' : 'lipsește' },

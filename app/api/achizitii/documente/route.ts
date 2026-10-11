@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import {randomUUID} from 'node:crypto'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
   const file = fd.get('file') as File | null
   const achizitieId = String(fd.get('achizitieId') || '')
   const tipDosar = String(fd.get('tipDosar') || '')
+  const supplier = String(fd.get('furnizorOferta') || '').trim()
+  const supplierKey = supplier.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')
+  if(supplier && (tipDosar!=='oferta'||supplier.length>120||!supplierKey))return NextResponse.json({error:'Furnizorul ofertei este invalid.'},{status:400})
   // Tipul ales la incarcare decide etapa si prefixul din nume (recunoscut de verificarea dosarului).
   const TIP: Record<string, { eticheta: string; etapa: string }> = {
     cerere: { eticheta: 'Cerere de oferta (Anexa 2)', etapa: 'oferta' }, oferta: { eticheta: 'Oferta', etapa: 'oferta' },
@@ -33,6 +37,7 @@ export async function POST(req: NextRequest) {
   const etapa = tip?.etapa || String(fd.get('etapa') || 'document')
   if (!file || !achizitieId) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
   if (!ALLOWED_TYPES.has(file.type)) return NextResponse.json({ error: 'Sunt acceptate doar fișiere PDF, JPG și PNG' }, { status: 400 })
+  if(!file.size||file.size>4*1024*1024)return NextResponse.json({error:'Fișierul trebuie să aibă între 1 octet și 4 MB.'},{status:400})
 
   const sb = getServiceSupabase()
   const { data: achizitie } = await sb.from('proiect_achizitii').select('id,firma_id,luna_id,denumire').eq('id', achizitieId).single()
@@ -41,7 +46,7 @@ export async function POST(req: NextRequest) {
   const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
   const bytes = new Uint8Array(await file.arrayBuffer())
   const safeName = (achizitie.denumire || 'achizitie').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 40)
-  const path = `${achizitie.firma_id}/${achizitie.luna_id || 'fara-luna'}/achizitii/${achizitieId}_${Date.now()}_${safeName}_${etapa}.${extension}`
+  const path = `${achizitie.firma_id}/${achizitie.luna_id || 'fara-luna'}/achizitii/${achizitieId}_${randomUUID()}_${safeName}_${etapa}.${extension}`
 
   const { error: uploadError } = await sb.storage.from('documente').upload(path, bytes, { contentType: file.type })
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
@@ -52,10 +57,10 @@ export async function POST(req: NextRequest) {
     achizitie_id: achizitieId,
     modul: 'achizitii',
     tip_document: etapa,
-    furnizor: achizitie.denumire,
+    furnizor: supplier || achizitie.denumire,
     fisier_path: path,
     // numele original al fisierului (cu tipul ales in fata), ca sa se vada si sa fie recunoscut in dosar
-    fisier_nume: `${tip ? `${tip.eticheta} - ` : ''}${(file.name || `${safeName}_${etapa}.${extension}`).replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 150)}`,
+    fisier_nume: supplier ? `Oferta [furnizor=${supplierKey}] - ${supplier.replace(/[\\/:*?"<>|]+/g,' ')}.${extension}` : `${tip ? `${tip.eticheta} - ` : ''}${(file.name || `${safeName}_${etapa}.${extension}`).replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 150)}`,
     fisier_tip: file.type,
     fisier_marime: bytes.length,
     in_zip: true,

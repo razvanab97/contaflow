@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 234, text: 'Oferte achiziții: selectează sau lipește din clipboard mai multe poze pentru același furnizor, verifică ordinea și salvează-le într-un singur PDF. O ofertă cu mai multe pagini se numără o singură dată; ofertele noi de la același furnizor nu umflă contorul celor trei furnizori.' },
   { v: 233, text: 'Achiziție nouă: scrie câteva cuvinte la specificații și folosește „Generează specificații cu AI” pentru un text structurat. Propunerea poate fi editată și aplicată explicit; datele lipsă sunt marcate de confirmat. Textul aplicat se salvează în dosar și se preia în formularele Word, fără a suprascrie schimbările făcute în timpul generării.' },
   { v: 232, text: 'Achiziții: două fluxuri de pornire selectabile și salvate în dosar — cerere de ofertă către furnizorul cunoscut sau încărcarea a trei oferte pentru Anexa 1. În fluxul celor trei oferte, cererea nu mai apare ca pas de pornire, iar formularul inițial este nota de determinare. Schimbarea fluxului păstrează documentele și datele existente.' },
   { v: 231, text: 'Formulare achiziții: „Recomandă cu AI” propune specificații tehnice și condiții pentru câmpurile goale, pe baza produselor din dosar. Propunerile se revizuiesc și se aplică individual; nu suprascriu completări, iar numerele, datele, furnizorii și prețurile nu sunt generate.' },

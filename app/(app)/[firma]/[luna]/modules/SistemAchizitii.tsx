@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import {purchaseFlow,withPurchaseFlow,type PurchaseFlow} from '@/lib/achizitii-flow'
 import SpecificationAiExpander from '@/components/proiect/SpecificationAiExpander'
+import OfferUpload from '@/components/proiect/OfferUpload'
 import { BUGET_ACHIZITII, PASI_PROCEDURA, PROIECT, coduriDin, linieDupaCod, dosarAchizitie, urmatorulPas, type DocDosar, type LinieBuget } from '@/lib/achizitii-procedura'
 
 const lei = (v: number) => new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
@@ -223,7 +224,7 @@ export function PasiAchizitie({ item, docs, onLinie, onSursa, onUploaded, onGene
     ...(flux==='trei_oferte'?[]:[{ cheie: 'cerere', titlu: 'Specificații + cerere de ofertă (Anexa 2)', ok: !!el('cerere')?.ok, partial: el('cerere')?.partial, detaliu: el('cerere')!.detaliu,
       actiuni: <><Genereaza k="oferta" eticheta="Completează cererea către furnizor (Word)" /><Incarca tip="cerere" eticheta="Încarcă cererea semnată" /></> }]),
     { cheie: 'oferte', titlu: '3 oferte de la furnizori diferiți', ok: !!el('oferte')?.ok, partial: el('oferte')?.partial, detaliu: el('oferte')!.detaliu,
-      actiuni: <Incarca tip="oferta" eticheta="Încarcă oferte (poți selecta mai multe)" multiplu /> },
+      actiuni: <OfferUpload purchaseId={item.id} status={item.status} onUploaded={onUploaded}/> },
     { cheie: 'nota', titlu: 'Notă de estimare (Anexa 1), semnată', ok: !!el('nota')?.ok, detaliu: el('nota')!.detaliu,
       actiuni: <><Genereaza k="nota" eticheta="Completează Anexa 1 din ofertele primite" /><Incarca tip="nota" eticheta="Încarcă nota semnată" /></> },
     ...(utilaj ? [{ cheie: 'contract', titlu: 'Contract cu furnizorul', ok: !!el('contract')?.ok, detaliu: el('contract')!.detaliu, actiuni: <Incarca tip="contract" eticheta="Încarcă contractul" /> }] : []),
