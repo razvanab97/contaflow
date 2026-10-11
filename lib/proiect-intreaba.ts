@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { listaMemorie, memorieText } from '@/lib/proiect-memorie'
 import { DOCUMENTE_PROIECT, VERSIUNE_DOCUMENTE } from '@/lib/proiect-cunostinte-date'
 import { BUGET_ACHIZITII, PASI_PROCEDURA, PROIECT, coduriDin } from '@/lib/achizitii-procedura'
 import { ACTIVITATI, CHELTUIELI_BUGET_LUNAR, OBLIGATII, STATUS_PLAN, VENITURI_PLAN_LUNAR, etapaProiect, etichetaLuna, lunaProiect, statusImplicitActivitate, termenDepasit, type StarePlan } from '@/lib/proiect-plan'
@@ -34,6 +35,9 @@ REGULI
    - **Bold** doar pentru cifre, sume și termene. Tabel doar dacă compari cifre (max. 4 coloane, 6 rânduri).
    - Lungime: maximum ~180 de cuvinte; până la ~300 doar dacă utilizatorul cere explicit detalii, un plan complet sau o listă lungă.
 
+11. MEMORIA PROIECTULUI (în DATE CONTAFLOW) e jurnalul cu ce s-a întâmplat efectiv — e cea mai recentă sursă; are prioritate față de rapoartele vechi când se contrazic. Folosește-o la orice întrebare despre stadiu.
+12. Când utilizatorul îți spune un FAPT NOU despre proiect (ceva ce s-a întâmplat sau s-a decis: „am primit autorizația de mediu azi”, „am semnat contract cu pensiunea X”, „am făcut atelierul de igienă pe 10 octombrie”), răspunde normal, iar la final adaugă pe rânduri separate, câte unul pe fapt: [[MEMORIE: AAAA-LL-ZZ | categorie | fapt scurt, complet, cu cifre/nume]] — categorie una din: Autorizații, Personal, Achiziții, Activitate și clienți, Social, Financiar, Raportare, Altele. Data = data faptului (dacă nu e spusă, data de azi). Nu marca întrebări, intenții sau lucruri deja aflate în memorie.
+
 PROCEDURA INTERNĂ DE ACHIZIȚII (ContaFlow)
 ${procedura}
 
@@ -48,9 +52,10 @@ export async function contextLive(sb: SupabaseClient, firmaId: string, stari: St
   const L = lunaProiect(azi)
   const stare = (cheie: string) => stari.find(s => s.cheie === cheie)
 
-  const [{ data: ach }, { data: raport }] = await Promise.all([
+  const [{ data: ach }, { data: raport }, { memorie }] = await Promise.all([
     sb.from('proiect_achizitii').select('*').eq('firma_id', firmaId).order('created_at'),
     sb.from('proiect_raport_campuri').select('*').eq('firma_id', firmaId).order('updated_at', { ascending: false }).limit(1),
+    listaMemorie(sb, firmaId, { limit: 200 }),
   ])
   const achizitii = (ach || []) as { denumire: string; valoare: number | null; sursa: string | null; status: string; linie_buget?: string | null }[]
   const linieAch = achizitii.map(a => `- ${a.denumire} | linia ${a.linie_buget || '— (fără linie)'} | ${a.sursa || '?'} | ${a.valoare != null ? lei(a.valoare) + ' lei' : 'fără valoare'} | status: ${a.status}`).join('\n') || '- (nicio achiziție)'
@@ -80,6 +85,9 @@ export async function contextLive(sb: SupabaseClient, firmaId: string, stari: St
 
   return `DATE CONTAFLOW (live, ${azi.toLocaleDateString('ro-RO')})
 Azi: ${azi.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })} — proiectul e în ${etapa.eticheta}. Implementare: 01.10.2025–31.03.2027 (L1–L18); sustenabilitate: 01.04.2027–30.04.2028.
+
+MEMORIA PROIECTULUI (ce s-a întâmplat efectiv, cele mai noi primele)
+${memorieText(memorie)}
 
 PLANUL PE LUNI (luna trecută, curentă, următoare — Buget AA3, foile 3_venituri-cheltuieli și 2.0)
 ${luniPlan}

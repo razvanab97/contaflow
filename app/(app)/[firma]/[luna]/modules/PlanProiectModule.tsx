@@ -4,11 +4,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ACTIVITATI, INDICATORI, OBLIGATII, PERIOADA, STATUS_PLAN, etapaProiect, etichetaLuna, lunaProiect, statusImplicitActivitate, termenDepasit, type CategorieObligatie, type StarePlan, type StatusPlan } from '@/lib/proiect-plan'
 import { BUGET_ACHIZITII, VERSIUNE_BUGET, coduriDin } from '@/lib/achizitii-procedura'
+import { CATEGORII_MEMORIE, extrageMemorieDinRaspuns, type Memorie } from '@/lib/proiect-memorie'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props { firma: Firma; lunaId: string }
 interface Intrebare { id?: string; intrebare: string; raspuns: string; created_at?: string; inCurs?: boolean }
-type Tab = 'intreaba' | 'plan' | 'indicatori'
+type Tab = 'intreaba' | 'memorie' | 'plan' | 'indicatori'
 
 const card: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '18px 20px' }
 const MUTED: React.CSSProperties = { fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }
@@ -127,7 +128,16 @@ function Intreaba({ firma }: { firma: Firma }) {
         <div key={x.id || i} style={{ display: 'grid', gap: 8 }}>
           <div style={{ justifySelf: 'end', maxWidth: '85%', background: 'var(--accent)', color: 'var(--accent-contrast, #fff)', borderRadius: 'var(--r-lg)', padding: '10px 14px', fontSize: 'var(--fs-md)', whiteSpace: 'pre-wrap' }}>{x.intrebare}</div>
           <div style={{ ...card, padding: '14px 18px' }}>
-            {x.raspuns ? <Markdown text={x.raspuns} /> : <div style={MUTED}>Caut în documentele proiectului…</div>}
+            {(() => {
+              const { curat, fapte } = extrageMemorieDinRaspuns(x.raspuns)
+              return <>
+                {curat ? <Markdown text={curat} /> : <div style={MUTED}>Caut în documentele proiectului…</div>}
+                {!x.inCurs && fapte.length > 0 && <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 'var(--r-md)', background: 'var(--surface-sunken)', fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+                  <strong style={{ color: 'var(--success)' }}>✓ Reținut în memoria proiectului</strong>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{fapte.map((f, i) => <li key={i}>{f.data.split('-').reverse().join('.')} · {f.categorie}: {f.text}</li>)}</ul>
+                </div>}
+              </>
+            })()}
             {x.inCurs && x.raspuns && <span style={{ ...MUTED, display: 'inline-block', marginTop: 4 }}>▍</span>}
             {x.created_at && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 6 }}>{new Date(x.created_at).toLocaleString('ro-RO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
           </div>
@@ -144,6 +154,74 @@ function Intreaba({ firma }: { firma: Firma }) {
         </div>
         <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 6 }}>Enter trimite · Shift+Enter rând nou · poți pune întrebări de continuare</div>
       </div>
+    </div>
+  )
+}
+
+// --- Memoria proiectului: jurnalul cu ce s-a intamplat (sursa pentru AI si raportul lunar) ---------
+function MemorieProiect({ firma }: { firma: Firma }) {
+  const [lista, setLista] = useState<Memorie[]>([])
+  const [lipsaMigrare, setLipsaMigrare] = useState(false)
+  const [text, setText] = useState('')
+  const [data, setData] = useState(new Date().toISOString().slice(0, 10))
+  const [categorie, setCategorie] = useState<string>('Activitate și clienți')
+  const [busy, setBusy] = useState(false)
+  const incarca = useCallback(() => {
+    fetch(`/api/proiect/memorie?firmaId=${firma.id}`).then(r => r.json()).then(d => { setLista(d.memorie || []); setLipsaMigrare(!!d.lipsaMigrare) }).catch(() => {})
+  }, [firma.id])
+  useEffect(() => { incarca() }, [incarca])
+
+  async function adauga() {
+    if (!text.trim()) return
+    setBusy(true)
+    const r = await fetch('/api/proiect/memorie', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId: firma.id, data, categorie, text }) })
+    const d = await r.json().catch(() => ({}))
+    setBusy(false)
+    if (!r.ok) { toast(d.error || 'Nu s-a salvat', 'err'); return }
+    setText(''); incarca()
+  }
+  async function sterge(id: string) {
+    if (!confirm('Ștergi această intrare din memorie?')) return
+    await fetch(`/api/proiect/memorie?firmaId=${firma.id}&id=${id}`, { method: 'DELETE' })
+    setLista(prev => prev.filter(m => m.id !== id))
+  }
+  const peLuni = lista.reduce<Record<string, Memorie[]>>((acc, m) => { (acc[m.data.slice(0, 7)] ||= []).push(m); return acc }, {})
+  const LUNI = ['ianuarie', 'februarie', 'martie', 'aprilie', 'mai', 'iunie', 'iulie', 'august', 'septembrie', 'octombrie', 'noiembrie', 'decembrie']
+  const SURSA: Record<string, string> = { manual: 'scris de tine', chat: 'din chat', plan: 'din plan' }
+  const inp: React.CSSProperties = { fontSize: 'var(--fs-md)', padding: '8px 10px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface-sunken)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit' }
+
+  return (
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ ...card, display: 'grid', gap: 10, borderColor: 'var(--accent)' }}>
+        <div>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--text-primary)' }}>Memoria proiectului</div>
+          <div style={MUTED}>Ce s-a întâmplat efectiv în proiect. Se completează din trei locuri: ce scrii aici, ce îi spui AI-ului în „Întreabă proiectul” (ex. „am primit autorizația de mediu azi”) și stările marcate în plan. De aici se completează raportul lunar („Completează din memoria proiectului”) și răspunsurile AI-ului.</div>
+          {lipsaMigrare && <div style={{ ...MUTED, color: 'var(--warning)', marginTop: 6 }}>Memoria nu se poate salva încă — rulează migrarea SQL (tabelul proiect_memorie).</div>}
+        </div>
+        <textarea value={text} onChange={e => setText(e.target.value)} rows={2} placeholder="Ce s-a întâmplat? Ex.: Am semnat contract de spălare lenjerii cu Pensiunea X (200 kg/lună). / Control APM la locație pe 08.10, fără observații."
+          style={{ ...inp, width: '100%', resize: 'vertical' }} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) adauga() }} />
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input type="date" value={data} onChange={e => setData(e.target.value)} style={inp} />
+          <select value={categorie} onChange={e => setCategorie(e.target.value)} style={inp}>{CATEGORII_MEMORIE.map(c => <option key={c}>{c}</option>)}</select>
+          <button type="button" className="btn btn-primary" onClick={adauga} disabled={busy || !text.trim()}>{busy ? 'Salvez…' : 'Reține'}</button>
+        </div>
+      </div>
+      {Object.keys(peLuni).length === 0 && <div style={MUTED}>Nimic reținut încă.</div>}
+      {Object.entries(peLuni).map(([luna, items]) => (
+        <div key={luna} style={{ ...card, display: 'grid', gap: 2 }}>
+          <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, textTransform: 'capitalize' }}>{LUNI[Number(luna.slice(5, 7)) - 1]} {luna.slice(0, 4)} <span style={{ ...MUTED, fontWeight: 400, textTransform: 'none' }}>· L{lunaProiect(new Date(luna + '-15'))} · {items.length} {items.length === 1 ? 'intrare' : 'intrări'}</span></div>
+          {items.map(m => (
+            <div key={m.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '7px 0', borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', minWidth: 46 }}>{m.data.slice(8, 10)}.{m.data.slice(5, 7)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }}>{m.text}</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{m.categorie} · {SURSA[m.sursa] || m.sursa}</div>
+              </div>
+              <button type="button" className="btn btn-sm" onClick={() => sterge(m.id)} title="Șterge din memorie">×</button>
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   )
 }
@@ -379,6 +457,7 @@ export default function PlanProiectModule({ firma }: Props) {
 
   const TABURI: { k: Tab; label: string }[] = [
     { k: 'intreaba', label: '✦ Întreabă proiectul' },
+    { k: 'memorie', label: 'Memoria proiectului' },
     { k: 'plan', label: `Plan și obligații${deConfirmat ? ` (${deConfirmat} de confirmat)` : ''}` },
     { k: 'indicatori', label: 'Indicatori și tranșe' },
   ]
@@ -388,6 +467,7 @@ export default function PlanProiectModule({ firma }: Props) {
         {TABURI.map(t => <button key={t.k} type="button" className={tab === t.k ? 'btn btn-primary' : 'btn'} onClick={() => setTab(t.k)}>{t.label}</button>)}
       </div>
       {tab === 'intreaba' && <Intreaba firma={firma} />}
+      {tab === 'memorie' && <MemorieProiect firma={firma} />}
       {tab === 'plan' && <Plan firma={firma} stari={stari} salveaza={salveaza} achizitii={achizitii} lipsaMigrare={lipsaMigrare} />}
       {tab === 'indicatori' && <Indicatori />}
     </div>

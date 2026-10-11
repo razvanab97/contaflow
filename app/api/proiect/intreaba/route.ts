@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { MODEL_PROIECT, contextLive, promptFix } from '@/lib/proiect-intreaba'
 import type { StarePlan } from '@/lib/proiect-plan'
+import { adaugaMemorie, extrageMemorieDinRaspuns } from '@/lib/proiect-memorie'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // raspuns in timp real, cu gandire - poate depasi 60s la intrebari complexe
@@ -78,6 +79,10 @@ export async function POST(req: NextRequest) {
         raspuns += msg
         controller.enqueue(enc.encode(msg))
       }
+      // Faptele noi spuse de utilizator -> memoria proiectului; marcajele nu raman in raspunsul salvat.
+      const { curat, fapte } = extrageMemorieDinRaspuns(raspuns)
+      for (const f of fapte) await adaugaMemorie(sb, firmaId, { ...f, sursa: 'chat' })
+      raspuns = curat
       if (raspuns.trim()) {
         const { error } = await sb.from('proiect_intrebari').insert({ firma_id: firmaId, intrebare: q, raspuns })
         if (error && !lipsaTabel(error)) console.error('proiect_intrebari insert', error.message)

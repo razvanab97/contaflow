@@ -29,12 +29,19 @@ interface Props {
   lunaLabel: string
   modulSlug: string
   template: DocumentTemplate
+  // Optional: un asistent care propune valori (ex. "Completeaza din memoria proiectului") - primeste
+  // functii generice de aplicare, ca workspace-ul sa ramana independent de document.
+  renderAssist?: (api: ReportAssistApi) => React.ReactNode
+}
+export interface ReportAssistApi {
+  applyValues: (v: Record<string, string | ListItem[]>) => void
+  setCustomByLabel: (label: string, valoare: string) => void
 }
 
 // Orchestrator generic de "document workspace" - nu contine nimic specific documentului
 // (raport lunar AB Textile); primeste `template` din afara si il randeaza. Un document viitor
 // (raport trimestrial, cerere etc.) ar refolosi acelasi component cu alt DocumentTemplate.
-export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel, modulSlug, template }: Props) {
+export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel, modulSlug, template, renderAssist }: Props) {
   const [tab, setTab] = useState<ReportTab>('editare')
   const [isNarrow, setIsNarrow] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
@@ -359,6 +366,19 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
       />
 
       <TaskSection tasks={tasks} lunaId={lunaId} culoare={firma.culoare}/>
+
+      {renderAssist && doc && renderAssist({
+        applyValues: v => {
+          const next = { ...valuesRef.current, ...v }
+          valuesRef.current = next
+          setValues(next)
+          scheduleSave(next)
+        },
+        setCustomByLabel: (label, valoare) => {
+          const c = custom.find(x => x.eticheta.trim().toLowerCase() === label.toLowerCase() || x.cheie.trim().toLowerCase() === label.toLowerCase())
+          if (c) handleCustomChange(c.id, valoare)
+        },
+      })}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
         <p style={{ color: 'var(--c-777777)', fontSize: 'var(--fs-sm)', margin: 0 }}>Apasă pe un rând din raport pentru a-l edita. Textul apare imediat; modificările se salvează automat.</p>
