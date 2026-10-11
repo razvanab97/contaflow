@@ -304,14 +304,19 @@ export function AchizitieNoua({ items = [], onCreeaza, onAnuleaza, busy }: { ite
     const x = cod && cod !== 'afara' ? linieDupaCod(cod) : null
     if (x) { setDenumire(x.denumire); setSursa(x.sursa); setValoare(String(x.valoare)) }
   }
-  const valid = denumire.trim() && linie
+  const valoareNumerica = valoare.trim() ? Number(valoare.replace(',', '.')) : null
+  const valoareValida = valoareNumerica === null || (Number.isFinite(valoareNumerica) && valoareNumerica > 0)
+  const depasire = l && valoareNumerica !== null && valoareValida ? Math.max(0, Math.round((valoareNumerica - l.valoare) * 100) / 100) : 0
+  const valid = denumire.trim() && linie && valoareValida
   const inp: React.CSSProperties = { width: '100%', fontSize: 'var(--fs-md)', padding: '9px 11px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface-sunken)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit', marginTop: '5px' }
   const lab: React.CSSProperties = { fontSize: 'var(--fs-xs)', fontWeight: 650, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '.05em' }
   function creeaza() {
-    const v = valoare ? Number(valoare.replace(',', '.')) : null
+    if (!valid || busy) return
+    const v = valoareNumerica
     const faraTva = v ? Math.round((v / 1.21) * 100) / 100 : null
     const parti = [
       l ? `Linia de buget ${l.cod} (${l.sursa === 'grant' ? 'subvenție' : 'cofinanțare'}): ${l.valoare.toLocaleString('ro-RO')} lei cu TVA.` : 'ÎN AFARA BUGETULUI — necesită acordul PROSOCIAL / act adițional înainte de cumpărare.',
+      depasire > 0 ? `Valoarea estimată depășește bugetul aprobat al liniei cu ${lei(depasire)} lei cu TVA. Bugetul aprobat rămâne neschimbat; eligibilitatea diferenței trebuie verificată separat.` : '',
       `Tip: ${tip}.`,
       faraTva ? `Buget maxim pentru oferte: ≈ ${faraTva.toLocaleString('ro-RO')} lei fără TVA.` : '',
       specificatii.trim() ? `Specificații tehnice minime: ${specificatii.trim()}` : '',
@@ -354,7 +359,8 @@ export function AchizitieNoua({ items = [], onCreeaza, onAnuleaza, busy }: { ite
           <textarea value={specificatii} onChange={e => setSpecificatii(e.target.value)} rows={3} placeholder="ex. putere minim 12000 BTU, clasă energetică A++, funcție de încălzire, montaj inclus" style={{ ...inp, resize: 'vertical' }} />
         </label>
       </div>
-      {l && valoare && Number(valoare) > l.valoare && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>Valoarea depășește bugetul liniei ({lei(l.valoare)} lei).</div>}
+      {!valoareValida && <div role="alert" style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>Introdu o valoare validă, mai mare decât zero.</div>}
+      {l && depasire > 0 && <div role="status" style={{ fontSize: 'var(--fs-sm)', padding: '9px 12px', borderRadius: 'var(--r-md)', background: 'var(--warning-soft)', color: 'var(--warning)' }}>Poți crea achiziția peste buget. Buget aprobat: {lei(l.valoare)} lei · Diferență: +{lei(depasire)} lei (cu TVA). Bugetul aprobat nu se modifică automat; verifică separat eligibilitatea și finanțarea diferenței.</div>}
       <div style={{ display: 'flex', gap: '8px' }}>
         <button type="button" className="btn btn-primary" disabled={!valid || busy} onClick={creeaza}>{busy ? 'Se creează…' : 'Creează achiziția și deschide pașii'}</button>
         <button type="button" className="btn" onClick={onAnuleaza}>Renunță</button>
