@@ -41,12 +41,12 @@ export function prefillPurchaseForms(state: Workflow, purchase: PurchaseContext 
   const forms = { ...state.forms }
   const product = purchaseProductExample(purchase)
   for (const kind of ['oferta', 'nota', 'receptie'] as const) {
-    const current = forms[kind] || { fields: kind === 'receptie' ? { comanda_online: 'nu' } : {}, lines: [{ supplier: '', product: '', specs: '', unit: 'buc', qty: '1', price: '', currency: 'RON', rate: '1', source: '', date: '' }] }
+    const current = forms[kind] || { fields: kind === 'receptie' ? { comanda_online: 'nu' } : {}, lines: [{ supplier: '', product: '', specs: '', unit: 'buc', qty: '1', price: '', currency: 'RON', rate: '1', source: '', date: '', priceMode: 'gross' as const }] }
     const fields = { ...current.fields }
     for (const [key, suggestion] of Object.entries(purchaseRecommendations(kind, state, purchase))) {
       if (!fields[key]?.trim()) fields[key] = suggestion.value
     }
-    const lines = current.lines.map(line => ({ ...line }))
+    const lines = current.lines.map(line => ({ ...line, ...(!line.price.trim() && !line.priceMode ? { priceMode: 'gross' as const } : {}) }))
     if (product) {
       const blank = lines.find(line => !line.product.trim() && !line.specs.trim() && !line.supplier.trim() && !line.price.trim() && !line.source.trim() && !line.date.trim())
       if (blank) Object.assign(blank, product)

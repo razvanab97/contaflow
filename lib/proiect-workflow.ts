@@ -1,4 +1,5 @@
 // Regulile sunt ținte interne editabile, nu termene contractuale confirmate.
+import {purchaseAmounts,purchaseNumber} from './achizitii-vat'
 export type Rule = { day: number; offset: number; frequency: 'monthly' | 'annual' | 'manual'; month: number }
 export type Step = 'lipsa' | 'primit' | 'semnat' | 'trimis' | 'acceptat' | 'neaplicabil' | 'initiat' | 'avizat' | 'executat'
 export const STEP_LABELS: Record<Step,string> = { initiat:'Plată inițiată', avizat:'Plată avizată', executat:'Plată executată', lipsa:'De pregătit', primit:'Primit / pregătit', semnat:'Semnat / verificat', trimis:'Trimis', acceptat:'Acceptat / încheiat', neaplicabil:'Nu se aplică' }
@@ -20,7 +21,7 @@ export const TASKS = [
 export type TaskKey = typeof TASKS[number]['key']
 export type TaskState = { status:Step; due:string | null; note:string }
 export type Asset = { id:string; task:string; name:string; type:string; createdAt:string; kind:'upload'|'generated' }
-export type Line = { supplier:string; product:string; specs:string; unit:string; qty:string; price:string; currency:string; rate:string; source:string; date:string }
+export type Line = { supplier:string; product:string; specs:string; unit:string; qty:string; price:string; currency:string; rate:string; source:string; date:string; priceMode?:'gross'|'net' }
 export type Draft = { fields:Record<string,string>; lines:Line[] }
 export type Workflow = { version:number; updatedAt:string; profile:Record<string,string>; rules:Record<string,Rule>; tasks:Record<string,TaskState>; forms:Record<string,Draft>; assets:Asset[] }
 export const PROFILE_FIELDS = { beneficiar:'Beneficiar', reprezentant:'Reprezentant legal', cui:'CUI', onrc:'Nr. Registrul Comerțului', adresa:'Sediu social', contract_subventie:'Contract de subvenție (număr / dată)', caen:'Activitate / CAEN' }
@@ -56,7 +57,7 @@ export const FORM_FIELDS:Record<FormKind,Record<string,string>>={
  receptie:{comanda_online:'Comandă online (da / nu)',numar:'Număr proces-verbal',data:'Data recepției',furnizor:'Denumire juridică furnizor',reprezentant_furnizor:'Reprezentant furnizor / comandă online',referinta:'Contract / factură (număr și dată)',constatari:'Ce s-a livrat / prestat, constatări și anexe (garanții, fotografii, punere în funcțiune)'},
  restituire:{data:'Data cererii',suma:'Suma de restituit (lei)',data_transfer:'Data transferului din surse proprii',scop:'Cheltuiala finanțată temporar'},
 }
-export const emptyLine=():Line=>({supplier:'',product:'',specs:'',unit:'buc',qty:'1',price:'',currency:'RON',rate:'1',source:'',date:''})
+export const emptyLine=():Line=>({supplier:'',product:'',specs:'',unit:'buc',qty:'1',price:'',currency:'RON',rate:'1',source:'',date:'',priceMode:'gross'})
 export function defaultDraft(kind:FormKind, month?:string):Draft {
  const fields:Record<string,string>=kind==='receptie'?{comanda_online:'nu'}:{}
  if(kind==='raport'&&month){const [y,m]=month.split('-').map(Number);const end=new Date(Date.UTC(y,m-1,0));const mm=String(end.getUTCMonth()+1).padStart(2,'0');fields.perioada=`01.${mm}.${end.getUTCFullYear()} – ${end.getUTCDate()}.${mm}.${end.getUTCFullYear()}`}
@@ -67,7 +68,7 @@ export function validateDraft(kind:FormKind,draft:Draft,profile:Record<string,st
  for(const k of ['beneficiar','reprezentant',...(kind==='restituire'?['cui','onrc','adresa','contract_subventie']:[]),...(kind==='raport'?['caen']:[])])if(!profile[k]?.trim())missing.push(PROFILE_FIELDS[k as keyof typeof PROFILE_FIELDS])
  if(['nota','oferta','receptie'].includes(kind)) {
  if(!draft.lines.length)missing.push('Cel puțin un produs / serviciu')
- draft.lines.forEach((l,i)=>{if(!l.product.trim()||!l.specs.trim()||!Number.isFinite(Number(l.qty))||Number(l.qty)<=0)missing.push(`Poziția ${i+1}: produs, specificații și cantitate pozitivă`);if(kind!=='oferta'&&(!l.price.trim()||!Number.isFinite(Number(l.price))||Number(l.price)<0||!Number.isFinite(Number(l.rate))||Number(l.rate)<=0))missing.push(`Poziția ${i+1}: preț și curs valide`);if(kind==='nota'&&(!l.supplier.trim()||!l.source.trim()||!l.date.trim()))missing.push(`Poziția ${i+1}: furnizor, sursă și dată ofertă`)})
+ draft.lines.forEach((l,i)=>{if(!l.product.trim()||!l.specs.trim()||!Number.isFinite(purchaseNumber(l.qty))||purchaseNumber(l.qty)<=0)missing.push(`Poziția ${i+1}: produs, specificații și cantitate pozitivă`);if((kind!=='oferta'||l.price.trim())&&!purchaseAmounts(l.price,l.qty,l.rate,l.priceMode||'net'))missing.push(`Poziția ${i+1}: preț și curs valide`);if(kind==='nota'&&(!l.supplier.trim()||!l.source.trim()||!l.date.trim()))missing.push(`Poziția ${i+1}: furnizor, sursă și dată ofertă`)})
  }
  if(kind==='restituire'&&(!Number.isFinite(Number(draft.fields.suma))||Number(draft.fields.suma)<=0))missing.push('Suma trebuie să fie pozitivă')
  return missing
