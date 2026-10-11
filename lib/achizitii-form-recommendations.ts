@@ -36,3 +36,29 @@ export function purchaseProductExample(purchase: PurchaseContext | null): Pick<D
   if (!purchase?.denumire.trim()) return null
   return { product: purchase.denumire.trim(), specs: purchase.nota?.split('Specificații tehnice minime: ')[1]?.trim() || '' }
 }
+
+export function prefillPurchaseForms(state: Workflow, purchase: PurchaseContext | null): Workflow {
+  const forms = { ...state.forms }
+  const product = purchaseProductExample(purchase)
+  for (const kind of ['oferta', 'nota', 'receptie'] as const) {
+    const current = forms[kind] || { fields: kind === 'receptie' ? { comanda_online: 'nu' } : {}, lines: [{ supplier: '', product: '', specs: '', unit: 'buc', qty: '1', price: '', currency: 'RON', rate: '1', source: '', date: '' }] }
+    const fields = { ...current.fields }
+    for (const [key, suggestion] of Object.entries(purchaseRecommendations(kind, state, purchase))) {
+      if (!fields[key]?.trim()) fields[key] = suggestion.value
+    }
+    const lines = current.lines.map(line => ({ ...line }))
+    if (product) {
+      const blank = lines.find(line => !line.product.trim() && !line.specs.trim() && !line.supplier.trim() && !line.price.trim() && !line.source.trim() && !line.date.trim())
+      if (blank) Object.assign(blank, product)
+    }
+    forms[kind] = { fields, lines }
+  }
+  return { ...state, forms }
+}
+
+export function isCompletedPurchaseExample(name: string, kind: FormKind): boolean {
+  const normalized = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  if (/sablon|template|model necompletat/.test(normalized)) return false
+  const patterns = { oferta: /cerere[ _-]*(de[ _-]*)?oferta|anexa[ _-]*2\b/, nota: /nota.*(estim|determin|valor)|anexa[ _-]*1\b/, receptie: /receptie|anexa[ _-]*3\b/ }
+  return kind in patterns && patterns[kind as keyof typeof patterns].test(normalized)
+}

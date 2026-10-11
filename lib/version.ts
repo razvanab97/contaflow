@@ -3,6 +3,7 @@
 export interface UpdateEntry { v: number; text: string }
 
 export const UPDATES: UpdateEntry[] = [
+  { v: 230, text: 'Formulare achiziții: câmpurile goale și produsul sunt precompletate direct din datele dosarului, fără suprascriere. Ghidul afișează un PDF existent pentru tipul de formular, cu miniatură și deschidere în vizualizator; exemplele din alte achiziții sunt marcate separat și nu se copiază în dosarul curent.' },
   { v: 229, text: 'Formulare achiziții: ghid de completare și recomandări cu sursa indicată, din denumirea, tipul și specificațiile achiziției și din formularele aceluiași dosar. Butoanele „Preia” completează câmpurile goale; produsul poate fi adăugat cu specificațiile salvate. Exemplele sunt orientative, fără furnizori, numere sau prețuri inventate.' },
   { v: 228, text: 'Achiziții: valorile peste buget sunt permise, cu avertizare informativă și diferența afișată și salvată în nota achiziției. Bugetul aprobat rămâne neschimbat. Valorile cu virgulă sunt tratate consecvent, iar valorile invalide sunt respinse.' },
   { v: 227, text: 'PROIECT AB Textile · Achiziții: în formularul „+ Achiziție nouă”, lista „Linia de buget” arată doar liniile încă necumpărate. Liniile care au deja o achiziție, finalizată sau în curs, sunt ascunse, iar sub listă scrie câte linii au fost ascunse. „Altceva — în afara bugetului aprobat” rămâne disponibil.' },

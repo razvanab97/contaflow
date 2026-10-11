@@ -1,6 +1,7 @@
 import {NextRequest,NextResponse} from 'next/server'
 import {TASKS,LEGACY_GROUPS,STEP_LABELS,FORM_FIELDS,defaultDraft,initialMonth,emptyWorkflow,blockedBy,type Workflow,type FormKind} from '@/lib/proiect-workflow'
 import {scopeContext,readWorkflow,writeWorkflow,sameOrigin,WorkflowError} from '@/lib/proiect-workflow-store'
+import {isCompletedPurchaseExample} from '@/lib/achizitii-form-recommendations'
 function failure(e:unknown){return NextResponse.json({error:e instanceof Error?e.message:'Eroare proiect'},{status:e instanceof WorkflowError?e.status:500})}
 function validate(state:Workflow) {
  if(!state||typeof state!=='object'||JSON.stringify(state).length>300000)throw new WorkflowError('Date prea mari sau invalide')
@@ -41,12 +42,18 @@ export async function GET(req:NextRequest){try{
   try{state=await writeWorkflow(prefix,corrected,state.version)}catch(e){if(e instanceof WorkflowError&&e.status===409)state=await readWorkflow(prefix);else throw e}
  }
  let purchase=null
+ let examples: {id:string;name:string;kind:FormKind;current:boolean}[]=[]
  if(scope.startsWith('purchase-')){
   const {data,error}=await sb.from('proiect_achizitii').select('denumire,nota,valoare').eq('firma_id',firmaId).eq('id',scope.slice(9)).single()
   if(error)throw new WorkflowError('Nu pot citi datele achiziției',503)
   purchase=data
+  const {data:docs,error:docsError}=await sb.from('documente').select('id,fisier_nume,achizitie_id').eq('firma_id',firmaId).eq('modul','achizitii').eq('fisier_tip','application/pdf').not('achizitie_id','is',null).order('created_at',{ascending:false}).limit(1000)
+  if(!docsError){
+   const ordered=[...(docs||[])].sort((a,b)=>Number(b.achizitie_id===scope.slice(9))-Number(a.achizitie_id===scope.slice(9)))
+   for(const kind of ['oferta','nota','receptie'] as FormKind[]){const doc=ordered.find(d=>isCompletedPurchaseExample(d.fisier_nume||'',kind));if(doc)examples.push({id:doc.id,name:doc.fisier_nume,kind,current:doc.achizitie_id===scope.slice(9)})}
+  }
  }
- return NextResponse.json({state,month,purchase},{headers:{'Cache-Control':'no-store'}})
+ return NextResponse.json({state,month,purchase,examples},{headers:{'Cache-Control':'no-store'}})
  }catch(e){return failure(e)}}
 export async function POST(req:NextRequest){try{
  sameOrigin(req)
