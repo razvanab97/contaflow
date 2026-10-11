@@ -21,6 +21,6 @@ export async function POST(req: NextRequest) {
     firma_id: firmaId, cheie: String(cheie), status: status as StatusPlan,
     nota: nota != null ? String(nota).slice(0, 2000) : null, data_realizare: dataRealizare || null, updated_at: new Date().toISOString(),
   }, { onConflict: 'firma_id,cheie' })
-  if (error) return NextResponse.json({ error: lipsaTabel(error) ? 'Tabelul proiect_plan_stari nu există încă — rulează migrarea SQL.' : error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: lipsaTabel(error) ? 'Tabelul proiect_plan_stari nu există încă — rulează migrarea SQL.' : error.code === '23514' ? 'Statusul nu e permis încă în baza de date — rulează SQL-ul pentru „Amânat”.' : error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

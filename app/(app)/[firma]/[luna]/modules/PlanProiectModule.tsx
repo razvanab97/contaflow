@@ -158,7 +158,7 @@ function SelectStatus({ value, implicit, onChange }: { value?: StatusPlan; impli
     </select>
   )
 }
-const BADGE: Record<StatusPlan, string> = { facut: 'badge badge-success', in_curs: 'badge badge-warning', urmeaza: 'badge', nu_se_aplica: 'badge' }
+const BADGE: Record<StatusPlan, string> = { facut: 'badge badge-success', in_curs: 'badge badge-warning', urmeaza: 'badge', amanat: 'badge', nu_se_aplica: 'badge' }
 
 function Nota({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
   const [v, setV] = useState(initial)
@@ -174,10 +174,15 @@ function Plan({ firma, stari, salveaza, achizitii, lipsaMigrare }: { firma: Firm
   const L = lunaProiect(azi)
   const etapa = etapaProiect(azi)
   const st = (k: string) => stari.find(s => s.cheie === k)
-  const deConfirmat = [
-    ...ACTIVITATI.filter(a => statusImplicitActivitate(a, L).intarziere && !['facut', 'nu_se_aplica'].includes(st(a.cheie)?.status || '')).map(a => ({ cheie: a.cheie, titlu: `${a.cod} · ${a.titlu}`, detaliu: `în plan până în ${etichetaLuna(a.luni[1])}` })),
-    ...OBLIGATII.filter(o => termenDepasit(o, azi) && !['facut', 'nu_se_aplica'].includes(st(o.cheie)?.status || '')).map(o => ({ cheie: o.cheie, titlu: o.titlu, detaliu: `termen ${dataRo(o.termen!)}` })),
-  ]
+  // Tot ce are termenul din plan trecut si nu e "Făcut"/"Nu se aplică": nemarcat -> "De confirmat",
+  // marcat "În curs" -> lista separata "În lucru, peste termen" (confirmat, dar inca intarziat).
+  const pesteTermen = [
+    ...ACTIVITATI.filter(a => statusImplicitActivitate(a, L).intarziere).map(a => ({ cheie: a.cheie, titlu: `${a.cod} · ${a.titlu}`, detaliu: `în plan până în ${etichetaLuna(a.luni[1])}` })),
+    ...OBLIGATII.filter(o => termenDepasit(o, azi)).map(o => ({ cheie: o.cheie, titlu: o.titlu, detaliu: `termen ${dataRo(o.termen!)}` })),
+  ].filter(d => !['facut', 'nu_se_aplica'].includes(st(d.cheie)?.status || ''))
+  const deConfirmat = pesteTermen.filter(d => !['in_curs', 'amanat'].includes(st(d.cheie)?.status || ''))
+  const inLucru = pesteTermen.filter(d => st(d.cheie)?.status === 'in_curs')
+  const amanate = pesteTermen.filter(d => st(d.cheie)?.status === 'amanat')
   const folosite = new Set(achizitii.flatMap(a => coduriDin(a.linie_buget)))
   const cumparate = BUGET_ACHIZITII.filter(l => folosite.has(l.cod)).length
   const pct = Math.max(0, Math.min(100, Math.round((Math.min(L, 18) / 18) * 100)))
@@ -208,10 +213,42 @@ function Plan({ firma, stari, salveaza, achizitii, lipsaMigrare }: { firma: Firm
               <div style={{ display: 'flex', gap: 6 }}>
                 <button type="button" className="btn btn-sm btn-primary" onClick={() => salveaza(d.cheie, { status: 'facut' })}>✓ Făcut</button>
                 <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'in_curs' })}>În curs</button>
+                <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'amanat' })} title="Nu e necesar momentan — se mută la „Amânate”, de unde îl poți relua">Amână</button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {inLucru.length > 0 && (
+        <div style={{ ...card, display: 'grid', gap: 8 }}>
+          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>În lucru, peste termenul din plan ({inLucru.length})</div>
+          <div style={MUTED}>Confirmate ca „În curs” — încă întârziate față de plan. Marchează „Făcut” când se încheie.</div>
+          {inLucru.map(d => (
+            <div key={d.cheie} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '6px 0', borderTop: '1px solid var(--border)' }}>
+              <div style={{ minWidth: 0 }}><div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }}>{d.titlu} <span className="badge badge-warning" style={{ marginLeft: 4 }}>În curs</span></div><div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{d.detaliu}</div></div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" className="btn btn-sm btn-primary" onClick={() => salveaza(d.cheie, { status: 'facut' })}>✓ Făcut</button>
+                <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'urmeaza' })} title="Scoate din „În curs” (revine la „De confirmat”)">Anulează</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {amanate.length > 0 && (
+        <details style={{ ...card, display: 'grid', gap: 8 }}>
+          <summary style={{ fontWeight: 700, color: 'var(--text-primary)', cursor: 'pointer' }}>Amânate — nu sunt necesare momentan ({amanate.length})</summary>
+          {amanate.map(d => (
+            <div key={d.cheie} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '6px 0', borderTop: '1px solid var(--border)', marginTop: 6 }}>
+              <div style={{ minWidth: 0 }}><div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-secondary)' }}>{d.titlu}</div><div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{d.detaliu}</div></div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'urmeaza' })} title="Revine la „De confirmat”">Reia</button>
+                <button type="button" className="btn btn-sm" onClick={() => salveaza(d.cheie, { status: 'facut' })}>✓ Făcut</button>
+              </div>
+            </div>
+          ))}
+        </details>
       )}
 
       <div style={{ ...card, display: 'grid', gap: 4 }}>
@@ -336,8 +373,8 @@ export default function PlanProiectModule({ firma }: Props) {
 
   const deConfirmat = useMemo(() => {
     const L = lunaProiect()
-    return ACTIVITATI.filter(a => statusImplicitActivitate(a, L).intarziere && !['facut', 'nu_se_aplica'].includes(stari.find(s => s.cheie === a.cheie)?.status || '')).length
-      + OBLIGATII.filter(o => termenDepasit(o) && !['facut', 'nu_se_aplica'].includes(stari.find(s => s.cheie === o.cheie)?.status || '')).length
+    const ok = (k: string) => ['facut', 'nu_se_aplica', 'in_curs', 'amanat'].includes(stari.find(s => s.cheie === k)?.status || '')
+    return ACTIVITATI.filter(a => statusImplicitActivitate(a, L).intarziere && !ok(a.cheie)).length + OBLIGATII.filter(o => termenDepasit(o) && !ok(o.cheie)).length
   }, [stari])
 
   const TABURI: { k: Tab; label: string }[] = [

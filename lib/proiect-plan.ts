@@ -28,8 +28,9 @@ export function etapaProiect(d: Date = new Date()): { eticheta: string; luna: nu
   return { eticheta: 'după sustenabilitate', luna: l }
 }
 
-export type StatusPlan = 'facut' | 'in_curs' | 'urmeaza' | 'nu_se_aplica'
-export const STATUS_PLAN: Record<StatusPlan, string> = { facut: 'Făcut', in_curs: 'În curs', urmeaza: 'Urmează', nu_se_aplica: 'Nu se aplică' }
+// amanat = nu e necesar momentan (scos din "De confirmat", se poate relua oricand).
+export type StatusPlan = 'facut' | 'in_curs' | 'urmeaza' | 'amanat' | 'nu_se_aplica'
+export const STATUS_PLAN: Record<StatusPlan, string> = { facut: 'Făcut', in_curs: 'În curs', urmeaza: 'Urmează', amanat: 'Amânat (nu e necesar momentan)', nu_se_aplica: 'Nu se aplică' }
 export interface StarePlan { cheie: string; status: StatusPlan; nota?: string | null; data_realizare?: string | null }
 
 // --- Activitatile din graficul de implementare (Plan AA3, cap. III.10, pag. 56-61) -----------------

@@ -12,9 +12,13 @@ create index if not exists proiect_intrebari_firma_idx on proiect_intrebari (fir
 create table if not exists proiect_plan_stari (
   firma_id uuid not null,
   cheie text not null,
-  status text not null default 'urmeaza' check (status in ('facut', 'in_curs', 'urmeaza', 'nu_se_aplica')),
+  status text not null default 'urmeaza' check (status in ('facut', 'in_curs', 'urmeaza', 'amanat', 'nu_se_aplica')),
   nota text,
   data_realizare date,
   updated_at timestamptz not null default now(),
   primary key (firma_id, cheie)
 );
+
+-- Status "amanat" (nu e necesar momentan) adaugat ulterior - actualizeaza constrangerea pe tabelele deja create.
+alter table proiect_plan_stari drop constraint if exists proiect_plan_stari_status_check;
+alter table proiect_plan_stari add constraint proiect_plan_stari_status_check check (status in ('facut', 'in_curs', 'urmeaza', 'amanat', 'nu_se_aplica'));
