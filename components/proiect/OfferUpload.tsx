@@ -32,7 +32,7 @@ export default function OfferUpload({ purchaseId, status, onUploaded }: { purcha
       const response = await fetch('/api/achizitii/documente',{method:'POST',body:form})
       const result = await response.json()
       if (!response.ok) throw new Error(result.error||'Oferta nu a putut fi salvată.')
-      setFiles([]);setSupplier('');setMessage('Oferta a fost salvată ca un singur PDF. Poți adăuga următorul furnizor.');onUploaded()
+      setFiles([]);setSupplier('');setMessage(`${result.fisier_nume} a fost salvat ca un singur PDF. Poți adăuga următorul furnizor.`);onUploaded()
     } catch(error) { setMessage(error instanceof Error?error.message:'Oferta nu a putut fi salvată.') }
     finally { setBusy(false) }
   }
@@ -48,7 +48,7 @@ export default function OfferUpload({ purchaseId, status, onUploaded }: { purcha
       </label>
     </div>
     {files.map((file,index)=><div key={index} style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}><FilePreview file={file}/><span>{index+1}. {file.name}</span><button type="button" className="btn btn-sm" disabled={busy||index===0} onClick={()=>setFiles(previous=>{const next=[...previous];[next[index-1],next[index]]=[next[index],next[index-1]];return next})}>Mută mai sus</button><button type="button" className="btn btn-sm" disabled={busy} onClick={()=>setFiles(previous=>previous.filter((_,i)=>i!==index))}>Elimină</button></div>)}
-    <p style={{margin:'10px 0',color:'var(--text-secondary)'}}>{files.length} fișiere · se salvează ca o singură ofertă PDF, nu ca {files.length} oferte. Maximum 4 MB în total. Repetă pentru ceilalți furnizori.</p>
+    <p style={{margin:'10px 0',color:'var(--text-secondary)'}}>{files.length} fișiere · se reunesc într-un singur PDF: Oferta 1.pdf, Oferta 2.pdf sau Oferta 3.pdf, după primul număr disponibil în dosar. Maximum 4 MB în total. Completează furnizorul și repetă pentru celelalte oferte.</p>
     <button type="button" className="btn btn-sm btn-primary" disabled={busy||!supplier.trim()||!files.length} onClick={()=>void save()}>{busy?'Se pregătește și salvează PDF-ul…':'Salvează această ofertă'}</button>
     {message&&<p role="status" style={{marginTop:8}}>{message}</p>}
   </section>

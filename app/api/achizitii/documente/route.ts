@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import {randomUUID} from 'node:crypto'
+import {nextOfferNumber,supplierKey as normalizeSupplier} from '@/lib/achizitii-offer-number'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
   const { data, error } = await sb
     .from('documente')
-    .select('id,fisier_nume,fisier_tip,tip_document,created_at')
+    .select('id,fisier_nume,fisier_tip,tip_document,created_at,furnizor')
     .eq('achizitie_id', achizitieId)
     .order('created_at', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
   const achizitieId = String(fd.get('achizitieId') || '')
   const tipDosar = String(fd.get('tipDosar') || '')
   const supplier = String(fd.get('furnizorOferta') || '').trim()
-  const supplierKey = supplier.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')
+  const supplierKey = normalizeSupplier(supplier)
   if(supplier && (tipDosar!=='oferta'||supplier.length>120||!supplierKey))return NextResponse.json({error:'Furnizorul ofertei este invalid.'},{status:400})
   // Tipul ales la incarcare decide etapa si prefixul din nume (recunoscut de verificarea dosarului).
   const TIP: Record<string, { eticheta: string; etapa: string }> = {
@@ -42,14 +43,21 @@ export async function POST(req: NextRequest) {
   const sb = getServiceSupabase()
   const { data: achizitie } = await sb.from('proiect_achizitii').select('id,firma_id,luna_id,denumire').eq('id', achizitieId).single()
   if (!achizitie) return NextResponse.json({ error: 'Achiziția nu a fost găsită' }, { status: 404 })
+  let offerNumber: number | null = null
+  if(supplier){
+    if(file.type!=='application/pdf')return NextResponse.json({error:'Pozele acestei oferte trebuie reunite într-un PDF înainte de salvare.'},{status:400})
+    const {data:existing,error}=await sb.from('documente').select('fisier_nume,furnizor').eq('achizitie_id',achizitieId).order('created_at',{ascending:true})
+    if(error)return NextResponse.json({error:'Nu pot verifica numerotarea ofertelor.'},{status:503})
+    try{offerNumber=nextOfferNumber(existing||[],supplier)}catch(error){return NextResponse.json({error:error instanceof Error?error.message:'Numerotare invalidă.'},{status:409})}
+  }
 
   const extension = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg'
   const bytes = new Uint8Array(await file.arrayBuffer())
   const safeName = (achizitie.denumire || 'achizitie').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 40)
-  const path = `${achizitie.firma_id}/${achizitie.luna_id || 'fara-luna'}/achizitii/${achizitieId}_${randomUUID()}_${safeName}_${etapa}.${extension}`
+  const path = offerNumber ? `${achizitie.firma_id}/${achizitie.luna_id || 'fara-luna'}/achizitii/${achizitieId}_oferta_${offerNumber}.pdf` : `${achizitie.firma_id}/${achizitie.luna_id || 'fara-luna'}/achizitii/${achizitieId}_${randomUUID()}_${safeName}_${etapa}.${extension}`
 
-  const { error: uploadError } = await sb.storage.from('documente').upload(path, bytes, { contentType: file.type })
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+  const { error: uploadError } = await sb.storage.from('documente').upload(path, bytes, { contentType: file.type, upsert:false })
+  if (uploadError) return NextResponse.json({ error: offerNumber ? 'Oferta nu a putut fi salvată; dacă altă fereastră a salvat simultan, încearcă din nou. Niciun PDF existent nu a fost suprascris.' : uploadError.message }, { status: offerNumber ? 409 : 500 })
 
   const { data: doc, error: docError } = await sb.from('documente').insert({
     firma_id: achizitie.firma_id,
@@ -60,7 +68,7 @@ export async function POST(req: NextRequest) {
     furnizor: supplier || achizitie.denumire,
     fisier_path: path,
     // numele original al fisierului (cu tipul ales in fata), ca sa se vada si sa fie recunoscut in dosar
-    fisier_nume: supplier ? `Oferta [furnizor=${supplierKey}] - ${supplier.replace(/[\\/:*?"<>|]+/g,' ')}.${extension}` : `${tip ? `${tip.eticheta} - ` : ''}${(file.name || `${safeName}_${etapa}.${extension}`).replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 150)}`,
+    fisier_nume: offerNumber ? `Oferta ${offerNumber}.pdf` : `${tip ? `${tip.eticheta} - ` : ''}${(file.name || `${safeName}_${etapa}.${extension}`).replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 150)}`,
     fisier_tip: file.type,
     fisier_marime: bytes.length,
     in_zip: true,

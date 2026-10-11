@@ -18,7 +18,7 @@ interface Achizitie {
   created_at: string
   linie_buget?: string | null
 }
-interface AchizitieDoc { id: string; fisier_nume: string; tip_document: string; created_at: string }
+interface AchizitieDoc { id: string; fisier_nume: string; tip_document: string; created_at: string; furnizor?: string | null }
 interface Sugestie {
   id: string
   achizitie_id: string | null
@@ -85,7 +85,7 @@ function AchizitieDocumente({ achizitieId, culoare, etapaCuranta, onChange }: { 
         <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-xs)', color: 'var(--c-999999)' }}>
           <span style={{ padding: '1px 6px', borderRadius: 'var(--r-full)', background: 'var(--c-1a1a1a)', fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-777777)' }}>{STATUS_LABEL[d.tip_document] || d.tip_document}</span>
           <VeziButon url={`/api/chitante/document?id=${d.id}`} />
-          <a href={`/api/chitante/document?id=${d.id}`} style={{ color:'var(--accent)', textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</a>
+          <a href={`/api/chitante/document?id=${d.id}`} style={{ color:'var(--accent)', textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}{/^Oferta [1-3]\.pdf$/i.test(d.fisier_nume)&&d.furnizor?` · ${d.furnizor}`:''}</a>
           <button onClick={() => remove(d.id)} style={{ color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 'var(--fs-xs)' }}>✕</button>
         </div>
       ))}

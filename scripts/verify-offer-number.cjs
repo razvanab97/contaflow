@@ -1,0 +1,20 @@
+const assert = require('node:assert/strict')
+async function main() {
+  const { nextOfferNumber, offerGroup } = await import('../lib/achizitii-offer-number.ts')
+  const { dosarAchizitie } = await import('../lib/achizitii-procedura.ts')
+  const doc=(n,supplier)=>({fisier_nume:`Oferta ${n}.pdf`,furnizor:supplier,tip_document:'oferta'})
+  assert.equal(nextOfferNumber([], 'A'),1)
+  assert.equal(nextOfferNumber([doc(1,'A')], 'B'),2)
+  assert.equal(nextOfferNumber([doc(1,'A'),doc(2,'B')], 'C'),3)
+  assert.equal(nextOfferNumber([doc(1,'A'),doc(3,'C')], 'B'),2)
+  assert.throws(()=>nextOfferNumber([doc(1,'A'),doc(2,'B'),doc(3,'C')],'D'))
+  assert.throws(()=>nextOfferNumber([doc(1,'Furnizor A')],' furnizor a '))
+  const old={fisier_nume:'Oferta [furnizor=a] - A.pdf'}
+  assert.equal(nextOfferNumber([old,old],'B'),2)
+  assert.equal(offerGroup(doc(1,'Ștefan SRL')),'stefan_srl')
+  const offers=dosarAchizitie([doc(1,'A'),doc(2,'B'),doc(3,'C')]).find(x=>x.cheie==='oferte')
+  assert.equal(offers.ok,true);assert.equal(offers.detaliu.includes('negrupate'),false)
+  assert.equal(dosarAchizitie([doc(1,'A'),doc(2,'A'),doc(3,'A')]).find(x=>x.cheie==='oferte').ok,false)
+  console.log('OK: Oferta 1/2/3, număr liber, duplicate, dosar complet, compatibilitate și contor furnizori.')
+}
+main().catch(error=>{console.error(error);process.exitCode=1})
