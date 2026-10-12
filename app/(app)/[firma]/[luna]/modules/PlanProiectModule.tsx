@@ -78,25 +78,52 @@ function Intro({ icon, titlu, children, actiune }: { icon: Parameters<typeof Ico
 }
 
 // --- Intreaba proiectul -------------------------------------------------------------------------
+// Fereastra de chat cu inaltime fixa (cat ramane din ecran): doar conversatia se deruleaza, pagina nu.
 function Intreaba({ firma }: { firma: Firma }) {
   const [lista, setLista] = useState<Intrebare[]>([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [lipsaMigrare, setLipsaMigrare] = useState(false)
-  const josRef = useRef<HTMLDivElement>(null)
+  const [inaltime, setInaltime] = useState<number | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const lipitJos = useRef(true)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     fetch(`/api/proiect/intreaba?firmaId=${firma.id}`).then(r => r.json()).then(d => { setLista(d.intrebari || []); setLipsaMigrare(!!d.lipsaMigrare) }).catch(() => {})
   }, [firma.id])
-  useEffect(() => { josRef.current?.scrollIntoView({ block: 'nearest' }) }, [lista])
+  // Inaltimea ferestrei = ecranul minus ce e deasupra ei, minus loc pentru butonul fix "Pasul urmator".
+  useEffect(() => {
+    let raf = 0
+    const calc = () => {
+      const el = panelRef.current
+      if (!el) return
+      const sus = el.getBoundingClientRect().top + window.scrollY
+      // Pe telefon antetul paginii ia jumatate din ecran - fereastra primeste macar ~62% din inaltime.
+      const min = window.innerWidth < 640 ? Math.round(window.innerHeight * 0.62) : 280
+      const h = Math.max(min, window.innerHeight - sus - 150)
+      setInaltime(h)
+      // A doua trecere: ce mai iese din ecran sub fereastra (ex. "Pasul urmator") se scade exact.
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const extra = document.documentElement.scrollHeight - window.innerHeight
+        if (extra > 0) setInaltime(Math.max(min, h - extra))
+      })
+    }
+    calc()
+    window.addEventListener('resize', calc)
+    return () => { window.removeEventListener('resize', calc); cancelAnimationFrame(raf) }
+  }, [])
+  // Raspunsul care curge tine conversatia jos - doar daca utilizatorul nu a urcat sa citeasca ceva mai vechi.
+  useEffect(() => { const el = scrollRef.current; if (el && lipitJos.current) el.scrollTop = el.scrollHeight }, [lista, inaltime])
   // Textarea creste odata cu textul (pana la max-height din CSS), fara bara de redimensionare.
   useEffect(() => { const el = inputRef.current; if (!el) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px` }, [text])
 
   async function trimite(q?: string) {
     const intrebare = (q ?? text).trim()
     if (!intrebare || busy) return
-    setText(''); setBusy(true)
+    setText(''); setBusy(true); lipitJos.current = true
     const istoric = lista.filter(x => !x.inCurs).slice(-6).map(x => ({ intrebare: x.intrebare, raspuns: x.raspuns }))
     setLista(prev => [...prev, { intrebare, raspuns: '', inCurs: true }])
     try {
@@ -126,63 +153,69 @@ function Intreaba({ firma }: { firma: Firma }) {
   }
 
   return (
-    <div className={css.chat}>
-      <div className={css.card}>
-        <Intro icon="sparkles" titlu="Întreabă proiectul" actiune={lista.length > 0 ? <button type="button" className="btn btn-sm btn-ghost" onClick={sterge} disabled={busy}><Icon name="history" size={14} /> Șterge istoricul</button> : undefined}>
-          Răspunde din planul de afaceri, buget, actul adițional și memoriul {VERSIUNE_BUGET.split(' ')[0]}, plus toate datele din ContaFlow, cu sursa citată. Ce nu reiese din documente îți spune clar.
-        </Intro>
-        {lipsaMigrare && <div className={css.warn}>Istoricul nu se salvează încă — rulează migrarea SQL (tabelul proiect_intrebari). Răspunsurile funcționează oricum.</div>}
-      </div>
-
-      {lista.length === 0 && (
-        <div>
-          <div className={css.eyebrow} style={{ marginBottom: 10 }}>Începe cu o întrebare</div>
-          <div className={css.suggestions}>
-            {SUGESTII.map(q => <button key={q} type="button" className={css.suggestion} onClick={() => trimite(q)} disabled={busy}><Icon name="arrowRight" size={14} /><span>{q}</span></button>)}
-          </div>
+    <div ref={panelRef} className={css.chatPanel} style={inaltime ? { height: inaltime } : undefined}>
+      <div className={css.chatHeader}>
+        <div className={css.introIcon} style={{ width: 34, height: 34, borderRadius: 10 }}><Icon name="sparkles" size={17} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className={css.h3}>Întreabă proiectul</div>
+          <div className={`${css.faint} ${css.hideMobile}`} style={{ marginTop: 2 }}>Planul, bugetul, actul adițional și memoriul {VERSIUNE_BUGET.split(' ')[0]} + toate datele din ContaFlow, cu sursa citată.</div>
         </div>
-      )}
+        {lista.length > 0 && <button type="button" className="btn btn-sm btn-ghost" onClick={sterge} disabled={busy}><Icon name="history" size={14} /> Șterge istoricul</button>}
+      </div>
+      {lipsaMigrare && <div className={css.warn} style={{ margin: 0, padding: '8px 20px' }}>Istoricul nu se salvează încă — rulează migrarea SQL (tabelul proiect_intrebari). Răspunsurile funcționează oricum.</div>}
 
-      {lista.map((x, i) => {
-        const { curat, fapte } = extrageMemorieDinRaspuns(x.raspuns)
-        return (
-          <div key={x.id || i} className={css.turn}>
-            <div className={css.question}>{x.intrebare}</div>
-            <div className={css.answer}>
-              <div className={css.avatar} aria-hidden><Icon name="sparkles" size={16} /></div>
-              <div className={css.answerBody}>
-                {curat
-                  ? <Markdown text={curat} />
-                  : <span className={css.thinking}><span className={css.dots}><i /><i /><i /></span>Caut în documentele și datele proiectului…</span>}
-                {x.inCurs && curat && <span className={css.caret} aria-hidden />}
-                {!x.inCurs && fapte.length > 0 && <div className={css.remembered}>
-                  <strong><Icon name="check" size={14} strokeWidth={2.25} /> Reținut în memoria proiectului</strong>
-                  <ul>{fapte.map((f, j) => <li key={j}>{f.data.split('-').reverse().join('.')} · {f.categorie}: {f.text}</li>)}</ul>
-                </div>}
-                {!x.inCurs && curat && (
-                  <div className={css.meta}>
-                    <span className={css.faint}>{x.created_at ? new Date(x.created_at).toLocaleString('ro-RO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                    <button type="button" className={css.copy} onClick={() => copiaza(curat)}>Copiază</button>
-                  </div>
-                )}
-              </div>
+      <div ref={scrollRef} className={css.messages} onScroll={e => { const el = e.currentTarget; lipitJos.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80 }}>
+        {lista.length === 0 && (
+          <div className={css.emptyChat}>
+            <div className={css.eyebrow} style={{ marginBottom: 10 }}>Începe cu o întrebare</div>
+            <div className={css.suggestions}>
+              {SUGESTII.map(q => <button key={q} type="button" className={css.suggestion} onClick={() => trimite(q)} disabled={busy}><Icon name="arrowRight" size={14} /><span>{q}</span></button>)}
             </div>
           </div>
-        )
-      })}
-      <div ref={josRef} />
+        )}
 
-      <div className={css.composer}>
-        <div className={css.composerRow}>
-          <textarea ref={inputRef} className={css.textarea} value={text} onChange={e => setText(e.target.value)} rows={1} aria-label="Întrebarea ta"
-            placeholder="Întreabă orice despre proiect — ex.: Ce trebuie să am în dosar pentru tranșa 2?"
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); trimite() } }} />
-          <button type="button" className={css.send} onClick={() => trimite()} disabled={busy || !text.trim()} aria-label={busy ? 'Se răspunde' : 'Trimite întrebarea'} title="Trimite (Enter)">
-            <Icon name="send" size={17} />
-          </button>
-        </div>
+        {lista.map((x, i) => {
+          const { curat, fapte } = extrageMemorieDinRaspuns(x.raspuns)
+          return (
+            <div key={x.id || i} className={css.turn}>
+              <div className={css.question}>{x.intrebare}</div>
+              <div className={css.answer}>
+                <div className={css.avatar} aria-hidden><Icon name="sparkles" size={16} /></div>
+                <div className={css.answerBody}>
+                  {curat
+                    ? <Markdown text={curat} />
+                    : <span className={css.thinking}><span className={css.dots}><i /><i /><i /></span>Caut în documentele și datele proiectului…</span>}
+                  {x.inCurs && curat && <span className={css.caret} aria-hidden />}
+                  {!x.inCurs && fapte.length > 0 && <div className={css.remembered}>
+                    <strong><Icon name="check" size={14} strokeWidth={2.25} /> Reținut în memoria proiectului</strong>
+                    <ul>{fapte.map((f, j) => <li key={j}>{f.data.split('-').reverse().join('.')} · {f.categorie}: {f.text}</li>)}</ul>
+                  </div>}
+                  {!x.inCurs && curat && (
+                    <div className={css.meta}>
+                      <span className={css.faint}>{x.created_at ? new Date(x.created_at).toLocaleString('ro-RO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                      <button type="button" className={css.copy} onClick={() => copiaza(curat)}>Copiază</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
-      <p className={css.hint} style={{ marginTop: -18, textAlign: 'center' }}><kbd>Enter</kbd> trimite · <kbd>Shift</kbd>+<kbd>Enter</kbd> rând nou · poți pune întrebări de continuare</p>
+
+      <div className={css.chatFooter}>
+        <div className={css.composer}>
+          <div className={css.composerRow}>
+            <textarea ref={inputRef} className={css.textarea} value={text} onChange={e => setText(e.target.value)} rows={1} aria-label="Întrebarea ta"
+              placeholder="Întreabă orice despre proiect — ex.: Ce trebuie să am în dosar pentru tranșa 2?"
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); trimite() } }} />
+            <button type="button" className={css.send} onClick={() => trimite()} disabled={busy || !text.trim()} aria-label={busy ? 'Se răspunde' : 'Trimite întrebarea'} title="Trimite (Enter)">
+              <Icon name="send" size={17} />
+            </button>
+          </div>
+        </div>
+        <p className={`${css.hint} ${css.hideMobile}`}><kbd>Enter</kbd> trimite · <kbd>Shift</kbd>+<kbd>Enter</kbd> rând nou · poți pune întrebări de continuare</p>
+      </div>
     </div>
   )
 }
