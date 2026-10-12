@@ -101,14 +101,14 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
   const curand = rows.filter(row => !row.trimis && zileRamase(row.scadenta) !== null && (zileRamase(row.scadenta) as number) >= 0 && (zileRamase(row.scadenta) as number) <= 5).length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
       <SincronizareProiectMail firmaId={firma.id} culoare={firma.culoare} onSynced={load} />
 
       <ProiectWorkflow firmaId={firma.id} lunaId={lunaId} luna={luna} firmaSlug={firma.slug} />
 
-      <details style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '14px 18px' }}>
-        <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650 }}>Checklist anterior și sugestii din email</summary>
-        <div style={{ display: 'grid', gap: '16px', marginTop: '14px' }}>
+      <details style={{ border: '1px solid var(--border)', borderRadius: '16px', padding: '0 20px', background: 'var(--surface)', boxShadow: 'var(--shadow-xs)' }}>
+        <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 600, padding: '15px 0', color: 'var(--text-primary)' }}>Checklist anterior și sugestii din email</summary>
+        <div style={{ display: 'grid', gap: '16px', marginTop: '2px', paddingBottom: '18px' }}>
       {(restante > 0 || curand > 0) && (
         <div style={{ display: 'flex', gap: '12px' }}>
           {restante > 0 && (
@@ -208,7 +208,7 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        <button onClick={() => confirmSugestie(s.id)} disabled={busy} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent-solid)', color: '#08210f', cursor: 'pointer' }}>Confirmă</button>
+                        <button onClick={() => confirmSugestie(s.id)} disabled={busy} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '6px 10px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--accent-solid)', color: 'var(--accent-contrast)', cursor: 'pointer' }}>Confirmă</button>
                         <button onClick={() => respingeSugestie(s.id)} disabled={busy} style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-888888)', background: 'transparent', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer' }}>Respinge</button>
                       </div>
                     </div>
@@ -221,9 +221,9 @@ export default function ObligatiiModule({ firma, lunaId, luna }: Props) {
       </div>
         </div>
       </details>
-      <details style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '14px 18px' }}>
-        <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 650 }}>Documente anterioare</summary>
-        <div style={{ display: 'grid', gap: '10px', marginTop: '14px' }}>
+      <details style={{ border: '1px solid var(--border)', borderRadius: '16px', padding: '0 20px', background: 'var(--surface)', boxShadow: 'var(--shadow-xs)' }}>
+        <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-md)', fontWeight: 600, padding: '15px 0', color: 'var(--text-primary)' }}>Documente anterioare</summary>
+        <div style={{ display: 'grid', gap: '10px', marginTop: '2px', paddingBottom: '18px' }}>
           {rows.map(row => <ObligatieDocumente key={row.tipKey} obligatieStareId={row.id} label={row.label}
             destinatar={row.destinatar} sursaInstructiuni={row.sursaInstructiuni} editabilLink={row.editabilLink}
             firmaSlug={firma.slug} luna={luna} culoare={firma.culoare} />)}

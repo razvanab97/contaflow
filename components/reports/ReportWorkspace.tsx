@@ -358,7 +358,7 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
       <ReportHeader
         firmaNume={firma.nume} firmaSlug={firma.slug} luna={luna} lunaLabel={lunaLabel} modulSlug={modulSlug}
         title={template.title} saveStatus={saveStatus} savedAt={savedAt}
@@ -380,14 +380,15 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
         },
       })}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-        <p style={{ color: 'var(--c-777777)', fontSize: 'var(--fs-sm)', margin: 0 }}>Apasă pe un rând din raport pentru a-l edita. Textul apare imediat; modificările se salvează automat.</p>
-        <button onClick={handleExport} disabled={!doc || exporting || docLoading} style={{ padding: '10px 16px', background: 'var(--accent-solid)', color: '#fff', border: 'none', borderRadius: 'var(--r-md)', cursor: 'pointer', fontWeight: 600, opacity: !doc || exporting ? .6 : 1 }}>
-          {exporting ? 'Se pregătește PDF-ul...' : 'Salvează PDF'}
-        </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', minWidth: 0 }}>
+          <ReportTabs active={tab} onChange={setTab}/>
+          <button type="button" className="btn btn-primary btn-lg" onClick={handleExport} disabled={!doc || exporting || docLoading}>
+            {exporting ? 'Se pregătește PDF-ul...' : 'Salvează PDF'}
+          </button>
+        </div>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', margin: '0 0 0 4px' }}>Apasă pe un rând din raport pentru a-l edita. Textul apare imediat; modificările se salvează automat.</p>
       </div>
-
-      <ReportTabs active={tab} onChange={setTab}/>
       {exportError && <p role="alert" style={{ color: 'var(--danger)' }}>{exportError}</p>}
 
       {docLoading ? (

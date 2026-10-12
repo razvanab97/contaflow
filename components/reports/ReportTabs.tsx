@@ -9,21 +9,26 @@ const TABS: { id: ReportTab; label: string }[] = [
 
 export default function ReportTabs({ active, onChange }: { active: ReportTab; onChange: (tab: ReportTab) => void }) {
   return (
-    <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--c-1a1a1a)' }}>
-      {TABS.map(t => (
-        <button
-          key={t.id}
-          onClick={() => onChange(t.id)}
-          style={{
-            fontSize: 'var(--fs-md)', fontWeight: 600, padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer',
-            color: active === t.id ? 'var(--c-eeeeee)' : 'var(--c-777777)',
-            borderBottom: active === t.id ? '2px solid var(--accent)' : '2px solid transparent',
-            marginBottom: '-1px',
-          }}
-        >
-          {t.label}
-        </button>
-      ))}
+    <div role="tablist" aria-label="Vizualizare raport" style={{ display: 'flex', gap: '2px', padding: '4px', background: 'var(--surface-sunken)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-full)', width: 'fit-content', maxWidth: '100%', minWidth: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      {TABS.map(t => {
+        const on = active === t.id
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(t.id)}
+            style={{
+              fontSize: 'var(--fs-md)', fontWeight: 550, height: '32px', padding: '0 14px', border: 'none', borderRadius: 'var(--r-full)', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
+              background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: on ? 'var(--shadow-sm)' : 'none',
+              transition: 'background-color .15s, color .15s',
+            }}
+          >
+            {t.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
