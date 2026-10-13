@@ -44,7 +44,34 @@ export default function ProiectWorkflow({firmaId,lunaId,luna,firmaSlug='proiect-
  async function run(action:()=>Promise<void>){setBusy(true);setError('');setMessage('');setGenerated(null);try{await action()}catch(e){setError(errorText(e))}finally{setBusy(false)}}
  async function openSettings(){if(settings){setTab('setari');return}await run(async()=>{const data=await response(await fetch(`/api/proiect-workflow?firmaId=${firmaId}&scope=settings`,{cache:'no-store'}));setSettings(data.state);setTab('setari')})}
  function assetUrl(id:string){return `/api/proiect-workflow/document?firmaId=${firmaId}&scope=${scope}&id=${id}`}
- async function upload(file:File,task:string){await run(async()=>{if(file.size>4*1024*1024)throw new Error('Fișierul depășește limita de 4 MB.');const saved=await save();if(!saved)return;const fd=new FormData();fd.set('firmaId',firmaId);fd.set('scope',scope);fd.set('version',String(saved.version));fd.set('task',task);fd.set('file',file);const data=await response(await fetch('/api/proiect-workflow/document',{method:'POST',body:fd}));setState(data.state);setMessage('Document salvat. Confirmă separat verificarea, semnarea sau trimiterea.')})}
+ async function upload(files:File[],task:string){
+  if(autoSaving||busy)return
+  await run(async()=>{
+   if(!files.length)return
+   if(files.length>20)throw new Error('Selectează maximum 20 de documente odată.')
+   const initial=await save()
+   if(!initial)return
+   let current:Workflow=initial
+   const errors:string[]=[],warnings:string[]=[]
+   let saved=0
+   // Sequential writes use the version returned by each successful upload.
+   for(const [index,file] of files.entries()){
+    setMessage(`Se încarcă ${index+1}/${files.length}: ${file.name}`)
+    if(!file.size||file.size>4*1024*1024){errors.push(`${file.name}: fișier gol sau mai mare de 4 MB.`);continue}
+    let conflict=false
+    try{
+     const fd=new FormData();fd.set('firmaId',firmaId);fd.set('scope',scope);fd.set('version',String(current.version));fd.set('task',task);fd.set('file',file)
+     const res=await fetch('/api/proiect-workflow/document',{method:'POST',body:fd})
+     conflict=res.status===409
+     const data=await response(res)
+     current=data.state;setState(data.state);saved++
+     if(data.warning)warnings.push(`${file.name}: ${data.warning}`)
+    }catch(e){errors.push(`${file.name}: ${errorText(e)}`);if(conflict){errors.push('Lotul a fost oprit. Reîncarcă înainte de a adăuga documentele rămase.');break}}
+   }
+   setMessage(`${saved}/${files.length} documente salvate separat. Confirmă separat verificarea, semnarea sau trimiterea.${warnings.length?' '+warnings.join(' '):''}`)
+   if(errors.length)setError(errors.join(' '))
+  })
+ }
  const selected=state?.forms[kind]||defaultDraft(kind,luna)
  function changeDraft(draft:Draft){if(!state)return;const forms={...state.forms,[kind]:draft};if(purchaseId){const shared=Object.fromEntries(Object.entries(draft.fields).filter(([key])=>common.has(key)));for(const k of ['oferta','nota','receptie'] as FormKind[]){if(k===kind)continue;const other=forms[k]||defaultDraft(k);forms[k]={fields:{...other.fields,...shared},lines:other.lines}}}edit({...state,forms})}
  const err=error&&<div role="alert" style={{...box,borderColor:'var(--danger)',color:'var(--danger)'}}>{error} <button style={button} onClick={()=>{if(!dirty||confirm('Reîncarci și renunți la modificările nesalvate?'))void load()}}>Reîncarcă</button></div>
@@ -69,7 +96,7 @@ export default function ProiectWorkflow({firmaId,lunaId,luna,firmaSlug='proiect-
  </div>
  {err}{message&&<div role="status" style={{...hint,color:'var(--success)'}}>{message}{generated?.scope===scope&&<a href={assetUrl(generated.id)} style={{...button,marginLeft:8}}>Descarcă Word · {generated.name}</a>}</div>}
  <fieldset disabled={busy} style={{border:0,padding:0,minWidth:0,display:'grid',gap:16}}>
- {tab==='rutina'&&<RutinaLunii state={state} month={month} next={next} onEdit={edit} onUpload={(f,k)=>void upload(f,k)} assetUrl={assetUrl} onRaport={()=>{setKind('raport');setTab('formulare')}}/>}
+ {tab==='rutina'&&<RutinaLunii state={state} month={month} next={next} onEdit={edit} onUpload={(files,k)=>void upload(files,k)} uploadDisabled={autoSaving} salaryArchiveUrl={`/api/proiect-workflow/salarizare?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} assetUrl={assetUrl} onRaport={()=>{setKind('raport');setTab('formulare')}}/>}
  {tab==='formulare'&&<>
  <div style={box} className={formStyles.header}>
    <div><h3>{FORM_LABELS[kind]}</h3><p>{purchase?.denumire || 'Completează documentul, verifică datele și generează Word.'}</p></div>

@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { TASKS, STEP_LABELS, blockedBy, type Workflow, type Step } from '@/lib/proiect-workflow'
 import Icon from '@/components/ui/Icon'
 import css from './RutinaLunii.module.css'
+import RegesRecommendations from './RegesRecommendations'
+import SalaryPackageDownload from './SalaryPackageDownload'
 
 type Task = typeof TASKS[number]
 type Asset = Workflow['assets'][number]
@@ -42,9 +44,9 @@ function Pastila({ ton, children }: { ton: Ton; children: React.ReactNode }) {
   return <span className={`${css.pill} ${TON[ton]}`}>{children}</span>
 }
 
-export default function RutinaLunii({ state, month, next, onEdit, onUpload, assetUrl, onRaport }: {
+export default function RutinaLunii({ state, month, next, onEdit, onUpload, assetUrl, onRaport, uploadDisabled = false, salaryArchiveUrl }: {
   state: Workflow; month: string; next: Task | null | undefined
-  onEdit: (w: Workflow) => void; onUpload: (f: File, task: string) => void; assetUrl: (id: string) => string; onRaport: () => void
+  onEdit: (w: Workflow) => void; onUpload: (files: File[], task: string) => void; assetUrl: (id: string) => string; onRaport: () => void; uploadDisabled?: boolean; salaryArchiveUrl?: string
 }) {
   const azi = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bucharest' }).format(new Date())
   const vizibile = (TASKS as readonly Task[]).filter(t => state.rules[t.key]?.frequency !== 'annual' || Number(month.slice(5, 7)) === state.rules[t.key].month || state.tasks[t.key]?.due).filter(t => state.tasks[t.key])
@@ -108,6 +110,7 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
               <span className={css.label}>Ce ai de făcut</span>
               <div className={css.todoText}>{t.action}</div>
             </div>
+            {t.key === 'reges' && <RegesRecommendations assets={docs} />}
             {blocat.length > 0 && (
               <div role="alert" className={css.blocked}><Icon name="ban" size={15} /> Întâi finalizează: {blocat.join(', ')}. Până atunci poți doar pregăti documentele.</div>
             )}
@@ -151,17 +154,18 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
               <span className={css.label}>Documente ({docs.length})</span>
               <div className={css.docs}>
                 {docs.map(a => (
-                  <a key={a.id} href={assetUrl(a.id)} className={css.doc} title={a.name}>
+                  <div key={a.id} style={{minWidth:0,maxWidth:'100%'}}><a href={assetUrl(a.id)} className={css.doc} title={a.originalName ? `${a.name} · Original: ${a.originalName}` : a.name}>
                     <Icon name="fileText" size={14} /><span>{a.name}</span><Icon name="download" size={13} />
-                  </a>
+                  </a>{a.namingWarning && <div className={css.help} style={{color:'var(--warning)'}}>{a.namingWarning}</div>}</div>
                 ))}
                 <label className={css.upload}>
-                  <Icon name="download" size={14} style={{ transform: 'rotate(180deg)' }} /> Adaugă document <small>PDF, Word, imagine · max 4 MB</small>
-                  <input type="file" accept=".pdf,.docx,.jpg,.jpeg,.png" onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onUpload(f, t.key) }} />
+                  <Icon name="download" size={14} style={{ transform: 'rotate(180deg)' }} /> {t.key==='reges'?'Adaugă documente REGES':'Adaugă document'} <small>PDF, Word, imagine · max 4 MB{t.key==='reges'?' / fișier':''}</small>
+                  <input type="file" aria-label={`Încarcă ${titlu}`} multiple={t.key==='reges'} disabled={uploadDisabled} accept=".pdf,.docx,.jpg,.jpeg,.png" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ''; if (files.length) onUpload(files, t.key) }} />
                 </label>
                 {t.key === 'raport' && <button type="button" className="btn btn-sm" onClick={onRaport}>Completează raportul (Word) <Icon name="arrowRight" size={13} /></button>}
               </div>
               <div className={css.help}>Încărcarea nu schimbă starea — după ce verifici / semnezi / trimiți, apasă starea potrivită.</div>
+              {t.key==='reges'&&<div className={css.help}>Poți selecta până la 20 de documente odată. PDF-urile rămân separate și sunt redenumite după tipul raportului, numele din raport și data emiterii. Conținutul și semnăturile PDF nu sunt modificate.</div>}
             </div>
           </div>
         )}
@@ -202,6 +206,7 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
             </div>
             <span className={css.groupCount}>{salarii.filter(t => gata(state.tasks[t.key].status)).length}/{salarii.length} încheiați</span>
           </div>
+          {salaryArchiveUrl && <SalaryPackageDownload assets={state.assets} url={salaryArchiveUrl} month={month} disabled={uploadDisabled} />}
           <div className={css.list}>{salarii.map((t, i) => renderPas(t, i + 1))}</div>
         </section>
       )}
