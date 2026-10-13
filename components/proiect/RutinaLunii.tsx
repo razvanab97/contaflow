@@ -54,6 +54,7 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
   const vizibile = (TASKS as readonly Task[]).filter(t => state.rules[t.key]?.frequency !== 'annual' || Number(month.slice(5, 7)) === state.rules[t.key].month || state.tasks[t.key]?.due).filter(t => state.tasks[t.key])
   const [deschise, setDeschise] = useState<Set<string>>(() => new Set(next ? [next.key] : []))
   const refs = useRef<Record<string, HTMLDivElement | null>>({})
+  const [tras, setTras] = useState<string | null>(null)
   useEffect(() => { if (next) setDeschise(prev => prev.size ? prev : new Set([next.key])) }, [next])
 
   const total = vizibile.length
@@ -119,58 +120,82 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
               <div role="alert" className={css.blocked}><Icon name="ban" size={15} /> Întâi finalizează: {blocat.join(', ')}. Până atunci poți doar pregăti documentele.</div>
             )}
 
-            <div>
-              <span className={css.label}>Stare</span>
-              <div className={css.stepper} role="group" aria-label={`Stare ${titlu}`}>
-                {flux.map((s, i) => {
-                  const activ = row.status === s, trecut = idx >= 0 && i < idx, interzis = blocat.length > 0 && BLOCATE.includes(s)
-                  return (
-                    <button key={s} type="button" className={css.step} data-active={activ} data-past={trecut} disabled={interzis} aria-pressed={activ}
-                      onClick={() => seteaza(t.key, { status: s })} title={interzis ? `Blocat: întâi ${blocat.join(', ')}` : STEP_LABELS[s]}>
-                      {trecut && <Icon name="check" size={12} strokeWidth={2.4} />}{SCURT[s]}
+            <div className={css.work}>
+              <div className={css.zone}>
+                <div className={css.zoneHead}>
+                  <span className={css.zoneTitle}>Stare</span>
+                  <span className={css.zoneNow}>Acum: <b>{row.status === 'neaplicabil' ? 'Nu se aplică luna asta' : STEP_LABELS[row.status]}</b></span>
+                </div>
+                <div className={css.track} role="group" aria-label={`Stare ${titlu}`}>
+                  {flux.map((s, i) => {
+                    const activ = row.status === s, trecut = idx >= 0 && i < idx, interzis = blocat.length > 0 && BLOCATE.includes(s)
+                    return (
+                      <button key={s} type="button" className={css.node} data-active={activ} data-past={trecut} disabled={interzis} aria-pressed={activ}
+                        onClick={() => seteaza(t.key, { status: s })} title={interzis ? `Blocat: întâi ${blocat.join(', ')}` : STEP_LABELS[s]}>
+                        <span className={css.dot}>{trecut ? <Icon name="check" size={13} strokeWidth={2.6} /> : i + 1}</span>
+                        <span className={css.nodeLabel}>{SCURT[s]}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className={css.ctaRow}>
+                  {urmator && !(blocat.length && BLOCATE.includes(urmator)) && (
+                    <button type="button" className="btn btn-primary" onClick={() => seteaza(t.key, { status: urmator })}>
+                      Marchează: {STEP_LABELS[urmator]} <Icon name="arrowRight" size={14} />
                     </button>
-                  )
-                })}
-              </div>
-              <div className={css.stateActions}>
-                {urmator && !(blocat.length && BLOCATE.includes(urmator)) && (
-                  <button type="button" className="btn btn-primary" onClick={() => seteaza(t.key, { status: urmator })}>
-                    Marchează: {STEP_LABELS[urmator]} <Icon name="arrowRight" size={14} />
+                  )}
+                  <button type="button" className={css.ghost} data-on={row.status === 'neaplicabil'} onClick={() => seteaza(t.key, { status: row.status === 'neaplicabil' ? 'lipsa' : 'neaplicabil' })}>
+                    {row.status === 'neaplicabil' ? '✓ Nu se aplică (anulează)' : 'Nu se aplică luna asta'}
                   </button>
-                )}
-                <button type="button" className={css.na} data-on={row.status === 'neaplicabil'} onClick={() => seteaza(t.key, { status: row.status === 'neaplicabil' ? 'lipsa' : 'neaplicabil' })}>
-                  {row.status === 'neaplicabil' ? '✓ Nu se aplică (anulează)' : 'Nu se aplică luna asta'}
-                </button>
+                </div>
+                {PLATI.has(t.key) && <div className={css.tip}><Icon name="alert" size={13} />La plăți: inițiată ≠ executată. „Executată” doar după ce vezi plata în extras.</div>}
               </div>
-              {PLATI.has(t.key) && <div className={css.help}>La plăți: inițiată ≠ executată. „Executată” doar după ce vezi plata în extras.</div>}
-            </div>
 
-            <div className={css.fields}>
-              <label><span className={css.label}>Termen</span>
-                <input type="date" className={css.input} aria-label={`Termen ${t.title}`} value={row.due || ''} onChange={e => seteaza(t.key, { due: e.target.value || null })} />
-              </label>
-              <label><span className={css.label}>Observații / referință confirmare</span>
-                <input className={css.input} value={row.note} placeholder="ex. trimis pe mail la Orieda pe 05.10, nr. înregistrare…" onChange={e => seteaza(t.key, { note: e.target.value })} />
-              </label>
-            </div>
+              <div className={css.zone}>
+                <div className={css.fieldGrid}>
+                  <label>Termen
+                    <input type="date" className={css.input} aria-label={`Termen ${t.title}`} value={row.due || ''} onChange={e => seteaza(t.key, { due: e.target.value || null })} />
+                  </label>
+                  <label>Observații / referință confirmare
+                    <input className={css.input} value={row.note} placeholder="ex. trimis pe mail la Orieda pe 05.10, nr. înregistrare…" onChange={e => seteaza(t.key, { note: e.target.value })} />
+                  </label>
+                </div>
+              </div>
 
-            <div>
-              <span className={css.label}>Documente ({docs.length})</span>
-              <div className={css.docs}>
-                {docs.map(a => (
-                  <div key={a.id} style={{minWidth:0,maxWidth:'100%'}}><a href={assetUrl(a.id)} className={css.doc} title={a.originalName ? `${a.name} · Original: ${a.originalName}` : a.name}>
-                    <Icon name="fileText" size={14} /><span>{a.name}</span><Icon name="download" size={13} />
-                  </a>{a.namingWarning && <div className={css.help} style={{color:'var(--warning)'}}>{a.namingWarning}</div>}</div>
-                ))}
-                <label className={css.upload}>
-                  <Icon name="download" size={14} style={{ transform: 'rotate(180deg)' }} /> {t.key==='reges'?'Adaugă documente REGES':'Adaugă document'} <small>PDF, Word, imagine · max 4 MB{t.key==='reges'?' / fișier':''}</small>
+              <div className={css.zone}>
+                <div className={css.zoneHead}>
+                  <span className={css.zoneTitle}>Documente · {docs.length}</span>
+                  {t.key === 'raport' && <button type="button" className="btn btn-sm" onClick={onRaport}>Completează raportul (Word) <Icon name="arrowRight" size={13} /></button>}
+                </div>
+                {docs.length > 0 ? (
+                  <div className={css.fileGrid}>
+                    {docs.map(a => {
+                      const ext = (a.name.split('.').pop() || '').toLowerCase()
+                      const kind = ext === 'pdf' ? 'pdf' : ['doc', 'docx'].includes(ext) ? 'doc' : 'img'
+                      return (
+                        <a key={a.id} href={assetUrl(a.id)} className={css.file} title={a.originalName ? `${a.name} · Original: ${a.originalName}` : a.name}>
+                          <span className={css.fileIcon} data-kind={kind}>{kind === 'pdf' ? 'PDF' : kind === 'doc' ? 'DOC' : 'IMG'}</span>
+                          <span className={css.fileText}>
+                            <span className={css.fileName}>{a.name.replace(/\.[a-z0-9]+$/i, '')}</span>
+                            {a.namingWarning ? <span className={css.fileWarn}>{a.namingWarning}</span> : <span className={css.fileSub}>{a.originalName ? `Original: ${a.originalName}` : new Date(a.createdAt).toLocaleDateString('ro-RO')}</span>}
+                          </span>
+                          <Icon name="download" size={15} className={css.fileDl} />
+                        </a>
+                      )
+                    })}
+                  </div>
+                ) : <div className={css.emptyFiles}>Niciun document încă.</div>}
+                <label className={css.drop} data-over={tras === t.key} data-disabled={uploadDisabled}
+                  onDragOver={e => { if (uploadDisabled) return; e.preventDefault(); setTras(t.key) }}
+                  onDragLeave={() => setTras(null)}
+                  onDrop={e => { e.preventDefault(); setTras(null); if (uploadDisabled) return; const files = Array.from(e.dataTransfer.files || []).filter(f => /\.(pdf|docx|jpe?g|png)$/i.test(f.name)); if (files.length) onUpload(['reges', 'salarii'].includes(t.key) ? files : files.slice(0, 1), t.key) }}>
+                  <Icon name="download" size={16} style={{ transform: 'rotate(180deg)' }} />
+                  <span>Trage fișierele aici sau <b>{t.key === 'reges' ? 'alege documentele REGES' : ['salarii'].includes(t.key) ? 'alege OP-urile' : 'alege un document'}</b></span>
+                  <small>PDF, Word, imagine · max 4 MB{['reges', 'salarii'].includes(t.key) ? ' / fișier · mai multe odată' : ''}</small>
                   <input type="file" aria-label={`Încarcă ${titlu}`} multiple={['reges','salarii'].includes(t.key)} disabled={uploadDisabled} accept=".pdf,.docx,.jpg,.jpeg,.png" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ''; if (files.length) onUpload(files, t.key) }} />
                 </label>
-                {t.key === 'raport' && <button type="button" className="btn btn-sm" onClick={onRaport}>Completează raportul (Word) <Icon name="arrowRight" size={13} /></button>}
+                <div className={css.tip}><Icon name="alert" size={13} />{t.key === 'reges' ? 'Până la 20 de documente odată; PDF-urile rămân separate și sunt redenumite după tip, nume și data emiterii, fără a le modifica conținutul. ' : t.key === 'salarii' ? 'OP-urile recunoscute păstrează beneficiarul și contul ca reper pentru lunile următoare. ' : ''}Încărcarea nu schimbă starea — după ce verifici / semnezi / trimiți, apasă starea potrivită.</div>
               </div>
-              <div className={css.help}>Încărcarea nu schimbă starea — după ce verifici / semnezi / trimiți, apasă starea potrivită.</div>
-              {t.key==='reges'&&<div className={css.help}>Poți selecta până la 20 de documente odată. PDF-urile rămân separate și sunt redenumite după tipul raportului, numele din raport și data emiterii. Conținutul și semnăturile PDF nu sunt modificate.</div>}
-              {t.key==='salarii'&&<div className={css.help}>Poți încărca mai multe OP-uri odată. Cele recunoscute păstrează beneficiarul și contul ca reper pentru lunile următoare; nu schimbă automat starea plății.</div>}
             </div>
           </div>
         )}
