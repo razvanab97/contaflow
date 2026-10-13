@@ -47,7 +47,7 @@ async function main() {
   assert.equal(formattedLine.specs.split('\n').length,3);assert.equal(formattedLine.price,'1000.00');assert.equal(formattedLine.priceMode,'net')
   assert.equal(offerWebsite('javascript:alert(1)'),'');assert.equal(offerWebsite('https://user:password@example.com'),'')
   const comparison={fields:{},lines:['A','B','C'].map((supplier,index)=>({...formattedLine,supplier,price:String(1000+index*100)}))}
-  const winner=lowestNoteOffer(comparison);assert.equal(winner.index,0);assert.equal(winner.amount,1000);assert.match(winner.text,/prețul cel mai mic fără TVA/)
+  const winner=lowestNoteOffer(comparison);assert.equal(winner.index,0);assert.equal(winner.amount,1000);assert.equal(winner.text,'În urma analizei ofertelor consultate, a fost selectată oferta NR 1, în valoare de 1000,00 lei fara TVA având prețul cel mai scăzut, respectă specificațiile tehnice și este conformă din punct de vedere al termenului de livrare și al condițiilor comerciale.')
   assert.equal(lowestNoteOffer({...comparison,lines:comparison.lines.slice(0,2)}),null)
   assert.equal(lowestNoteOffer({...comparison,lines:comparison.lines.map(line=>({...line,price:'1000'}))}),null)
   assert.equal(lowestNoteOffer({...comparison,lines:comparison.lines.map((line,index)=>index===1?{...line,currency:'EUR'}:line)}),null)

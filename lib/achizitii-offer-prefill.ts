@@ -78,6 +78,7 @@ export function lowestNoteOffer(draft: Draft): { index: number; amount: number; 
   const indexes = values.map((value, index) => value!.netTotal === minimum ? index : -1).filter(index => index >= 0)
   if (indexes.length !== 1) return null
   const index = indexes[0]
-  const amount = minimum.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return { index, amount: minimum, text: `În urma analizei celor trei oferte consultate, am ales oferta nr. ${index + 1}, de la ${draft.lines[index].supplier}, în valoare de ${amount} lei fără TVA, deoarece are prețul cel mai mic fără TVA.` }
+  // Formularea exacta din Anexa 1 aprobata (valoarea fara separator de mii, ca in document: "2644,55 lei fara TVA").
+  const amount = minimum.toFixed(2).replace('.', ',')
+  return { index, amount: minimum, text: `În urma analizei ofertelor consultate, a fost selectată oferta NR ${index + 1}, în valoare de ${amount} lei fara TVA având prețul cel mai scăzut, respectă specificațiile tehnice și este conformă din punct de vedere al termenului de livrare și al condițiilor comerciale.` }
 }
