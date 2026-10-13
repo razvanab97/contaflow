@@ -101,7 +101,7 @@ function Intreaba({ firma }: { firma: Firma }) {
       if (!el) return
       const sus = el.getBoundingClientRect().top + window.scrollY
       // Pe telefon antetul paginii ia jumatate din ecran - fereastra primeste macar ~62% din inaltime.
-      const min = window.innerWidth < 640 ? Math.round(window.innerHeight * 0.62) : 280
+      const min = window.innerWidth < 640 ? Math.round(window.innerHeight * 0.62) : 220
       const h = Math.max(min, window.innerHeight - sus - 150)
       setInaltime(h)
       // A doua trecere: ce mai iese din ecran sub fereastra (ex. "Pasul urmator") se scade exact.

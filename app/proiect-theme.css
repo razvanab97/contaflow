@@ -1,0 +1,85 @@
+/* PROIECT AB Textile - strat premium aplicat DOAR cand e deschis proiectul (ShellClient pune
+   data-firma pe .app-shell). Text usor marit pentru citire comoda, colturi mai rotunde, umbre fine
+   stratificate, fundal cu o stralucire discreta si un grid fin "futurist". Celelalte firme raman neatinse.
+   Totul e in tokeni / clase comune - functionalitatea paginilor nu se schimba. */
+
+.app-shell[data-firma="proiect-ab-textile"] {
+  --fs-xs: 12px;  --fs-sm: 13px;  --fs-md: 14px;  --fs-base: 15px;
+  --fs-lg: 17.5px;  --fs-xl: 22px;  --fs-2xl: 30px;
+  --r-sm: 8px;  --r-md: 10px;  --r-lg: 16px;
+  --pa-ring: color-mix(in srgb, var(--brand) 22%, var(--border));
+  font-size: var(--fs-md);
+  line-height: 1.55;
+}
+:root[data-theme="light"] .app-shell[data-firma="proiect-ab-textile"] {
+  --shadow-xs: 0 1px 2px rgba(16,24,40,.04), 0 1px 1px rgba(16,24,40,.02);
+  --shadow-sm: 0 1px 2px rgba(16,24,40,.05), 0 6px 16px -8px rgba(16,24,40,.10);
+  --shadow-md: 0 2px 4px rgba(16,24,40,.04), 0 18px 40px -16px rgba(16,24,40,.18);
+  --pa-card-shadow: 0 1px 2px rgba(16,24,40,.04), 0 10px 30px -18px rgba(16,24,40,.16);
+  --pa-grid: rgba(16,24,40,.045);
+}
+:root:not([data-theme="light"]) .app-shell[data-firma="proiect-ab-textile"] {
+  --pa-card-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 12px 30px -18px rgba(0,0,0,.6);
+  --pa-grid: rgba(255,255,255,.035);
+}
+
+/* Fundal: stralucire in culoarea proiectului + grid fin care se stinge spre jos. */
+.app-shell[data-firma="proiect-ab-textile"] .app-main {
+  background:
+    radial-gradient(900px 440px at 88% -140px, color-mix(in srgb, var(--brand) 10%, transparent), transparent 70%),
+    radial-gradient(760px 420px at -12% 6%, color-mix(in srgb, var(--accent-blue, #3b82f6) 5%, transparent), transparent 70%);
+}
+.app-shell[data-firma="proiect-ab-textile"] #continut { position: relative; isolation: isolate; }
+.app-shell[data-firma="proiect-ab-textile"] #continut::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 560px; z-index: -1; pointer-events: none;
+  background-image: linear-gradient(var(--pa-grid) 1px, transparent 1px), linear-gradient(90deg, var(--pa-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+
+/* Antet de pagina mai generos. */
+.app-shell[data-firma="proiect-ab-textile"] .page-title { font-size: 24px; font-weight: 700; letter-spacing: -0.028em; }
+@media (min-width: 768px) { .app-shell[data-firma="proiect-ab-textile"] .page-title { font-size: 30px; } }
+.app-shell[data-firma="proiect-ab-textile"] .page-subtitle { font-size: var(--fs-base); line-height: 1.6; max-width: 80ch; }
+.app-shell[data-firma="proiect-ab-textile"] .page-header { margin-bottom: 28px; }
+.app-shell[data-firma="proiect-ab-textile"] .section-title > h2,
+.app-shell[data-firma="proiect-ab-textile"] .section-title > .h2 { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -0.015em; }
+
+/* Suprafete comune: carduri, liste de module, statistici. */
+.app-shell[data-firma="proiect-ab-textile"] .card,
+.app-shell[data-firma="proiect-ab-textile"] .module-list,
+.app-shell[data-firma="proiect-ab-textile"] .stat {
+  border-radius: var(--r-lg);
+  box-shadow: var(--pa-card-shadow);
+}
+.app-shell[data-firma="proiect-ab-textile"] .module-item { padding: 16px 20px; gap: 16px; }
+.app-shell[data-firma="proiect-ab-textile"] .module-item:hover { background: color-mix(in srgb, var(--brand) 4%, var(--surface)); }
+.app-shell[data-firma="proiect-ab-textile"] .stat-value { font-size: 26px; }
+
+/* Butoane: putin mai inalte, colturi moi, primar cu reflex. */
+.app-shell[data-firma="proiect-ab-textile"] .btn { height: 36px; padding: 0 14px; font-size: var(--fs-md); border-radius: 10px; }
+.app-shell[data-firma="proiect-ab-textile"] .btn-sm { height: 31px; padding: 0 11px; font-size: var(--fs-sm); border-radius: 9px; }
+.app-shell[data-firma="proiect-ab-textile"] .btn-lg { height: 42px; padding: 0 18px; font-size: var(--fs-base); border-radius: 12px; }
+.app-shell[data-firma="proiect-ab-textile"] .btn-primary { background-image: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,0) 60%); }
+.app-shell[data-firma="proiect-ab-textile"] .btn:focus-visible { box-shadow: var(--focus-ring); }
+
+/* Etichete. */
+.app-shell[data-firma="proiect-ab-textile"] .badge { font-size: var(--fs-xs); padding: 2px 9px; }
+
+/* Bara laterala ramane la dimensiunile originale (e navigatie, nu continut; altfel nu mai incape
+   deasupra cronometrului). Doar elementul activ primeste bara de accent. */
+.app-shell[data-firma="proiect-ab-textile"] .sidebar {
+  --fs-xs: 11px;  --fs-sm: 12px;  --fs-md: 13px;  --fs-base: 14px;  --fs-lg: 16px;  --fs-xl: 20px;
+  --r-sm: 6px;  --r-md: 8px;  --r-lg: 12px;
+  font-size: 13px; line-height: 1.45;
+}
+.app-shell[data-firma="proiect-ab-textile"] .nav-item.is-active { background: color-mix(in srgb, var(--brand) 11%, transparent); box-shadow: inset 3px 0 0 var(--brand); }
+
+/* Butonul fix "Pasul urmator": pastila cu stralucire. */
+.app-shell[data-firma="proiect-ab-textile"] .next-step .btn-lg { border-radius: 999px; padding: 0 20px; box-shadow: 0 10px 28px -10px var(--brand-glow, rgba(0,0,0,.3)), var(--shadow-md); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-shell[data-firma="proiect-ab-textile"] .card-interactive:hover,
+  .app-shell[data-firma="proiect-ab-textile"] .module-item { transition: background-color .15s ease, box-shadow .2s ease; }
+}

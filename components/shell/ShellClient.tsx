@@ -82,7 +82,7 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
   const modules = firmaSlug ? getFirmaModules(firmaSlug) : undefined
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-firma={firmaSlug}>
       {/* Directia "brand per firma": culoarea firmei active devine --brand pentru toata interfata.
           Randat ca <style> (si pe server), ca sa nu clipeasca accentul implicit la incarcare. */}
       {firmaAtivaObj && <style>{`:root{--brand:${/^#[0-9a-fA-F]{6}$/.test(firmaAtivaObj.culoare) ? firmaAtivaObj.culoare : '#6366F1'}}`}</style>}

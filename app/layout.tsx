@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Script from 'next/script'
 import { Inter, Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
+// Strat premium doar pentru PROIECT AB Textile (activ prin data-firma pe .app-shell).
+import './proiect-theme.css'
 import UpdateWidget from '@/components/UpdateWidget'
 import Toaster from '@/components/ui/Toaster'
 import DocViewer from '@/components/ui/DocViewer'
