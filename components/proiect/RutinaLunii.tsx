@@ -114,7 +114,7 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
             </div>
             {t.key === 'reges' && <RegesRecommendations assets={docs} />}
             {t.key === 'creditare' && creditCalculationUrl && <CreditProposal url={creditCalculationUrl} assets={state.assets} assetUrl={assetUrl} disabled={uploadDisabled} onSaveScheme={creditScheme => onEdit({ ...state, creditScheme })} />}
-            {t.key === 'salarii' && salaryPlanUrl && salaryDocumentUrl && <SalaryPaymentPlan url={salaryPlanUrl} assets={state.assets} documentUrl={salaryDocumentUrl} />}
+            {t.key === 'salarii' && salaryPlanUrl && salaryDocumentUrl && <SalaryPaymentPlan url={salaryPlanUrl} assets={state.assets} documentUrl={salaryDocumentUrl} checks={state.salaryChecks||{}} onChecksChange={salaryChecks=>onEdit({...state,salaryChecks})} disabled={uploadDisabled} />}
             {blocat.length > 0 && (
               <div role="alert" className={css.blocked}><Icon name="ban" size={15} /> Întâi finalizează: {blocat.join(', ')}. Până atunci poți doar pregăti documentele.</div>
             )}

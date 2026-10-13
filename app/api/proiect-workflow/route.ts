@@ -10,6 +10,7 @@ function validate(state:Workflow) {
  for(const t of TASKS){const r=state.rules?.[t.key];if(!r||!Number.isInteger(r.day)||r.day<1||r.day>31||!Number.isInteger(r.offset)||r.offset<0||r.offset>2||!['monthly','annual','manual'].includes(r.frequency)||!Number.isInteger(r.month)||r.month<1||r.month>12)throw new WorkflowError('Regulă de termen invalidă')}
  if(!state.tasks||!state.forms)throw new WorkflowError('Date incomplete')
  if(state.creditScheme!==undefined&&!validCreditScheme(state.creditScheme))throw new WorkflowError('Schema de creditare este invalidă')
+ if(state.salaryChecks!==undefined&&(!state.salaryChecks||typeof state.salaryChecks!=='object'||Array.isArray(state.salaryChecks)||Object.keys(state.salaryChecks).length>100||Object.entries(state.salaryChecks).some(([key,value])=>! /^[A-Z][A-Z0-9]{1,99}$/.test(key)||typeof value!=='string'||value.length>500)))throw new WorkflowError('Bife salariale invalide')
  for(const [key,t]of Object.entries(state.tasks)){
  if(!TASKS.some(x=>x.key===key)||!t||!Object.hasOwn(STEP_LABELS,t.status)||typeof t.note!=='string'||t.note.length>10000||t.due!==null&&(typeof t.due!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(t.due)||!Number.isFinite(Date.parse(t.due))||new Date(t.due).toISOString().slice(0,10)!==t.due))throw new WorkflowError('Stare / dată invalidă')
  }

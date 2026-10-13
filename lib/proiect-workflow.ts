@@ -26,7 +26,7 @@ export type TaskState = { status:Step; due:string | null; note:string }
 export type Asset = { id:string; task:string; name:string; type:string; createdAt:string; kind:'upload'|'generated'; reges?:RegesReport; salaryPayment?:SalaryPayment; originalName?:string; namingWarning?:string }
 export type Line = { supplier:string; product:string; specs:string; unit:string; qty:string; price:string; currency:string; rate:string; source:string; date:string; priceMode?:'gross'|'net'; website?:string }
 export type Draft = { fields:Record<string,string>; lines:Line[] }
-export type Workflow = { version:number; updatedAt:string; profile:Record<string,string>; rules:Record<string,Rule>; tasks:Record<string,TaskState>; forms:Record<string,Draft>; assets:Asset[]; creditScheme?:CreditScheme }
+export type Workflow = { version:number; updatedAt:string; profile:Record<string,string>; rules:Record<string,Rule>; tasks:Record<string,TaskState>; forms:Record<string,Draft>; assets:Asset[]; creditScheme?:CreditScheme; salaryChecks?:Record<string,string> }
 export const PROFILE_FIELDS = { beneficiar:'Beneficiar', reprezentant:'Reprezentant legal', cui:'CUI', onrc:'Nr. Registrul Comerțului', adresa:'Sediu social', contract_subventie:'Contract de subvenție (număr / dată)', caen:'Activitate / CAEN' }
 export function emptyWorkflow():Workflow { return {version:0,updatedAt:'',profile:{beneficiar:'AB TEXTILE S.R.L.',reprezentant:'Abunei Elena',cui:'52575850',caen:'CAEN 9610 — Spălarea și curățarea articolelor textile și a produselor din blană'},rules:Object.fromEntries(TASKS.map(t=>[t.key,{day:t.day,offset:0,frequency:t.key==='ajofm'?'annual':'monthly',month:3}])),tasks:{},forms:{},assets:[]} }
 export function dueDate(workMonth:string, rule:Rule):string|null {

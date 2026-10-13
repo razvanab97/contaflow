@@ -90,8 +90,10 @@ async function main(){
   const forms=local(path.resolve(__dirname,'../lib/achizitii-form-recommendations.ts'))
   const postRoute=compile(path.resolve(__dirname,'../app/api/proiect-workflow/route.ts'),key=>key==='@/lib/proiect-workflow-store'?postStore:key==='@/lib/proiect-workflow'?workflow:key==='@/lib/achizitii-form-recommendations'?forms:key==='@/lib/grant-credit'?helpers:require(key))
   const post=next=>new NextRequest('http://localhost/api/proiect-workflow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({firmaId:'mock',scope:'month-test',state:next})})
-  response=await postRoute.POST(post({...state,creditScheme:{...scheme,confirmedAt:'2026-10-13T12:00:00Z'}}));assert.equal(response.status,200)
-  data=await response.json();assert.equal(data.state.tasks.creditare.status,'lipsa');assert.deepEqual(data.state.assets,assets);assert.equal(writes,1)
+  const salaryChecks={ABUNEIELENA:JSON.stringify(['2026-09','stat-id',257400,'month-test','source-id'])}
+  response=await postRoute.POST(post({...state,salaryChecks,creditScheme:{...scheme,confirmedAt:'2026-10-13T12:00:00Z'}}));assert.equal(response.status,200)
+  data=await response.json();assert.equal(data.state.tasks.creditare.status,'lipsa');assert.equal(data.state.tasks.salarii.status,'lipsa');assert.deepEqual(data.state.salaryChecks,salaryChecks);assert.deepEqual(data.state.assets,assets);assert.equal(writes,1)
+  for(const checks of [[],{'bad key':'yes'},{ABUNEIELENA:123},{ABUNEIELENA:'x'.repeat(501)}]){response=await postRoute.POST(post({...state,salaryChecks:checks}));assert.equal(response.status,400);assert.equal(writes,1)}
   response=await postRoute.POST(post({...state,creditScheme:{...scheme,rows:[{name:'',netCents:-1,contributionsCents:0}]}}));assert.equal(response.status,400);assert.equal(writes,1)
   response=await postRoute.POST(post({...state,version:18,creditScheme:scheme}));assert.equal(response.status,409);assert.equal(writes,1)
   console.log('PASS full-scheme arithmetic, no double CAM, totals/company/period/person validation, prior/current scheme, newest revision, read-only scoped PDF endpoint, storage and input failures.')
