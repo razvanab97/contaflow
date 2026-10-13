@@ -6,6 +6,7 @@ import css from './RutinaLunii.module.css'
 import RegesRecommendations from './RegesRecommendations'
 import SalaryPackageDownload from './SalaryPackageDownload'
 import CreditProposal from './CreditProposal'
+import SalaryPaymentPlan from './SalaryPaymentPlan'
 
 type Task = typeof TASKS[number]
 type Asset = Workflow['assets'][number]
@@ -45,9 +46,9 @@ function Pastila({ ton, children }: { ton: Ton; children: React.ReactNode }) {
   return <span className={`${css.pill} ${TON[ton]}`}>{children}</span>
 }
 
-export default function RutinaLunii({ state, month, next, onEdit, onUpload, assetUrl, onRaport, uploadDisabled = false, salaryArchiveUrl, creditCalculationUrl }: {
+export default function RutinaLunii({ state, month, next, onEdit, onUpload, assetUrl, onRaport, uploadDisabled = false, salaryArchiveUrl, creditCalculationUrl, salaryPlanUrl, salaryDocumentUrl }: {
   state: Workflow; month: string; next: Task | null | undefined
-  onEdit: (w: Workflow) => void; onUpload: (files: File[], task: string) => void; assetUrl: (id: string) => string; onRaport: () => void; uploadDisabled?: boolean; salaryArchiveUrl?: string; creditCalculationUrl?: string
+  onEdit: (w: Workflow) => void; onUpload: (files: File[], task: string) => void; assetUrl: (id: string) => string; onRaport: () => void; uploadDisabled?: boolean; salaryArchiveUrl?: string; creditCalculationUrl?: string; salaryPlanUrl?: string; salaryDocumentUrl?: (scope:string,id:string)=>string
 }) {
   const azi = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bucharest' }).format(new Date())
   const vizibile = (TASKS as readonly Task[]).filter(t => state.rules[t.key]?.frequency !== 'annual' || Number(month.slice(5, 7)) === state.rules[t.key].month || state.tasks[t.key]?.due).filter(t => state.tasks[t.key])
@@ -113,6 +114,7 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
             </div>
             {t.key === 'reges' && <RegesRecommendations assets={docs} />}
             {t.key === 'creditare' && creditCalculationUrl && <CreditProposal url={creditCalculationUrl} assets={state.assets} assetUrl={assetUrl} disabled={uploadDisabled} onSaveScheme={creditScheme => onEdit({ ...state, creditScheme })} />}
+            {t.key === 'salarii' && salaryPlanUrl && salaryDocumentUrl && <SalaryPaymentPlan url={salaryPlanUrl} assets={state.assets} documentUrl={salaryDocumentUrl} />}
             {blocat.length > 0 && (
               <div role="alert" className={css.blocked}><Icon name="ban" size={15} /> Întâi finalizează: {blocat.join(', ')}. Până atunci poți doar pregăti documentele.</div>
             )}
@@ -162,12 +164,13 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
                 ))}
                 <label className={css.upload}>
                   <Icon name="download" size={14} style={{ transform: 'rotate(180deg)' }} /> {t.key==='reges'?'Adaugă documente REGES':'Adaugă document'} <small>PDF, Word, imagine · max 4 MB{t.key==='reges'?' / fișier':''}</small>
-                  <input type="file" aria-label={`Încarcă ${titlu}`} multiple={t.key==='reges'} disabled={uploadDisabled} accept=".pdf,.docx,.jpg,.jpeg,.png" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ''; if (files.length) onUpload(files, t.key) }} />
+                  <input type="file" aria-label={`Încarcă ${titlu}`} multiple={['reges','salarii'].includes(t.key)} disabled={uploadDisabled} accept=".pdf,.docx,.jpg,.jpeg,.png" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ''; if (files.length) onUpload(files, t.key) }} />
                 </label>
                 {t.key === 'raport' && <button type="button" className="btn btn-sm" onClick={onRaport}>Completează raportul (Word) <Icon name="arrowRight" size={13} /></button>}
               </div>
               <div className={css.help}>Încărcarea nu schimbă starea — după ce verifici / semnezi / trimiți, apasă starea potrivită.</div>
               {t.key==='reges'&&<div className={css.help}>Poți selecta până la 20 de documente odată. PDF-urile rămân separate și sunt redenumite după tipul raportului, numele din raport și data emiterii. Conținutul și semnăturile PDF nu sunt modificate.</div>}
+              {t.key==='salarii'&&<div className={css.help}>Poți încărca mai multe OP-uri odată. Cele recunoscute păstrează beneficiarul și contul ca reper pentru lunile următoare; nu schimbă automat starea plății.</div>}
             </div>
           </div>
         )}

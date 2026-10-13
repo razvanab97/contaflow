@@ -2,6 +2,7 @@
 import {purchaseAmounts,purchaseNumber} from './achizitii-vat'
 import type { RegesReport } from './reges-reports'
 import type { CreditScheme } from './grant-credit'
+import type { SalaryPayment } from './salary-payment'
 export type Rule = { day: number; offset: number; frequency: 'monthly' | 'annual' | 'manual'; month: number }
 export type Step = 'lipsa' | 'primit' | 'semnat' | 'trimis' | 'acceptat' | 'neaplicabil' | 'initiat' | 'avizat' | 'executat'
 export const STEP_LABELS: Record<Step,string> = { initiat:'Plată inițiată', avizat:'Plată avizată', executat:'Plată executată', lipsa:'De pregătit', primit:'Primit / pregătit', semnat:'Semnat / verificat', trimis:'Trimis', acceptat:'Acceptat / încheiat', neaplicabil:'Nu se aplică' }
@@ -22,7 +23,7 @@ export const TASKS = [
 ] as const
 export type TaskKey = typeof TASKS[number]['key']
 export type TaskState = { status:Step; due:string | null; note:string }
-export type Asset = { id:string; task:string; name:string; type:string; createdAt:string; kind:'upload'|'generated'; reges?:RegesReport; originalName?:string; namingWarning?:string }
+export type Asset = { id:string; task:string; name:string; type:string; createdAt:string; kind:'upload'|'generated'; reges?:RegesReport; salaryPayment?:SalaryPayment; originalName?:string; namingWarning?:string }
 export type Line = { supplier:string; product:string; specs:string; unit:string; qty:string; price:string; currency:string; rate:string; source:string; date:string; priceMode?:'gross'|'net'; website?:string }
 export type Draft = { fields:Record<string,string>; lines:Line[] }
 export type Workflow = { version:number; updatedAt:string; profile:Record<string,string>; rules:Record<string,Rule>; tasks:Record<string,TaskState>; forms:Record<string,Draft>; assets:Asset[]; creditScheme?:CreditScheme }

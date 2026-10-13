@@ -5,6 +5,8 @@ import {generateProjectDoc} from '@/lib/proiect-generate'
 import {scopeContext,readWorkflow,writeWorkflow,sameOrigin,WorkflowError} from '@/lib/proiect-workflow-store'
 import {readRegesPdf} from '@/lib/reges-pdf'
 import {regesFilename,type RegesReport} from '@/lib/reges-reports'
+import {readSalaryPaymentPdf} from '@/lib/salary-payment-pdf'
+import type {SalaryPayment} from '@/lib/salary-payment'
 const MIME='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 function failure(e:unknown){return NextResponse.json({error:e instanceof Error?e.message:'Eroare document'},{status:e instanceof WorkflowError?e.status:500})}
 export async function GET(req:NextRequest){try{
@@ -26,6 +28,7 @@ export async function POST(req:NextRequest){try{
  if(state.assets.length>=200)throw new WorkflowError('Limita de 200 documente pe dosar a fost atinsă')
  let bytes:Buffer,name:string,type:string,task:string
  let reges:RegesReport|undefined,originalName:string|undefined,namingWarning:string|undefined
+ let salaryPayment:SalaryPayment|undefined
  if(upload){
  const file=fd!.get('file');task=String(body.task||'')
  if(!TASKS.some(t=>t.key===task)&&!Object.hasOwn(FORM_LABELS,task))throw new WorkflowError('Categorie invalidă')
@@ -39,6 +42,12 @@ export async function POST(req:NextRequest){try{
    if(report&&(!expectedCui||report.employerCui===expectedCui)){reges=report;name=regesFilename(report)}
    else namingWarning=report?'Firma din raport nu corespunde profilului sau nu a fost identificată sigur. Numele original a fost păstrat; verifică documentul.':'Tipul raportului și numele nu au fost identificate sigur. Numele original a fost păstrat; verifică documentul.'
  }
+ if(task==='salarii'&&type==='application/pdf'){
+   try{
+     const payment=await readSalaryPaymentPdf(bytes)
+     if(payment){salaryPayment=payment;originalName=name;name=`OP salariu - ${payment.name} - ${payment.period} - ${payment.processedOn}.pdf`}
+   }catch(e){namingWarning=e instanceof Error?e.message:'OP-ul nu a fost recunoscut sigur; verifică documentul.'}
+ }
  }else{
  task=String(body.kind)
  if(!Object.hasOwn(FORM_LABELS,task))throw new WorkflowError('Formular invalid')
@@ -48,7 +57,7 @@ export async function POST(req:NextRequest){try{
  try{bytes=await generateProjectDoc(kind,draft,state.profile)}catch(e){throw new WorkflowError(e instanceof Error?e.message:'Formular incomplet')}
  name=`${FORM_LABELS[kind]}_${new Date().toISOString().slice(0,10)}_v${state.version}.docx`;type=MIME
  }
- const asset:Asset={id:randomUUID(),task,name,type,createdAt:new Date().toISOString(),kind:upload?'upload':'generated',...(reges?{reges}:{}),...(originalName?{originalName}:{}),...(namingWarning?{namingWarning}:{})}
+ const asset:Asset={id:randomUUID(),task,name,type,createdAt:new Date().toISOString(),kind:upload?'upload':'generated',...(reges?{reges}:{}),...(salaryPayment?{salaryPayment}:{}),...(originalName?{originalName}:{}),...(namingWarning?{namingWarning}:{})}
  const path=`${prefix}/files/${asset.id}`
  const {error}=await sb.storage.from('documente').upload(path,bytes,{contentType:type,upsert:false})
  if(error)throw new WorkflowError('Încărcarea a eșuat: '+error.message,503)
