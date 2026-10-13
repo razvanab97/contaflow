@@ -43,6 +43,7 @@ async function main() {
   await new Promise((resolve,reject)=>webpack({mode:'development',devtool:false,entry:path.join(dir,'entry.js'),output:{path:dir,filename:'bundle.js'},resolve:{extensions:['.tsx','.ts','.js'],modules:[path.join(root,'node_modules')],alias:{
     '@/components/proiect/PurchaseForm.module.css$':path.join(dir,'css.js'),
     './RutinaLunii.module.css$':path.join(dir,'css.js'),
+    './CreditProposal.module.css$':path.join(dir,'css.js'),
     '@/lib/vizualizare$':path.join(dir,'stub.js'),
     '@/components/ui/VeziButon$':path.join(dir,'stub.js'),
     'next/link$':path.join(dir,'stub.js'),'@':root,

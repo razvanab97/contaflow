@@ -5,6 +5,7 @@ import Icon from '@/components/ui/Icon'
 import css from './RutinaLunii.module.css'
 import RegesRecommendations from './RegesRecommendations'
 import SalaryPackageDownload from './SalaryPackageDownload'
+import CreditProposal from './CreditProposal'
 
 type Task = typeof TASKS[number]
 type Asset = Workflow['assets'][number]
@@ -44,9 +45,9 @@ function Pastila({ ton, children }: { ton: Ton; children: React.ReactNode }) {
   return <span className={`${css.pill} ${TON[ton]}`}>{children}</span>
 }
 
-export default function RutinaLunii({ state, month, next, onEdit, onUpload, assetUrl, onRaport, uploadDisabled = false, salaryArchiveUrl }: {
+export default function RutinaLunii({ state, month, next, onEdit, onUpload, assetUrl, onRaport, uploadDisabled = false, salaryArchiveUrl, creditCalculationUrl }: {
   state: Workflow; month: string; next: Task | null | undefined
-  onEdit: (w: Workflow) => void; onUpload: (files: File[], task: string) => void; assetUrl: (id: string) => string; onRaport: () => void; uploadDisabled?: boolean; salaryArchiveUrl?: string
+  onEdit: (w: Workflow) => void; onUpload: (files: File[], task: string) => void; assetUrl: (id: string) => string; onRaport: () => void; uploadDisabled?: boolean; salaryArchiveUrl?: string; creditCalculationUrl?: string
 }) {
   const azi = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bucharest' }).format(new Date())
   const vizibile = (TASKS as readonly Task[]).filter(t => state.rules[t.key]?.frequency !== 'annual' || Number(month.slice(5, 7)) === state.rules[t.key].month || state.tasks[t.key]?.due).filter(t => state.tasks[t.key])
@@ -104,13 +105,14 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
           <Icon name="chevronDown" size={16} className={css.chev} />
         </button>
 
-        {deschis && (
-          <div className={css.panel}>
+        {(deschis || t.key === 'creditare') && (
+          <div className={css.panel} style={!deschis ? { display: 'none' } : undefined}>
             <div className={css.todo}>
               <span className={css.label}>Ce ai de făcut</span>
               <div className={css.todoText}>{t.action}</div>
             </div>
             {t.key === 'reges' && <RegesRecommendations assets={docs} />}
+            {t.key === 'creditare' && creditCalculationUrl && <CreditProposal url={creditCalculationUrl} assets={state.assets} assetUrl={assetUrl} disabled={uploadDisabled} onSaveScheme={creditScheme => onEdit({ ...state, creditScheme })} />}
             {blocat.length > 0 && (
               <div role="alert" className={css.blocked}><Icon name="ban" size={15} /> Întâi finalizează: {blocat.join(', ')}. Până atunci poți doar pregăti documentele.</div>
             )}

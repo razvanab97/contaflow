@@ -1,6 +1,7 @@
 // Regulile sunt ținte interne editabile, nu termene contractuale confirmate.
 import {purchaseAmounts,purchaseNumber} from './achizitii-vat'
 import type { RegesReport } from './reges-reports'
+import type { CreditScheme } from './grant-credit'
 export type Rule = { day: number; offset: number; frequency: 'monthly' | 'annual' | 'manual'; month: number }
 export type Step = 'lipsa' | 'primit' | 'semnat' | 'trimis' | 'acceptat' | 'neaplicabil' | 'initiat' | 'avizat' | 'executat'
 export const STEP_LABELS: Record<Step,string> = { initiat:'Plată inițiată', avizat:'Plată avizată', executat:'Plată executată', lipsa:'De pregătit', primit:'Primit / pregătit', semnat:'Semnat / verificat', trimis:'Trimis', acceptat:'Acceptat / încheiat', neaplicabil:'Nu se aplică' }
@@ -24,7 +25,7 @@ export type TaskState = { status:Step; due:string | null; note:string }
 export type Asset = { id:string; task:string; name:string; type:string; createdAt:string; kind:'upload'|'generated'; reges?:RegesReport; originalName?:string; namingWarning?:string }
 export type Line = { supplier:string; product:string; specs:string; unit:string; qty:string; price:string; currency:string; rate:string; source:string; date:string; priceMode?:'gross'|'net'; website?:string }
 export type Draft = { fields:Record<string,string>; lines:Line[] }
-export type Workflow = { version:number; updatedAt:string; profile:Record<string,string>; rules:Record<string,Rule>; tasks:Record<string,TaskState>; forms:Record<string,Draft>; assets:Asset[] }
+export type Workflow = { version:number; updatedAt:string; profile:Record<string,string>; rules:Record<string,Rule>; tasks:Record<string,TaskState>; forms:Record<string,Draft>; assets:Asset[]; creditScheme?:CreditScheme }
 export const PROFILE_FIELDS = { beneficiar:'Beneficiar', reprezentant:'Reprezentant legal', cui:'CUI', onrc:'Nr. Registrul Comerțului', adresa:'Sediu social', contract_subventie:'Contract de subvenție (număr / dată)', caen:'Activitate / CAEN' }
 export function emptyWorkflow():Workflow { return {version:0,updatedAt:'',profile:{beneficiar:'AB TEXTILE S.R.L.',reprezentant:'Abunei Elena',cui:'52575850',caen:'CAEN 9610 — Spălarea și curățarea articolelor textile și a produselor din blană'},rules:Object.fromEntries(TASKS.map(t=>[t.key,{day:t.day,offset:0,frequency:t.key==='ajofm'?'annual':'monthly',month:3}])),tasks:{},forms:{},assets:[]} }
 export function dueDate(workMonth:string, rule:Rule):string|null {

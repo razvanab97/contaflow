@@ -2,12 +2,14 @@ import {NextRequest,NextResponse} from 'next/server'
 import {TASKS,LEGACY_GROUPS,STEP_LABELS,FORM_FIELDS,defaultDraft,initialMonth,emptyWorkflow,blockedBy,type Workflow,type FormKind} from '@/lib/proiect-workflow'
 import {scopeContext,readWorkflow,writeWorkflow,sameOrigin,WorkflowError} from '@/lib/proiect-workflow-store'
 import {isCompletedPurchaseExample} from '@/lib/achizitii-form-recommendations'
+import {validCreditScheme} from '@/lib/grant-credit'
 function failure(e:unknown){return NextResponse.json({error:e instanceof Error?e.message:'Eroare proiect'},{status:e instanceof WorkflowError?e.status:500})}
 function validate(state:Workflow) {
  if(!state||typeof state!=='object'||JSON.stringify(state).length>300000)throw new WorkflowError('Date prea mari sau invalide')
  if(!state.profile||Object.values(state.profile).some(v=>typeof v!=='string'||v.length>20000))throw new WorkflowError('Date beneficiar invalide')
  for(const t of TASKS){const r=state.rules?.[t.key];if(!r||!Number.isInteger(r.day)||r.day<1||r.day>31||!Number.isInteger(r.offset)||r.offset<0||r.offset>2||!['monthly','annual','manual'].includes(r.frequency)||!Number.isInteger(r.month)||r.month<1||r.month>12)throw new WorkflowError('Regulă de termen invalidă')}
  if(!state.tasks||!state.forms)throw new WorkflowError('Date incomplete')
+ if(state.creditScheme!==undefined&&!validCreditScheme(state.creditScheme))throw new WorkflowError('Schema de creditare este invalidă')
  for(const [key,t]of Object.entries(state.tasks)){
  if(!TASKS.some(x=>x.key===key)||!t||!Object.hasOwn(STEP_LABELS,t.status)||typeof t.note!=='string'||t.note.length>10000||t.due!==null&&(typeof t.due!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(t.due)||!Number.isFinite(Date.parse(t.due))||new Date(t.due).toISOString().slice(0,10)!==t.due))throw new WorkflowError('Stare / dată invalidă')
  }
