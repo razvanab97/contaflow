@@ -188,24 +188,30 @@ export function PasiAchizitie({ item, docs, documents, onLinie, onSursa, onUploa
   const [mesaj, setMesaj] = useState('')
   const buget = coduri.reduce((s, c) => s + (linieDupaCod(c)?.valoare || 0), 0)
 
-  async function incarca(tip: string, files: FileList | null) {
-    if (!files?.length) return
+  // Lista de fisiere se copiaza inainte ca inputul sa fie golit; mesajul spune exact ce s-a salvat si sub ce nume,
+  // sau motivul primit de la server.
+  async function incarca(tip: string, lista: File[]) {
+    if (!lista.length) return
     setIncarc(tip); setMesaj('')
-    let erori = 0
-    for (const f of Array.from(files)) {
+    const salvate: string[] = [], erori: string[] = []
+    for (const f of lista) {
       const fd = new FormData()
       fd.append('file', f); fd.append('achizitieId', item.id); fd.append('etapa', item.status); fd.append('tipDosar', tip)
       const r = await fetch('/api/achizitii/documente', { method: 'POST', body: fd }).catch(() => null)
-      if (!r?.ok) erori++
+      const d = r ? await r.json().catch(() => null) as { fisier_nume?: string; error?: string } | null : null
+      if (r?.ok) salvate.push(d?.fisier_nume || f.name)
+      else erori.push(`${f.name}: ${d?.error || 'nu a putut fi încărcat (doar PDF, JPG, PNG, max 4 MB)'}`)
     }
     setIncarc(null)
-    setMesaj(erori ? `${erori} fișier(e) nu au putut fi încărcate (doar PDF, JPG, PNG)` : `${files.length} document${files.length > 1 ? 'e încărcate' : ' încărcat'}`)
+    setMesaj([salvate.length ? `✓ Salvat: ${salvate.join(', ')}` : '', erori.length ? `✕ Nu s-a salvat — ${erori.join('; ')}` : ''].filter(Boolean).join(' · '))
     onUploaded()
   }
-  const Incarca = ({ tip, eticheta, multiplu = false, imagini = false }: { tip: string; eticheta: string; multiplu?: boolean; imagini?: boolean }) => (
-    <label className="btn btn-sm" style={{ cursor: incarc ? 'wait' : 'pointer' }}>
+  // Functie de randare, NU componenta definita in componenta: altfel butonul si inputul s-ar recrea la fiecare
+  // reimprospatare si un fisier ales cat timp dialogul era deschis s-ar pierde fara niciun mesaj.
+  const incarcaBtn = ({ tip, eticheta, multiplu = false, imagini = false }: { tip: string; eticheta: string; multiplu?: boolean; imagini?: boolean }) => (
+    <label key={`incarca-${tip}`} className="btn btn-sm" style={{ cursor: incarc ? 'wait' : 'pointer' }}>
       {incarc === tip ? 'Se încarcă…' : `↑ ${eticheta}`}
-      <input type="file" multiple={multiplu} accept={imagini ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png'} style={{ display: 'none' }} disabled={!!incarc} onChange={e => { incarca(tip, e.target.files); e.target.value = '' }} />
+      <input type="file" aria-label={eticheta} multiple={multiplu} accept={imagini ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png'} style={{ display: 'none' }} disabled={!!incarc} onChange={e => { const lista = Array.from(e.target.files || []); e.target.value = ''; void incarca(tip, lista) }} />
     </label>
   )
   const Genereaza = ({ k, eticheta }: { k: FormKindAch; eticheta: string }) => <button type="button" className="btn btn-sm btn-primary" onClick={() => onGenereaza(k)}>✎ {eticheta}</button>
@@ -223,20 +229,20 @@ export function PasiAchizitie({ item, docs, documents, onLinie, onSursa, onUploa
         </select>
       </> },
     ...(flux==='trei_oferte'?[]:[{ cheie: 'cerere', titlu: 'Specificații + cerere de ofertă (Anexa 2)', ok: !!el('cerere')?.ok, partial: el('cerere')?.partial, detaliu: el('cerere')!.detaliu,
-      actiuni: <><Genereaza k="oferta" eticheta="Completează cererea către furnizor (Word)" /><Incarca tip="cerere" eticheta="Încarcă cererea semnată" /></> }]),
+      actiuni: <><Genereaza k="oferta" eticheta="Completează cererea către furnizor (Word)" />{incarcaBtn({ tip: 'cerere', eticheta: 'Încarcă cererea semnată' })}</> }]),
     { cheie: 'oferte', titlu: '3 oferte de la furnizori diferiți', ok: !!el('oferte')?.ok, partial: el('oferte')?.partial, detaliu: el('oferte')!.detaliu,
       actiuni: <OfferUpload purchaseId={item.id} status={item.status} onUploaded={onUploaded} complete={!!el('oferte')?.ok} revision={JSON.stringify(docs)}/> },
     { cheie: 'nota', titlu: 'Notă de estimare (Anexa 1), semnată', ok: !!el('nota')?.ok, detaliu: el('nota')!.detaliu,
-      actiuni: <><Genereaza k="nota" eticheta="Completează Anexa 1 din ofertele primite" /><Incarca tip="nota" eticheta="Încarcă nota semnată" /></> },
-    ...(utilaj ? [{ cheie: 'contract', titlu: 'Contract cu furnizorul', ok: !!el('contract')?.ok, detaliu: el('contract')!.detaliu, actiuni: <Incarca tip="contract" eticheta="Încarcă contractul" /> }] : []),
+      actiuni: <><Genereaza k="nota" eticheta="Completează Anexa 1 din ofertele primite" />{incarcaBtn({ tip: 'nota', eticheta: 'Încarcă nota semnată' })}</> },
+    ...(utilaj ? [{ cheie: 'contract', titlu: 'Contract cu furnizorul', ok: !!el('contract')?.ok, detaliu: el('contract')!.detaliu, actiuni: incarcaBtn({ tip: 'contract', eticheta: 'Încarcă contractul' }) }] : []),
     { cheie: 'plata', titlu: 'Proformă / comandă + plata prin OP', ok: !!el('plata')?.ok, detaliu: el('plata')!.detaliu,
-      actiuni: <><Incarca tip="proforma" eticheta="Încarcă proforma / comanda" /><Incarca tip="plata" eticheta="Încarcă dovada plății (extras / OP)" /></> },
+      actiuni: <>{incarcaBtn({ tip: 'proforma', eticheta: 'Încarcă proforma / comanda' })}{incarcaBtn({ tip: 'plata', eticheta: 'Încarcă dovada plății (extras / OP)' })}</> },
     { cheie: 'factura', titlu: 'Factura fiscală', ok: !!el('factura')?.ok, partial: el('factura')?.partial, detaliu: el('factura')!.detaliu,
-      actiuni: <Incarca tip="factura" eticheta="Încarcă factura fiscală" /> },
+      actiuni: incarcaBtn({ tip: 'factura', eticheta: 'Încarcă factura fiscală' }) },
     { cheie: 'pv', titlu: 'Recepție — PV (Anexa 3), semnat', ok: !!el('pv')?.ok, detaliu: el('pv')!.detaliu,
-      actiuni: <><Genereaza k="receptie" eticheta="Generează PV-ul de recepție (Word)" /><Incarca tip="pv" eticheta="Încarcă PV-ul semnat" /></> },
+      actiuni: <><Genereaza k="receptie" eticheta="Generează PV-ul de recepție (Word)" />{incarcaBtn({ tip: 'pv', eticheta: 'Încarcă PV-ul semnat' })}</> },
     { cheie: 'poze', titlu: 'Poze cu bunul, cu înscrisuri', ok: !!el('poze')?.ok, detaliu: el('poze')!.detaliu,
-      actiuni: <Incarca tip="poza" eticheta="Încarcă poze" multiplu imagini /> },
+      actiuni: incarcaBtn({ tip: 'poza', eticheta: 'Încarcă poze', multiplu: true, imagini: true }) },
   ]
   const curent = pasi.find(p => !p.ok)
   const facute = pasi.filter(p => p.ok).length
