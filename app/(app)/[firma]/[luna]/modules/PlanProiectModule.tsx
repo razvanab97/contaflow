@@ -93,28 +93,30 @@ function Intreaba({ firma }: { firma: Firma }) {
   useEffect(() => {
     fetch(`/api/proiect/intreaba?firmaId=${firma.id}`).then(r => r.json()).then(d => { setLista(d.intrebari || []); setLipsaMigrare(!!d.lipsaMigrare) }).catch(() => {})
   }, [firma.id])
-  // Inaltimea ferestrei = ecranul minus ce e deasupra ei, minus loc pentru butonul fix "Pasul urmator".
+  // Fereastra cat ecranul: pagina coboara singura pana la taburi (titlul iese din vedere), iar fereastra ia
+  // tot restul inaltimii - sub antetul fix al aplicatiei si deasupra butonului fix "Pasul urmator".
   useEffect(() => {
-    let raf = 0
+    const ANTET = 56, SUS = 12, JOS = 78
+    const taburi = () => document.querySelector<HTMLElement>('[role="tablist"][aria-label="Secțiuni proiect"]')
     const calc = () => {
       const el = panelRef.current
       if (!el) return
-      const sus = el.getBoundingClientRect().top + window.scrollY
-      // Pe telefon antetul paginii ia jumatate din ecran - fereastra primeste macar ~62% din inaltime.
-      const min = window.innerWidth < 640 ? Math.round(window.innerHeight * 0.62) : 220
-      const h = Math.max(min, window.innerHeight - sus - 150)
-      setInaltime(h)
-      // A doua trecere: ce mai iese din ecran sub fereastra (ex. "Pasul urmator") se scade exact.
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        const extra = document.documentElement.scrollHeight - window.innerHeight
-        if (extra > 0) setInaltime(Math.max(min, h - extra))
-      })
+      const t = taburi()
+      const deasupra = t ? el.getBoundingClientRect().top - t.getBoundingClientRect().top : 0
+      setInaltime(Math.max(300, window.innerHeight - ANTET - SUS - deasupra - JOS))
     }
     calc()
     window.addEventListener('resize', calc)
-    return () => { window.removeEventListener('resize', calc); cancelAnimationFrame(raf) }
+    return () => window.removeEventListener('resize', calc)
   }, [])
+  // Coborarea paginii se face abia dupa ce fereastra are inaltimea finala (altfel pagina inca e prea scurta).
+  const coborat = useRef(false)
+  useEffect(() => {
+    if (!inaltime || coborat.current) return
+    coborat.current = true
+    const t = document.querySelector<HTMLElement>('[role="tablist"][aria-label="Secțiuni proiect"]')
+    if (t) requestAnimationFrame(() => window.scrollTo({ top: Math.max(0, t.getBoundingClientRect().top + window.scrollY - 56 - 12), behavior: 'smooth' }))
+  }, [inaltime])
   // Raspunsul care curge tine conversatia jos - doar daca utilizatorul nu a urcat sa citeasca ceva mai vechi.
   useEffect(() => { const el = scrollRef.current; if (el && lipitJos.current) el.scrollTop = el.scrollHeight }, [lista, inaltime])
   // Textarea creste odata cu textul (pana la max-height din CSS), fara bara de redimensionare.

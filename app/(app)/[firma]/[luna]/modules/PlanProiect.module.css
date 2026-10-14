@@ -69,7 +69,7 @@
 .md td { padding: 8px 12px; border-top: 1px solid var(--border-subtle); vertical-align: top; }
 
 /* Fereastra de chat: inaltime fixa, doar mesajele se deruleaza */
-.chatPanel { display: flex; flex-direction: column; min-height: 220px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow-xs); overflow: hidden; }
+.chatPanel { display: flex; flex-direction: column; min-height: 300px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow-xs); overflow: hidden; }
 .chatHeader { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
 .messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px 24px 28px; display: grid; gap: 26px; align-content: start; background: color-mix(in srgb, var(--surface-sunken) 45%, var(--surface)); scrollbar-width: thin; }
 .emptyChat { padding: 8px 0; }
