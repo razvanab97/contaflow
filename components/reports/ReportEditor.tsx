@@ -4,6 +4,7 @@ import type { DocumentTemplate, ListItem } from '@/lib/documentWorkspace/types'
 import ReportSection from './ReportSection'
 import ReportField from './ReportField'
 import type { ReportExtraSection } from '@/lib/documentWorkspace/reportSections'
+import css from './Report.module.css'
 
 export interface CampCustom { id: string; cheie: string; eticheta: string; valoare: string }
 
@@ -37,12 +38,12 @@ function EditableLabel({ value, onCommit }: { value: string; onCommit: (v: strin
         autoFocus value={draft} onChange={e => setDraft(e.target.value)}
         onBlur={() => { setEditing(false); if (draft.trim() && draft !== value) onCommit(draft.trim()) }}
         onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
-        style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--c-999999)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-sm)', padding: '2px 6px', outline: 'none' }}
+        style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '2px 6px', outline: 'none' }}
       />
     )
   }
   return (
-    <button onClick={() => { setDraft(value); setEditing(true) }} title="Redenumește" style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--c-999999)', background: 'transparent', border: 'none', cursor: 'text', padding: 0, textAlign: 'left' }}>
+    <button onClick={() => { setDraft(value); setEditing(true) }} title="Redenumește" style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'text', padding: 0, textAlign: 'left' }}>
       {value}
     </button>
   )
@@ -61,8 +62,7 @@ export default function ReportEditor({
     const fields = editorRef.current?.querySelectorAll<HTMLElement>('[data-editor-field]')
     fields?.forEach(field => {
       const active = field.dataset.editorField === activeField
-      field.style.outline = active ? '2px solid var(--accent)' : ''
-      field.style.outlineOffset = '4px'
+      // Campul activ e evidentiat de cardul sectiunii (:focus-within); aici doar derulam la el.
       if (active && !editorRef.current?.contains(document.activeElement)) field.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     })
   }, [activeField])
@@ -85,18 +85,21 @@ export default function ReportEditor({
       const field = (event.target as HTMLElement).closest<HTMLElement>('[data-editor-field]')
       if (field?.dataset.editorField) onFieldFocus(field.dataset.editorField)
     }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {template.sections.map(section => (
-        <ReportSection key={section.id} title={section.title} description={section.description} collapsible={section.collapsible}>
+      {template.sections.map((section, sIdx) => {
+        const lista = section.fields.length === 1 && section.fields[0].type === 'list' ? values[section.fields[0].key] : null
+        return (
+        <ReportSection key={section.id} nr={sIdx + 1} count={Array.isArray(lista) ? lista.filter(i => i.text.trim()).length : undefined} title={section.title} description={section.description} collapsible={section.collapsible}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {section.fields.map(field => (
               <div key={field.id} data-editor-field={field.key} style={{ borderRadius: 'var(--r-sm)' }}><ReportField field={field} value={values[field.key] ?? (field.type === 'list' ? [] : '')} onChange={v => onFieldChange(field.key, v)}/></div>
             ))}
           </div>
         </ReportSection>
-      ))}
+        )
+      })}
 
       {custom.length > 0 && (
-        <ReportSection title="Câmpuri suplimentare" description='Aceste informații vor fi incluse în raport.'>
+        <ReportSection nr="+" title="Câmpuri suplimentare" description='Aceste informații vor fi incluse în raport.'>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {custom.map(c => (
               <div key={c.id} data-editor-field={`custom:${c.id}`} style={{ borderRadius: 'var(--r-sm)' }}>
@@ -106,11 +109,7 @@ export default function ReportEditor({
                     ✕ Șterge
                   </button>
                 </div>
-                <input
-                  value={c.valoare}
-                  onChange={e => onCustomChange(c.id, e.target.value)}
-                  style={{ width: '100%', fontSize: 'var(--fs-base)', color: 'var(--c-dddddd)', background: 'var(--c-0d0d0d)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', outline: 'none' }}
-                />
+                <input className={css.input} value={c.valoare} onChange={e => onCustomChange(c.id, e.target.value)} />
               </div>
             ))}
           </div>
@@ -120,28 +119,25 @@ export default function ReportEditor({
       {sections.map(section => (
         <ReportSection key={section.id} title={section.title || 'Secțiune nouă'} description="Inclusă în raport, înainte de semnătură" onDelete={() => onSectionsChange(sections.filter(s => s.id !== section.id))}>
           <div data-editor-field={`section:${section.id}:title`} style={{ borderRadius: 'var(--r-sm)', marginBottom: '10px' }}>
-            <label style={{ display: 'block', fontSize: 'var(--fs-xs)', marginBottom: '4px' }}>Titlul secțiunii
-              <input value={section.title} onChange={e => onSectionsChange(sections.map(s => s.id === section.id ? { ...s, title: e.target.value } : s))} maxLength={300} style={{ display: 'block', width: '100%', padding: '10px', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', background: 'var(--c-0d0d0d)', color: 'var(--text-primary)', font: 'inherit' }}/>
+            <label className={css.label}>Titlul secțiunii
+              <input value={section.title} onChange={e => onSectionsChange(sections.map(s => s.id === section.id ? { ...s, title: e.target.value } : s))} maxLength={300} className={css.input} style={{ marginTop: 5 }}/>
             </label>
           </div>
           <div data-editor-field={`section:${section.id}:content`} style={{ borderRadius: 'var(--r-sm)' }}>
-            <label style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>Conținut
-              <textarea value={section.content} onChange={e => onSectionsChange(sections.map(s => s.id === section.id ? { ...s, content: e.target.value } : s))} maxLength={20000} style={{ display: 'block', width: '100%', minHeight: '100px', padding: '10px', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', background: 'var(--c-0d0d0d)', color: 'var(--text-primary)', font: 'inherit', resize: 'vertical' }}/>
+            <label className={css.label}>Conținut
+              <textarea value={section.content} onChange={e => onSectionsChange(sections.map(s => s.id === section.id ? { ...s, content: e.target.value } : s))} maxLength={20000} className={css.input} style={{ marginTop: 5 }}/>
             </label>
           </div>
         </ReportSection>
       ))}
 
       {template.allowCustomSections && (
-        <button disabled={sections.length >= 30} onClick={() => onSectionsChange([...sections, { id: crypto.randomUUID(), title: 'Secțiune nouă', content: '' }])} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)', background: 'transparent', border: '1px dashed var(--accent)', borderRadius: 'var(--r-md)', padding: '12px', cursor: 'pointer' }}>
+        <button type="button" className={css.ghostBtn} disabled={sections.length >= 30} onClick={() => onSectionsChange([...sections, { id: crypto.randomUUID(), title: 'Secțiune nouă', content: '' }])}>
           + Adaugă secțiune
         </button>
       )}
 
-      <button
-        onClick={onGenerate} disabled={generating}
-        style={{ fontSize: 'var(--fs-base)', fontWeight: 600, padding: '12px', borderRadius: 'var(--r-md)', border: 'none', background: 'var(--accent-solid)', color: '#fff', cursor: 'pointer', opacity: generating ? .6 : 1, marginTop: '4px' }}
-      >
+      <button type="button" className={css.primary} onClick={onGenerate} disabled={generating}>
         {generating ? 'Se salvează...' : 'Salvează raportul'}
       </button>
     </div>

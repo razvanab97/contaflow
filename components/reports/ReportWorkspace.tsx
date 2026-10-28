@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import TaskSection, { TaskItem } from '../../app/(app)/[firma]/[luna]/modules/TaskSection'
 import type { DocumentTemplate, ListItem } from '@/lib/documentWorkspace/types'
@@ -60,6 +60,10 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
   const sectionsRef = useRef(sections)
   const [activeField, setActiveField] = useState('')
   const [templateHtml, setTemplateHtml] = useState<string | null>(null)
+  // Sablonul HTML se incarca o data; previzualizarea live se calculeaza local din el, deci dupa o salvare
+  // nu mai cerem din nou conversia Word -> HTML de la server (era cauza principala de lentoare).
+  const templateHtmlRef = useRef<string | null>(null)
+  templateHtmlRef.current = templateHtml
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [savedAt, setSavedAt] = useState<Date | null>(null)
@@ -163,7 +167,7 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
       docRef.current = data.doc
       setDoc(data.doc)
       setSaveStatus('saved'); setSavedAt(new Date())
-      loadPreview(data.doc.id)
+      if (!templateHtmlRef.current) loadPreview(data.doc.id)
       return data.doc
     } catch {
       saveFailed.current = true
@@ -262,7 +266,7 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
         if (!res.ok) { setSaveStatus('error'); throw new Error(data.error || 'Câmpul nu a putut fi salvat.') }
         if (customSaves.current[id] === run) delete customSaves.current[id]
         setSaveStatus('saved'); setSavedAt(new Date())
-        if (data.doc) { docRef.current = data.doc; setDoc(data.doc); loadPreview(data.doc.id) }
+        if (data.doc) { docRef.current = data.doc; setDoc(data.doc); if (!templateHtmlRef.current) loadPreview(data.doc.id) }
         return data.doc || null
       })
       saveQueue.current = job.catch(() => null)
@@ -331,9 +335,11 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
     await fetch(`/api/proiect-documente?firmaId=${encodeURIComponent(firma.id)}&sectiune=${SECTIUNE}`, { method: 'DELETE' })
   }
 
+  // Documentul din stanga se redeseneaza cu prioritate mica: scrisul in formular ramane fluid.
+  const valuesLent = useDeferredValue(values), customLent = useDeferredValue(custom), sectionsLent = useDeferredValue(sections)
   const liveHtml = useMemo(() => templateHtml
-    ? liveReportHtml(templateHtml, values, custom, sections, tab === 'editare' && !exporting)
-    : previewHtml, [templateHtml, values, custom, sections, tab, exporting, previewHtml])
+    ? liveReportHtml(templateHtml, valuesLent, customLent, sectionsLent, tab === 'editare' && !exporting)
+    : previewHtml, [templateHtml, valuesLent, customLent, sectionsLent, tab, exporting, previewHtml])
 
   const editorNode = (
     <fieldset disabled={exporting} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
