@@ -67,3 +67,9 @@
 .send { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; border: 0; background: var(--accent-solid); color: var(--accent-contrast, #fff); cursor: pointer; flex-shrink: 0; }
 .send:disabled { opacity: .35; cursor: default; }
 .hint { font-size: 11px; color: var(--text-muted); text-align: center; }
+
+/* Imagini lipite (clipboard): miniaturi in compositor si in mesajul trimis */
+.thumb { position: relative; display: inline-block; width: 54px; height: 54px; border-radius: 9px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-secondary, var(--surface)); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.attached .thumb button { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; padding: 0; border-radius: 50%; display: grid; place-items: center; line-height: 1; background: rgba(0,0,0,.62); color: #fff; font-size: 13px; }
+.pic { max-width: min(220px, 70%); max-height: 160px; border-radius: 10px; border: 1px solid var(--border); object-fit: contain; background: #fff; }

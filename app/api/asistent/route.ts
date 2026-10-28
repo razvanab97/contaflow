@@ -11,6 +11,12 @@ const EFFORT = (process.env.ASISTENT_AI_EFFORT as 'low' | 'medium' | 'high') || 
 const MAX_PASI = 12
 
 type Mesaje = Anthropic.Beta.BetaMessageParam[]
+// Imagini lipite in asistent (capturi de ecran, poze): intra in mesajul utilizatorului ca blocuri „image”, AI-ul le vede.
+const TIPURI_IMAGINE = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
+type TipImagine = typeof TIPURI_IMAGINE[number]
+const MAX_IMAGINI = 5
+const MAX_CARACTERE_IMAGINE = 1_800_000   // per imagine, in base64
+const MAX_CARACTERE_TOTAL = 4_000_000     // limita corpului cererii pe functia serverless e ~4,5 MB
 type Eveniment =
   | { t: 'text'; d: string }
   | { t: 'unealta'; nume: string }
@@ -29,10 +35,13 @@ const ETICHETE: Record<string, string> = {
 // utilizatorului) se executa sau se refuza.
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: 'ANTHROPIC_API_KEY lipsește.' }, { status: 500 })
-  const body = await req.json().catch(() => ({})) as { mesaje?: Mesaje; text?: string; decizii?: { id: string; aproba: boolean }[]; pagina?: { firma?: string; luna?: string; cale?: string } }
+  const body = await req.json().catch(() => ({})) as { mesaje?: Mesaje; text?: string; imagini?: { mediaType?: string; data?: string; nume?: string }[]; decizii?: { id: string; aproba: boolean }[]; pagina?: { firma?: string; luna?: string; cale?: string } }
   const mesaje: Mesaje = Array.isArray(body.mesaje) ? body.mesaje.slice(-60) : []
   const text = String(body.text || '').trim().slice(0, 8000)
-  if (!text && !body.decizii?.length) return NextResponse.json({ error: 'Scrie un mesaj.' }, { status: 400 })
+  const imagini = (Array.isArray(body.imagini) ? body.imagini : []).slice(0, MAX_IMAGINI)
+    .filter((i): i is { mediaType: TipImagine; data: string; nume?: string } => !!i && TIPURI_IMAGINE.includes(i.mediaType as TipImagine) && typeof i.data === 'string' && i.data.length <= MAX_CARACTERE_IMAGINE && /^[A-Za-z0-9+/]+={0,2}$/.test(i.data))
+  if (imagini.reduce((n, i) => n + i.data.length, 0) > MAX_CARACTERE_TOTAL) return NextResponse.json({ error: 'Imaginile sunt prea mari împreună. Lipește mai puține sau mai mici.' }, { status: 413 })
+  if (!text && !body.decizii?.length && !imagini.length) return NextResponse.json({ error: 'Scrie un mesaj.' }, { status: 400 })
 
   const sb = getServiceSupabase()
   const lista = await firme(sb)
@@ -59,7 +68,9 @@ export async function POST(req: NextRequest) {
           }
           mesaje.push({ role: 'user', content: rezultate })
         } else {
-          mesaje.push({ role: 'user', content: text })
+          mesaje.push({ role: 'user', content: imagini.length
+            ? [...imagini.map(i => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: i.mediaType, data: i.data } })), { type: 'text' as const, text: text || 'Uită-te la imaginea atașată.' }]
+            : text })
         }
 
         // 2. Bucla agentului.
