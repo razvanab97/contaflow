@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import Sidebar, { FirmaNav } from '@/components/Sidebar'
 import GlobalHeader from './GlobalHeader'
 import CommandPalette from './CommandPalette'
+import AsistentAI from './AsistentAI'
 import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
 import { etichetaLunaScurta } from '@/lib/accounting-period'
 
@@ -35,6 +36,9 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
   const [paletteOpen, setPaletteOpen] = useState(false)
   const openPalette = useCallback(() => { setMenuOpen(false); setPaletteOpen(true) }, [])
   const closePalette = useCallback(() => setPaletteOpen(false), [])
+  // Asistentul AI global (pop-up pe dreapta): butonul din antet sau ⌘J / Ctrl+J.
+  const [asistentOpen, setAsistentOpen] = useState(false)
+  const closeAsistent = useCallback(() => setAsistentOpen(false), [])
 
   // ⌘K / Ctrl+K oriunde, sau "/" cand nu se scrie intr-un camp -> paleta de comenzi/cautare.
   useEffect(() => {
@@ -42,6 +46,7 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
       const t = e.target as HTMLElement | null
       const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
       if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setPaletteOpen(o => !o) }
+      else if ((e.key === 'j' || e.key === 'J') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setAsistentOpen(o => !o) }
       else if (e.key === '/' && !typing) { e.preventDefault(); setPaletteOpen(true) }
     }
     const onOpen = () => setPaletteOpen(true)
@@ -100,7 +105,8 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
         onSearch={openPalette}
       />
       <div className="app-main">
-        <GlobalHeader firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} onMenu={() => setMenuOpen(true)} onSearch={openPalette} />
+        <GlobalHeader firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} onMenu={() => setMenuOpen(true)} onSearch={openPalette} onAsistent={() => setAsistentOpen(o => !o)} />
+        <AsistentAI open={asistentOpen} onClose={closeAsistent} firme={firmeNav} firma={firmaSlug} luna={lunaEfectiva} cale={pathname} />
         {/* Montata doar cat e deschisa -> fiecare deschidere porneste cu stare curata (text gol, scope implicit). */}
         {paletteOpen && <CommandPalette open onClose={closePalette} firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} />}
         <div id="continut" tabIndex={-1} style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, outline: 'none' }}>

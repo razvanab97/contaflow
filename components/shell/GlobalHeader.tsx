@@ -14,6 +14,7 @@ interface Props {
   lunaInPath: boolean
   onMenu: () => void
   onSearch: () => void
+  onAsistent?: () => void
 }
 
 const PAGINI_FIRMA: Record<string, string> = {
@@ -28,7 +29,7 @@ const PAGINI_FIRMA: Record<string, string> = {
 // contextual (Firma ▾ › Luna › Modul) + cautarea de documente a firmei active. Comutatorul de
 // firma pastreaza pagina curenta cand se poate (aceeasi luna/modul, sau aceeasi pagina de firma),
 // ca schimbarea firmei sa nu te scoata din contextul in care lucrai.
-export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMenu, onSearch }: Props) {
+export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMenu, onSearch, onAsistent }: Props) {
   const [isMac, setIsMac] = useState(true)
   useEffect(() => { setIsMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) }, [])
   const [open, setOpen] = useState(false)
@@ -136,6 +137,9 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMe
       <button type="button" className="btn btn-ghost btn-icon header-search-icon" onClick={onSearch} aria-label="Caută">
         <Icon name="search" size={18} />
       </button>
+      {onAsistent && <button type="button" className="btn btn-primary" onClick={onAsistent} aria-label="Deschide asistentul AI" title={`Asistent AI (${isMac ? '⌘J' : 'Ctrl J'})`} style={{ flexShrink: 0, gap: 6 }}>
+        <Icon name="sparkles" size={15} /><span className="header-asistent-label">Asistent</span>
+      </button>}
     </header>
   )
 }
