@@ -430,7 +430,7 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
       ) : tab === 'previzualizare' ? (
         <div style={{ maxWidth: '900px', margin: '0 auto', width: '100%', minWidth: 0 }}>{previewNode}</div>
       ) : tab === 'istoric' ? (
-        <ReportHistory updatedAt={doc.updated_at} fisierNume={doc.fisier_nume}/>
+        <ReportHistory firmaId={firma.id} updatedAt={doc.updated_at} fisierNume={doc.fisier_nume}/>
       ) : (
         <ReportFiles doc={doc} culoare={firma.culoare} uploading={uploading} onUpload={handleUpload} onRemove={handleRemoveDoc}/>
       )}

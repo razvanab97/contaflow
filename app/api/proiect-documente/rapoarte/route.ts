@@ -21,3 +21,17 @@ export async function GET(req: NextRequest) {
   const rapoarte = (data || []).map(d => ({ ...d, luna: cheie(d.fisier_nume) })).sort((a, b) => b.luna.localeCompare(a.luna) || b.created_at.localeCompare(a.created_at))
   return NextResponse.json({ rapoarte })
 }
+
+// Sterge un raport salvat al unei luni (doar randurile „Raport implementare ...” ale proiectului). Documentul curent din editor
+// nu e afectat; daca luna lui e stearsa, se salveaza din nou la urmatoarea generare.
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'id lipsește' }, { status: 400 })
+  const sb = getServiceSupabase()
+  const { data: doc } = await sb.from('documente').select('id,fisier_path,fisier_nume').eq('id', id).eq('modul', 'obligatii').eq('tip_document', 'raport').like('fisier_nume', 'Raport implementare %').maybeSingle()
+  if (!doc) return NextResponse.json({ error: 'Raportul nu a fost găsit' }, { status: 404 })
+  const { error } = await sb.from('documente').delete().eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (doc.fisier_path) await sb.storage.from('documente').remove([doc.fisier_path])
+  return NextResponse.json({ ok: true })
+}
