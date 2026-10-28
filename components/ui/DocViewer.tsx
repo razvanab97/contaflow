@@ -1,7 +1,46 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { linkDocument } from '@/lib/vizualizare'
 import Icon from './Icon'
+
+// Document Word (.docx): randat in browser cu docx-preview (acelasi randator ca la „Salveaza PDF” din Raport lunar), in
+// pagini ca in Word. Se ia fisierul direct din storage; daca browserul il blocheaza (CORS), prin ruta aplicatiei.
+function DocxVizualizare({ urlStorage, urlApp }: { urlStorage: string; urlApp: string }) {
+  const frame = useRef<HTMLIFrameElement>(null)
+  const [stare, setStare] = useState<'incarca' | 'gata' | 'eroare'>('incarca')
+  useEffect(() => {
+    let anulat = false
+    ;(async () => {
+      try {
+        let res = await fetch(urlStorage, { cache: 'no-store' }).catch(() => null)
+        if (!res?.ok) res = await fetch(urlApp, { cache: 'no-store' })
+        if (!res.ok) throw new Error('descarcare')
+        const buffer = await res.arrayBuffer()
+        const doc = frame.current?.contentDocument
+        if (!doc || anulat) return
+        doc.open(); doc.write('<!doctype html><html lang="ro"><head><meta charset="utf-8"><style>html{background:#e9ecef}body{margin:0;padding:16px 0}</style></head><body></body></html>'); doc.close()
+        const { randeazaDocx } = await import('@/lib/documentWorkspace/docxPdf')
+        await randeazaDocx(doc, buffer)
+        // pe ecran: paginile una sub alta, centrate, cu umbra (stilul de tiparire le lipeste si le face fara umbra)
+        const st = doc.createElement('style')
+        st.textContent = '.docx-wrapper{background:transparent!important;padding:0!important;display:flex!important;flex-direction:column;align-items:center;gap:14px}.docx-wrapper>section.docx{box-shadow:0 1px 8px rgba(0,0,0,.2)!important;margin:0!important;background:#fff}'
+        doc.head.appendChild(st)
+        if (!anulat) setStare('gata')
+      } catch { if (!anulat) setStare('eroare') }
+    })()
+    return () => { anulat = true }
+  }, [urlStorage, urlApp])
+  return (
+    <>
+      {stare === 'incarca' && <div className="doc-viewer-loading" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'var(--surface-sunken)', zIndex: 1 }}><span className="spinner" /> Se pregătește documentul…</div>}
+      {stare === 'eroare' && <div className="doc-viewer-loading" style={{ position: 'absolute', inset: 0, flexDirection: 'column', gap: '10px', textAlign: 'center', background: 'var(--surface-sunken)', zIndex: 1 }}>
+        <span>Documentul Word nu a putut fi afișat aici.</span>
+        <a href={urlApp} className="btn btn-primary btn-sm">Descarcă</a>
+      </div>}
+      <iframe ref={frame} title="Document Word" style={{ width: '100%', height: '100%', border: 0, background: '#e9ecef' }} />
+    </>
+  )
+}
 
 interface Stare { url: string; nume: string | null; link: { url: string; nume: string; tip: string } | null; eroare: string | null; incarcat: boolean }
 
@@ -48,6 +87,7 @@ export default function DocViewer() {
   const tip = s.link?.tip || ''
   const ePdf = tip === 'application/pdf'
   const eImagine = tip.startsWith('image/')
+  const eDocx = tip.includes('wordprocessingml.document') || /\.docx$/i.test(nume)
   const descarca = s.url
   const sep = descarca.includes('?') ? '&' : '?'
 
@@ -81,7 +121,8 @@ export default function DocViewer() {
               <img src={s.link.url} alt={nume} style={{ maxWidth: '100%', height: 'auto', display: 'block', background: '#fff' }} />
             </div>
           )}
-          {s.link && !ePdf && !eImagine && (
+          {s.link && eDocx && !ePdf && <DocxVizualizare key={s.link.url} urlStorage={s.link.url} urlApp={descarca.replace(/[?&]preview=1/, '')} />}
+          {s.link && !ePdf && !eImagine && !eDocx && (
             <div className="doc-viewer-loading" style={{ flexDirection: 'column', gap: '10px', textAlign: 'center' }}>
               <span>Acest tip de fișier nu se poate previzualiza în browser.</span>
               <a href={descarca} className="btn btn-primary btn-sm">Descarcă</a>
