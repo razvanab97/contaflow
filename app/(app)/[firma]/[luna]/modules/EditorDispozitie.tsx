@@ -2,17 +2,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { deschideDocument } from '@/lib/vizualizare'
 
-export interface EditorFactura { id: string; fisier_nume: string; data_document?: string | null; locatie?: string | null; utilitate?: string | null; suma?: number | null }
+export interface EditorFactura { id: string; fisier_nume: string; data_document?: string | null; locatie?: string | null; utilitate?: string | null; suma?: number | null; valuta?: string | null; curs_bnr?: number | null }
 export interface EditorDP { id: string; numar_document: string; locatie?: string | null; data?: Record<string, string | number>; attachments?: EditorFactura[] }
 interface Firma { id: string; nume: string; cif: string; nrRegCom: string; adresa: string; judet: string; tara: string }
 
 // Randul unei facturi in editor: valorile editabile tin textul din campuri; `initial` = ce era salvat (pentru a trimite doar ce s-a schimbat).
-interface Rand { id: string; fisier_nume: string; sumaTxt: string; utilitateTxt: string; locatieTxt: string; dataTxt: string }
-const rand = (f: EditorFactura): Rand => ({ id: f.id, fisier_nume: f.fisier_nume, sumaTxt: f.suma != null ? String(f.suma) : '', utilitateTxt: f.utilitate || '', locatieTxt: f.locatie || '', dataTxt: String(f.data_document || '').slice(0, 10) })
+// valuta/curs: facturile in EUR/USD raman in moneda lor; in total intra echivalentul in lei (curs BNR din data facturii).
+interface Rand { id: string; fisier_nume: string; sumaTxt: string; utilitateTxt: string; locatieTxt: string; dataTxt: string; valuta: string; curs: number | null }
+const rand = (f: EditorFactura): Rand => ({ id: f.id, fisier_nume: f.fisier_nume, sumaTxt: f.suma != null ? String(f.suma) : '', utilitateTxt: f.utilitate || '', locatieTxt: f.locatie || '', dataTxt: String(f.data_document || '').slice(0, 10), valuta: (f.valuta || 'RON').toUpperCase(), curs: f.curs_bnr ?? null })
 const num = (t: string) => { const v = Number(String(t).replace(',', '.')); return Number.isFinite(v) && String(t).trim() !== '' ? v : null }
 const r2 = (n: number) => Math.round(n * 100) / 100
 const money = (n: number) => new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
-const sumaFacturi = (l: Rand[]) => r2(l.reduce((a, f) => a + (num(f.sumaTxt) || 0), 0))
+const inLeiRand = (f: Rand) => { const v = num(f.sumaTxt) || 0; return f.valuta === 'RON' ? v : f.curs ? v * f.curs : 0 }
+const sumaFacturi = (l: Rand[]) => r2(l.reduce((a, f) => a + inLeiRand(f), 0))
 
 const INP: React.CSSProperties = { fontSize: 'var(--fs-sm)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '8px 10px', color: 'var(--text-primary)', outline: 'none', width: '100%' }
 const LBL: React.CSSProperties = { fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }
@@ -173,7 +175,7 @@ export default function EditorDispozitie({ dp, firma, lunaId, onClose, onSaved }
                     <label style={LBL}>Furnizor / utilitate<input value={f.utilitateTxt} onChange={e => seteaza(f.id, { utilitateTxt: e.target.value })} style={INP} /></label>
                     <label style={LBL}>Apartament<input value={f.locatieTxt} onChange={e => seteaza(f.id, { locatieTxt: e.target.value })} style={INP} /></label>
                     <label style={LBL}>Data facturii<input type="date" value={f.dataTxt} onChange={e => seteaza(f.id, { dataTxt: e.target.value })} style={INP} /></label>
-                    <label style={LBL}>Sumă (RON)<input inputMode="decimal" value={f.sumaTxt} onChange={e => seteaza(f.id, { sumaTxt: e.target.value })} style={{ ...INP, fontWeight: 700 }} /></label>
+                    <label style={LBL}>Sumă ({f.valuta})<input inputMode="decimal" value={f.sumaTxt} onChange={e => seteaza(f.id, { sumaTxt: e.target.value })} style={{ ...INP, fontWeight: 700 }} />{f.valuta !== 'RON' && <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, textTransform: 'none', letterSpacing: 0, color: 'var(--text-secondary)' }}>{f.curs ? `≈ ${money(inLeiRand(f))} lei · curs BNR ${f.curs.toFixed(4)}` : 'curs BNR indisponibil'}</span>}</label>
                   </div>
                 </div>
               ))}

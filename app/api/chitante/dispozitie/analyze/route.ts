@@ -3,11 +3,12 @@ import { finalizeazaDocument } from '@/lib/denumire-document'
 import Anthropic from '@anthropic-ai/sdk'
 import { createHash } from 'node:crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { cursuriBnrSigur, inLei } from '@/lib/curs-bnr'
 import { isEonInvoice, isEonPdf, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
-type ExtractedInvoice = { category?:string; amount?:number; supplier?:string; series?:string; invoiceNumber?:string; apartment?:string; invoiceDate?:string; representingPeriod?:string; receiptFrom?:string }
+type ExtractedInvoice = { category?:string; amount?:number; currency?:string; supplier?:string; series?:string; invoiceNumber?:string; apartment?:string; invoiceDate?:string; representingPeriod?:string; receiptFrom?:string }
 
 // Instrucțiuni generale + o regulă specifică pentru chitanțele (scrise de mână) ale ASOCIAȚIEI
 // DE LOCATARI BL. CFR PT. GARA 2 (CIF 5552650) - regula se activează doar dacă AI-ul recunoaște
@@ -15,10 +16,11 @@ type ExtractedInvoice = { category?:string; amount?:number; supplier?:string; se
 const INVOICE_EXTRACTION_PROMPT = `Extrage datele facturii sau chitanței pentru o dispoziție de plată. Documentul poate fi o factură tipărită SAU o chitanță fotografiată/scanată, cu câmpuri completate de mână și posibil hârtie îndoită, umbre, ștampilă peste text sau semnătură - analizează vizual imaginea (nu te baza doar pe OCR) și citește cu atenție atât textul tipărit, cât și scrisul de mână. Nu interpreta ștampila sau semnătura ca text de câmp.
 
 Returnează DOAR JSON, fără text suplimentar:
-{"category":"gaz|curent|asociatie|alta","amount":123.45,"supplier":"numele asociatiei sau furnizorului","series":"seria documentului","invoiceNumber":"numarul documentului","apartment":"numarul apartamentului sau adresa scurta (bloc/apartament)","invoiceDate":"ZZ.LL.AAAA","representingPeriod":"copiaza exact textul din campul reprezentand/pentru luna — poate fi o luna (ex: Mai 2026) sau doua luni (ex: Mai si Iunie 2026) — lasa null daca nu exista acest camp","receiptFrom":"numele persoanei de la campul \\"Am primit de la\\" (doar pentru chitante), sau null"}
+{"category":"gaz|curent|asociatie|alta","amount":123.45,"currency":"RON|EUR|USD|...","supplier":"numele asociatiei sau furnizorului","series":"seria documentului","invoiceNumber":"numarul documentului","apartment":"numarul apartamentului sau adresa scurta (bloc/apartament)","invoiceDate":"ZZ.LL.AAAA","representingPeriod":"copiaza exact textul din campul reprezentand/pentru luna — poate fi o luna (ex: Mai 2026) sau doua luni (ex: Mai si Iunie 2026) — lasa null daca nu exista acest camp","receiptFrom":"numele persoanei de la campul \\"Am primit de la\\" (doar pentru chitante), sau null"}
 
 Reguli generale:
 - Nu scrie descrieri lungi, nu inventa date. Dacă un câmp este parțial ilizibil, lasă-l null - mai bine null decât o valoare inventată.
+- "currency" = moneda în care e emisă factura, cod ISO din 3 litere (RON, EUR, USD, GBP...). "lei"/"RON" -> "RON", "€"/"euro" -> "EUR", "$"/"dolari"/"USD" -> "USD". "amount" rămâne în ACEASTĂ monedă - nu converti tu în lei. Dacă nu apare nicio monedă, "RON".
 - Pentru "amount": suma NUMERICĂ (câmpul "Suma de") are prioritate față de suma scrisă în litere; normalizează formatul românesc la cel intern (1.000,00 -> 1000, 443,52 -> 443.52). Dacă după virgulă e scrisă o SINGURĂ cifră (ex: "1000,0"), aceasta înseamnă zecimi, deci completează cu un zero la final (1000,0 -> 1000.00) - nu adăuga altă cifră.
 - Cifrele scrise de mână pot fi ambigue (mai ales în cifre grăbite/cursive): "5" poate semăna cu "2", "3" cu "9" sau "8", "1" cu "7". Când citești un număr scris de mână (număr de chitanță, dată), analizează FIECARE cifră separat după forma buclelor/liniilor ei, nu citi numărul "din prima impresie" - o cifră confundată schimbă tot numărul.
 
@@ -186,6 +188,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Factura ramane in moneda ei (suma + valuta); dispozitia se plateste in lei, deci calculam
+    // echivalentul la cursul BNR din data facturii (ultimul curs publicat pana atunci).
+    const currency = (/^[A-Za-z]{3}$/.test(String(extracted.currency || '')) ? String(extracted.currency).toUpperCase() : 'RON')
+    const dataCurs = normalizeInvoiceDate(extracted.invoiceDate) || new Date().toISOString().slice(0, 10)
+    const conversie = currency !== 'RON' && extracted.amount ? inLei(await cursuriBnrSigur([dataCurs]), extracted.amount, currency, dataCurs) : null
+    const amountRon = currency === 'RON' ? (extracted.amount || null) : (conversie?.sumaRon ?? null)
+
     const documentHash = createHash('sha256').update(bytes).digest('hex')
     const purpose = dispositionPurpose(extracted)
     const sb = getServiceSupabase()
@@ -239,11 +248,11 @@ export async function POST(req: NextRequest) {
       furnizor:`Atașament dispoziție ${number} | ${purpose} | HASH:${documentHash}`,
       numar_document:String(extracted.invoiceNumber || ''), fisier_path:path, fisier_nume:fileName,
       fisier_tip:file.type, fisier_marime:bytes.length, in_zip:false,
-      suma: extracted.amount || null, locatie: extracted.apartment || null, utilitate: utilitate || null, data_document: invoiceDate,
-    }).select('id,fisier_nume,furnizor,data_document,created_at,locatie,utilitate,suma').single()
+      suma: extracted.amount || null, valuta: currency, locatie: extracted.apartment || null, utilitate: utilitate || null, data_document: invoiceDate,
+    }).select('id,fisier_nume,furnizor,data_document,created_at,locatie,utilitate,suma,valuta').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error:error.message }, { status:500 }) }
     if (document?.id) { const numeNou = await finalizeazaDocument(sb, document.id, { extrage: false }); if (numeNou) document.fisier_nume = numeNou }
-    return NextResponse.json({ document, purpose, amount:extracted.amount || null, locatie:extracted.apartment || null, utilitate: utilitate || null, receiptFrom: extracted.receiptFrom || null, duplicateWarning })
+    return NextResponse.json({ document: document ? { ...document, suma_ron: amountRon, curs_bnr: conversie?.curs ?? null } : document, purpose, currency, amountOriginal: extracted.amount || null, rate: conversie?.curs ?? null, rateDate: dataCurs, amount: amountRon, locatie:extracted.apartment || null, utilitate: utilitate || null, receiptFrom: extracted.receiptFrom || null, duplicateWarning })
   } catch (error) {
     return NextResponse.json({ error:String(error) }, { status:500 })
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib'
+import { cursuriBnrSigur, inLei } from '@/lib/curs-bnr'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import JSZip from 'jszip'
 import { finalizeazaDocument } from '@/lib/denumire-document'
@@ -138,13 +139,20 @@ export async function GET(req: NextRequest) {
     const { data:attachmentDocuments, error:attachmentError } = documents?.length
       ? await sb
           .from('documente')
-          .select('id,fisier_nume,numar_document,furnizor,data_document,created_at,locatie,utilitate,suma')
+          .select('id,fisier_nume,numar_document,furnizor,data_document,created_at,locatie,utilitate,suma,valuta')
           .eq('luna_id', lunaId)
           .eq('modul', 'acte_contabile')
           .eq('tip_document', 'factura')
           .like('furnizor', 'Atașament DP %')
       : { data:[], error:null }
     if (attachmentError) throw new Error(attachmentError.message)
+    // Facturile in valuta: echivalentul in lei la cursul BNR din data facturii (doar pentru afisare/total).
+    const valutare = (attachmentDocuments || []).filter(a => a.valuta && a.valuta !== 'RON')
+    const curs = valutare.length ? await cursuriBnrSigur(valutare.map(a => a.data_document)) : null
+    for (const a of attachmentDocuments || []) {
+      const c = inLei(curs, a.suma, a.valuta, a.data_document)
+      Object.assign(a, { suma_ron: !a.valuta || a.valuta === 'RON' ? a.suma : c?.sumaRon ?? null, curs_bnr: c?.curs ?? null })
+    }
     const parsedDocuments = (documents || []).map(document => {
       const attachments = (attachmentDocuments || []).filter(attachment =>
         String(attachment.furnizor).startsWith(`Atașament DP ${document.id} `)
