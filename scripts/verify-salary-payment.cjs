@@ -50,7 +50,10 @@ async function main(){
     const planRoute=compile(path.resolve(__dirname,'../app/api/proiect-workflow/plata-salarii/route.ts'),key=>key==='@/lib/proiect-workflow-store'?planStore:key.startsWith('@/lib/')?local(key.slice(6)):require(key))
     const request=()=>new NextRequest('http://localhost/api/proiect-workflow/plata-salarii?firmaId=mock&scope=month-test')
     const unchanged=JSON.stringify(state);response=await planRoute.GET(request());assert.equal(response.status,200);data=await response.json();assert.equal(data.netCents,1069300);assert.equal(data.contributionsCents,705900);assert.ok(data.rows.every(row=>row.reference));assert.equal(JSON.stringify(state),unchanged);assert.match(response.headers.get('Cache-Control'),/private, no-store/)
-    prior={assets:[]};response=await planRoute.GET(request());data=await response.json();assert.ok(data.rows.every(row=>!row.reference));assert.ok(data.warnings.length)
+    const currentAssets=state.assets;state={...state,assets:[...currentAssets,...sources]};prior={assets:[]}
+    const currentTasks=JSON.stringify(state.tasks);response=await planRoute.GET(request());assert.equal(response.status,200);data=await response.json()
+    assert.equal(data.period,'2026-09');assert.equal(data.netCents,1069300);assert.ok(data.rows.every(row=>row.reference?.scope==='month-test'));assert.equal(JSON.stringify(state.tasks),currentTasks)
+    state={...state,assets:currentAssets};response=await planRoute.GET(request());data=await response.json();assert.ok(data.rows.every(row=>!row.reference));assert.ok(data.warnings.length)
     fail=true;response=await planRoute.GET(request());assert.equal(response.status,503)
     fail=false;state={...state,assets:[]};response=await planRoute.GET(request());assert.equal(response.status,422)
   }

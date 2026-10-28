@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "apartpro",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/razvanabunei/Documents/GitHub/apartpro", "run", "dev", "--", "-p", "3001"],
+      "port": 3001
     }
   ]
 }
