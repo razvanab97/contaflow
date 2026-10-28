@@ -142,6 +142,13 @@ export async function randeazaDocx(target: Document, buffer: ArrayBuffer): Promi
   const box = target.createElement('div'); target.body.appendChild(box)
   await renderAsync(pregatit, box, undefined, { inWrapper: true, breakPages: true, experimental: true, renderHeaders: true, renderFooters: true, ignoreLastRenderedPageBreak: true, useBase64URL: true })
   await target.fonts.ready
+  // Documentele Word ale proiectului sunt in format Letter (612x792 pt), dar se tiparesc pe A4: pastram latimea si aducem pagina la
+  // proportia A4 (inaltime = latime x 297/210). Tiparirea pe A4 o potriveste exact pe foaie (aceeasi scalare la latime), subsolul
+  // ajunge jos pe foaie - nu la ~82% din ea - iar corpul are in plus ~74 pt, deci raportul ramane pe o singura foaie.
+  target.querySelectorAll<HTMLElement>('section.docx').forEach(sec => {
+    const w = parseFloat(sec.style.width), h = parseFloat(sec.style.minHeight)
+    if (/pt$/.test(sec.style.width) && /pt$/.test(sec.style.minHeight) && w > 0 && h > 0 && Math.abs(h / w - 792 / 612) < 0.02) sec.style.minHeight = `${(w * 297 / 210).toFixed(2)}pt`
+  })
   corecteaza(target, layout)
   pagineaza(target, layout)
   const sec = target.querySelector<HTMLElement>('section.docx')
