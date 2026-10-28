@@ -3,6 +3,7 @@ import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
 import { workMonthLabel } from '@/lib/accounting-period'
 import { ignorareDeVerificat } from '@/lib/tranzactii-reguli'
 import { getStareFirma } from '@/lib/sistem-lucru'
+import { PLATI_RECURENTE, aparitiiPlata, zilePanaLa } from '@/lib/plati-recurente'
 
 export interface ItemDeFacut {
   id: string
@@ -16,6 +17,7 @@ export interface ItemDeFacut {
   icon: string
   urgenta: 'depasit' | 'curand' | 'normal'
   zile?: number | null   // zile pana la termen (negativ = depasit)
+  marcheaza?: { lunaId: string; taskKey: string }  // buton „Plătit”: bifeaza task-ul lunii
 }
 
 const TERMEN_IMPOZITE = 25 // ziua din luna de lucru (declaratii/plati pentru luna contabila anterioara)
@@ -40,6 +42,35 @@ export async function getDeFacut(firme: { id: string; slug: string; nume: string
     const base = { firmaId: f.id, firmaSlug: f.slug, firmaNume: nume, culoare: f.culoare }
     const { data: luni } = await sb.from('luni_contabile').select('id,luna').eq('firma_id', f.id)
     const l = (luni || []).find(x => String(x.luna).startsWith(luna))
+
+    // Calendarul platilor recurente (lib/plati-recurente.ts): un reminder pe fiecare plata, pana e bifata. Merge pe
+    // zilele calendaristice (nu pe luna de lucru), ca termenul de pe 1 sa se vada si cand luna de lucru s-a schimbat.
+    const reguli = PLATI_RECURENTE[f.slug] || []
+    if (reguli.length) {
+      const aziCal = { an: azi.getFullYear(), luna: azi.getMonth() + 1, zi: azi.getDate() }
+      const apar = reguli.map(r => ({ r, apar: aparitiiPlata(r, aziCal) }))
+      const lunaRand = (yyyymm: string) => (luni || []).find(x => String(x.luna).startsWith(yyyymm))
+      const ids = [...new Set(apar.flatMap(a => a.apar.map(x => lunaRand(x.luna)?.id).filter(Boolean) as string[]))]
+      const { data: bife } = ids.length ? await sb.from('task_stari').select('luna_id,task_key,completat').in('luna_id', ids) : { data: [] as { luna_id: string; task_key: string; completat: boolean }[] }
+      const gata = (lunaId: string | undefined, key: string) => !!lunaId && !!(bife || []).find(b => b.luna_id === lunaId && b.task_key === key && b.completat)
+      for (const { r, apar: aparitii } of apar) {
+        for (const a of aparitii) {
+          const rand = lunaRand(a.luna)
+          const bifata = gata(rand?.id, `plati.${r.key}`)
+          const modulGata = r.gataCandModul ? (getFirmaModules(f.slug).find(m => m.slug === r.gataCandModul)?.tasks || []) : []
+          const toateGata = modulGata.length > 0 && modulGata.every(t => gata(rand?.id, t.key))
+          if (bifata || toateGata) break // cea mai noua aparitie e rezolvata: nu cadem pe cea veche
+          const zile = zilePanaLa(a.termen, aziCal)
+          // pana la ultima aparitie din lista ramane urmatoarea doar daca cea curenta n-a inceput (vezi aparitiiPlata)
+          if (a.start > Date.UTC(aziCal.an, aziCal.luna - 1, aziCal.zi)) continue
+          items.push({ ...base, id: `plata-${f.id}-${r.key}-${a.luna}`, titlu: r.titlu,
+            detaliu: r.detaliu, href: `/${f.slug}/${a.luna}/${r.modul}`, icon: r.icon, zile, urgenta: zile < 0 ? 'depasit' : zile <= 5 ? 'curand' : 'normal',
+            ...(rand ? { marcheaza: { lunaId: rand.id, taskKey: `plati.${r.key}` } } : {}) })
+          break
+        }
+      }
+    }
+
     if (!l) {
       const calendar = esteLunaCalendaristica(f.slug)
       items.push({ ...base, id: `init-${f.id}`, titlu: calendar ? `Luna ${workMonthLabel(luna)} nu e începută` : 'Luna nu e începută', detaliu: calendar ? 'Pornește luna ca să apară rutina și task-urile' : 'Pornește contabilitatea lunii ca să apară task-urile', href: `/${f.slug}/${luna}`, icon: 'calendar', urgenta: 'normal' })
@@ -74,7 +105,8 @@ export async function getDeFacut(firme: { id: string; slug: string; nume: string
     // Termen impozite
     const imp = active.find(m => m.slug === 'impozite')
     const impRamase = imp ? imp.tasks.filter(t => !done.has(t.key)) : []
-    if (impRamase.length) {
+    const impInCalendar = reguli.some(r => r.key === 'taxe_stat') // reminderul din calendarul de plati il inlocuieste pe cel general
+    if (impRamase.length && !impInCalendar) {
       const zile = zilePana(luna, TERMEN_IMPOZITE, azi)
       items.push({ ...base, id: `imp-${f.id}`, titlu: `Plată impozite — ${impRamase.length} ${impRamase.length === 1 ? 'neplătit' : 'neplătite'}`,
         detaliu: `${impRamase.map(t => t.label).slice(0, 3).join(', ')}${impRamase.length > 3 ? '…' : ''} · termen ${TERMEN_IMPOZITE} ale lunii`,

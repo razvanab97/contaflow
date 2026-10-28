@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Icon from './ui/Icon'
 import type { ItemDeFacut } from '@/lib/de-facut'
+import MarcheazaPlata from './MarcheazaPlata'
 
 const TON = {
   depasit: { bg: 'var(--danger-soft)', c: 'var(--danger)' },
@@ -17,8 +18,8 @@ function termen(z: number | null | undefined) {
 
 function Rand({ it }: { it: ItemDeFacut }) {
   const t = termen(it.zile)
-  return (
-    <Link href={it.href} className="module-item" style={{ textDecoration: 'none' }}>
+  const continut = (
+    <>
       <div style={{ width: '32px', height: '32px', borderRadius: 'var(--r-md)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: TON[it.urgenta].bg, color: TON[it.urgenta].c }}>
         <Icon name={it.icon} size={16} />
       </div>
@@ -33,6 +34,20 @@ function Rand({ it }: { it: ItemDeFacut }) {
           {it.detaliu && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {it.detaliu}</span>}
         </div>
       </div>
+    </>
+  )
+  // Cu buton „Plătit”: nu se poate pune un buton in interiorul unui link, deci randul e un container cu linkul si butonul alaturi.
+  if (it.marcheaza) {
+    return (
+      <div className="module-item" style={{ cursor: 'default' }}>
+        <Link href={it.href} style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1 1 260px', minWidth: 0, textDecoration: 'none' }}>{continut}</Link>
+        <MarcheazaPlata lunaId={it.marcheaza.lunaId} taskKey={it.marcheaza.taskKey} />
+      </div>
+    )
+  }
+  return (
+    <Link href={it.href} className="module-item" style={{ textDecoration: 'none' }}>
+      {continut}
       <Icon name="chevronRight" size={16} style={{ color: 'var(--text-muted)' }} />
     </Link>
   )
