@@ -13,6 +13,7 @@ import ReportFiles from './ReportFiles'
 import { SaveStatus } from './ReportAutosaveStatus'
 import { printReport } from '@/lib/documentWorkspace/reportPresentation'
 import { liveReportHtml } from '@/lib/documentWorkspace/liveReport'
+import { printeazaDocx } from '@/lib/documentWorkspace/docxPdf'
 import { parseReportSections, REPORT_SECTIONS_KEY, ReportExtraSection } from '@/lib/documentWorkspace/reportSections'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
@@ -291,6 +292,12 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
       await saveQueue.current
       const currentDoc = docRef.current
       if (saveFailed.current || !currentDoc) throw new Error('Salvarea a eșuat. Reîncearcă înainte de export.')
+      // Documentul Word generat se tipareste cu formatarea lui reala (pagina, antet, subsol, fonturi, tabel),
+      // ca PDF-ul sa arate ca documentul de baza, nu ca o conversie simplificata in HTML.
+      if (currentDoc.fisier_tip?.includes('wordprocessingml') || currentDoc.fisier_nume.toLowerCase().endsWith('.docx')) {
+        await printeazaDocx(`/api/proiect-documente/download?id=${currentDoc.id}`, currentDoc.fisier_nume)
+        return
+      }
       const res = await fetch(`/api/proiect-documente/preview?id=${currentDoc.id}`, { cache: 'no-store' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Exportul nu a putut fi pregătit.')
