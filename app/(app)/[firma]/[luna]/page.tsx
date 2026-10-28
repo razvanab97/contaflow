@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import InitLuna from './InitLuna'
 import ProiectWorkflow from '@/components/ProiectWorkflow'
+import SincronizareProiectSrl from '@/components/SincronizareProiectSrl'
 import ModuleGrid from './ModuleGrid'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getLuniContabile, getRestanteCount } from '@/lib/queries'
@@ -55,6 +56,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
 
   return (
     <main className="page animate-in">
+      {(slug === 'proiect-ab-textile' || slug === 'ab-textile') && <SincronizareProiectSrl lunaId={lunaData.id} />}
       <section className="hero">
         <div className="hero-grid">
           <div style={{ minWidth: 0 }}>

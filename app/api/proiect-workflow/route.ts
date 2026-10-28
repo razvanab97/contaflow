@@ -70,7 +70,7 @@ export async function POST(req:NextRequest){try{
  if(updated.status!==current.tasks[t.key]?.status&&['semnat','trimis','acceptat','initiat','avizat','executat'].includes(updated.status)&&blockedBy(t.key,state).length)throw new WorkflowError('Finalizează întâi: '+blockedBy(t.key,state).join(', '))
  if(updated.status==='neaplicabil'&&!updated.note.trim())throw new WorkflowError('Adaugă motivul pentru „Nu se aplică”.')
  }
- const saved=await writeWorkflow(prefix,{...state,assets:current.assets},current.version)
+ const saved=await writeWorkflow(prefix,{...state,assets:current.assets,sync:current.sync},current.version)
  let warning=''
  if(month){
  const states=Object.entries(LEGACY_GROUPS).map(([key,keys])=>({luna_id:scope.slice(6),task_key:key,completat:keys.every(k=>['trimis','acceptat','neaplicabil'].includes(saved.tasks[k]?.status)),updated_at:new Date().toISOString()}))

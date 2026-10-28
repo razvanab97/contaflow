@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import SincronizareProiectSrl from '@/components/SincronizareProiectSrl'
 import PageHeader from '@/components/ui/PageHeader'
 import MonthNav from '@/components/ui/MonthNav'
 import nextDynamic from 'next/dynamic'
@@ -165,6 +166,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
 
   return (
     <main className={`page animate-in${modulSlug === 'raport-lunar-proiect' ? ' page-wide' : ''}`}>
+      {(slug === 'proiect-ab-textile' || slug === 'ab-textile') && <SincronizareProiectSrl lunaId={lunaData.id} />}
       {modulSlug !== 'raport-lunar-proiect' && <PageHeader
         back={{ href: `/${slug}/${luna}`, label: 'Rezumatul lunii' }}
         culoare={firma.culoare}

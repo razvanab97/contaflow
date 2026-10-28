@@ -177,7 +177,7 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
                           <span className={css.fileIcon} data-kind={kind}>{kind === 'pdf' ? 'PDF' : kind === 'doc' ? 'DOC' : 'IMG'}</span>
                           <span className={css.fileText}>
                             <span className={css.fileName}>{a.name.replace(/\.[a-z0-9]+$/i, '')}</span>
-                            {a.namingWarning ? <span className={css.fileWarn}>{a.namingWarning}</span> : <span className={css.fileSub}>{a.originalName ? `Original: ${a.originalName}` : new Date(a.createdAt).toLocaleDateString('ro-RO')}</span>}
+                            {a.namingWarning ? <span className={css.fileWarn}>{a.namingWarning}</span> : <span className={css.fileSub}>{a.from ? `Din ${a.from} · ${new Date(a.createdAt).toLocaleDateString('ro-RO')}` : a.originalName ? `Original: ${a.originalName}` : new Date(a.createdAt).toLocaleDateString('ro-RO')}</span>}
                           </span>
                           <Icon name="download" size={15} className={css.fileDl} />
                         </a>

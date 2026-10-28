@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import SincronizareProiectSrl from '@/components/SincronizareProiectSrl'
 import ExtrasClient from './ExtrasClient'
 import { MODULE_DEFS, getFirmaConfig, ModuleSlug } from '@/lib/firma-config'
 import { accountingShortLabel } from '@/lib/accounting-period'
@@ -51,6 +52,8 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
   const nextHref = nextDef ? `/${slug}/${luna}/${nextDef.linkDirect || nextDef.slug}` : null
 
   return (
+    <>
+    {slug === 'ab-textile' && <SincronizareProiectSrl lunaId={lunaData.id} />}
     <ExtrasClient
       firma={firma}
       lunaId={lunaData.id}
@@ -63,5 +66,6 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
       nextLabel={nextDef?.label || null}
       nextHref={nextHref}
     />
+    </>
   )
 }
