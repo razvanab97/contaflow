@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
+import { lunaRaportata, numeRaportImplementare, perioadaDinDocx, salveazaRaportLuna } from '@/lib/proiectRaport'
 
 const SECTIUNI = ['raport_lunar']
 
@@ -32,13 +33,20 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await sb.from('proiect_documente')
     .select('fisier_path').eq('firma_id', firmaId).eq('sectiune', sectiune).maybeSingle()
 
-  const path = `${firmaId}/proiect-documente/${sectiune}/${Date.now()}_${file.name}`
-  const { error: upErr } = await sb.storage.from('documente').upload(path, file, { contentType: file.type })
+  // Raport Word incarcat de mana: luna raportata se citeste din „Perioada de raportare” a documentului, iar numele devine
+  // „Raport implementare <Luna> <An>” (si se pastreaza si ca document propriu al lunii). Fara perioada, ramane numele fisierului.
+  const bytes = Buffer.from(await file.arrayBuffer())
+  const esteDocx = /\.docx$/i.test(file.name) || file.type.includes('wordprocessingml')
+  const lunaRap = esteDocx ? lunaRaportata(await perioadaDinDocx(bytes)) : null
+  const nume = lunaRap ? numeRaportImplementare(lunaRap.eticheta) : file.name
+
+  const path = `${firmaId}/proiect-documente/${sectiune}/${Date.now()}_${nume.replace(/[^A-Za-z0-9._-]+/g, '_')}`
+  const { error: upErr } = await sb.storage.from('documente').upload(path, bytes, { contentType: file.type })
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
   const { data, error } = await sb.from('proiect_documente')
     .upsert({
-      firma_id: firmaId, sectiune, fisier_nume: file.name, fisier_path: path,
+      firma_id: firmaId, sectiune, fisier_nume: nume, fisier_path: path,
       fisier_tip: file.type, fisier_marime: file.size, updated_at: new Date().toISOString(),
     }, { onConflict: 'firma_id,sectiune' })
     .select('id,fisier_nume,fisier_tip,fisier_marime,updated_at').single()
@@ -49,6 +57,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (existing?.fisier_path) await sb.storage.from('documente').remove([existing.fisier_path])
+  if (lunaRap) await salveazaRaportLuna(sb, firmaId, bytes, nume, file.type, lunaRap.cheie).catch(e => console.error('Raportul lunii nu s-a putut păstra:', e))
 
   return NextResponse.json({ doc: data })
 }

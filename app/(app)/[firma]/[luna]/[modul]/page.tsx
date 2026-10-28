@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import RapoarteSalvate from '@/components/reports/RapoarteSalvate'
 import SincronizareProiectSrl from '@/components/SincronizareProiectSrl'
 import PageHeader from '@/components/ui/PageHeader'
 import MonthNav from '@/components/ui/MonthNav'
@@ -150,7 +151,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
       case 'impozite':
         return <ImpoziteModule firma={firmaForModule} lunaId={lunaData.id} luna={luna} tasks={modulDef.tasks} stari={impoziteStari}/>
       case 'raport-lunar-proiect':
-        return <div style={{display:'grid',gap:20,minWidth:0}}><RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/><details className="card card-pad"><summary style={{fontSize:'var(--fs-md)',fontWeight:600,color:'var(--text-secondary)'}}>Rutina lunii, date permanente și versiunile anterioare</summary><ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} initialForm /></details></div>
+        return <div style={{display:'grid',gap:20,minWidth:0}}><RaportLunarProiectModule firma={firmaForModule} lunaId={lunaData.id} tasks={tasks} luna={luna} lunaLabel={ll} modulSlug={modulSlug}/><RapoarteSalvate firmaId={firma.id} /><details className="card card-pad"><summary style={{fontSize:'var(--fs-md)',fontWeight:600,color:'var(--text-secondary)'}}>Rutina lunii, date permanente și versiunile anterioare</summary><ProiectWorkflow firmaId={firma.id} lunaId={lunaData.id} luna={luna} initialForm /></details></div>
       case 'obligatii-recurente':
         return <ObligatiiModule firma={firmaForModule} lunaId={lunaData.id} luna={luna}/>
       case 'achizitii':

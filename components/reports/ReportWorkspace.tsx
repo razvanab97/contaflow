@@ -167,6 +167,7 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
       saveFailed.current = false
       docRef.current = data.doc
       setDoc(data.doc)
+      window.dispatchEvent(new Event('cf:raport-salvat')) // lista „Rapoarte salvate” se reciteste
       setSaveStatus('saved'); setSavedAt(new Date())
       if (!templateHtmlRef.current) loadPreview(data.doc.id)
       return data.doc

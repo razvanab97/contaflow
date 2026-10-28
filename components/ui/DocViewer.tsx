@@ -25,6 +25,10 @@ function DocxVizualizare({ urlStorage, urlApp }: { urlStorage: string; urlApp: s
         const st = doc.createElement('style')
         st.textContent = '.docx-wrapper{background:transparent!important;padding:0!important;display:flex!important;flex-direction:column;align-items:center;gap:14px}.docx-wrapper>section.docx{box-shadow:0 1px 8px rgba(0,0,0,.2)!important;margin:0!important;background:#fff}'
         doc.head.appendChild(st)
+        // pe ecran ingust pagina (A4) se micsoreaza ca sa incapa pe latime, in loc sa iasa din fereastra
+        const pagina = doc.querySelector<HTMLElement>('section.docx')?.getBoundingClientRect().width || 0
+        const larg = frame.current?.clientWidth || 0
+        if (pagina && larg && pagina > larg - 16) doc.body.style.setProperty('zoom', String((larg - 16) / pagina))
         if (!anulat) setStare('gata')
       } catch { if (!anulat) setStare('eroare') }
     })()
