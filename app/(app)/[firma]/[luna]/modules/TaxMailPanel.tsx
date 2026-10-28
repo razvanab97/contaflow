@@ -39,38 +39,37 @@ export function PaymentSummary({payment,onCopy,onEdit,onPaid,busy,index}:{paymen
   const issues=paymentIssues(payment)
   const [copied,setCopied]=useState('')
   const culoare=culoareTaxa(payment.label||'?')
-  const copyBtn=(label:string,copyValue:string)=>!!copyValue&&<button type="button" style={{...btn,padding:'4px 10px',borderRadius:8,fontSize:'var(--fs-xs)',color:copied===label?'var(--success)':'var(--text-secondary)',borderColor:copied===label?'color-mix(in srgb, var(--success) 40%, var(--border))':'var(--border)'}} onClick={async()=>{if(await onCopy(copyValue,label))setCopied(label)}} aria-label={'Copiază '+label}>{copied===label?'✓ Copiat':'Copiază'}</button>
-  // Un camp al fisei: eticheta mica, valoarea mare si butonul de copiere. Campurile goale nu se afiseaza.
+  const copyBtn=(label:string,copyValue:string)=>!!copyValue&&<button type="button" style={{...btn,padding:'3px 9px',borderRadius:7,fontSize:'var(--fs-xs)',fontWeight:700,color:copied===label?'var(--success)':'var(--text-secondary)',borderColor:copied===label?'color-mix(in srgb, var(--success) 40%, var(--border))':'var(--border)'}} onClick={async()=>{if(await onCopy(copyValue,label))setCopied(label)}} aria-label={'Copiază '+label}>{copied===label?'✓ Copiat':'Copiază'}</button>
+  // Un camp compact: eticheta deasupra, valoarea ingrosata si "Copiaza" pe acelasi rand. Campurile goale nu apar.
   const item=(label:string,value:string,copyValue=value,opts:{mono?:boolean;title?:string;flex?:string}={})=>!!value&&(
-    <div style={{minWidth:0,flex:opts.flex||'1 1 180px',padding:'12px 14px',borderRadius:12,background:'var(--surface)',border:'1px solid var(--border-subtle,var(--border))'}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}><span style={eyebrow}>{label}</span>{copyBtn(label,copyValue)}</div>
-      <div title={opts.title} style={{marginTop:6,fontSize:'var(--fs-base)',fontWeight:600,color:'var(--text-primary)',overflowWrap:'anywhere',fontFamily:opts.mono?'var(--font-mono,ui-monospace,monospace)':undefined,letterSpacing:opts.mono?'.03em':undefined}}>{value}</div>
+    <div style={{minWidth:0,flex:opts.flex||'1 1 160px',padding:'8px 12px',borderRadius:10,background:'var(--surface)',border:'1px solid var(--border-subtle,var(--border))'}}>
+      <div style={{...eyebrow,color:'var(--text-secondary)',fontSize:11}}>{label}</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:2}}>
+        <span title={opts.title} style={{fontSize:'var(--fs-md)',fontWeight:700,color:'var(--text-primary)',overflowWrap:'anywhere',fontFamily:opts.mono?'var(--font-mono,ui-monospace,monospace)':undefined,letterSpacing:opts.mono?'.02em':undefined}}>{value}</span>
+        {copyBtn(label,copyValue)}
+      </div>
     </div>
   )
-  return <article style={{...card,padding:0,overflow:'hidden',opacity:payment.paid?.78:1}}>
-    <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',padding:'16px 20px',borderBottom:'1px solid var(--border-subtle,var(--border))',background:'color-mix(in srgb, '+culoare+' 5%, var(--surface))'}}>
-      <div aria-hidden style={{display:'grid',placeItems:'center',width:42,height:42,borderRadius:13,background:'color-mix(in srgb, '+culoare+' 14%, transparent)',color:culoare,fontWeight:800,fontSize:'var(--fs-lg)'}}>{payment.paid?'✓':index!==undefined?index+1:'•'}</div>
-      <div style={{flex:'1 1 220px',minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-          <strong style={{fontSize:'var(--fs-lg)',letterSpacing:'-.01em'}}>{payment.label||'Plată fără tip'}</strong>
-          <span style={payment.paid?chip('var(--success-soft)','var(--success)'):chip('color-mix(in srgb, var(--accent) 10%, transparent)','var(--accent)')}>{payment.paid?'Plătit · confirmat manual':'De plătit'}</span>
-          {!!issues.length&&<span style={{...chip('var(--warning-soft)','var(--warning)'),whiteSpace:'normal',lineHeight:1.4}} title={issues.join(', ')}>⚠ De verificat: {issues.join(', ')}</span>}
-        </div>
-        {payment.due&&<div style={{...small,marginTop:3}}>Scadență {payment.due.split('-').reverse().join('.')}</div>}
+  return <article style={{...card,padding:0,overflow:'hidden',opacity:payment.paid?.75:1}}>
+    <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',padding:'10px 14px',borderBottom:'1px solid var(--border-subtle,var(--border))',background:'color-mix(in srgb, '+culoare+' 5%, var(--surface))'}}>
+      <div aria-hidden style={{display:'grid',placeItems:'center',width:32,height:32,borderRadius:10,background:'color-mix(in srgb, '+culoare+' 14%, transparent)',color:culoare,fontWeight:800,fontSize:'var(--fs-md)',flexShrink:0}}>{payment.paid?'✓':index!==undefined?index+1:'•'}</div>
+      <div style={{flex:'1 1 240px',minWidth:0,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <strong style={{fontSize:'var(--fs-lg)',fontWeight:800,letterSpacing:'-.01em'}}>{payment.label||'Plată fără tip'}</strong>
+        <span style={payment.paid?chip('var(--success-soft)','var(--success)'):chip('color-mix(in srgb, var(--accent) 10%, transparent)','var(--accent)')}>{payment.paid?'Plătit · confirmat manual':'De plătit'}</span>
+        {payment.due&&<span style={{...small,fontWeight:600}}>Scadență {payment.due.split('-').reverse().join('.')}</span>}
+        {!!issues.length&&<span style={{...chip('var(--warning-soft)','var(--warning)'),whiteSpace:'normal',lineHeight:1.4}} title={issues.join(', ')}>⚠ {issues.join(', ')}</span>}
       </div>
-      <div style={{display:'grid',justifyItems:'end',gap:4}}><div style={{display:'flex',alignItems:'center',gap:8}}><span style={eyebrow}>Sumă</span>{copyBtn('Sumă',payment.amount===null?'':String(payment.amount))}</div><div style={{fontSize:24,fontWeight:750,letterSpacing:'-.02em',fontVariantNumeric:'tabular-nums',color:'var(--text-primary)'}}>{money(payment.amount)}</div></div>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',justifyContent:'flex-end',marginLeft:'auto'}}>
+        <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:22,fontWeight:800,letterSpacing:'-.02em',fontVariantNumeric:'tabular-nums',color:'var(--text-primary)'}}>{money(payment.amount)}</span>{copyBtn('Sumă',payment.amount===null?'':String(payment.amount))}</div>
+        <button type="button" style={{...btn,padding:'6px 11px'}} disabled={busy} onClick={onEdit}>Editează</button>
+        <button type="button" style={{...(payment.paid?btn:primary),padding:'6px 12px'}} disabled={busy} onClick={onPaid}>{payment.paid?'Marchează neplătit':'✓ Marchează plătit'}</button>
+      </div>
     </div>
-    <div style={{padding:'16px 20px',display:'grid',gap:14,background:'color-mix(in srgb, var(--surface-sunken) 40%, var(--surface))'}}>
-      <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-        {item('CUI/CIF',payment.fiscalId)}
-        {item('IBAN',payment.iban?ibanGrupat(payment.iban):'',payment.iban,{mono:true,title:payment.iban,flex:'2 1 330px'})}
-        {item('Beneficiar',payment.recipient)}
-        {item('Detalii',payment.description,payment.description,{flex:'1 1 100%'})}
-      </div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,flexWrap:'wrap'}}>
-        <button type="button" style={btn} disabled={busy} onClick={onEdit}>Editează</button>
-        <button type="button" style={payment.paid?btn:primary} disabled={busy} onClick={onPaid}>{payment.paid?'Marchează neplătit':'✓ Marchează plătit după verificarea în bancă'}</button>
-      </div>
+    <div style={{display:'flex',flexWrap:'wrap',gap:8,padding:'10px 14px',background:'color-mix(in srgb, var(--surface-sunken) 40%, var(--surface))'}}>
+      {item('CUI/CIF',payment.fiscalId,payment.fiscalId,{flex:'0 1 190px'})}
+      {item('IBAN',payment.iban?ibanGrupat(payment.iban):'',payment.iban,{mono:true,title:payment.iban,flex:'2 1 300px'})}
+      {item('Beneficiar',payment.recipient)}
+      {item('Detalii',payment.description,payment.description,{flex:'1 1 220px'})}
     </div>
   </article>
 }
@@ -165,22 +164,22 @@ export default function TaxMailPanel({firma,lunaId,luna,onTotals}:{firma:Firma;l
     {state&&state.payments.length>0&&(()=>{
       const total=state.payments.reduce((sum,p)=>sum+(p.amount||0),0),ramas=state.payments.reduce((sum,p)=>sum+(p.paid?0:p.amount||0),0),platite=state.payments.filter(p=>p.paid).length
       const surse=[...new Set(state.payments.map(p=>p.sourceId))].map(paymentSource).filter(Boolean) as NonNullable<ReturnType<typeof paymentSource>>[]
-      return <div style={{display:'grid',gap:14}}>
+      return <div style={{display:'grid',gap:10}}>
         <div style={{...card,padding:0,overflow:'hidden'}}>
-          <div style={{padding:'20px 22px',display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:16,flexWrap:'wrap',background:'radial-gradient(120% 160% at 100% 0%, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 55%)'}}>
+          <div style={{padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:14,flexWrap:'wrap',background:'radial-gradient(120% 160% at 100% 0%, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 55%)'}}>
             <div style={{minWidth:0}}>
               <div style={eyebrow}>Plăți către stat · din email</div>
-              <h3 style={{fontSize:'var(--fs-xl,20px)',fontWeight:700,letterSpacing:'-.02em',marginTop:4}}>Plăți salvate din email</h3>
-              <p style={{...small,marginTop:4}}>{state.payments.length} poziții · {money(ramas)} rămas de plătit. Fiecare fișă rămâne fixă până alegi „Editează”.</p>
+              <h3 style={{fontSize:'var(--fs-lg)',fontWeight:800,letterSpacing:'-.015em',marginTop:2}}>Plăți salvate din email</h3>
+              <p style={{...small,marginTop:2,fontWeight:500}}>{state.payments.length} poziții · fiecare fișă rămâne fixă până alegi „Editează”.</p>
             </div>
             <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-              <div style={{padding:'12px 16px',borderRadius:14,background:'color-mix(in srgb, var(--accent) 8%, var(--surface))',border:'1px solid color-mix(in srgb, var(--accent) 25%, transparent)'}}><div style={eyebrow}>Rămas de plătit</div><div style={{fontSize:22,fontWeight:750,color:'var(--accent)',fontVariantNumeric:'tabular-nums',marginTop:4}}>{money(ramas)}</div></div>
-              <div style={{padding:'12px 16px',borderRadius:14,background:'var(--surface)',border:'1px solid var(--border)'}}><div style={eyebrow}>Plătite</div><div style={{fontSize:22,fontWeight:750,fontVariantNumeric:'tabular-nums',marginTop:4}}>{platite}<span style={{fontSize:'var(--fs-md)',color:'var(--text-muted)',fontWeight:500}}> / {state.payments.length}</span></div></div>
-              <div style={{padding:'12px 16px',borderRadius:14,background:'var(--surface)',border:'1px solid var(--border)'}}><div style={eyebrow}>Total</div><div style={{fontSize:22,fontWeight:750,fontVariantNumeric:'tabular-nums',marginTop:4}}>{money(total)}</div></div>
+              <div style={{padding:'8px 14px',borderRadius:12,background:'color-mix(in srgb, var(--accent) 8%, var(--surface))',border:'1px solid color-mix(in srgb, var(--accent) 25%, transparent)'}}><div style={eyebrow}>Rămas de plătit</div><div style={{fontSize:20,fontWeight:800,color:'var(--accent)',fontVariantNumeric:'tabular-nums',marginTop:2}}>{money(ramas)}</div></div>
+              <div style={{padding:'8px 14px',borderRadius:12,background:'var(--surface)',border:'1px solid var(--border)'}}><div style={eyebrow}>Plătite</div><div style={{fontSize:20,fontWeight:800,fontVariantNumeric:'tabular-nums',marginTop:2}}>{platite}<span style={{fontSize:'var(--fs-md)',color:'var(--text-muted)',fontWeight:500}}> / {state.payments.length}</span></div></div>
+              <div style={{padding:'8px 14px',borderRadius:12,background:'var(--surface)',border:'1px solid var(--border)'}}><div style={eyebrow}>Total</div><div style={{fontSize:20,fontWeight:800,fontVariantNumeric:'tabular-nums',marginTop:2}}>{money(total)}</div></div>
             </div>
           </div>
           <div style={{height:4,background:'color-mix(in srgb, var(--border) 60%, transparent)'}}><div style={{height:'100%',width:(state.payments.length?Math.round(platite/state.payments.length*100):0)+'%',background:'var(--success)',transition:'width .3s'}}/></div>
-          {surse.length>0&&<div style={{padding:'10px 22px',display:'flex',gap:14,flexWrap:'wrap',...small,borderTop:'1px solid var(--border-subtle,var(--border))'}}>{surse.map(source=><span key={source.id}>Sursă: {source.company||firma.nume} · {source.period||'perioadă neidentificată'} · {source.filePath?<a href={sourceUrl(source.id)} target="_blank" rel="noreferrer" style={{color:'var(--accent)',fontWeight:600}}>{source.name} ↗</a>:source.name}</span>)}</div>}
+          {surse.length>0&&<div style={{padding:'8px 18px',fontWeight:500,display:'flex',gap:14,flexWrap:'wrap',...small,borderTop:'1px solid var(--border-subtle,var(--border))'}}>{surse.map(source=><span key={source.id}>Sursă: {source.company||firma.nume} · {source.period||'perioadă neidentificată'} · {source.filePath?<a href={sourceUrl(source.id)} target="_blank" rel="noreferrer" style={{color:'var(--accent)',fontWeight:600}}>{source.name} ↗</a>:source.name}</span>)}</div>}
         </div>
         {state.payments.map((payment,index)=>{const editing=editPayment?.id===payment.id;return <div key={payment.id}>{editing?<div style={{display:'grid',gap:10}}><PaymentEditor payment={editPayment} onChange={patch=>setEditPayment(prev=>prev?{...prev,...patch}:prev)}/><div style={{display:'flex',gap:8,justifyContent:'flex-end'}}><button style={btn} disabled={!!busy} onClick={()=>setEditPayment(null)}>Renunță</button><button style={primary} disabled={!!busy} onClick={()=>void savePayment(editPayment)}>Salvează modificările</button></div></div>:<PaymentSummary payment={payment} index={index} busy={!!busy||!!editPayment} onCopy={(value,label)=>copy(value,label)} onEdit={()=>setEditPayment({...payment})} onPaid={()=>void savePayment({...payment,paid:!payment.paid})}/>}</div>})}
         <details style={{...card,padding:'4px 20px'}}><summary style={{...small,cursor:'pointer',padding:'12px 0',fontWeight:600,color:'var(--text-primary)'}}>Vezi textul surselor importate</summary>{state.sources.map(source=><div key={source.id} style={{margin:'4px 0 14px'}}><strong style={{fontSize:'var(--fs-sm)'}}>{source.name} · {source.period||'perioadă neidentificată'}</strong><pre style={{...small,whiteSpace:'pre-wrap',wordBreak:'break-word',marginTop:5,padding:12,borderRadius:10,background:'var(--surface-sunken)'}}>{source.text}</pre></div>)}</details>
