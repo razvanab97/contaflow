@@ -5,6 +5,7 @@ import Sidebar, { FirmaNav } from '@/components/Sidebar'
 import GlobalHeader from './GlobalHeader'
 import CommandPalette from './CommandPalette'
 import AsistentAI from './AsistentAI'
+import ProiectPopup, { CHEIE_STARE } from './ProiectPopup'
 import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
 import { etichetaLunaScurta } from '@/lib/accounting-period'
 
@@ -39,6 +40,13 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
   // Asistentul AI global (pop-up pe dreapta): butonul din antet sau ⌘J / Ctrl+J.
   const [asistentOpen, setAsistentOpen] = useState(false)
   const closeAsistent = useCallback(() => setAsistentOpen(false), [])
+  // „Plan & AI proiect” ca fereastra pop-up peste orice pagina (ramane deschisa la navigare): antet, meniu lateral, pagina
+  // modulului (eveniment cf:proiect-popup) sau Alt+P.
+  const [proiectOpen, setProiectOpen] = useState(false)
+  const [proiectMin, setProiectMin] = useState(false)
+  useEffect(() => { try { const v = sessionStorage.getItem(CHEIE_STARE); if (v) { setProiectOpen(true); setProiectMin(v === 'min') } } catch { /* fara sessionStorage */ } }, [])
+  useEffect(() => { try { if (proiectOpen) sessionStorage.setItem(CHEIE_STARE, proiectMin ? 'min' : 'open'); else sessionStorage.removeItem(CHEIE_STARE) } catch { /* nu se retine */ } }, [proiectOpen, proiectMin])
+  const comutaProiect = useCallback(() => { setProiectMin(false); setProiectOpen(o => !o) }, [])
 
   // ⌘K / Ctrl+K oriunde, sau "/" cand nu se scrie intr-un camp -> paleta de comenzi/cautare.
   useEffect(() => {
@@ -47,15 +55,19 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
       const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
       if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setPaletteOpen(o => !o) }
       else if ((e.key === 'j' || e.key === 'J') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setAsistentOpen(o => !o) }
+      else if (e.code === 'KeyP' && e.altKey && !e.metaKey && !e.ctrlKey) { e.preventDefault(); comutaProiect() }
       else if (e.key === '/' && !typing) { e.preventDefault(); setPaletteOpen(true) }
     }
     const onOpen = () => setPaletteOpen(true)
+    const onProiect = (e: Event) => { const d = (e as CustomEvent).detail || {}; setProiectMin(false); if (d.open === undefined) setProiectOpen(o => !o); else setProiectOpen(!!d.open) }
     document.addEventListener('keydown', onKey)
     window.addEventListener('cf:palette', onOpen)
-    return () => { document.removeEventListener('keydown', onKey); window.removeEventListener('cf:palette', onOpen) }
-  }, [])
+    window.addEventListener('cf:proiect-popup', onProiect)
+    return () => { document.removeEventListener('keydown', onKey); window.removeEventListener('cf:palette', onOpen); window.removeEventListener('cf:proiect-popup', onProiect) }
+  }, [comutaProiect])
 
   const firmaAtivaObj = firmeNav.find(f => f.slug === firmaSlug)
+  const firmaProiect = firmeNav.find(f => f.slug === 'proiect-ab-textile')
   const firmaId = firmaAtivaObj?.id
 
   useEffect(() => {
@@ -103,9 +115,11 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
         open={menuOpen}
         onClose={closeMenu}
         onSearch={openPalette}
+        onProiectPopup={firmaProiect ? comutaProiect : undefined}
       />
       <div className="app-main">
-        <GlobalHeader firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} onMenu={() => setMenuOpen(true)} onSearch={openPalette} onAsistent={() => setAsistentOpen(o => !o)} />
+        <GlobalHeader firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} onMenu={() => setMenuOpen(true)} onSearch={openPalette} onProiect={firmaProiect ? comutaProiect : undefined} proiectOpen={proiectOpen} onAsistent={() => setAsistentOpen(o => !o)} />
+        {firmaProiect && <ProiectPopup firma={firmaProiect} open={proiectOpen} minimizat={proiectMin} onClose={() => setProiectOpen(false)} onMinimizat={setProiectMin} luna={lunaEfectiva} />}
         <AsistentAI open={asistentOpen} onClose={closeAsistent} firme={firmeNav} firma={firmaSlug} luna={lunaEfectiva} cale={pathname} />
         {/* Montata doar cat e deschisa -> fiecare deschidere porneste cu stare curata (text gol, scope implicit). */}
         {paletteOpen && <CommandPalette open onClose={closePalette} firme={firmeNav} firmaAtiva={firmaAtivaObj} luna={lunaEfectiva} lunaInPath={!!lunaFromPath} />}

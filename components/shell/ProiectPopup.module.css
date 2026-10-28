@@ -1,0 +1,21 @@
+/* Fereastra pop-up „Plan & AI proiect”: ne-modala (nu blocheaza pagina de dedesubt), ramane deschisa la navigare. */
+.win { position: fixed; right: 16px; bottom: 16px; z-index: 80; display: flex; flex-direction: column; width: min(480px, calc(100vw - 32px)); height: min(740px, calc(100vh - 88px)); background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 24px 60px -18px rgba(16, 24, 40, .45), 0 2px 8px rgba(16, 24, 40, .12); overflow: hidden; animation: pop .16s ease both; }
+.win.wide { width: min(860px, calc(100vw - 32px)); }
+.win.min { height: auto; }
+.win[hidden] { display: none; }
+.bar { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--border-subtle, var(--border)); background: var(--surface); flex-shrink: 0; }
+.win.min .bar { border-bottom: 0; }
+.title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title small { font-weight: 500; color: var(--text-muted); font-size: 11.5px; }
+.ico { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 15px; line-height: 1; text-decoration: none; }
+.ico:hover { background: var(--hover, var(--surface-hover)); color: var(--text-primary); }
+.body { flex: 1; min-height: 0; padding: 10px 12px 12px; overflow: hidden; }
+.win.min .body { display: none; }
+.loading { display: flex; align-items: center; gap: 10px; padding: 24px; color: var(--text-muted); font-size: 13px; }
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+@media (max-width: 640px) {
+  .win, .win.wide { inset: 0; width: 100vw; height: 100dvh; border-radius: 0; }
+  .win.min { inset: auto 0 0 0; height: auto; border-radius: 14px 14px 0 0; }
+  .wideBtn { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .win { animation: none; } }

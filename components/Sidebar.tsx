@@ -21,6 +21,7 @@ interface Props {
   lunaLabel: string
   firmaAtiva?: string
   moduleFirma?: ModuleDef[]
+  onProiectPopup?: () => void  // butonul „pop-up” de langa Plan & AI proiect
   restanteCount?: number
   moduleComplete?: Record<string, boolean>
   open: boolean
@@ -33,7 +34,7 @@ interface Props {
 // luna firmei active (rezumat + module, in ordinea de lucru) -> date permanente ale firmei
 // (furnizori, date personale, modele, facturi de asociat). Pe desktop e fixa (sticky); sub
 // 900px devine sertar, deschis din butonul de meniu al header-ului (starea traieste in ShellClient).
-export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, moduleFirma, restanteCount, moduleComplete, open, onClose, onSearch, lunaCalendaristica = false }: Props) {
+export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, moduleFirma, restanteCount, moduleComplete, open, onClose, onSearch, onProiectPopup, lunaCalendaristica = false }: Props) {
   const pathname = usePathname()
   const isDashboard = pathname === '/dashboard'
 
@@ -154,7 +155,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
                 const href = `/${firmaAtiva}/${lunaCurenta}/${m.linkDirect || m.slug}`
                 const isCurrentMod = m.slug === modulActiv || (!!m.linkDirect && m.linkDirect === modulActiv)
                 const isComplete = !!moduleComplete?.[m.slug]
-                return (
+                const link = (
                   <Link key={m.slug} href={href}
                     className={`nav-item${isCurrentMod ? ' is-active' : ''}${isComplete && !isCurrentMod ? ' is-done' : ''}`}
                     aria-current={isCurrentMod ? 'page' : undefined}
@@ -169,6 +170,17 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
                     )}
                   </Link>
                 )
+                // Plan & AI proiect: buton „pop-up” langa element (nu in interiorul linkului), deschide fereastra peste pagina curenta
+                if (m.slug === 'plan-proiect' && onProiectPopup) return (
+                  <div key={m.slug} style={{ position: 'relative' }}>
+                    {link}
+                    <button type="button" onClick={onProiectPopup} title="Deschide ca pop-up, peste pagina curentă (Alt+P)" aria-label="Deschide Plan și AI proiect ca pop-up"
+                      style={{ position: 'absolute', right: 30, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 24, height: 24, display: 'grid', placeItems: 'center', border: 0, borderRadius: 6, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                      <span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>⧉</span>
+                    </button>
+                  </div>
+                )
+                return link
               })}
             </div>
           )}

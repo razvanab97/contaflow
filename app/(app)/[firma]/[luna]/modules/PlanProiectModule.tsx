@@ -9,7 +9,8 @@ import Icon from '@/components/ui/Icon'
 import css from './PlanProiect.module.css'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
-interface Props { firma: Firma; lunaId: string }
+// inPopup = fereastra pop-up globala (components/shell/ProiectPopup.tsx): fara lunaId si fara calculele de inaltime/derulare ale paginii
+interface Props { firma: Firma; lunaId?: string; inPopup?: boolean }
 interface Intrebare { id?: string; intrebare: string; raspuns: string; created_at?: string; inCurs?: boolean }
 type Tab = 'intreaba' | 'memorie' | 'plan' | 'indicatori'
 
@@ -79,7 +80,7 @@ function Intro({ icon, titlu, children, actiune }: { icon: Parameters<typeof Ico
 
 // --- Intreaba proiectul -------------------------------------------------------------------------
 // Fereastra de chat cu inaltime fixa (cat ramane din ecran): doar conversatia se deruleaza, pagina nu.
-function Intreaba({ firma }: { firma: Firma }) {
+function Intreaba({ firma, inPopup = false }: { firma: Firma; inPopup?: boolean }) {
   const [lista, setLista] = useState<Intrebare[]>([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -96,6 +97,7 @@ function Intreaba({ firma }: { firma: Firma }) {
   // Fereastra cat ecranul: pagina coboara singura pana la taburi (titlul iese din vedere), iar fereastra ia
   // tot restul inaltimii - sub antetul fix al aplicatiei si deasupra butonului fix "Pasul urmator".
   useEffect(() => {
+    if (inPopup) return // in pop-up inaltimea o da fereastra (CSS), nu pagina
     const ANTET = 56, SUS = 12, JOS = 78
     const taburi = () => document.querySelector<HTMLElement>('[role="tablist"][aria-label="Secțiuni proiect"]')
     const calc = () => {
@@ -108,15 +110,15 @@ function Intreaba({ firma }: { firma: Firma }) {
     calc()
     window.addEventListener('resize', calc)
     return () => window.removeEventListener('resize', calc)
-  }, [])
+  }, [inPopup])
   // Coborarea paginii se face abia dupa ce fereastra are inaltimea finala (altfel pagina inca e prea scurta).
   const coborat = useRef(false)
   useEffect(() => {
-    if (!inaltime || coborat.current) return
+    if (inPopup || !inaltime || coborat.current) return
     coborat.current = true
     const t = document.querySelector<HTMLElement>('[role="tablist"][aria-label="Secțiuni proiect"]')
     if (t) requestAnimationFrame(() => window.scrollTo({ top: Math.max(0, t.getBoundingClientRect().top + window.scrollY - 56 - 12), behavior: 'smooth' }))
-  }, [inaltime])
+  }, [inaltime, inPopup])
   // Raspunsul care curge tine conversatia jos - doar daca utilizatorul nu a urcat sa citeasca ceva mai vechi.
   useEffect(() => { const el = scrollRef.current; if (el && lipitJos.current) el.scrollTop = el.scrollHeight }, [lista, inaltime])
   // Textarea creste odata cu textul (pana la max-height din CSS), fara bara de redimensionare.
@@ -519,7 +521,7 @@ function Indicatori() {
   )
 }
 
-export default function PlanProiectModule({ firma }: Props) {
+export default function PlanProiectModule({ firma, inPopup = false }: Props) {
   const [tab, setTab] = useState<Tab>('intreaba')
   const [stari, setStari] = useState<StarePlan[]>([])
   const [lipsaMigrare, setLipsaMigrare] = useState(false)
@@ -544,25 +546,41 @@ export default function PlanProiectModule({ firma }: Props) {
     return ACTIVITATI.filter(a => statusImplicitActivitate(a, L).intarziere && !ok(a.cheie)).length + OBLIGATII.filter(o => termenDepasit(o) && !ok(o.cheie)).length
   }, [stari])
 
+  // In pop-up (480 px) etichetele sunt scurte, ca sa incapa toate cele 4 sectiuni
   const TABURI: { k: Tab; label: string; icon: Parameters<typeof Icon>[0]['name']; count?: number }[] = [
-    { k: 'intreaba', label: 'Întreabă proiectul', icon: 'sparkles' },
-    { k: 'memorie', label: 'Memoria proiectului', icon: 'history' },
-    { k: 'plan', label: 'Plan și obligații', icon: 'calendar', count: deConfirmat },
-    { k: 'indicatori', label: 'Indicatori și tranșe', icon: 'chart' },
+    { k: 'intreaba', label: inPopup ? 'Întreabă' : 'Întreabă proiectul', icon: 'sparkles' },
+    { k: 'memorie', label: inPopup ? 'Memorie' : 'Memoria proiectului', icon: 'history' },
+    { k: 'plan', label: inPopup ? 'Plan' : 'Plan și obligații', icon: 'calendar', count: deConfirmat },
+    { k: 'indicatori', label: inPopup ? 'Indicatori' : 'Indicatori și tranșe', icon: 'chart' },
   ]
-  return (
-    <div className={css.root}>
-      <div className={css.tabs} role="tablist" aria-label="Secțiuni proiect">
-        {TABURI.map(t => (
-          <button key={t.k} type="button" role="tab" aria-selected={tab === t.k} className={css.tab} onClick={() => setTab(t.k)}>
-            <Icon name={t.icon} size={15} />{t.label}{t.count ? <span className={css.count} title={`${t.count} de confirmat`}>{t.count}</span> : null}
-          </button>
-        ))}
-      </div>
-      {tab === 'intreaba' && <Intreaba firma={firma} />}
+  const continut = (
+    <>
+      {tab === 'intreaba' && <Intreaba firma={firma} inPopup={inPopup} />}
       {tab === 'memorie' && <MemorieProiect firma={firma} />}
       {tab === 'plan' && <Plan firma={firma} stari={stari} salveaza={salveaza} achizitii={achizitii} lipsaMigrare={lipsaMigrare} />}
       {tab === 'indicatori' && <Indicatori />}
+    </>
+  )
+  const taburi = (
+    <div className={css.tabs} role="tablist" aria-label={inPopup ? 'Secțiuni proiect (fereastră)' : 'Secțiuni proiect'}>
+      {TABURI.map(t => (
+        <button key={t.k} type="button" role="tab" aria-selected={tab === t.k} className={css.tab} onClick={() => setTab(t.k)}>
+          <Icon name={t.icon} size={15} />{t.label}{t.count ? <span className={css.count} title={`${t.count} de confirmat`}>{t.count}</span> : null}
+        </button>
+      ))}
+    </div>
+  )
+  if (inPopup) return <div className={`${css.root} ${css.rootPopup}`}>{taburi}<div className={css.popBody}>{continut}</div></div>
+  return (
+    <div className={css.root}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        {taburi}
+        <button type="button" className="btn btn-sm" onClick={() => window.dispatchEvent(new CustomEvent('cf:proiect-popup', { detail: { open: true } }))}
+          title="Deschide Plan & AI proiect într-o fereastră care rămâne deschisă peste celelalte pagini (Alt+P)">
+          <span aria-hidden>⧉</span> Deschide ca pop-up
+        </button>
+      </div>
+      {continut}
     </div>
   )
 }
