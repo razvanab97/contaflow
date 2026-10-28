@@ -20,3 +20,14 @@ export function linkDocument(url: string): Promise<Link | null> {
   setTimeout(() => cache.delete(url), 50 * 60_000)
   return p
 }
+
+// Rutele de descarcare pe care vizualizatorul pop-up stie sa le deschida (aceleasi ca in /api/document-url): un link catre
+// ele, din orice loc (ex. raspunsurile asistentului AI), se deschide in pop-up in loc sa descarce fisierul.
+const CAI_VIZUALIZABILE = new Set([
+  '/api/chitante/document', '/api/tranzactii/document', '/api/checklist/docs', '/api/emag', '/api/documente-generale',
+  '/api/bonuri/download', '/api/facturi-asteptate/download', '/api/model-documente/download', '/api/inbox-facturi/global/document',
+  '/api/proiect-documente/download', '/api/extras/pdf-download', '/api/firma-date/download',
+])
+export function esteDocumentVizualizabil(url: string): boolean {
+  try { return CAI_VIZUALIZABILE.has(new URL(url, 'http://local').pathname) } catch { return false }
+}

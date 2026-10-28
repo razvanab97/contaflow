@@ -1,6 +1,7 @@
 'use client'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { deschideDocument, esteDocumentVizualizabil } from '@/lib/vizualizare'
 import Icon from '@/components/ui/Icon'
 import css from './AsistentAI.module.css'
 
@@ -22,6 +23,8 @@ function inline(t: string) {
     if (p.startsWith('**') && p.endsWith('**')) return <strong key={i}>{p.slice(2, -2)}</strong>
     if (p.startsWith('`') && p.endsWith('`')) return <code key={i}>{p.slice(1, -1)}</code>
     const l = p.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/)
+    // Documente: previzualizare in pop-up (vizualizatorul global), nu descarcare; href ramane pentru „deschide in tab nou”.
+    if (l && esteDocumentVizualizabil(l[2])) return <a key={i} href={l[2]} target="_blank" rel="noreferrer" onClick={e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); deschideDocument(l[2], l[1]) }}>{l[1]}</a>
     if (l) return l[2].startsWith('/api/') || /^https?:/.test(l[2]) ? <a key={i} href={l[2]} target="_blank" rel="noreferrer">{l[1]}</a> : l[2].startsWith('/') ? <Link key={i} href={l[2]}>{l[1]}</Link> : <Fragment key={i}>{l[1]}</Fragment>
     return <Fragment key={i}>{p}</Fragment>
   })
@@ -65,7 +68,8 @@ export default function AsistentAI({ open, onClose, firme, firma, luna, cale }: 
   useEffect(() => { const el = input.current; if (!el) return; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }, [text])
   useEffect(() => {
     if (!open) return
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    // Esc inchide mai intai previzualizarea documentului (vizualizatorul global), nu si asistentul de sub ea
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('.doc-viewer')) onClose() }
     window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc)
   }, [open, onClose])
 

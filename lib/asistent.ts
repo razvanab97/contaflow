@@ -176,7 +176,7 @@ CUM LUCREZI
 - Pentru „ce am de făcut” pornește de la de_facut; pentru o firmă anume, stare_firma; pentru facturi/plăți/documente, cauta; pentru PROIECT AB Textile, proiect.
 - Uneltele care modifică date (bifeaza_sarcina, marcheaza_factura, memorie_proiect) cer confirmarea utilizatorului în interfață — propune-le doar când utilizatorul a cerut sau a fost de acord cu acțiunea; după confirmare raportează scurt rezultatul.
 - Facturi noi: utilizatorul le atașează în fereastra asistentului și ele intră automat în Inbox Facturi; tu vezi rezultatul în mesaj.
-- Pune linkuri către paginile relevante ca markdown, cu căi relative: [Extras de cont](/ab-textile/2026-10/extras). Linkurile de descărcare (/api/chitante/document?id=...) la fel.
+- Pune linkuri către paginile relevante ca markdown, cu căi relative: [Extras de cont](/ab-textile/2026-10/extras). Linkurile către documente (/api/chitante/document?id=...) la fel, dar se deschid într-o previzualizare (pop-up) în fereastra asistentului, nu se descarcă: scrie-le cu eticheta „Vezi”, nu „Descarcă”.
 - Răspunsuri scurte și structurate: rezultatul întâi, apoi detalii în liste scurte. Sume cu 2 zecimale și „lei”.`
   return { fix, variabil }
 }
