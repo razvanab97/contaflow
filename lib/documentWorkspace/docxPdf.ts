@@ -101,6 +101,39 @@ function corecteaza(root: Document, L: Layout) {
   })
 }
 
+// Word muta pe pagina urmatoare tot ce nu mai incape DEASUPRA subsolului (si subsolul se repeta pe fiecare pagina). docx-preview
+// nu pagineaza singur - o sectiune creste cat e textul -, iar subsolul e asezat jos, deci ultimele randuri (ex. „Reprezentant legal”,
+// „Data”) ajungeau peste siglele si textul din subsol. Aici impartim fiecare sectiune in pagini: rezerva de jos = cat e mai mare
+// dintre marginea paginii si inaltimea subsolului; ce depaseste trece, impreuna cu restul, intr-o sectiune noua (cu antet si subsol).
+function pagineaza(root: Document, L: Layout) {
+  const pt = 4 / 3
+  for (const sec0 of Array.from(root.querySelectorAll<HTMLElement>('section.docx'))) {
+    let sec = sec0
+    for (let pagina = 0; pagina < 30; pagina++) {
+      const art = sec.querySelector<HTMLElement>(':scope > article')
+      if (!art) break
+      const cs = root.defaultView!.getComputedStyle(sec)
+      const inaltimePagina = parseFloat(cs.minHeight)
+      if (!inaltimePagina) break
+      const subsol = sec.querySelector<HTMLElement>(':scope > footer')
+      const rezerva = Math.max(parseFloat(cs.paddingBottom) || 0, (subsol ? subsol.getBoundingClientRect().height : 0) + L.footer * pt)
+      const limita = inaltimePagina - rezerva
+      const sus = sec.getBoundingClientRect().top
+      const copii = Array.from(art.children) as HTMLElement[]
+      const idx = copii.findIndex(c => c.getBoundingClientRect().bottom - sus > limita + 0.5)
+      if (idx <= 0) break // totul incape, sau primul element nu incape nici singur pe o pagina (nu avem ce muta)
+      const urmatoarea = sec.cloneNode(true) as HTMLElement
+      const articolNou = urmatoarea.querySelector(':scope > article') as HTMLElement
+      Array.from(articolNou.children).forEach((c, i) => { if (i < idx) c.remove() })
+      copii.slice(idx).forEach(c => c.remove())
+      // paragrafele goale de la inceputul paginii noi (distantele dintre blocuri) nu se mai pun sus
+      while (articolNou.firstElementChild && articolNou.firstElementChild.tagName === 'P' && !articolNou.firstElementChild.textContent?.replace(/[\u200b\s]/g, '') && !articolNou.firstElementChild.querySelector('img')) articolNou.firstElementChild.remove()
+      sec.after(urmatoarea)
+      sec = urmatoarea
+    }
+  }
+}
+
 // Randeaza .docx-ul intr-un document (iframe) gata de tiparit; intoarce marimea paginii.
 export async function randeazaDocx(target: Document, buffer: ArrayBuffer): Promise<{ width: string; height: string }> {
   const { renderAsync } = await import('docx-preview')
@@ -110,6 +143,7 @@ export async function randeazaDocx(target: Document, buffer: ArrayBuffer): Promi
   await renderAsync(pregatit, box, undefined, { inWrapper: true, breakPages: true, experimental: true, renderHeaders: true, renderFooters: true, ignoreLastRenderedPageBreak: true, useBase64URL: true })
   await target.fonts.ready
   corecteaza(target, layout)
+  pagineaza(target, layout)
   const sec = target.querySelector<HTMLElement>('section.docx')
   return { width: sec?.style.width || '210mm', height: sec?.style.minHeight || sec?.style.height || '297mm' }
 }
