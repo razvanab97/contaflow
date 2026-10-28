@@ -3,7 +3,7 @@ import { finalizeazaDocument } from '@/lib/denumire-document'
 import { PDFDocument } from 'pdf-lib'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { isEonApartment99, isEonInvoice, isEonPdf, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
+import { isEonInvoice, isEonPdf, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
 import { sumaRonDinPdf } from '@/lib/suma-ron-pdf'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
@@ -402,7 +402,7 @@ export async function POST(req: NextRequest) {
   // Numele fisierului trebuie sa spuna ce e documentul — preferam ce a citit AI-ul (furnizor + numar
   // document), completat cu ce ai scris tu manual; daca AI-ul n-a gasit nimic, ramane eticheta tipului
   let effectiveSupplier = supplier || genericExtractie?.furnizor || ''
-  if (!isAirbnbCsv && file.type === 'application/pdf' && (isEonInvoice(effectiveSupplier) || await isEonPdf(Buffer.from(uploadBytes))) && !isEonApartment99(genericExtractie?.locatie) && await pdfPageCount(Buffer.from(uploadBytes)) > 1) {
+  if (!isAirbnbCsv && file.type === 'application/pdf' && (isEonInvoice(effectiveSupplier) || await isEonPdf(Buffer.from(uploadBytes))) && await pdfPageCount(Buffer.from(uploadBytes)) > 1) {
     uploadBytes = await keepOnlyFirstPage(Buffer.from(uploadBytes))
     genericExtractie = await analyzeGenericDoc(uploadBytes, file.type)
     effectiveSupplier = supplier || genericExtractie?.furnizor || effectiveSupplier

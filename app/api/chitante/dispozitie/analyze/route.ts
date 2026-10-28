@@ -3,7 +3,7 @@ import { finalizeazaDocument } from '@/lib/denumire-document'
 import Anthropic from '@anthropic-ai/sdk'
 import { createHash } from 'node:crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { isEonApartment99, isEonInvoice, isEonPdf, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
+import { isEonInvoice, isEonPdf, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
     console.log(`[Invoice PDF] Provider: ${extracted.supplier || 'necunoscut'}`)
     if (file.type === 'application/pdf') {
       const originalPageCount = await pdfPageCount(bytes)
-      if ((isEonInvoice(extracted.supplier) || await isEonPdf(bytes)) && !isEonApartment99(extracted.apartment) && originalPageCount > 1) {
+      if ((isEonInvoice(extracted.supplier) || await isEonPdf(bytes)) && originalPageCount > 1) {
         console.log(`[Invoice PDF] Original pages: ${originalPageCount}`)
         console.log('[Invoice PDF] Splitting E.ON invoice')
         console.log('[Invoice PDF] Keeping page 1 only')

@@ -16,23 +16,14 @@ export async function isEonPdf(pdf: Buffer | Uint8Array): Promise<boolean> {
   try {
     const { text } = await extractText(await getDocumentProxy(new Uint8Array(pdf)), { mergePages: false })
     const primele = (Array.isArray(text) ? text.slice(0, 2).join('\n') : String(text)).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    return /E\.ON Energie Romania|seria MS EON|eon\.ro\/(contact|myline)|\bE\.ON (ACTUAL|Myline)\b/i.test(primele)
+    return /E\.ON Energie Romania|seria [A-Z]{1,3} EON|eon\.ro\/(contact|myline)|\bE\.ON (ACTUAL|Myline|DUO|Duo|GAZ|Gaz)\b/i.test(primele)
   } catch {
     return false
   }
 }
 
-export function isEonApartment99(apartmentOrAddress: string | null | undefined): boolean {
-  const normalized = String(apartmentOrAddress || '')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-  const digitsOnly = normalized.replace(/\D/g, '')
-  return digitsOnly === '99' || /\b(ap|apt|apartament|apartment)\.?\s*99\b/.test(normalized)
-}
-
-// Reconstruiește fizic PDF-ul păstrând DOAR prima pagină - pentru facturile E.ON, ale căror
-// pagini 2+ (grafice de consum, condiții generale) nu trebuie salvate, trimise la AI sau afișate.
+// Reconstruiește fizic PDF-ul păstrând DOAR prima pagină - pentru TOATE facturile E.ON (curent, gaz, Duo),
+// fără excepții: prima pagină are suma, numărul facturii, scadența și data emiterii; paginile 2+ (grafice de consum, condiții generale) nu trebuie salvate, trimise la AI sau afișate.
 // Nu doar "ignoră" paginile suplimentare - creează un document nou, validat, cu exact 1 pagină.
 export async function keepOnlyFirstPage(pdfBuffer: Buffer): Promise<Buffer> {
   const sourcePdf = await PDFDocument.load(pdfBuffer)
