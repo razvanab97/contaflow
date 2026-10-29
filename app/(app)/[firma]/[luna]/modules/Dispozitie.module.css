@@ -29,6 +29,13 @@
 .dpMeta { font-size: var(--fs-xs); color: var(--text-secondary); margin-top: 2px; }
 .dpSum { font-size: var(--fs-lg); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dpActions { display: flex; gap: 4px; }
+.dpWrap { display: grid; gap: 6px; }
+.muta { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; margin: 0 0 4px 12px; padding: 12px 14px; border-radius: 12px; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
+.mutaField { display: grid; gap: 5px; font-size: var(--fs-xs); font-weight: 650; color: var(--text-secondary); }
+.mutaActions { display: flex; gap: 6px; }
+.mutaHint { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.5; }
+.mutaOk { margin-bottom: 8px; padding: 9px 12px; border-radius: 10px; background: var(--success-soft); color: var(--success); font-size: var(--fs-sm); font-weight: 600; }
+@media (max-width: 640px) { .muta { grid-template-columns: minmax(0, 1fr); margin-left: 0; } }
 .iconBtn { display: grid; place-items: center; height: 32px; min-width: 32px; padding: 0 9px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); font: inherit; font-size: var(--fs-xs); font-weight: 650; cursor: pointer; text-decoration: none; white-space: nowrap; }
 .iconBtn:hover { border-color: var(--accent); color: var(--accent); }
 .iconDanger:hover { border-color: var(--danger); color: var(--danger); }

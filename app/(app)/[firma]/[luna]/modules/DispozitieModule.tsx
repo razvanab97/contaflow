@@ -6,6 +6,7 @@ import { Proprietar } from '@/lib/firma-config'
 import EditorDispozitie from './EditorDispozitie'
 import Icon from '@/components/ui/Icon'
 import css from './Dispozitie.module.css'
+import { accountingPeriod, workMonthLabel } from '@/lib/accounting-period'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string; luna_id?:string; cui?:string|null; nrRegCom?:string|null; adresa?:string|null; judet?:string|null; tara?:string|null }
 interface Props { firma: Firma; firmeDisponibile: Firma[]; lunaId: string; tasks: TaskItem[]; proprietari?: Proprietar[] }
@@ -133,6 +134,12 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
   const [templateBusy, setTemplateBusy] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
   const [error, setError] = useState('')
+  // Mutarea unei dispozitii pe alta luna (ex. emisa pe luna gresita de contabilizare)
+  const [mutaId, setMutaId] = useState('')
+  const [luni, setLuni] = useState<{ id: string; luna: string }[]>([])
+  const [mutaTinta, setMutaTinta] = useState('')
+  const [mutaBusy, setMutaBusy] = useState(false)
+  const [mutaMesaj, setMutaMesaj] = useState('')
   const [trasFacturi, setTrasFacturi] = useState(false)
   const invoiceRef = useRef<HTMLInputElement>(null)
   const buletinRef = useRef<HTMLInputElement>(null)
@@ -210,6 +217,37 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
     if (!res.ok) setError(data.error || 'Eroare ștergere')
     else { setNumber(data.nextNumber || number); setDocuments(prev=>prev.filter(e=>e.id!==doc.id)) }
     setDeletingId('')
+  }
+
+  const lunaCurenta = luni.find(l => l.id === selectedLunaId)?.luna || ''
+  const lunaUrm = (k: string) => { const [y, m] = k.split('-').map(Number); const d = new Date(Date.UTC(y, m, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}` }
+  // Lunile deja deschise + luna urmatoare celei curente (se deschide automat la mutare)
+  const optiuniLuni = [...new Set([...luni.map(l => l.luna), ...(lunaCurenta ? [lunaUrm(lunaCurenta)] : [])])].filter(k => k !== lunaCurenta).sort().reverse()
+  const etichetaLunaDp = (k: string) => `${workMonthLabel(k)} · contabilizare ${accountingPeriod(k).monthName} ${accountingPeriod(k).year}${luni.some(l => l.luna === k) ? '' : ' (lună nouă)'}`
+
+  async function deschideMuta(doc: DispDoc) {
+    setMutaMesaj('')
+    if (mutaId === doc.id) { setMutaId(''); return }
+    setMutaId(doc.id)
+    const res = await fetch(`/api/chitante/dispozitie/muta?firmaId=${encodeURIComponent(selectedFirma.id)}`)
+    const data = await res.json().catch(() => ({}))
+    const lista: { id: string; luna: string }[] = data.luni || []
+    setLuni(lista)
+    const cur = lista.find(l => l.id === selectedLunaId)?.luna
+    setMutaTinta(cur ? lunaUrm(cur) : '')
+  }
+
+  async function mutaDispozitie(doc: DispDoc) {
+    if (!mutaTinta) return
+    setMutaBusy(true); setError('')
+    const res = await fetch('/api/chitante/dispozitie/muta', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      id:doc.id, firmaId:selectedFirma.id, luna:mutaTinta, firmaNume:selectedFirma.nume, cif:legal.cif, nrRegCom:legal.nrRegCom, adresa:legal.adresa,
+    }) })
+    const data = await res.json().catch(() => ({}))
+    setMutaBusy(false)
+    if (!res.ok) { setError(data.error || 'Dispoziția nu a putut fi mutată'); return }
+    setDocuments(prev => prev.filter(e => e.id !== doc.id)); setNumber(data.nextNumber || number); setMutaId('')
+    setMutaMesaj(`Dispoziția nr. ${data.vechi} a fost mutată pe ${workMonthLabel(mutaTinta)} (contabilizare ${accountingPeriod(mutaTinta).monthName} ${accountingPeriod(mutaTinta).year}) ca nr. ${data.numar}${data.facturi ? `, cu ${data.facturi} ${data.facturi === 1 ? 'factură atașată' : 'facturi atașate'}` : ''}.`)
   }
 
   async function generate() {
@@ -382,10 +420,12 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
 
         <div className={css.issued}>
           <div className={css.secHead}><span className={css.eyebrow}>Dispoziții emise · {documents.length}</span></div>
+          {mutaMesaj && <div className={css.mutaOk}>✓ {mutaMesaj}</div>}
           {documents.length === 0 && <div className={css.muted}>Nu există încă dispoziții generate pentru luna selectată.</div>}
           <div className={css.dpList}>
             {documents.map(doc => (
-              <div key={doc.id} className={css.dp}>
+              <div key={doc.id} className={css.dpWrap}>
+              <div className={css.dp}>
                 <div className={css.dpNr}>{doc.numar_document}</div>
                 <div className={css.dpMain}>
                   <div className={css.dpTitle} title={dpLabel(doc)}>{dpLabel(doc)}</div>
@@ -396,8 +436,25 @@ export default function DispozitieModule({ firma, firmeDisponibile, lunaId, task
                   <a className={css.iconBtn} href={`/api/chitante/dispozitie?download=${encodeURIComponent(doc.id)}`} title="Descarcă dispoziția (cu anexele)" aria-label="Descarcă"><Icon name="download" size={14} /></a>
                   <button className={css.iconBtn} onClick={()=>setEditorDoc(doc)} title="Vezi facturile, modifică sumele sau șterge facturi">Editează</button>
                   <button className={css.iconBtn} onClick={()=>editDisposition(doc)} title="Încarcă dispoziția în formularul de mai jos">Modifică</button>
+                  <button className={css.iconBtn} onClick={()=>deschideMuta(doc)} aria-expanded={mutaId===doc.id} title="Mută dispoziția (cu facturile atașate) pe altă lună">Mută</button>
                   <button className={`${css.iconBtn} ${css.iconDanger}`} onClick={()=>deleteDisposition(doc)} disabled={deletingId===doc.id} aria-label="Șterge dispoziția" title="Șterge dispoziția">{deletingId===doc.id?'…':'✕'}</button>
                 </div>
+              </div>
+              {mutaId === doc.id && (
+                <div className={css.muta}>
+                  <label className={css.mutaField}>Mută pe luna
+                    <select className={css.input} value={mutaTinta} onChange={e=>setMutaTinta(e.target.value)} disabled={!luni.length}>
+                      {!luni.length && <option value="">Se încarcă lunile…</option>}
+                      {optiuniLuni.map(k => <option key={k} value={k}>{etichetaLunaDp(k)}</option>)}
+                    </select>
+                  </label>
+                  <div className={css.mutaActions}>
+                    <button className={`${css.btn} ${css.btnPrimary}`} onClick={()=>mutaDispozitie(doc)} disabled={!mutaTinta||mutaBusy}>{mutaBusy ? 'Se mută…' : 'Mută'}</button>
+                    <button className={css.btn} onClick={()=>setMutaId('')}>Anulează</button>
+                  </div>
+                  <div className={css.mutaHint}>Pe luna aleasă primește următorul număr liber, iar PDF-ul se regenerează cu numărul nou; facturile atașate se mută împreună cu ea. Data dispoziției ({doc.data?.date ? String(doc.data.date).split('-').reverse().join('.') : '—'}) rămâne aceeași — o poți schimba apoi cu „Modifică”.</div>
+                </div>
+              )}
               </div>
             ))}
           </div>
