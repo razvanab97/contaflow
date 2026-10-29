@@ -2,6 +2,7 @@
 import { deschideDocument } from '@/lib/vizualizare'
 import { useEffect, useRef, useState } from 'react'
 import CopyButton from '@/components/CopyButton'
+import ActeFirma from './ActeFirma'
 
 interface FirmaDate {
   id: string; nume: string
@@ -39,10 +40,7 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<FirmaDate>>({})
-  const [savingCert, setSavingCert] = useState(false)
-  const [previewCert, setPreviewCert] = useState(false)
   const [previewBuletinIds, setPreviewBuletinIds] = useState<Set<string>>(new Set())
-  const certInputRef = useRef<HTMLInputElement>(null)
   const buletinInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   function toggleBuletinPreview(id: string) {
@@ -69,22 +67,6 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
     setFirma({ ...firma, ...draft })
     setEditing(false)
     await fetch('/api/firma-date', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  }
-
-  async function uploadCertificat(file: File) {
-    setSavingCert(true)
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('firmaId', firmaId)
-    const res = await fetch('/api/firma-date/upload-certificat', { method: 'POST', body: fd })
-    setSavingCert(false)
-    if (res.ok) load()
-  }
-
-  async function renameCertificat(certificat_nume: string) {
-    if (!firma || !certificat_nume.trim() || certificat_nume === firma.certificat_nume) return
-    setFirma({ ...firma, certificat_nume })
-    await fetch('/api/firma-date', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, certificat_nume }) })
   }
 
   async function addProprietar() {
@@ -153,37 +135,7 @@ export default function DatePersonaleClient({ firmaId }: { firmaId: string }) {
 
         <div style={{ height: '1px', background: 'var(--c-1e1e1e)', margin: '16px 0' }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ width: '120px', flexShrink: 0, fontSize: 'var(--fs-sm)', color: 'var(--c-888888)' }}>Certificat</span>
-          {firma.certificat_path ? (
-            <>
-              <input
-                defaultValue={firma.certificat_nume ?? ''}
-                onBlur={e => renameCertificat(e.target.value.trim())}
-                style={{ flex: 1, fontSize: 'var(--fs-md)', color: 'var(--c-dddddd)', background: 'transparent', border: 'none', outline: 'none', padding: 0 }}
-              />
-              {isPreviewable(firma.certificat_nume) && (
-                <button onClick={() => deschideDocument(`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`, 'Certificat de înregistrare')} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: previewCert ? 'var(--c-dddddd)' : 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>{previewCert ? 'Ascunde' : 'Vezi'}</button>
-              )}
-              <a href={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}`} style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-blue)', textDecoration: 'none' }}>Descarcă</a>
-            </>
-          ) : (
-            <span style={{ flex: 1, fontSize: 'var(--fs-md)', color: 'var(--c-555555)' }}>Niciun fișier încărcat</span>
-          )}
-          <input ref={certInputRef} type="file" accept="application/pdf,image/*" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }}
-            onChange={e => e.target.files?.[0] && uploadCertificat(e.target.files[0])} />
-          <button onClick={() => certInputRef.current?.click()} disabled={savingCert} style={{
-            fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--c-888888)', background: 'var(--c-161616)', border: '1px solid var(--c-262626)',
-            borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
-          }}>{savingCert ? '...' : (firma.certificat_path ? 'Înlocuiește' : 'Încarcă')}</button>
-        </div>
-        {previewCert && firma.certificat_path && (
-          isPreviewable(firma.certificat_nume) === 'pdf' ? (
-            <iframe src={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}&preview=1`} style={{ width: '100%', height: '65vh', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-md)', marginTop: '10px', background: 'var(--c-ffffff)' }} />
-          ) : (
-            <img src={`/api/firma-date/download?tip=certificat&firmaId=${firmaId}&preview=1`} alt="Certificat" style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-md)', marginTop: '10px', background: 'var(--c-ffffff)' }} />
-          )
-        )}
+        <ActeFirma firmaId={firmaId} />
       </div>
 
       {/* Proprietari */}

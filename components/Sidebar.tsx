@@ -119,6 +119,10 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
               <span className="nav-icon"><Icon name="check" /></span>
               <span className="nav-text">Sistem de lucru</span>
             </Link>
+            <Link href="/op-uri" className={`nav-item${pathname?.startsWith('/op-uri') ? ' is-active' : ''}`} aria-current={pathname?.startsWith('/op-uri') ? 'page' : undefined}>
+              <span className="nav-icon"><Icon name="receipt" /></span>
+              <span className="nav-text">OP-uri</span>
+            </Link>
           </div>
 
           {/* Firme */}
