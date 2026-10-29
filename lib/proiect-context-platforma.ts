@@ -4,10 +4,11 @@ import { STEP_LABELS, TASKS, PROFILE_FIELDS } from '@/lib/proiect-workflow'
 import { readWorkflow } from '@/lib/proiect-workflow-store'
 import { workMonthLabel, accountingPeriodLabel } from '@/lib/accounting-period'
 import { CATEGORII, type Punct } from '@/lib/mail-contabil-tipuri'
+import { bugetText, type PlataProiect } from '@/lib/proiect-buget'
 
 // "Intreaba proiectul" - TOT ce exista in platforma pentru AB TEXTILE, ca AI-ul sa nu mai ceara
 // utilizatorului sa copieze date care sunt deja in ContaFlow:
-//  - PROIECT AB Textile (firma proiect-ab-textile): obligatii recurente pe fiecare luna (scadenta,
+//  - PROIECT AB Textile (firma proiect-ab-textile): executia bugetului (buget AA3 minus platile), obligatii recurente pe fiecare luna (scadenta,
 //    trimis, documente atasate, sugestii din mail), rutina lunara (pasii din proiect-workflow),
 //    achizitiile cu documentele pe etape, toate rapoartele lunare + campurile custom, documentele;
 //  - AB TEXTILE S.R.L. (firma ab-textile, contabilitatea firmei): pe luni - progres module,
@@ -123,6 +124,9 @@ async function contextProiect(sb: SupabaseClient, firmaId: string): Promise<stri
     }
   }
   for (const s of sugAch) ach.push(`  · sugestie din mail neconfirmată (${s.actiune}${s.denumire ? ' ' + s.denumire : ''}${s.status_propus ? ' → ' + s.status_propus : ''}${s.valoare != null ? ', ' + lei(Number(s.valoare)) + ' lei' : ''}, ${s.incredere}): „${scurt(s.sursa_subiect, 80)}” ${dataRo(s.sursa_data)} — ${scurt(s.sursa_rezumat, 160)}`)
+  // Executia bugetului: bugetul AA3 minus platile din registrul proiect_plati (tab-ul „Buget și plăți”)
+  const plati = await citeste(sb.from('proiect_plati').select('id,linie_cod,data,suma,sursa,descriere,beneficiar').eq('firma_id', firmaId))
+  out.push(`## ${bugetText(plati.map(p => ({ ...p, suma: Number(p.suma) })) as PlataProiect[])}`)
   out.push(`## Achiziții (modulul „Achiziții”, detaliat)\n${ach.join('\n') || '(nicio achiziție)'}`)
 
   // Toate rapoartele lunare

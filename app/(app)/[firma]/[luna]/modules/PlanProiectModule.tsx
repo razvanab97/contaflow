@@ -7,12 +7,14 @@ import { BUGET_ACHIZITII, VERSIUNE_BUGET, coduriDin } from '@/lib/achizitii-proc
 import { CATEGORII_MEMORIE, extrageMemorieDinRaspuns, type Memorie } from '@/lib/proiect-memorie'
 import Icon from '@/components/ui/Icon'
 import css from './PlanProiect.module.css'
+import BugetProiect from './BugetProiect'
+import { executieBuget, type PlataProiect } from '@/lib/proiect-buget'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 // inPopup = fereastra pop-up globala (components/shell/ProiectPopup.tsx): fara lunaId si fara calculele de inaltime/derulare ale paginii
 interface Props { firma: Firma; lunaId?: string; inPopup?: boolean }
 interface Intrebare { id?: string; intrebare: string; raspuns: string; created_at?: string; inCurs?: boolean }
-type Tab = 'intreaba' | 'memorie' | 'plan' | 'indicatori'
+type Tab = 'intreaba' | 'memorie' | 'plan' | 'buget' | 'indicatori'
 
 const lei = (n: number) => `${n.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} lei`
 const dataRo = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('ro-RO')
@@ -526,10 +528,13 @@ export default function PlanProiectModule({ firma, inPopup = false }: Props) {
   const [stari, setStari] = useState<StarePlan[]>([])
   const [lipsaMigrare, setLipsaMigrare] = useState(false)
   const [achizitii, setAchizitii] = useState<{ linie_buget?: string | null; status: string }[]>([])
+  const [platiIntarziate, setPlatiIntarziate] = useState(0)
 
   useEffect(() => {
     fetch(`/api/proiect/plan-stari?firmaId=${firma.id}`).then(r => r.json()).then(d => { setStari(d.stari || []); setLipsaMigrare(!!d.lipsaMigrare) }).catch(() => {})
     fetch(`/api/achizitii?firmaId=${firma.id}`).then(r => r.json()).then(d => setAchizitii(Array.isArray(d) ? d : [])).catch(() => {})
+    // Numarul de pe tab-ul Buget: lunile trecute cu plati planificate fara OP inregistrat
+    fetch(`/api/proiect/plati?firmaId=${firma.id}`).then(r => r.json()).then(d => setPlatiIntarziate(new Set(executieBuget(((d.plati || []) as PlataProiect[]).map(p => ({ ...p, suma: Number(p.suma) }))).urmatoare.filter(u => u.intarziat).map(u => u.luna)).size)).catch(() => {})
   }, [firma.id])
 
   const salveaza = useCallback(async (cheie: string, p: Partial<StarePlan>) => {
@@ -546,11 +551,12 @@ export default function PlanProiectModule({ firma, inPopup = false }: Props) {
     return ACTIVITATI.filter(a => statusImplicitActivitate(a, L).intarziere && !ok(a.cheie)).length + OBLIGATII.filter(o => termenDepasit(o) && !ok(o.cheie)).length
   }, [stari])
 
-  // In pop-up (480 px) etichetele sunt scurte, ca sa incapa toate cele 4 sectiuni
+  // In pop-up (480 px) etichetele sunt scurte, ca sa incapa toate cele 5 sectiuni
   const TABURI: { k: Tab; label: string; icon: Parameters<typeof Icon>[0]['name']; count?: number }[] = [
     { k: 'intreaba', label: inPopup ? 'Întreabă' : 'Întreabă proiectul', icon: 'sparkles' },
     { k: 'memorie', label: inPopup ? 'Memorie' : 'Memoria proiectului', icon: 'history' },
     { k: 'plan', label: inPopup ? 'Plan' : 'Plan și obligații', icon: 'calendar', count: deConfirmat },
+    { k: 'buget', label: inPopup ? 'Buget' : 'Buget și plăți', icon: 'bank', count: platiIntarziate },
     { k: 'indicatori', label: inPopup ? 'Indicatori' : 'Indicatori și tranșe', icon: 'chart' },
   ]
   const continut = (
@@ -558,6 +564,7 @@ export default function PlanProiectModule({ firma, inPopup = false }: Props) {
       {tab === 'intreaba' && <Intreaba firma={firma} inPopup={inPopup} />}
       {tab === 'memorie' && <MemorieProiect firma={firma} />}
       {tab === 'plan' && <Plan firma={firma} stari={stari} salveaza={salveaza} achizitii={achizitii} lipsaMigrare={lipsaMigrare} />}
+      {tab === 'buget' && <BugetProiect firma={firma} onIntarziate={setPlatiIntarziate} />}
       {tab === 'indicatori' && <Indicatori />}
     </>
   )
@@ -565,7 +572,7 @@ export default function PlanProiectModule({ firma, inPopup = false }: Props) {
     <div className={css.tabs} role="tablist" aria-label={inPopup ? 'Secțiuni proiect (fereastră)' : 'Secțiuni proiect'}>
       {TABURI.map(t => (
         <button key={t.k} type="button" role="tab" aria-selected={tab === t.k} className={css.tab} onClick={() => setTab(t.k)}>
-          <Icon name={t.icon} size={15} />{t.label}{t.count ? <span className={css.count} title={`${t.count} de confirmat`}>{t.count}</span> : null}
+          <Icon name={t.icon} size={15} />{t.label}{t.count ? <span className={css.count} title={t.k === 'buget' ? `${t.count} luni trecute cu plăți planificate fără OP` : `${t.count} de confirmat`}>{t.count}</span> : null}
         </button>
       ))}
     </div>

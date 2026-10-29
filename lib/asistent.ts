@@ -33,7 +33,7 @@ export const TOOLS: Anthropic.Tool[] = [
     input_schema: { type: 'object', properties: { firma: firmaProp, luna: lunaProp, doar_fara_document: { type: 'boolean' }, tip: { type: 'string', enum: ['credit', 'debit'] }, text: { type: 'string' } }, required: ['firma'], additionalProperties: false } },
   { name: 'facturi_neplatite', description: 'Facturile de furnizor neplătite ale unei firme (din Facturi restante și Inbox Facturi), cu sumă, dată și ID-ul documentului.',
     input_schema: { type: 'object', properties: { firma: firmaProp }, required: ['firma'], additionalProperties: false } },
-  { name: 'proiect', description: 'Tot contextul PROIECT AB Textile (fonduri europene PROSOCIAL): obligații recurente pe luni, rutina lunii, achiziții cu documente, rapoarte lunare, contabilitatea AB TEXTILE SRL.',
+  { name: 'proiect', description: 'Tot contextul PROIECT AB Textile (fonduri europene PROSOCIAL): execuția bugetului (cât s-a plătit, cât rămâne pe fiecare linie, plăți care urmează), obligații recurente pe luni, rutina lunii, achiziții cu documente, rapoarte lunare, contabilitatea AB TEXTILE SRL.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'bifeaza_sarcina', description: 'MODIFICĂ: bifează sau debifează o sarcină (task) dintr-un modul al unei firme pe o lună. Cere confirmarea utilizatorului. Folosește cheile exacte din stare_firma.',
     input_schema: { type: 'object', properties: { firma: firmaProp, luna: lunaProp, task_key: { type: 'string' }, completat: { type: 'boolean' } }, required: ['firma', 'task_key', 'completat'], additionalProperties: false } },
