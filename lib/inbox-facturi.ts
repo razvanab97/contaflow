@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { FIRMA_CONFIGS } from '@/lib/firma-config'
 import { pdfPageCount, extractPageRange } from '@/lib/pdfBatch'
-import { isEonInvoice, isEonPdf, keepOnlyFirstPage } from '@/lib/eonInvoice'
+import { isFirstPageOnlyInvoice, isFirstPageOnlyPdf, keepOnlyFirstPage } from '@/lib/eonInvoice'
 import { finalizeazaDocument } from '@/lib/denumire-document'
 import { diferentaSuma, furnizorInDescriere } from '@/lib/tranzactii-potrivire'
 import { cursuriBnrSigur } from '@/lib/curs-bnr'
@@ -390,7 +390,7 @@ export async function importInboxDocument({
       extracted,
     }
   }
-  if (mediaType === 'application/pdf' && (isEonInvoice(extracted?.furnizor) || await isEonPdf(Buffer.from(bytes))) && await pdfPageCount(Buffer.from(bytes)) > 1) {
+  if (mediaType === 'application/pdf' && (isFirstPageOnlyInvoice(extracted?.furnizor) || await isFirstPageOnlyPdf(Buffer.from(bytes))) && await pdfPageCount(Buffer.from(bytes)) > 1) {
     bytes = await keepOnlyFirstPage(Buffer.from(bytes))
     extracted = await analyzeInvoice(bytes, mediaType, candidates)
   }

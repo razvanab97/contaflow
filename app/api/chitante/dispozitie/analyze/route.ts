@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createHash } from 'node:crypto'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { cursuriBnrSigur, inLei } from '@/lib/curs-bnr'
-import { isEonInvoice, isEonPdf, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
+import { isFirstPageOnlyInvoice, isFirstPageOnlyPdf, keepOnlyFirstPage, pdfPageCount } from '@/lib/eonInvoice'
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
@@ -169,15 +169,15 @@ export async function POST(req: NextRequest) {
     console.log(`[Invoice PDF] Provider: ${extracted.supplier || 'necunoscut'}`)
     if (file.type === 'application/pdf') {
       const originalPageCount = await pdfPageCount(bytes)
-      if ((isEonInvoice(extracted.supplier) || await isEonPdf(bytes)) && originalPageCount > 1) {
+      if ((isFirstPageOnlyInvoice(extracted.supplier) || await isFirstPageOnlyPdf(bytes)) && originalPageCount > 1) {
         console.log(`[Invoice PDF] Original pages: ${originalPageCount}`)
-        console.log('[Invoice PDF] Splitting E.ON invoice')
+        console.log('[Invoice PDF] Splitting E.ON / Hidroelectrica invoice')
         console.log('[Invoice PDF] Keeping page 1 only')
         try {
           bytes = await keepOnlyFirstPage(bytes)
         } catch (splitError) {
-          console.error('[Invoice PDF] E.ON split failed:', splitError)
-          return NextResponse.json({ error:'Nu am putut procesa factura E.ON: splitarea paginilor a eșuat' }, { status:500 })
+          console.error('[Invoice PDF] E.ON / Hidroelectrica split failed:', splitError)
+          return NextResponse.json({ error:'Nu am putut procesa factura (E.ON / Hidroelectrica): splitarea paginilor a eșuat' }, { status:500 })
         }
         console.log('[Invoice PDF] Final pages: 1')
         // Re-extragem din PDF-ul cu o singură pagină, ca datele folosite mai jos (sumă, apartament,
