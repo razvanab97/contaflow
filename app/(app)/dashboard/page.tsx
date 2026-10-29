@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import DocumenteGenerale from '@/components/DocumenteGenerale'
 import FirmaQuickInfo from '@/components/FirmaQuickInfo'
+import ActePersonale from '@/components/ActePersonale'
 import FacturiLocaleGlobal from '@/components/FacturiLocaleGlobal'
 import FirmaTrend from '@/components/FirmaTrend'
 import ProgressRing from '@/components/ui/ProgressRing'
@@ -207,6 +208,8 @@ export default async function Dashboard() {
             </div>
           )
         })}
+        {/* Actele personale (buletin etc.), in acelasi format ca firmele */}
+        <ActePersonale />
       </div>
 
       <div className="section-title" style={{ marginTop: '32px' }}><h2>Documente</h2></div>
