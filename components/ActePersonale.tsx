@@ -3,25 +3,15 @@ import { useEffect, useRef, useState } from 'react'
 import CopyButton from './CopyButton'
 import { deschideDocument } from '@/lib/vizualizare'
 import type { ActPersonal } from '@/lib/acte-personale'
+import css from './dashboard/Dashboard.module.css'
 
-// Actele personale pe Dashboard, ca o carte langa firme: datele citite din act (de copiat) + Vezi / Descarcă.
-// Un act nou (buletin, pasaport, permis) se adauga cu „+ Act personal”: AI citeste datele, se pot corecta cu „Editează”.
+// Actele personale (buletin etc.) pe Dashboard, primele dupa bara lunii - datele de care e nevoie la toate firmele,
+// ca banda subtire: CNP, CI, domiciliu, emis de, valabilitate (de copiat) + Vezi / Descarcă. „Editează” corecteaza
+// datele citite de AI; „+ Act personal” adauga alt act (buletin, pasaport, permis).
 
 const dataRo = (iso: string | null) => iso ? iso.split('-').reverse().join('.') : ''
 const zilePana = (iso: string | null) => iso ? Math.ceil((Date.parse(iso + 'T23:59:59') - Date.now()) / 86400000) : null
 
-const RANDURI: { label: string; val: (a: ActPersonal) => string; cheie?: keyof ActPersonal }[] = [
-  { label: 'CNP', val: a => a.cnp || '', cheie: 'cnp' },
-  { label: 'Serie și nr.', val: a => [a.serie, a.numar].filter(Boolean).join(' ') },
-  { label: 'Nume', val: a => a.nume || '', cheie: 'nume' },
-  { label: 'Prenume', val: a => a.prenume || '', cheie: 'prenume' },
-  { label: 'Data nașterii', val: a => dataRo(a.data_nasterii) },
-  { label: 'Loc naștere', val: a => a.loc_nastere || '', cheie: 'loc_nastere' },
-  { label: 'Domiciliu', val: a => a.domiciliu || '', cheie: 'domiciliu' },
-  { label: 'Emis de', val: a => a.emis_de || '', cheie: 'emis_de' },
-  { label: 'Valabilitate', val: a => [dataRo(a.valabil_de), dataRo(a.valabil_pana)].filter(Boolean).join(' – ') },
-  { label: 'Cetățenie', val: a => [a.cetatenie, a.sex ? `sex ${a.sex}` : ''].filter(Boolean).join(' · '), cheie: 'cetatenie' },
-]
 const EDITABILE: { k: keyof ActPersonal; label: string; tip?: string }[] = [
   { k: 'tip', label: 'Tip act' }, { k: 'nume', label: 'Nume' }, { k: 'prenume', label: 'Prenume' }, { k: 'cnp', label: 'CNP' },
   { k: 'serie', label: 'Serie' }, { k: 'numar', label: 'Număr' }, { k: 'data_nasterii', label: 'Data nașterii', tip: 'date' }, { k: 'sex', label: 'Sex' },
@@ -29,76 +19,60 @@ const EDITABILE: { k: keyof ActPersonal; label: string; tip?: string }[] = [
   { k: 'valabil_de', label: 'Valabil de la', tip: 'date' }, { k: 'valabil_pana', label: 'Valabil până la', tip: 'date' },
 ]
 
-function Rand({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '28px' }}>
-      <span style={{ width: '104px', flexShrink: 0, fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{label}</span>
-      <span title={value} style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-md)', color: value ? 'var(--text-primary)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '—'}</span>
-      {value && <CopyButton value={value} />}
-    </div>
-  )
-}
-
-function CarteAct({ a, onChange, onDelete }: { a: ActPersonal; onChange: (a: ActPersonal) => void; onDelete: () => void }) {
+function Banda({ a, onChange, onDelete }: { a: ActPersonal; onChange: (a: ActPersonal) => void; onDelete: () => void }) {
   const [edit, setEdit] = useState(false)
   const [draft, setDraft] = useState<Partial<ActPersonal>>({})
+  const [stergere, setStergere] = useState(false)
   const z = zilePana(a.valabil_pana)
-  const numeComplet = [a.prenume, a.nume].filter(Boolean).join(' ') || a.fisier_nume
+  const numeComplet = [a.prenume, a.nume].filter(Boolean).map(s => s!.toLowerCase().replace(/(^|[\s-])\p{L}/gu, c => c.toUpperCase())).join(' ') || a.fisier_nume
   const ini = [a.prenume, a.nume].map(s => (s || '').trim()[0] || '').join('').toUpperCase() || 'CI'
-  const url = (preview = false) => `/api/acte-personale?download=${a.id}${preview ? '&preview=1' : ''}`
+  const url = `/api/acte-personale?download=${a.id}`
+  const chips = [
+    ['CNP', a.cnp || ''], ['CI', [a.serie, a.numar].filter(Boolean).join(' ')], ['Domiciliu', a.domiciliu || ''],
+    ['Emis de', a.emis_de || ''], ['Valabil', [dataRo(a.valabil_de), dataRo(a.valabil_pana)].filter(Boolean).join(' – ')],
+  ].filter(([, v]) => v)
 
   async function salveaza() {
     const r = await fetch('/api/acte-personale', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: a.id, ...draft }) })
     const d = await r.json().catch(() => ({}))
-    if (r.ok) { onChange(d.act); setEdit(false) }
+    if (r.ok) { onChange(d.act); setEdit(false); setDraft({}) }
   }
 
   return (
-    <div className="card card-interactive" style={{ display: 'flex', flexDirection: 'column', padding: '20px', position: 'relative', overflow: 'hidden' }}>
-      <div aria-hidden="true" style={{ position: 'absolute', inset: '0 0 auto 0', height: '120px', background: 'radial-gradient(420px 120px at 85% -20%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%)', pointerEvents: 'none' }} />
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', position: 'relative' }}>
-        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--r-md)', flexShrink: 0, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--accent)' }}>{ini}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em', lineHeight: 1.3 }}>{numeComplet}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
-            <span className="badge">{a.tip}</span>
-            {z != null && (z < 0 ? <span className="badge badge-danger">expirat</span> : z <= 90 ? <span className="badge badge-warning">expiră în {z} zile</span> : <span className="badge badge-success">valabil până la {dataRo(a.valabil_pana)}</span>)}
-          </div>
+    <section className={css.id} aria-label={`${a.tip} ${numeComplet}`}>
+      <div className={css.idWho}>
+        <span className={css.avatar}>{ini}</span>
+        <div style={{ minWidth: 0 }}>
+          <b>{numeComplet}</b>
+          <small>{a.tip}{z != null && <> · <span style={{ fontWeight: 600, color: z < 0 ? 'var(--danger)' : z <= 90 ? 'var(--warning)' : 'var(--success)' }}>{z < 0 ? 'expirat' : z <= 90 ? `expiră în ${z} zile` : `valabil până la ${dataRo(a.valabil_pana)}`}</span></>}</small>
         </div>
       </div>
-
-      <div style={{ height: '16px' }} />
-      <div className="eyebrow" style={{ marginBottom: '8px' }}>Date personale</div>
-      {edit ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', background: 'var(--surface-sunken)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-md)', padding: '10px' }}>
+      <div className={css.idAct}>
+        {edit ? <>
+          <button type="button" className="btn btn-sm btn-primary" onClick={salveaza}>Salvează</button>
+          <button type="button" className="btn btn-sm" onClick={() => { setEdit(false); setDraft({}); setStergere(false) }}>Anulează</button>
+          {stergere
+            ? <button type="button" className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={onDelete}>Confirm ștergerea</button>
+            : <button type="button" className="btn btn-sm btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => setStergere(true)}>Șterge</button>}
+        </> : <>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => setEdit(true)}>Editează</button>
+          <button type="button" className="btn btn-sm" onClick={() => deschideDocument(url, `${a.tip} ${numeComplet}`)}>Vezi</button>
+          <a className="btn btn-sm btn-primary" href={url} download>Descarcă PDF</a>
+        </>}
+      </div>
+      <div className={css.chips}>
+        {chips.map(([k, v]) => (
+          <span key={k} className={css.chip}><span className={css.chipK}>{k}</span><span className={`${css.chipV} ${/^(\d|[A-Z]{2} \d)/.test(v) ? css.mono : ''}`} title={v}>{v}</span><CopyButton value={v} /></span>
+        ))}
+      </div>
+      {edit && (
+        <div className={css.idEdit}>
           {EDITABILE.map(({ k, label, tip }) => (
-            <label key={k} style={{ display: 'grid', gap: '3px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 600 }}>{label}
-              <input type={tip || 'text'} defaultValue={String(a[k] ?? '')} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
-                style={{ height: '30px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', font: 'inherit', fontSize: 'var(--fs-md)', padding: '0 8px', minWidth: 0 }} />
-            </label>
+            <label key={k}>{label}<input type={tip || 'text'} defaultValue={String(a[k] ?? '')} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} /></label>
           ))}
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'var(--surface-sunken)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-md)', padding: '8px 8px 8px 12px' }}>
-          {RANDURI.map(r => <Rand key={r.label} label={r.label} value={r.val(a)} />)}
-        </div>
       )}
-
-      <div style={{ marginTop: 'auto', paddingTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{a.fisier_nume}</span>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {edit ? <>
-            <button className="btn btn-sm btn-primary" onClick={salveaza}>Salvează</button>
-            <button className="btn btn-sm" onClick={() => { setEdit(false); setDraft({}) }}>Anulează</button>
-            <button className="btn btn-sm btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => { if (confirm(`Ștergi ${a.tip.toLowerCase()} (${numeComplet})?`)) onDelete() }}>Șterge</button>
-          </> : <>
-            <button className="btn btn-sm btn-ghost" onClick={() => setEdit(true)}>Editează</button>
-            <button className="btn btn-sm" onClick={() => deschideDocument(url(), `${a.tip} ${numeComplet}`)}>Vezi</button>
-            <a className="btn btn-sm btn-primary" href={url()} download>Descarcă</a>
-          </>}
-        </div>
-      </div>
-    </div>
+    </section>
   )
 }
 
@@ -124,16 +98,15 @@ export default function ActePersonale() {
     if (r.ok) setActe(prev => (prev || []).filter(a => a.id !== id))
   }
 
-  if (!acte) return null
+  if (!acte) return <div className="skeleton" style={{ height: 70, borderRadius: 16, marginBottom: 16 }} />
   return (
     <>
-      {acte.map(a => <CarteAct key={a.id} a={a} onChange={n => setActe(prev => (prev || []).map(x => x.id === n.id ? n : x))} onDelete={() => sterge(a.id)} />)}
-      <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px', borderStyle: 'dashed' }}>
-        <div style={{ fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--text-primary)' }}>+ Act personal</div>
-        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Buletin, pașaport sau permis (PDF sau poză). AI citește datele de pe el; le poți corecta apoi cu „Editează”.</div>
+      {acte.map(a => <Banda key={a.id} a={a} onChange={n => setActe(prev => (prev || []).map(x => x.id === n.id ? n : x))} onDelete={() => sterge(a.id)} />)}
+      <div className={css.idAdd}>
         <input ref={inputRef} type="file" accept="application/pdf,image/jpeg,image/png" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && adauga(e.target.files[0])} />
-        <button className="btn btn-sm" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? 'Se citește actul…' : 'Alege fișierul'}</button>
-        {eroare && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>{eroare}</div>}
+        <button type="button" className="btn btn-sm btn-ghost" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? 'Se citește actul…' : '+ Act personal'}</button>
+        {!acte.length && <span>Buletin, pașaport sau permis — AI citește datele de pe el.</span>}
+        {eroare && <span style={{ color: 'var(--danger)' }}>{eroare}</span>}
       </div>
     </>
   )

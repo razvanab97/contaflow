@@ -1,89 +1,121 @@
-import Link from 'next/link'
 import DocumenteGenerale from '@/components/DocumenteGenerale'
-import FirmaQuickInfo from '@/components/FirmaQuickInfo'
 import ActePersonale from '@/components/ActePersonale'
 import FacturiLocaleGlobal from '@/components/FacturiLocaleGlobal'
-import FirmaTrend from '@/components/FirmaTrend'
-import ProgressRing from '@/components/ui/ProgressRing'
-import CountUp from '@/components/ui/CountUp'
-import DeFacut from '@/components/DeFacut'
 import DateLipsaDocumente from '@/components/DateLipsaDocumente'
+import PulsLuna, { type Semnal } from '@/components/dashboard/PulsLuna'
+import FirmeTabel, { type RandFirma, type ModulRand } from '@/components/dashboard/FirmeTabel'
 import { getDeFacut } from '@/lib/de-facut'
 import { dbSelect } from '@/lib/db'
 import { getRestanteCount } from '@/lib/queries'
 import { getStardeskDiscrepanteCount } from '@/lib/stardeskVerify'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
-import { rgb, legibil, tint } from '@/lib/colors'
+import { getServiceSupabase } from '@/lib/supabase/server'
+import { platiFaraOp } from '@/lib/ordine-plata-server'
 import { accountingFullLabel, accountingPeriodLabel, currentWorkMonthKey } from '@/lib/accounting-period'
 
 export const dynamic = 'force-dynamic'
 
-const LUNA = currentWorkMonthKey()
-function ini(n: string) { return n.split(' ').filter((w:string) => /^[A-ZĂÎȘȚ]/.test(w)).slice(0,2).map((w:string)=>w[0]).join('') }
+// Dashboard: bara lunii (progres + semnale), buletinul (datele cerute la toate firmele), firmele ca tabel
+// (un rand pe firma, detaliile la click), apoi documentele.
+
+function ini(n: string) { return n.split(' ').filter((w: string) => /^[A-ZĂÎȘȚ]/.test(w)).slice(0, 2).map((w: string) => w[0]).join('') }
+const ibanAfisat = (v: string | null) => v ? v.replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim() : ''
+
+// Cate documente (facturi/bonuri/avize) nu au suma - aceeasi regula ca /api/documente/completeaza
+async function documenteFaraSuma(): Promise<number> {
+  try {
+    const { count } = await getServiceSupabase().from('documente').select('id', { count: 'exact', head: true })
+      .is('suma', null).in('tip_document', ['factura', 'bon', 'chitanta', 'aviz_plata', 'invoice']).is('extractie_incercata_at', null)
+      .or('fisier_tip.eq.application/pdf,fisier_tip.like.image/*,fisier_nume.ilike.*.pdf,fisier_nume.ilike.*.jpg,fisier_nume.ilike.*.jpeg,fisier_nume.ilike.*.png')
+    return count || 0
+  } catch { return 0 }
+}
 
 export default async function Dashboard() {
+  const LUNA = currentWorkMonthKey()
   const [firme, luni] = await Promise.all([
     dbSelect('firme', { eq: { activa: true }, order: 'created_at' }),
     dbSelect('luni_contabile', { select: '*' }),
   ])
 
   const luniMap: Record<string, any> = {}
-  for (const l of luni) luniMap[`${l.firma_id}_${l.luna?.slice(0,7)}`] = l
+  for (const l of luni) luniMap[`${l.firma_id}_${l.luna?.slice(0, 7)}`] = l
 
-  // Doar luna curenta pe firmele active - task_stari creste nemarginit in timp, nu are rost
-  // sa citim tot istoricul doar ca sa aratam procentul lunii afisate acum pe Dashboard.
+  // Doar luna curenta pe firmele active - task_stari creste nemarginit in timp.
   const lunaIds = firme.map((f: any) => luniMap[`${f.id}_${LUNA}`]?.id).filter(Boolean)
-  const [taskStariRaw, proprietariRaw] = await Promise.all([
-    lunaIds.length ? dbSelect('task_stari', { select: 'luna_id,completat', in: { luna_id: lunaIds } }) : Promise.resolve([]),
+  const sb = getServiceSupabase()
+  const [taskStariRaw, proprietariRaw, acteRaw, faraOp, faraSuma] = await Promise.all([
+    lunaIds.length ? dbSelect('task_stari', { select: 'luna_id,task_key,completat', in: { luna_id: lunaIds } }) : Promise.resolve([]),
     dbSelect('proprietari', { select: 'id,firma_id,nume,serie_ci,numar_ci', order: 'ordine' }),
+    sb.from('documente').select('id,firma_id,fisier_nume,furnizor').eq('modul', 'acte_firma').order('created_at').then(r => r.data || [], () => []),
+    platiFaraOp(sb).then(x => x.length, () => 0),
+    documenteFaraSuma(),
   ])
 
-  const taskCount: Record<string, { done: number }> = {}
-  for (const ts of taskStariRaw) {
-    if (!taskCount[ts.luna_id]) taskCount[ts.luna_id] = { done: 0 }
-    if (ts.completat) taskCount[ts.luna_id].done++
-  }
+  const bifate = new Map<string, Set<string>>()
+  for (const ts of taskStariRaw) if (ts.completat) { if (!bifate.has(ts.luna_id)) bifate.set(ts.luna_id, new Set()); bifate.get(ts.luna_id)!.add(ts.task_key) }
 
-  const proprietariMap: Record<string, any[]> = {}
-  for (const p of proprietariRaw) {
-    if (!proprietariMap[p.firma_id]) proprietariMap[p.firma_id] = []
-    proprietariMap[p.firma_id].push(p)
-  }
-
-  // Restante per firma - vizibile direct din dashboard, fara sa intri in fiecare firma.
   const restanteCounts = await Promise.all(firme.map((f: any) => getRestanteCount(f.id)))
   const restanteMap: Record<string, number> = {}
   firme.forEach((f: any, i: number) => { restanteMap[f.id] = restanteCounts[i] })
-  const totalRestante = restanteCounts.reduce((sum, n) => sum + n, 0)
-  const firmeCuRestante = restanteCounts.filter(n => n > 0).length
 
-  // Discrepante de pret 5StarDesk (factura gasita, dar suma nu corespunde cu borderoul) - trebuie
-  // sesizate la timp, cat mai poate fi emisa o factura corectata, nu doar la o verificare manuala.
+  // Discrepante de pret 5StarDesk (factura gasita, dar suma nu corespunde cu borderoul)
   const discrepanteCounts = await Promise.all(firme.map((f: any) => {
     const lunaData = luniMap[`${f.id}_${LUNA}`]
     const are5stardesk = getFirmaModules(f.slug).some((m: any) => m.slug === '5stardesk')
     return are5stardesk && lunaData ? getStardeskDiscrepanteCount(lunaData.id) : Promise.resolve(0)
   }))
-  const discrepanteMap: Record<string, number> = {}
-  firme.forEach((f: any, i: number) => { discrepanteMap[f.id] = discrepanteCounts[i] })
-  const totalDiscrepante = discrepanteCounts.reduce((sum, n) => sum + n, 0)
-  const firmeCuDiscrepante = discrepanteCounts.filter(n => n > 0).length
 
-  const ll = accountingFullLabel(LUNA)
   const deFacut = await getDeFacut(firme.map((f: any) => ({ id: f.id, slug: f.slug, nume: f.nume, culoare: f.culoare })), LUNA, restanteMap)
-  const urgente = deFacut.filter(i => i.urgenta !== 'normal').length
 
-  // Agregate pentru banda de indicatori - calculate o singura data, aceleasi formule ca pe carduri.
-  const firmeStats = firme.map((f: any) => {
+  const randuri: RandFirma[] = firme.map((f: any, i: number) => {
     const lunaData = luniMap[`${f.id}_${LUNA}`]
+    const facute = (lunaData && bifate.get(lunaData.id)) || new Set<string>()
+    const modules = getFirmaModules(f.slug)
+    let urmatorGasit = false
+    const module: ModulRand[] = modules.map(m => {
+      const href = `/${f.slug}/${LUNA}/${m.slug}`
+      if (!m.tasks.length) return { slug: m.slug, label: m.label, href, stare: 'none' }
+      if (m.tasks.every(t => facute.has(t.key))) return { slug: m.slug, label: m.label, href, stare: 'ok' }
+      if (!urmatorGasit) { urmatorGasit = true; return { slug: m.slug, label: m.label, href, stare: 'next' } }
+      return { slug: m.slug, label: m.label, href, stare: 'todo' }
+    })
+    const urm = modules.find(m => module.find(x => x.slug === m.slug)?.stare === 'next')
+    const ramase = urm ? urm.tasks.filter(t => !facute.has(t.key)) : []
     const total = getFirmaTotalTasks(f.slug)
-    const done = lunaData ? (taskCount[lunaData.id]?.done || 0) : 0
-    return { total, done, finalizata: !!lunaData && total > 0 && done >= total }
+    const proprietari = proprietariRaw.filter((p: any) => p.firma_id === f.id)
+    return {
+      id: f.id, slug: f.slug, nume: f.nume, culoare: f.culoare, initiale: ini(f.nume) || f.nume.slice(0, 2).toUpperCase(),
+      done: lunaData ? Math.min(modules.flatMap(m => m.tasks).filter(t => facute.has(t.key)).length, total) : 0, total, lunaInceputa: !!lunaData,
+      restante: restanteCounts[i], discrepante: discrepanteCounts[i],
+      linkLuna: `/${f.slug}/${LUNA}`, luna: LUNA,
+      urmator: urm ? { label: urm.label, detaliu: ramase.length === 1 ? ramase[0].label : `${ramase.length} sarcini rămase`, href: `/${f.slug}/${LUNA}/${urm.slug}` } : null,
+      module,
+      deFacut: deFacut.filter(it => it.firmaId === f.id),
+      date: f.cui ? [
+        { label: 'CUI', value: f.cui || '', mono: true },
+        { label: 'ONRC', value: f.nr_reg_com || '', mono: true },
+        { label: 'Adresă', value: [f.adresa, f.judet, f.tara].filter(Boolean).join(', ') },
+        ...(f.iban_ron ? [{ label: 'IBAN RON', value: ibanAfisat(f.iban_ron), mono: true }] : []),
+        ...(f.iban_eur ? [{ label: 'IBAN EUR', value: ibanAfisat(f.iban_eur), mono: true }] : []),
+        ...proprietari.map((p: any) => ({ label: p.nume, value: `${p.serie_ci ?? ''} ${p.numar_ci ?? ''}`.trim(), mono: true })),
+      ] : [],
+      acte: (acteRaw as any[]).filter(a => a.firma_id === f.id).map(a => ({ id: a.id, nume: a.fisier_nume, tip: a.furnizor || 'Act' })),
+    }
   })
-  const sumTotal = firmeStats.reduce((s, x) => s + x.total, 0)
-  const sumDone = firmeStats.reduce((s, x) => s + x.done, 0)
-  const pctGlobal = sumTotal > 0 ? Math.round((sumDone / sumTotal) * 100) : 0
-  const firmeFinalizate = firmeStats.filter(x => x.finalizata).length
+
+  // Semnalele din bara lunii: doar ce cere atentie, fiecare duce unde se rezolva
+  const totalRestante = restanteCounts.reduce((s, n) => s + n, 0)
+  const totalDiscrepante = discrepanteCounts.reduce((s, n) => s + n, 0)
+  const primaCu = (arr: number[]) => firme[arr.findIndex(n => n > 0)]?.slug
+  const semnale: Semnal[] = [
+    ...(totalRestante ? [{ n: totalRestante, text: totalRestante === 1 ? 'factură restantă' : 'facturi restante', href: `#firma-${primaCu(restanteCounts)}`, ton: 'bad' as const }] : []),
+    ...(totalDiscrepante ? [{ n: totalDiscrepante, text: `${totalDiscrepante === 1 ? 'discrepanță' : 'discrepanțe'} preț 5StarDesk`, href: `#firma-${primaCu(discrepanteCounts)}`, ton: 'warn' as const }] : []),
+    ...(faraOp ? [{ n: faraOp, text: faraOp === 1 ? 'plată fără OP' : 'plăți fără OP', href: '/op-uri', ton: 'warn' as const }] : []),
+    ...(faraSuma ? [{ n: faraSuma, text: faraSuma === 1 ? 'document fără sumă' : 'documente fără sumă', href: '#documente', ton: 'info' as const }] : []),
+  ]
+  const deschisaImplicit = randuri.find(r => r.deFacut.some(it => it.urgenta === 'depasit'))?.slug || null
+  const ramaseTotal = randuri.reduce((s, r) => s + Math.max(0, r.total - r.done), 0)
 
   return (
     <main className="page animate-in">
@@ -91,128 +123,15 @@ export default async function Dashboard() {
         <div className="page-header-main">
           <div className="eyebrow" style={{ marginBottom: '8px' }}>Contabilitate {accountingPeriodLabel(LUNA)}</div>
           <h1 className="hero-title">Bună, Razvan</h1>
-          <p className="page-subtitle">{ll} · {firme.length} firme active</p>
+          <p className="page-subtitle">{accountingFullLabel(LUNA)} · {firme.length} firme active{ramaseTotal ? ` · mai ai ${ramaseTotal} task-uri până închizi luna` : ' · luna e închisă la toate firmele'}</p>
         </div>
       </div>
 
-      {/* Indicatori lunari - tot ce cere atentie, vizibil fara sa intri in fiecare firma */}
-      <div className="stat-grid stagger" style={{ marginBottom: '28px' }}>
-        <div className="stat">
-          <div className="stat-label">Progres general</div>
-          <div className="stat-value" style={{ color: pctGlobal === 100 ? 'var(--success)' : 'var(--text-primary)' }}><CountUp value={pctGlobal} suffix="%" /></div>
-          <div className="progress" style={{ marginTop: '10px' }}><span style={{ width: `${pctGlobal}%` }} /></div>
-          <div className="stat-hint">{sumDone}/{sumTotal} task-uri</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Firme finalizate</div>
-          <div className="stat-value"><CountUp value={firmeFinalizate} /><span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>/{firme.length}</span></div>
-          <div className="stat-hint">luna aceasta</div>
-        </div>
-        <div className="stat" style={totalRestante > 0 ? { borderColor: 'color-mix(in srgb, var(--danger) 35%, var(--border))' } : undefined}>
-          <div className="stat-label">Facturi restante</div>
-          <div className="stat-value" style={{ color: totalRestante > 0 ? 'var(--danger)' : 'var(--text-primary)' }}><CountUp value={totalRestante} /></div>
-          <div className="stat-hint">{totalRestante > 0 ? `în ${firmeCuRestante} ${firmeCuRestante === 1 ? 'firmă' : 'firme'}` : 'nimic restant'}</div>
-        </div>
-        <div className="stat" style={totalDiscrepante > 0 ? { borderColor: 'color-mix(in srgb, var(--warning) 35%, var(--border))' } : undefined}>
-          <div className="stat-label">Discrepanțe 5StarDesk</div>
-          <div className="stat-value" style={{ color: totalDiscrepante > 0 ? 'var(--warning)' : 'var(--text-primary)' }}><CountUp value={totalDiscrepante} /></div>
-          <div className="stat-hint">{totalDiscrepante > 0 ? `de preț, în ${firmeCuDiscrepante} ${firmeCuDiscrepante === 1 ? 'firmă' : 'firme'}` : 'fără diferențe de preț'}</div>
-        </div>
-      </div>
+      <PulsLuna firme={randuri.map(r => ({ slug: r.slug, nume: r.nume, culoare: r.culoare, done: r.done, total: r.total }))} semnale={semnale} />
+      <ActePersonale />
+      <FirmeTabel firme={randuri} implicit={deschisaImplicit} />
 
-      <div className="section-title">
-        <h2>De făcut</h2>
-        <span style={{ fontSize: 'var(--fs-sm)', color: urgente ? 'var(--warning)' : 'var(--text-muted)' }}>{deFacut.length ? `${deFacut.length} ${deFacut.length === 1 ? 'acțiune' : 'acțiuni'}${urgente ? ` · ${urgente} ${urgente === 1 ? 'urgentă' : 'urgente'}` : ''}` : ''}</span>
-        <Link href="/sistem-de-lucru" style={{ marginLeft: 'auto', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)' }}>Sistem de lucru — pașii în ordine →</Link>
-      </div>
-      <DeFacut items={deFacut} />
-
-      <div className="section-title"><h2>Firme</h2></div>
-      <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: '12px', alignItems: 'start' }}>
-        {firme.map((f: any) => {
-          const lunaData = luniMap[`${f.id}_${LUNA}`]
-          const total = getFirmaTotalTasks(f.slug)
-          const done = lunaData ? (taskCount[lunaData.id]?.done || 0) : 0
-          const pct = total > 0 ? Math.round((done / total) * 100) : 0
-          const r = rgb(f.culoare)
-          const isFinalizata = pct === 100 && lunaData
-          const isStarted = done > 0
-          const statusLabel = !lunaData ? 'Neîncepută' : isFinalizata ? 'Finalizată' : isStarted ? 'În lucru' : 'Neîncepută'
-          const statusClass = isFinalizata ? 'badge badge-success' : isStarted ? 'badge badge-warning' : 'badge'
-          const modules = getFirmaModules(f.slug)
-          const restante = restanteMap[f.id] || 0
-          const discrepante = discrepanteMap[f.id] || 0
-
-          return (
-            <div key={f.id} className="card card-interactive" style={{ display: 'flex', flexDirection: 'column', padding: '20px', position: 'relative', overflow: 'hidden' }}>
-              <div aria-hidden="true" style={{ position: 'absolute', inset: '0 0 auto 0', height: '120px', background: `radial-gradient(420px 120px at 85% -20%, ${tint(r, .16, .1)}, transparent 70%)`, pointerEvents: 'none' }} />
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                <div style={{
-                  width: '40px', height: '40px', borderRadius: 'var(--r-md)', flexShrink: 0,
-                  background: `${tint(r,.14,.16)}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 'var(--fs-md)', fontWeight: 700, color: legibil(f.culoare),
-                }}>
-                  {ini(f.nume)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em', lineHeight: 1.3 }}>
-                    {f.nume}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
-                    <span className={statusClass}>{statusLabel}</span>
-                    {restante > 0 && <span className="badge badge-danger">{restante} restante</span>}
-                    {discrepante > 0 && <span className="badge badge-warning">{discrepante} discrepanțe preț</span>}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                  <ProgressRing pct={pct} size={60} stroke={6} color={f.culoare} title={`${pct}% din task-urile lunii`} />
-                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
-                    <span className="num">{done}/{total}</span> task-uri
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ height: '16px' }} />
-              <FirmaTrend firmaId={f.id} firmaSlug={f.slug} luna={LUNA} culoare={f.culoare} />
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '16px' }} aria-label={`${modules.length} module`}>
-                {modules.map(m => (
-                  <span key={m.slug} style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, padding: '3px 7px', borderRadius: 'var(--r-sm)', background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
-                    {m.label}
-                  </span>
-                ))}
-              </div>
-
-              {/* Proiectele (fără CUI - nu sunt firme reale) nu au date de firmă de arătat */}
-              {f.cui && (
-                <FirmaQuickInfo
-                  cui={f.cui}
-                  nrRegCom={f.nr_reg_com}
-                  adresa={f.adresa}
-                  judet={f.judet}
-                  tara={f.tara}
-                  proprietari={proprietariMap[f.id] || []}
-                />
-              )}
-
-              <div style={{ marginTop: 'auto', paddingTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
-                  {lunaData ? `${modules.length} module · ${total} task-uri lunare` : 'Lună neîncepută'}
-                </span>
-                <Link href={`/${f.slug}/${LUNA}`} className="btn btn-sm" style={{ position: 'relative', zIndex: 1 }}>
-                  Deschide luna
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                </Link>
-              </div>
-            </div>
-          )
-        })}
-        {/* Actele personale (buletin etc.), in acelasi format ca firmele */}
-        <ActePersonale />
-      </div>
-
-      <div className="section-title" style={{ marginTop: '32px' }}><h2>Documente</h2></div>
+      <div className="section-title" id="documente" style={{ scrollMarginTop: '80px' }}><h2>Documente</h2></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(440px, 100%), 1fr))', gap: '12px', alignItems: 'start' }}>
         <FacturiLocaleGlobal firme={firme.map((f: any) => ({ id: f.id, nume: f.nume }))} />
         <DateLipsaDocumente />
