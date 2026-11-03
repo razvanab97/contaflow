@@ -1,4 +1,5 @@
 import type { Draft, FormKind, Workflow } from './proiect-workflow'
+import { CONSTATARI_STANDARD } from './achizitii-receptie-prefill'
 
 export interface PurchaseContext { denumire: string; nota: string | null; valoare: number | null }
 export interface FieldRecommendation { value: string; source: string }
@@ -29,6 +30,7 @@ export function purchaseRecommendations(kind: FormKind, state: Workflow, purchas
   if (purchase?.denumire.trim() && !result.achizitie) result.achizitie = { value: purchase.denumire.trim(), source: 'Denumirea salvată a achiziției' }
   const type = purchase?.nota?.match(/(?:^|\s)Tip: (Produse|Servicii|Lucrări)\./)?.[1]
   if (type && !result.tip) result.tip = { value: type, source: 'Nota salvată la crearea achiziției' }
+  if (kind === 'receptie' && !result.constatari) result.constatari = { value: CONSTATARI_STANDARD, source: 'Modelul aprobat al Anexei 3' }
   return result
 }
 

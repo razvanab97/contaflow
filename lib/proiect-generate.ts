@@ -36,7 +36,8 @@ export async function generateProjectDoc(kind:FormKind,draft:Draft,profile:Recor
  const rows=draft.lines.map((l,i)=>{
   const amounts=purchaseAmounts(l.price,l.qty,l.rate,l.priceMode||'net')
   const price=amounts?.netUnit||0;const total=amounts?.netTotal||0
-  const vat=amounts?`\nValoare fără TVA: ${money(amounts.netTotal)} lei\nTVA 21%: ${money(amounts.vatTotal)} lei\nTotal cu TVA: ${money(amounts.grossTotal)} lei`:''
+  // PV-ul de receptie arata doar valoarea fara TVA (ca in modelul aprobat, v20); cererea de oferta pastreaza si TVA-ul.
+  const vat=!amounts?'':kind==='receptie'?`\nValoare fără TVA: ${money(amounts.netTotal)} lei`:`\nValoare fără TVA: ${money(amounts.netTotal)} lei\nTVA 21%: ${money(amounts.vatTotal)} lei\nTotal cu TVA: ${money(amounts.grossTotal)} lei`
   const operator=l.supplier+(l.website?`\n(${l.website})`:'')
   if(styledNoteRow){
    const line:Record<string,string>={index:String(i+1),operator:l.supplier.trim()+(siteComplet(l.website||'')?`\n(${siteComplet(l.website||'')})`:''),product:l.product,specs:specificatii(l.specs),qty:l.qty,price:grupat(price),total:grupat(total)}
@@ -48,7 +49,10 @@ export async function generateProjectDoc(kind:FormKind,draft:Draft,profile:Recor
  xml=styledNoteRow?xml.replace(styledNoteRow,()=>rows):xml.replace('%%ROWS%%',()=>rows)
  if(kind==='nota')xml=runsJustificare(xml,draft.fields.justificare||'')
  const selectedType=(draft.fields.tip||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase()
- const values:Record<string,string>={...profile,...draft.fields,nr_oferte:String(draft.lines.length),tip:(draft.fields.tip||'').trim(),tip_produse:selectedType==='produse'?'☒':'☐',tip_servicii:selectedType==='servicii'?'☒':'☐',tip_lucrari:selectedType==='lucrari'?'☒':'☐',semnatura_furnizor:draft.fields.comanda_online==='da'?'':'Prestator / Furnizor,\nSemnătura: ____________________'}
+ const values:Record<string,string>={...profile,...draft.fields,nr_oferte:String(draft.lines.length),tip:(draft.fields.tip||'').trim(),tip_produse:selectedType==='produse'?'☒':'☐',tip_servicii:selectedType==='servicii'?'☒':'☐',tip_lucrari:selectedType==='lucrari'?'☒':'☐',semnatura_furnizor:draft.fields.comanda_online==='da'?'':'Prestator / Furnizor,\nSemnătura: ____________________',
+  // Anexa 3: "confirmarea livrării produselor, conform facturii" - dupa tipul achizitiei si referinta
+  obiect_receptie:selectedType==='servicii'?'prestării serviciilor':selectedType==='lucrari'?'executării lucrărilor':'livrării produselor',
+  conform_receptie:/contract/i.test(draft.fields.referinta||'')?(/factur/i.test(draft.fields.referinta||'')?'contractului / facturii':'contractului'):'facturii'}
  xml=xml.replace(/%%([a-z_]+)%%/g,(_,key)=>text(values[key]||''))
  if(/%%\w+%%/.test(xml))throw new Error('Șablonul conține câmpuri necompletate')
  zip.file('word/document.xml',xml)

@@ -8,6 +8,7 @@ import PurchaseAiRecommendations from '@/components/proiect/PurchaseAiRecommenda
 import PurchasePriceBreakdown from '@/components/proiect/PurchasePriceBreakdown'
 import PurchaseOfferPrefill from '@/components/proiect/PurchaseOfferPrefill'
 import PurchaseReceptionPrefill from '@/components/proiect/PurchaseReceptionPrefill'
+import PurchaseFormEditor from '@/components/proiect/PurchaseFormEditor'
 import formStyles from '@/components/proiect/PurchaseForm.module.css'
 import {TASKS,STEP_LABELS,PROFILE_FIELDS,FORM_LABELS,FORM_FIELDS,activeTasks,blockedBy,nextTask,dueDate,defaultDraft,emptyLine,validateDraft,type Workflow,type FormKind,type Draft,type Step} from '@/lib/proiect-workflow'
 const box:CSSProperties={padding:20,border:'1px solid var(--border)',borderRadius:'var(--r-lg)',background:'var(--surface)'}
@@ -90,15 +91,16 @@ export default function ProiectWorkflow({firmaId,lunaId,luna,firmaSlug='proiect-
  return <section className={purchaseId?formStyles.editor:undefined} style={{display:'grid',gap:16}}>
  <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
  {!purchaseId&&<button style={tabStyle(tab==='rutina')} aria-pressed={tab==='rutina'} onClick={()=>setTab('rutina')}>✓ Rutina lunii</button>}
- <button style={tabStyle(tab==='formulare')} aria-pressed={tab==='formulare'} onClick={()=>setTab('formulare')}>Formulare și versiuni</button>
- <button style={tabStyle(tab==='setari')} aria-pressed={tab==='setari'} disabled={busy} onClick={()=>void openSettings()}>Date permanente și termene</button>
+ {(!purchaseId||tab==='setari')&&<button style={tabStyle(tab==='formulare')} aria-pressed={tab==='formulare'} onClick={()=>setTab('formulare')}>{purchaseId?'← Înapoi la formulare':'Formulare și versiuni'}</button>}
+ {(!purchaseId||tab!=='setari')&&<button style={purchaseId?{...button,border:0,background:'transparent',color:'var(--text-secondary)',padding:0}:tabStyle(tab==='setari')} aria-pressed={tab==='setari'} disabled={busy} onClick={()=>void openSettings()}>{purchaseId?'Date permanente și termene':'Date permanente și termene'}</button>}
  <span role="status" style={{...hint,marginLeft:'auto',fontWeight:600,color:busy||autoSaving?'var(--text-secondary)':dirty||settingsDirty?'var(--warning)':'var(--success)'}}>{busy||autoSaving?'Se salvează…':dirty?'Se salvează automat…':settingsDirty?'Setări nesalvate':state.updatedAt?'✓ Salvat automat':''}</span>
- {tab!=='setari'&&<button style={{...button,background:'var(--accent-solid)',color:'#fff'}} disabled={busy||!dirty} onClick={()=>void run(async()=>{await save();setMessage('Modificările au fost salvate.')})}>Salvează modificările</button>}
+ {tab!=='setari'&&(!purchaseId||dirty)&&<button style={{...button,background:'var(--accent-solid)',color:'#fff'}} disabled={busy||!dirty} onClick={()=>void run(async()=>{await save();setMessage('Modificările au fost salvate.')})}>Salvează modificările</button>}
  </div>
  {err}{message&&<div role="status" style={{...hint,color:'var(--success)'}}>{message}{generated?.scope===scope&&<a href={assetUrl(generated.id)} style={{...button,marginLeft:8}}>Descarcă Word · {generated.name}</a>}</div>}
  <fieldset disabled={busy} style={{border:0,padding:0,minWidth:0,display:'grid',gap:16}}>
  {tab==='rutina'&&<RutinaLunii state={state} month={month} next={next} onEdit={edit} onUpload={(files,k)=>void upload(files,k)} uploadDisabled={autoSaving} salaryArchiveUrl={`/api/proiect-workflow/salarizare?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} creditCalculationUrl={`/api/proiect-workflow/creditare?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} salaryPlanUrl={`/api/proiect-workflow/plata-salarii?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} salaryDocumentUrl={(fromScope,id)=>`/api/proiect-workflow/document?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(fromScope)}&id=${encodeURIComponent(id)}`} assetUrl={assetUrl} onRaport={()=>{setKind('raport');setTab('formulare')}}/>}
- {tab==='formulare'&&<>
+ {tab==='formulare'&&purchaseId&&<PurchaseFormEditor firmaId={firmaId} scope={scope} state={state} kind={kind} onKind={setKind} draft={selected!} onDraft={changeDraft} onProfile={profile=>edit({...state,profile})} recommendations={recommendations} productExample={productExample} example={example} purchase={purchase} disabled={autoSaving||busy} assetUrl={assetUrl} onGenerate={()=>void run(async()=>{const missing=validateDraft(kind,selected!,state.profile);if(missing.length)throw new Error('Completează: '+missing.join('; '));const updated={...state,forms:{...state.forms,[kind]:selected!}};const saved=await save(updated);const data=await response(await fetch('/api/proiect-workflow/document',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({firmaId,scope,version:saved!.version,kind})}));setState(data.state);setGenerated({id:data.asset.id,name:data.asset.name,scope});setMessage('Document generat.')})}/>}
+ {tab==='formulare'&&!purchaseId&&<>
  <div style={box} className={formStyles.header}>
    <div><h3>{FORM_LABELS[kind]}</h3><p>{purchase?.denumire || 'Completează documentul, verifică datele și generează Word.'}</p></div>
    <label style={hint}>Formular<select aria-label="Alege formularul" style={input} value={kind} onChange={e=>{setKind(e.target.value as FormKind);setFormPage('document')}}>{Object.entries(FORM_LABELS).filter(([k])=>purchaseId?['oferta','nota','receptie'].includes(k):['raport','restituire'].includes(k)).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>

@@ -15,6 +15,7 @@ export interface ReceptieExtract {
   produse: ProdusFactura[]; warnings: string[]
 }
 export interface DosarReceptie { garantie: boolean; poze: boolean; plata: boolean; comanda: boolean }
+// (garantie / poze raman in context pentru dosar, dar nu mai apar in PV - vezi CONSTATARI_STANDARD)
 export interface PropunereReceptie { draft: Draft; verificari: string[]; surse: string[] }
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
@@ -35,6 +36,8 @@ export function dataRo(v: unknown): string | null {
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
   return m ? `${m[3]}.${m[2]}.${m[1]}` : null
 }
+// Fraza de constatari din modelul aprobat al Anexei 3 (PV v20, AC Vortex)
+export const CONSTATARI_STANDARD = 'Părțile confirmă prin prezentul proces-verbal că serviciile au fost prestate/produsele au fost livrate integral și la termen, conform celor convenite.'
 const lei = (n: number) => n.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export function parseReceptieExtract(raw: string): ReceptieExtract | null {
@@ -79,25 +82,17 @@ export function buildReceptieDraft(current: Draft, ex: ReceptieExtract, ctx: { n
   const comanda = ex.comandaNumar ? `comanda online nr. ${ex.comandaNumar}${ex.comandaData ? ` din ${ex.comandaData}` : ''}` : null
 
   // Data receptiei = data reala a livrarii; daca documentele nu o arata, propunem data facturii.
-  const data = ex.livrareData || ex.facturaData || ''
-  if (!ex.livrareData) verificari.push(`Data recepției: am propus data facturii (${ex.facturaData || 'necunoscută'}). Schimb-o cu data reală a livrării, dacă e alta.`)
-  verificari.push(`Numărul procesului-verbal: am propus ${ctx.numarPropus}, următorul din registrul PV-urilor generate în proiect. Confirmă-l în registrul intern.`)
+  // Numarul si data deja completate de utilizator (ex. la o regenerare) sunt pastrate.
+  const dataExistenta = current.fields.data?.trim()
+  const numarExistent = current.fields.numar?.trim()
+  const data = dataExistenta || ex.livrareData || ex.facturaData || ''
+  if (!dataExistenta && !ex.livrareData) verificari.push(`Data recepției: am propus data facturii (${ex.facturaData || 'necunoscută'}). Schimb-o cu data reală a livrării, dacă e alta.`)
+  if (!numarExistent) verificari.push(`Numărul procesului-verbal: am propus ${ctx.numarPropus}, următorul după PV-urile celorlalte achiziții. Confirmă-l în registrul intern.`)
 
-  const descriereProduse = produse.map(p => `${p.cantitate} ${p.um} ${p.denumire}${p.specificatii ? ` (${p.specificatii})` : ''}`).join('; ')
+  // Constatarile urmeaza modelul aprobat (PV v20): fraza standard, fara detalii de plata / anexe.
+  if (extra.length) verificari.push(`Pe factură apar și ${extra.map(p => `${p.denumire} (${lei(p.cantitate * p.pretUnitarFaraTva)} lei fără TVA)`).join(', ')}. Nu sunt în tabelul PV-ului; adaugă-le dacă intră în achiziție.`)
+  const constatari = CONSTATARI_STANDARD
   const minime = cerinteMinime(ctx.specsMinime)
-  const anexe = ['factura fiscală', ctx.dosar.comanda && 'comanda / avizul de plată', ctx.dosar.plata && 'dovada plății', 'certificatul de garanție', 'fotografii ale echipamentului'].filter(Boolean)
-  if (!ctx.dosar.garantie) verificari.push(`Certificatul de garanție nu e încărcat în dosar${ex.garantie ? ` (pe factură: ${ex.garantie})` : ''}. Încarcă-l sau scoate-l din anexe.`)
-  if (!ctx.dosar.poze) verificari.push('Fotografiile echipamentului nu sunt încărcate în dosar. Încarcă-le sau scoate-le din anexe.')
-  verificari.push('Confirmă că produsul a fost livrat complet și fără deteriorări, așa cum scrie la constatări. Dacă nu, corectează textul.')
-
-  const constatari = [
-    `Au fost recepționate: ${descriereProduse}${facturii ? `, conform ${facturii}${ex.furnizor ? ` emise de ${ex.furnizor}` : ''}` : ''}.`,
-    `Produsele au fost livrate complet, în cantitatea comandată, fără deteriorări vizibile${minime.length ? `, și corespund specificațiilor tehnice minime din cererea de ofertă (${minime.join('; ')})` : ''}.`,
-    extra.length ? `Pe aceeași factură: ${extra.map(p => `${p.denumire} - ${lei(p.cantitate * p.pretUnitarFaraTva)} lei fără TVA`).join('; ')}.` : null,
-    [comanda && `Achiziția s-a făcut prin ${comanda}`, ex.plataSuma != null && `plătită integral: ${lei(ex.plataSuma)} lei${ex.plataNumar ? `, OP nr. ${ex.plataNumar}` : ''}${ex.plataData ? ` din ${ex.plataData}` : ''}`].filter(Boolean).join(', ') || null,
-    `Anexe: ${anexe.join(', ')}.`,
-  ].filter(Boolean).map(s => s!.endsWith('.') ? s : s + '.').join(' ')
-  if (extra.length) verificari.push(`Pe factură apar și ${extra.map(p => p.denumire).join(', ')}. Le-am trecut la constatări, nu în tabelul produselor recepționate; adaugă-le în tabel dacă intră în achiziție.`)
 
   const lines: Line[] = produse.map(p => ({
     supplier: ex.furnizor || '', product: p.denumire, specs: p.specificatii || minime.join('; '),
@@ -108,11 +103,11 @@ export function buildReceptieDraft(current: Draft, ex: ReceptieExtract, ctx: { n
   const fields: Record<string, string> = {
     ...current.fields,
     comanda_online: online ? 'da' : 'nu',
-    numar: ctx.numarPropus,
+    numar: numarExistent || ctx.numarPropus,
     data,
     furnizor,
     // in sablon: "Prestator/Furnizor: X, reprezentat prin %%reprezentant_furnizor%%"
-    reprezentant_furnizor: online ? `— (${comanda || 'comandă online'}; recepție fără reprezentant al furnizorului)` : (current.fields.reprezentant_furnizor || ''),
+    reprezentant_furnizor: online ? `— (${comanda || 'comandă online'})` : (current.fields.reprezentant_furnizor || ''),
     referinta: [factura && factura[0].toUpperCase() + factura.slice(1), comanda].filter(Boolean).join('; '),
     constatari,
   }

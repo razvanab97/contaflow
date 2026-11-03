@@ -53,7 +53,9 @@ Date în format ZZ.LL.AAAA. Răspunde exclusiv JSON: {"furnizor":"","cui":"","re
     if (!extract) throw new WorkflowError('Documentele nu au putut fi citite. Încearcă din nou.', 502)
 
     // Urmatorul numar din registrul PV-urilor de receptie generate in proiect.
-    const { count } = await sb.from('documente').select('id', { count: 'exact', head: true }).eq('firma_id', body.firmaId).eq('tip_document', 'receptie')
+    // (fara PV-urile acestei achizitii - o regenerare pastreaza numarul ei, vezi buildReceptieDraft)
+    const { data: pvAlte } = await sb.from('documente').select('achizitie_id').eq('firma_id', body.firmaId).eq('tip_document', 'receptie').neq('achizitie_id', achizitieId)
+    const count = new Set((pvAlte || []).map(d => d.achizitie_id)).size
     const state = await readWorkflow(prefix)
     const current = state.forms.receptie || defaultDraft('receptie')
     const specsMinime = String(purchase.nota || '').split('Specificații tehnice minime: ')[1]?.trim() || ''
