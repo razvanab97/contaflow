@@ -1,3 +1,4 @@
+import { incarcaComanda } from '@/lib/comenzi-marketplace'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 function curataFurnizor(raw: string | null | undefined): string {
@@ -16,6 +17,9 @@ function scurtaReferinta(value: string | null | undefined) {
 // cineva verifica de ce o singura plata din extras acopera mai multe documente.
 // Nu face nimic daca tranzactia are 0 sau 1 documente atasate.
 export async function syncComandaNote(sb: SupabaseClient, txId: string) {
+  // Plata impartita pe o comanda marketplace: nota (si potrivirea facturilor pe vanzatori) vine din comanda
+  const { data: comanda, error: eCom } = await sb.from('comenzi_marketplace').select('id').eq('tranzactie_id', txId).maybeSingle()
+  if (!eCom && comanda) { await incarcaComanda(sb as never, txId); return }
   const { data: tx } = await sb.from('tranzactii').select('id,suma,valuta,referinta').eq('id', txId).maybeSingle()
   if (!tx) return
 

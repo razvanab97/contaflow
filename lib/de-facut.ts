@@ -128,6 +128,20 @@ export async function getDeFacut(firme: { id: string; slug: string; nume: string
       items.push({ ...base, id: `ext-${f.id}`, titlu: 'Extrasul de cont nu e încărcat', href: `/${f.slug}/${luna}/extras`, icon: 'bank', urgenta: 'normal' })
     }
 
+    // Comenzi marketplace (o plata, mai multe facturi) care inca asteapta facturi de la unii vanzatori
+    const { data: comenzi, error: eCom } = await sb.from('comenzi_marketplace').select('id,platforma,numar_comanda,tranzactie_id,created_at,comenzi_marketplace_linii(stare,subtotal)').eq('firma_id', f.id)
+    const incomplete = eCom ? [] : (comenzi || []).map(c => ({ c, lipsa: ((c as any).comenzi_marketplace_linii || []).filter((x: any) => x.stare === 'asteptata') })).filter(x => x.lipsa.length)
+    if (incomplete.length) {
+      const { data: txs } = await sb.from('tranzactii').select('id,extras_id').in('id', incomplete.map(x => x.c.tranzactie_id))
+      const { data: exs } = txs?.length ? await sb.from('extrase').select('id,luna_id').in('id', txs.map(t => t.extras_id)) : { data: [] as { id: string; luna_id: string }[] }
+      const lunaTx = (txId: string) => { const t = (txs || []).find(x => x.id === txId); const e = (exs || []).find(x => x.id === t?.extras_id); return String((luni || []).find(x => x.id === e?.luna_id)?.luna || luna).slice(0, 7) }
+      const nr = incomplete.reduce((s2, x) => s2 + x.lipsa.length, 0)
+      const vechi = incomplete.some(x => (Date.now() - Date.parse(x.c.created_at)) / 86400000 > 10)
+      items.push({ ...base, id: `cmd-${f.id}`, titlu: `${nr} ${nr === 1 ? 'factură lipsă' : 'facturi lipsă'} din comenzi marketplace`,
+        detaliu: incomplete.slice(0, 3).map(x => `${x.c.platforma} ${x.c.numar_comanda || ''}: ${x.lipsa.length} (${lei(x.lipsa.reduce((s2: number, y: any) => s2 + Number(y.subtotal), 0))} lei)`).join(' · '),
+        href: `/${f.slug}/${lunaTx(incomplete[0].c.tranzactie_id)}/extras`, icon: 'cart', urgenta: vechi ? 'curand' : 'normal' })
+    }
+
     if (bonRes.count) items.push({ ...base, id: `bon-${f.id}`, titlu: `${bonRes.count} ${bonRes.count === 1 ? 'bon' : 'bonuri'} în așteptare`, detaliu: 'Neasociate încă cu o tranzacție', href: `/${f.slug}/${luna}/bonuri`, icon: 'fuel', urgenta: 'normal' })
     if (faRes.count) items.push({ ...base, id: `fa-${f.id}`, titlu: `${faRes.count} ${faRes.count === 1 ? 'factură de asociat' : 'facturi de asociat'}`, detaliu: 'Se potrivesc automat la importul extrasului', href: `/${f.slug}/facturi-de-asociat`, icon: 'link', urgenta: 'normal' })
     const rest = restanteMap[f.id] || 0
