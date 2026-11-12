@@ -25,15 +25,33 @@ export default function ActeFirma({ firmaId }: { firmaId: string }) {
       .then(d => { setActe(d.acte || []); setTipuri(d.tipuri || []) }).catch(() => setMesaj('Actele nu s-au putut încărca')).finally(() => setIncarcat(true))
   }, [firmaId])
 
+  // Direct din browser in storage (URL semnat), ca fisierele mari - acte scanate de 8-20 MB - sa nu loveasca limita
+  // de 4,5 MB a cererilor pe Vercel; serverul doar pregateste URL-urile si inregistreaza actele.
   async function incarca(files: File[]) {
     if (!files.length) return
     setBusy(true); setMesaj('')
-    const fd = new FormData(); fd.append('firmaId', firmaId); files.forEach(f => fd.append('file', f))
-    const r = await fetch('/api/firma-date/acte', { method: 'POST', body: fd })
-    const d = await r.json().catch(() => ({}))
+    const erori: string[] = []
+    try {
+      const r = await fetch('/api/firma-date/acte', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, fisiere: files.map(f => ({ nume: f.name, tip: f.type, marime: f.size })) }) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || `Pregătirea încărcării a eșuat (${r.status})`)
+      const incarcate: { path: string; nume: string; tip: string; marime: number }[] = []
+      await Promise.all((d.fisiere || []).map(async (x: { nume: string; path?: string; url?: string; eroare?: string }, i: number) => {
+        if (x.eroare || !x.url || !x.path) { erori.push(`${x.nume}: ${x.eroare || 'eroare'}`); return }
+        const f = files[i]
+        const up = await fetch(x.url, { method: 'PUT', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f }).catch(() => null)
+        if (!up?.ok) { erori.push(`${x.nume}: încărcarea în storage a eșuat${up ? ` (${up.status})` : ''}`); return }
+        incarcate.push({ path: x.path, nume: f.name, tip: f.type, marime: f.size })
+      }))
+      if (incarcate.length) {
+        const r2 = await fetch('/api/firma-date/acte', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, incarcate }) })
+        const d2 = await r2.json().catch(() => ({}))
+        if (d2.acte?.length) setActe(prev => [...prev, ...d2.acte])
+        erori.push(...(d2.erori || []), ...(!r2.ok && !d2.erori ? [d2.error || 'Înregistrarea actelor a eșuat'] : []))
+      }
+    } catch (e) { erori.push(e instanceof Error ? e.message : 'Încărcarea a eșuat') }
     setBusy(false); if (inputRef.current) inputRef.current.value = ''
-    if (d.acte?.length) setActe(prev => [...prev, ...d.acte])
-    setMesaj((d.erori || []).join(' · ') || (r.ok ? '' : d.error || 'Încărcarea a eșuat'))
+    setMesaj(erori.join(' · '))
   }
 
   async function modifica(id: string, patch: Record<string, string>) {

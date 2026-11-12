@@ -62,8 +62,26 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ acte: data || [], tipuri: TIPURI_ACTE })
 }
 
+// Fisierele mari (Vercel refuza cererile peste 4,5 MB) se urca direct din browser in storage:
+// PUT {firmaId, fisiere:[{nume,tip,marime}]} -> URL-uri semnate de upload; apoi POST JSON {firmaId, incarcate:[...]} le inregistreaza.
+export async function PUT(req: NextRequest) {
+  const b = await req.json().catch(() => ({})) as { firmaId?: string; fisiere?: { nume: string; tip: string; marime: number }[] }
+  if (!b.firmaId || !b.fisiere?.length) return NextResponse.json({ error: 'Alege cel puțin un fișier' }, { status: 400 })
+  const sb = getServiceSupabase()
+  const out = []
+  for (const f of b.fisiere.slice(0, 30)) {
+    if (!TIPURI_FISIER.has(f.tip)) { out.push({ nume: f.nume, eroare: 'doar PDF, imagini sau Word' }); continue }
+    if (f.marime > 50 * 1024 * 1024) { out.push({ nume: f.nume, eroare: 'mai mare de 50 MB' }); continue }
+    const path = `${b.firmaId}/acte-firma/${Date.now()}_${numeSigur(f.nume)}`
+    const { data, error } = await sb.storage.from('documente').createSignedUploadUrl(path)
+    out.push(error || !data ? { nume: f.nume, eroare: error?.message || 'nu s-a putut pregăti încărcarea' } : { nume: f.nume, path, url: data.signedUrl })
+  }
+  return NextResponse.json({ fisiere: out })
+}
+
 // Unul sau mai multe fisiere odata; tipul se poate da pentru toate (campul `tip`), altfel se ghiceste din nume.
 export async function POST(req: NextRequest) {
+  if ((req.headers.get('content-type') || '').includes('application/json')) return inregistreaza(req)
   const fd = await req.formData()
   const firmaId = String(fd.get('firmaId') || '')
   const tipAles = fd.get('tip') ? tipValid(fd.get('tip')) : null
@@ -82,6 +100,23 @@ export async function POST(req: NextRequest) {
       fisier_path: path, fisier_nume: file.name, fisier_tip: file.type, fisier_marime: file.size, in_zip: false,
     }).select(COLOANE).single()
     if (error) { await sb.storage.from('documente').remove([path]); erori.push(`${file.name}: ${error.message}`); continue }
+    adaugate.push(data)
+  }
+  return NextResponse.json({ acte: adaugate, erori }, { status: adaugate.length ? 200 : 400 })
+}
+
+async function inregistreaza(req: NextRequest) {
+  const b = await req.json().catch(() => ({})) as { firmaId?: string; tip?: string; incarcate?: { path: string; nume: string; tip: string; marime: number }[] }
+  if (!b.firmaId || !b.incarcate?.length) return NextResponse.json({ error: 'Nimic de înregistrat' }, { status: 400 })
+  const sb = getServiceSupabase()
+  const adaugate = [], erori: string[] = []
+  for (const f of b.incarcate) {
+    if (!f.path.startsWith(`${b.firmaId}/acte-firma/`)) { erori.push(`${f.nume}: cale invalidă`); continue }
+    const { data, error } = await sb.from('documente').insert({
+      firma_id: b.firmaId, luna_id: null, modul: 'acte_firma', tip_document: 'act_firma', furnizor: b.tip ? tipValid(b.tip) : tipDinNume(f.nume),
+      fisier_path: f.path, fisier_nume: f.nume, fisier_tip: f.tip, fisier_marime: f.marime, in_zip: false,
+    }).select(COLOANE).single()
+    if (error) { await sb.storage.from('documente').remove([f.path]); erori.push(`${f.nume}: ${error.message}`); continue }
     adaugate.push(data)
   }
   return NextResponse.json({ acte: adaugate, erori }, { status: adaugate.length ? 200 : 400 })
