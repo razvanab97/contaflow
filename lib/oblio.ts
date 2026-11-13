@@ -3,7 +3,12 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 // Token Oblio din conexiunea deja salvata in ContaFlow (Inbox facturi → Oblio, inbox_surse_email).
 // Contul Oblio e acelasi pentru toate firmele (AB Homes Invest / ABXHomes / AB Textile) - cautam
 // conexiunea care are acces la CIF-ul cerut. Tokenul (valabil ~1h) se refoloseste pana expira.
-export async function oblioToken(cif: string): Promise<string> {
+// fortat = cere un token nou chiar daca cel salvat pare valid (Oblio l-a refuzat ca expirat - ex. a fost emis intre
+// timp alt token pentru acelasi cont, raportat direct: „The access token provided has expired”)
+// raspuns Oblio = token expirat / invalid -> se cere unul nou si se reincearca o data
+export const tokenRefuzat = (status: number, mesaj?: string) => status === 401 || /access token|token.*(expired|invalid)|expired.*token/i.test(String(mesaj || ''))
+
+export async function oblioToken(cif: string, fortat = false): Promise<string> {
   const sb = getServiceSupabase()
   const { data, error } = await sb
     .from('inbox_surse_email')
@@ -17,7 +22,7 @@ export async function oblioToken(cif: string): Promise<string> {
   if (!sursa?.email || !sursa.client_secret) throw new Error('Oblio nu e conectat în ContaFlow (Inbox facturi → Oblio)')
 
   const expira = sursa.token_expires_at ? new Date(sursa.token_expires_at).getTime() : 0
-  if (sursa.access_token && expira > Date.now() + 60_000) return sursa.access_token
+  if (!fortat && sursa.access_token && expira > Date.now() + 60_000) return sursa.access_token
 
   const res = await fetch('https://www.oblio.eu/api/authorize/token', {
     method: 'POST',
