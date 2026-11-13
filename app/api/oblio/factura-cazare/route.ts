@@ -54,30 +54,50 @@ async function cuToken<T>(fn: (token: string) => Promise<T>): Promise<T> {
     return await fn(await oblioToken(SETARI.cif, true))
   }
 }
-type FacturaOblio = { seriesName?: string; number?: string | number; issueDate?: string; draft?: number | string | boolean }
-async function ultimaFactura(token: string): Promise<{ data: string; numar: string } | null> {
-  let ultima: { data: string; numar: string; nr: number } | null = null
+type FacturaOblio = { seriesName?: string; number?: string | number; issueDate?: string; draft?: number | string | boolean; total?: number | string; currency?: string; canceled?: number | string | boolean; link?: string; client?: { name?: string; cif?: string } }
+// toate facturile din seria RH (pagini de 100)
+async function toateFacturile(token: string): Promise<FacturaOblio[]> {
+  const toate: FacturaOblio[] = []
   for (let offset = 0, pagini = 0; pagini < 100; offset += 100, pagini++) {
     const q = new URLSearchParams({ cif: SETARI.cif, seriesName: SETARI.serie, limitPerPage: '100', offset: String(offset), orderBy: 'issueDate', orderDir: 'DESC' })
     const res = await fetch(`https://www.oblio.eu/api/docs/invoice/list?${q}`, { headers: { Authorization: `Bearer ${token}` } })
     const out = await res.json().catch(() => ({})) as { status?: number; statusMessage?: string; data?: FacturaOblio[] }
     if (tokenRefuzat(res.status, out.statusMessage)) throw new TokenExpirat(out.statusMessage || 'token expirat')
     if (!res.ok || out.status !== 200 || !Array.isArray(out.data)) throw new Error(`Oblio (lista facturilor ${SETARI.serie}): ${out.statusMessage || `eroare ${res.status}`}`)
-    for (const f of out.data) {
-      if (f.draft && String(f.draft) !== '0') continue
-      const d = String(f.issueDate || '').slice(0, 10)
-      const nr = Number(String(f.number ?? '').replace(/\D/g, '')) || 0
-      // la aceeasi data castiga numarul mai mare (raportat direct: RH 0001 si RH 0002 din 29.10 - aparea RH 0001)
-      if (/^\d{4}-\d{2}-\d{2}$/.test(d) && (!ultima || d > ultima.data || (d === ultima.data && nr > ultima.nr))) ultima = { data: d, nr, numar: `${f.seriesName || SETARI.serie} ${f.number ?? ''}`.trim() }
-    }
+    toate.push(...out.data)
     if (out.data.length < 100) break
+  }
+  return toate
+}
+const da = (v: unknown) => !!v && String(v) !== '0' && String(v).toLowerCase() !== 'false'
+async function ultimaFactura(token: string): Promise<{ data: string; numar: string } | null> {
+  let ultima: { data: string; numar: string; nr: number } | null = null
+  for (const f of await toateFacturile(token)) {
+    if (f.draft && String(f.draft) !== '0') continue
+    const d = String(f.issueDate || '').slice(0, 10)
+    const nr = Number(String(f.number ?? '').replace(/\D/g, '')) || 0
+    // la aceeasi data castiga numarul mai mare (raportat direct: RH 0001 si RH 0002 din 29.10 - aparea RH 0001)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d) && (!ultima || d > ultima.data || (d === ultima.data && nr > ultima.nr))) ultima = { data: d, nr, numar: `${f.seriesName || SETARI.serie} ${f.number ?? ''}`.trim() }
   }
   return ultima && { data: ultima.data, numar: ultima.numar }
 }
 
 // GET = ultima factura din seria RH (pentru ApartPro: se afiseaza la facturare si limiteaza data emiterii)
+// GET ?lista=1 = toate facturile RH cu suma reala din Oblio (cerut direct: „verifică sumele din facturi, nu din aplicație” -
+// ApartPro compara cu raportul de castiguri Airbnb)
 export async function GET(req: NextRequest) {
   if (!autorizat(req)) return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
+  if (req.nextUrl.searchParams.get('lista')) {
+    try {
+      const facturi = (await cuToken(toateFacturile)).filter(f => !da(f.draft)).map(f => ({
+        numar: `${f.seriesName || SETARI.serie} ${f.number ?? ''}`.trim(), data: String(f.issueDate || '').slice(0, 10),
+        total: f.total == null || f.total === '' ? null : Number(f.total), moneda: f.currency || 'RON', client: f.client?.name || '', anulata: da(f.canceled), link: f.link || null,
+      })).sort((a, b) => a.numar.localeCompare(b.numar, 'ro', { numeric: true }))
+      return NextResponse.json({ serie: SETARI.serie, facturi })
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : 'Nu am putut citi facturile' }, { status: 502 })
+    }
+  }
   try {
     return NextResponse.json({ serie: SETARI.serie, ultima: await cuToken(ultimaFactura) })
   } catch (e) {
