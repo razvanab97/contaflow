@@ -135,7 +135,8 @@ export async function POST(req: NextRequest) {
         save: 0,
       },
       products: [{
-        name: 'Servicii de cazare',
+        // denumirea (cerut direct: „să rămână doar «servicii conform platformă»”); descrierea = client + codul rezervarii
+        name: 'Servicii conform platformă',
         description: descriere,
         price: suma,
         quantity: 1,
