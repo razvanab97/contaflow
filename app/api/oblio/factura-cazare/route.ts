@@ -102,13 +102,9 @@ export async function POST(req: NextRequest) {
   if (lipsa.length) return NextResponse.json({ error: `Lipsește: ${lipsa.join(', ')}` }, { status: 400 })
 
   const platforma = CANAL[String(r.canal)] || String(r.canal || 'platformă')
-  const nopti = Number(r.nopti) || 0
-  const descriere = [
-    r.apartament,
-    `${zi(r.checkin!)} – ${zi(r.checkout!)}${nopti ? ` (${nopti} ${nopti === 1 ? 'noapte' : 'nopți'})` : ''}`,
-    r.persoane ? `${r.persoane} ${Number(r.persoane) === 1 ? 'persoană' : 'persoane'}` : '',
-    `rezervare ${platforma} ${cod}`,
-  ].filter(Boolean).join(' · ')
+  // Doar numele clientului si codul rezervarii (cerut direct: „prea multe detalii pe factură, e de ajuns să scrie numele
+  // clientului care a făcut rezervarea și codul de pe Airbnb”) - fara apartament, perioada, nopti, persoane
+  const descriere = `${String(r.numeClient).trim()} · rezervare ${platforma} ${cod}`
 
   try {
     const token = await oblioToken(SETARI.cif)
@@ -124,7 +120,6 @@ export async function POST(req: NextRequest) {
       language: 'RO',
       currency: 'RON',
       spvExtern: SETARI.spvExtern,
-      mentions: `Rezervare ${platforma}: ${cod}`,
       // Aceeasi rezervare nu poate fi facturata de doua ori, chiar daca butonul e apasat repetat
       idempotencyKey: `apartpro-rez-${r.rezervareId}`,
       client: {
