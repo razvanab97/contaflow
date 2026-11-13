@@ -98,8 +98,7 @@ export async function POST(req: NextRequest) {
     !r.rezervareId && 'ID rezervare',
     !String(r.numeClient || '').trim() && 'numele clientului',
     !cod && 'codul rezervării de la platformă',
-    !r.checkin && 'check-in',
-    !r.checkout && 'check-out',
+    // check-in / check-out nu mai apar pe factura -> optionale (factura fara rezervare din ApartPro: doar client + cod + suma)
     !(suma > 0) && 'suma',
   ].filter(Boolean)
   const azi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' })
