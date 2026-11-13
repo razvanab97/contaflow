@@ -47,7 +47,7 @@ function autorizat(req: NextRequest) {
 // cele anulate (isi pastreaza numarul si data); ciornele nu au numar si nu conteaza.
 type FacturaOblio = { seriesName?: string; number?: string | number; issueDate?: string; draft?: number | string | boolean }
 async function ultimaFactura(token: string): Promise<{ data: string; numar: string } | null> {
-  let ultima: { data: string; numar: string } | null = null
+  let ultima: { data: string; numar: string; nr: number } | null = null
   for (let offset = 0, pagini = 0; pagini < 100; offset += 100, pagini++) {
     const q = new URLSearchParams({ cif: SETARI.cif, seriesName: SETARI.serie, limitPerPage: '100', offset: String(offset), orderBy: 'issueDate', orderDir: 'DESC' })
     const res = await fetch(`https://www.oblio.eu/api/docs/invoice/list?${q}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -56,11 +56,13 @@ async function ultimaFactura(token: string): Promise<{ data: string; numar: stri
     for (const f of out.data) {
       if (f.draft && String(f.draft) !== '0') continue
       const d = String(f.issueDate || '').slice(0, 10)
-      if (/^\d{4}-\d{2}-\d{2}$/.test(d) && (!ultima || d > ultima.data)) ultima = { data: d, numar: `${f.seriesName || SETARI.serie} ${f.number ?? ''}`.trim() }
+      const nr = Number(String(f.number ?? '').replace(/\D/g, '')) || 0
+      // la aceeasi data castiga numarul mai mare (raportat direct: RH 0001 si RH 0002 din 29.10 - aparea RH 0001)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d) && (!ultima || d > ultima.data || (d === ultima.data && nr > ultima.nr))) ultima = { data: d, nr, numar: `${f.seriesName || SETARI.serie} ${f.number ?? ''}`.trim() }
     }
     if (out.data.length < 100) break
   }
-  return ultima
+  return ultima && { data: ultima.data, numar: ultima.numar }
 }
 
 // GET = ultima factura din seria RH (pentru ApartPro: se afiseaza la facturare si limiteaza data emiterii)
