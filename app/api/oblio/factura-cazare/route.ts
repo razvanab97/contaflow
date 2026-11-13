@@ -31,7 +31,8 @@ type Cerere = {
   // data emiterii aleasa in ApartPro (YYYY-MM-DD, cel mult azi); lipsa = azi
   dataEmitere?: string
   // domiciliul clientului (cerut pentru e-Factura / SPV): tara, judet si localitate reale, din rezervare
-  client?: { tara?: string; judet?: string; localitate?: string; adresa?: string }
+  // pj = factura pe firma (datele din ANAF, cautate in ApartPro dupa CUI)
+  client?: { tara?: string; judet?: string; localitate?: string; adresa?: string; pj?: boolean; cui?: string; firma?: string; regCom?: string; platitorTva?: boolean }
 }
 
 function autorizat(req: NextRequest) {
@@ -110,6 +111,9 @@ export async function POST(req: NextRequest) {
   const eRomania = /^rom[aâ]nia$/i.test(tara)
   if (eRomania && !judet) lipsa.push('județul clientului')
   if (!localitate) lipsa.push('localitatea clientului')
+  const pj = !!r.client?.pj, cui = String(r.client?.cui || '').toUpperCase().replace(/^RO/, '').replace(/\s/g, ''), firma = String(r.client?.firma || '').trim()
+  if (pj && !/^\d{2,10}$/.test(cui)) lipsa.push('CUI-ul firmei (doar cifre, cu sau fără RO)')
+  if (pj && !firma) lipsa.push('denumirea firmei')
   if (lipsa.length) return NextResponse.json({ error: `Lipsește: ${lipsa.join(', ')}` }, { status: 400 })
 
   const platforma = CANAL[String(r.canal)] || String(r.canal || 'platformă')
@@ -133,7 +137,8 @@ export async function POST(req: NextRequest) {
       // Aceeasi rezervare nu poate fi facturata de doua ori, chiar daca butonul e apasat repetat
       idempotencyKey: `apartpro-rez-${r.rezervareId}`,
       client: {
-        name: String(r.numeClient).trim(),
+        // firma: denumire + CIF (cu RO daca e platitoare de TVA) + Reg. Com.; altfel persoana fizica
+        ...(pj ? { name: firma, cif: `${r.client?.platitorTva ? 'RO' : ''}${cui}`, ...(r.client?.regCom ? { rc: String(r.client.regCom).trim() } : {}), vatPayer: r.client?.platitorTva ? 1 : 0 } : { name: String(r.numeClient).trim() }),
         country: eRomania ? 'Romania' : tara,
         ...(judet ? { state: judet } : {}),
         city: localitate,
