@@ -41,6 +41,38 @@ function autorizat(req: NextRequest) {
   return timingSafeEqual(Buffer.from(primit), Buffer.from(secret))
 }
 
+// Ultima factura din serie, direct din Oblio (cerut direct: „să știm să nu facturăm înapoi de ultima dată facturată -
+// e interzis”): numerotarea unei serii trebuie sa fie cronologica, deci nicio factura noua cu data mai veche. Se citesc
+// TOATE facturile seriei (pagini de 100, fara sa ne bazam pe ordinea intoarsa), inclusiv cele emise direct din Oblio si
+// cele anulate (isi pastreaza numarul si data); ciornele nu au numar si nu conteaza.
+type FacturaOblio = { seriesName?: string; number?: string | number; issueDate?: string; draft?: number | string | boolean }
+async function ultimaFactura(token: string): Promise<{ data: string; numar: string } | null> {
+  let ultima: { data: string; numar: string } | null = null
+  for (let offset = 0, pagini = 0; pagini < 100; offset += 100, pagini++) {
+    const q = new URLSearchParams({ cif: SETARI.cif, seriesName: SETARI.serie, limitPerPage: '100', offset: String(offset), orderBy: 'issueDate', orderDir: 'DESC' })
+    const res = await fetch(`https://www.oblio.eu/api/docs/invoice/list?${q}`, { headers: { Authorization: `Bearer ${token}` } })
+    const out = await res.json().catch(() => ({})) as { status?: number; statusMessage?: string; data?: FacturaOblio[] }
+    if (!res.ok || out.status !== 200 || !Array.isArray(out.data)) throw new Error(`Oblio (lista facturilor ${SETARI.serie}): ${out.statusMessage || `eroare ${res.status}`}`)
+    for (const f of out.data) {
+      if (f.draft && String(f.draft) !== '0') continue
+      const d = String(f.issueDate || '').slice(0, 10)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d) && (!ultima || d > ultima.data)) ultima = { data: d, numar: `${f.seriesName || SETARI.serie} ${f.number ?? ''}`.trim() }
+    }
+    if (out.data.length < 100) break
+  }
+  return ultima
+}
+
+// GET = ultima factura din seria RH (pentru ApartPro: se afiseaza la facturare si limiteaza data emiterii)
+export async function GET(req: NextRequest) {
+  if (!autorizat(req)) return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
+  try {
+    return NextResponse.json({ serie: SETARI.serie, ultima: await ultimaFactura(await oblioToken(SETARI.cif)) })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Nu am putut citi ultima factură' }, { status: 502 })
+  }
+}
+
 const zi = (d: string) => { const [y, m, z] = d.split('-'); return `${z}.${m}.${y}` }
 const CANAL: Record<string, string> = { airbnb: 'Airbnb', booking: 'Booking.com' }
 
@@ -80,6 +112,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const token = await oblioToken(SETARI.cif)
+    // interzis: data emiterii inaintea ultimei facturi din serie (daca lista nu se poate citi, NU emitem)
+    const ultima = await ultimaFactura(token)
+    if (ultima && dataEmitere < ultima.data) {
+      return NextResponse.json({ error: `Data emiterii ${zi(dataEmitere)} e înaintea ultimei facturi ${ultima.numar} din ${zi(ultima.data)}. Nu se poate factura în urmă — alege ${zi(ultima.data)} sau o dată ulterioară.`, ultima }, { status: 400 })
+    }
     const body = {
       cif: SETARI.cif,
       seriesName: SETARI.serie,
