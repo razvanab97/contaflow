@@ -108,6 +108,17 @@ export async function GET(req: NextRequest) {
 const zi = (d: string) => { const [y, m, z] = d.split('-'); return `${z}.${m}.${y}` }
 const CANAL: Record<string, string> = { airbnb: 'Airbnb', booking: 'Booking.com' }
 
+// numele tarilor ca in nomenclatorul Oblio (cerut direct: „Marea Britanie să se transforme în Regatul Unit, că așa se regăsește
+// în Oblio, și Rep. Moldova în Moldova simplu”)
+const ALIAS_TARA: Record<string, string> = {
+  'marea britanie': 'Regatul Unit', 'regatul unit': 'Regatul Unit', 'regatul unit al marii britanii': 'Regatul Unit', 'anglia': 'Regatul Unit', 'scotia': 'Regatul Unit', 'uk': 'Regatul Unit', 'united kingdom': 'Regatul Unit', 'great britain': 'Regatul Unit', 'marea britanie (uk)': 'Regatul Unit', 'regatul unit (uk)': 'Regatul Unit',
+  'republica moldova': 'Moldova', 'rep. moldova': 'Moldova', 'rep moldova': 'Moldova', 'r. moldova': 'Moldova', 'r moldova': 'Moldova', 'moldova': 'Moldova',
+}
+function taraOblio(t: string) {
+  const k = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+  return ALIAS_TARA[k] || t
+}
+
 export async function POST(req: NextRequest) {
   if (!autorizat(req)) return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
   const r = await req.json().catch(() => ({})) as Cerere
@@ -125,7 +136,7 @@ export async function POST(req: NextRequest) {
   const dataEmitere = String(r.dataEmitere || '').trim() || azi
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataEmitere) || isNaN(Date.parse(dataEmitere))) lipsa.push('data emiterii (format AAAA-LL-ZZ)')
   else if (dataEmitere > azi) lipsa.push('o dată de emitere care nu e în viitor')
-  const tara = String(r.client?.tara || '').trim() || 'Romania'
+  const tara = taraOblio(String(r.client?.tara || '').trim() || 'Romania')
   const judet = String(r.client?.judet || '').trim(), localitate = String(r.client?.localitate || '').trim(), adresa = String(r.client?.adresa || '').trim()
   const eRomania = /^rom[aâ]nia$/i.test(tara)
   if (eRomania && !judet) lipsa.push('județul clientului')
@@ -159,9 +170,11 @@ export async function POST(req: NextRequest) {
         // firma: denumire + CIF (cu RO daca e platitoare de TVA) + Reg. Com.; altfel persoana fizica
         ...(pj ? { name: firma, cif: `${r.client?.platitorTva ? 'RO' : ''}${cui}`, ...(r.client?.regCom ? { rc: String(r.client.regCom).trim() } : {}), vatPayer: r.client?.platitorTva ? 1 : 0 } : { name: String(r.numeClient).trim() }),
         country: eRomania ? 'Romania' : tara,
-        ...(judet ? { state: judet } : {}),
+        // strain fara judet / regiune -> „-” (cerut direct: „când avem alte țări în afară de România, să se pună - și la județ”)
+        state: judet || '-',
         city: localitate,
-        ...(adresa ? { address: adresa } : {}),
+        // fara adresa -> „-” (cerut direct: „dacă nu adăugăm adresa, să se trimită în Oblio cu liniuță”)
+        address: adresa || '-',
         ...(r.telefon ? { phone: r.telefon } : {}),
         ...(r.email ? { email: r.email } : {}),
         save: 0,
