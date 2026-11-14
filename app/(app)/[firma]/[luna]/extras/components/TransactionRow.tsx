@@ -20,7 +20,8 @@ function TransactionRowImpl({ tx, isSelected, onClick }: { tx: Tx; isSelected: b
   const deVerificat = ignorareDeVerificat(tx)
   const m = status === 'ignorata' ? motivEfectiv(tx) : null
   const motiv = m ? MOTIV_LABEL[m] : null
-  const label = tx.documente?.furnizor || tx.descriere_curatata || tx.descriere
+  // furnizor-ul documentului poate contine metadate („… | Sursa: Folder local | …”) - doar numele
+  const label = tx.documente?.furnizor?.split('|')[0].trim() || tx.descriere_curatata || tx.descriere
   const data = new Date(tx.data_tranzactie).toLocaleDateString('ro-RO', { day:'2-digit', month:'short' })
 
   return (

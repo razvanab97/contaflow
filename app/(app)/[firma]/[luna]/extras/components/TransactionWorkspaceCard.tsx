@@ -95,7 +95,7 @@ export default function TransactionWorkspaceCard({
               <DocumentActions
                 tx={tx} firmaId={firmaId} lunaId={lunaId} culoare={culoare} onSuccess={onUploadSuccess}
                 initialTip={editDoc ? tx.documente?.tip_document : undefined}
-                initialFurnizor={editDoc ? tx.documente?.furnizor : undefined}
+                initialFurnizor={editDoc ? tx.documente?.furnizor?.split('|')[0].trim() : undefined}
                 initialNumDoc={editDoc ? tx.documente?.numar_document : undefined}
                 title={editDoc ? 'Schimbă documentul principal' : 'Nu este documentul potrivit?'}
               />

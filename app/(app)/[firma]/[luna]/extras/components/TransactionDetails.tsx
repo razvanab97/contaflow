@@ -184,7 +184,7 @@ export default function TransactionDetails({ tx, index, total, onRefresh }: { tx
             {tx.documente?.furnizor ? 'Furnizor' : 'Entitate (extras bancă)'}
           </div>
           <div style={{ fontSize:'var(--fs-lg)', fontWeight:700, color:'var(--text-primary)', lineHeight:'1.3', wordBreak:'break-word' }}>
-            {tx.documente?.furnizor || tx.descriere_curatata || tx.descriere}
+            {tx.documente?.furnizor?.split('|')[0].trim() || tx.descriere_curatata || tx.descriere}
           </div>
           {tx.documente?.furnizor && (
             <div style={{ fontSize:'var(--fs-xs)', color:'var(--text-secondary)', marginTop:'5px', wordBreak:'break-word' }}>{tx.descriere_curatata || tx.descriere}</div>

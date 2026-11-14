@@ -7,6 +7,8 @@
 //   3. incasari de la Booking, Airbnb, eMAG (justificate de borderou / aviz)     -> 'incasare_platforma'
 //   4. chirie platita unei persoane fizice ("... chirie ..." fara SRL/SA/PFA)    -> 'chirie' (fara document)
 //   5. impozite si taxe catre Trezorerie / ANAF / DGRFP / "impozit"             -> 'impozit'
+//   6. salarii: "salariu" / "salarii" in textul platii (plata salariului, creditare salarii) -> 'salariu'
+//      (dupa impozit: "Trezorerie ... contributii salarii" ramane impozit)
 // Platile intre firmele proprii NU se sar: se fac pe baza de factura, care trebuie atasata.
 //
 // Reguli pentru documente (in lib/inbox-facturi.ts si lib/tranzactii-potrivire.ts):
@@ -53,6 +55,7 @@ export const EXPLICATIE_REGULA: Record<string, string> = {
   incasare_platforma: 'Încasările Booking/Airbnb/eMAG sunt justificate de borderou / avizul de plată.',
   chirie: 'Chiria plătită unei persoane fizice nu are factură - se sare fără document.',
   impozit: 'Plățile către Trezorerie / ANAF sunt justificate de declarații (vezi Plată impozite).',
+  salariu: 'Salariile sunt justificate de statul de plată (vezi Documente angajați).',
 }
 
 export interface TxPentruReguli { descriere?: string | null; descriere_curatata?: string | null; tip?: string | null; categorie?: string | null }
@@ -73,6 +76,8 @@ const RE_CHIRIE = /\bchirie\b|\bchirii\b|\bchiria\b/
 const RE_PERSOANA_JURIDICA = /\bs\.?r\.?l\b|\bs\.?a\b|\bpfa\b|\bi\.?i\b|\bltd\b|\bgmbh\b|asociatia|\bsc\b/
 // "Avans trezorerie" = avans de numerar catre asociat, nu impozit (vezi motivSugerat -> 'asociat')
 const RE_IMPOZIT = /(?<!avans )trezorerie|\banaf\b|d\.?g\.?r\.?f\.?p|\bimpozit/
+// "Salariu septembrie", "Salariu August", "creditare salarii septembrie 2026"
+const RE_SALARIU = /\bsalari(u|i|ul|ile|ului|ilor)?\b/
 
 // Regula STANDARD (sarire automata) - vezi lista din capul fisierului. Intoarce motivul sau null.
 export function regulaAutomata(t: TxPentruReguli): MotivIgnorare | null {
@@ -84,6 +89,7 @@ export function regulaAutomata(t: TxPentruReguli): MotivIgnorare | null {
   // chiria inaintea impozitului: "Plata Instant X chirie impozit" e plata chiriei, nu a unui impozit
   if (t.tip !== 'credit' && RE_CHIRIE.test(s) && !RE_PERSOANA_JURIDICA.test(s)) return 'chirie'
   if (t.tip !== 'credit' && RE_IMPOZIT.test(s)) return 'impozit'
+  if (RE_SALARIU.test(s)) return 'salariu'
   return null
 }
 
