@@ -1,11 +1,12 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import CopyButton from '@/components/CopyButton'
+import VeziButon from '@/components/ui/VeziButon'
 import type { RandRh, FacturaRhLista } from '@/lib/cazare-rh-verificare'
 
 // Facturile de cazare RH (Oblio, emise din ApartPro) fata de rezervarile din CSV-ul Airbnb al lunii - la firmele
 // care nu factureaza cazarea in 5StarDesk (AB Textile). Se reincarca la fiecare CSV nou (cf:airbnb-refresh).
-interface VerificareRh { perioada: { de: string; pana: string }; randuri: RandRh[]; faraRezervare: FacturaRhLista[]; anulate: number }
+interface VerificareRh { perioada: { de: string; pana: string }; randuri: RandRh[]; faraRezervare: FacturaRhLista[]; anulate: number; pdfuri?: Record<string, { id: string; numar: string; suma: number | null }>; pdfTotal?: number }
 
 const zi = (d?: string | null) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}` : '' }
 const bani = (v?: number | null) => v == null ? '—' : `${new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v))} RON`
@@ -21,6 +22,20 @@ export default function FacturiRhVerificare({ firmaId, lunaId }: { firmaId: stri
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [doarProbleme, setDoarProbleme] = useState(false)
+  const [incarc, setIncarc] = useState('')
+
+  // PDF-urile facturilor RH (exportul din Oblio, una sau mai multe facturi intr-un fisier) - impartite si
+  // salvate ca facturi de vanzare, fiecare legata de rezervarea Airbnb scrisa pe ea.
+  async function incarcaPdf(files: FileList | null) {
+    if (!files?.length) return
+    setIncarc('Se împart și se salvează facturile…')
+    const fd = new FormData(); fd.set('firmaId', firmaId); fd.set('lunaId', lunaId)
+    for (const f of Array.from(files)) fd.append('file', f)
+    const res = await fetch('/api/airbnb/facturi-rh', { method: 'POST', body: fd }).catch(() => null)
+    const j = res ? await res.json().catch(() => ({})) : {}
+    setIncarc(res?.ok ? `✓ ${j.salvate?.length || 0} facturi RH salvate${j.erori?.length ? ` · ${j.erori.join('; ')}` : ''}` : (j.error || 'Încărcarea a eșuat'))
+    load()
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -74,10 +89,15 @@ export default function FacturiRhVerificare({ firmaId, lunaId }: { firmaId: stri
             style={doarProbleme ? { background: 'var(--accent-soft)', borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}>
             {doarProbleme ? 'Arată toate' : `Doar de verificat (${probleme.length})`}
           </button>}
+          <label className="btn btn-sm" title="PDF-ul exportat din Oblio cu facturile RH ale lunii - se împarte pe facturi și se leagă de rezervări">
+            ↑ PDF facturi RH{d.pdfTotal ? ` (${d.pdfTotal})` : ''}
+            <input type="file" accept="application/pdf" multiple hidden onChange={e => { incarcaPdf(e.target.files); e.target.value = '' }} />
+          </label>
           <button className="btn btn-sm" onClick={load} disabled={loading} title="Recitește facturile RH din Oblio">{loading ? 'Se verifică…' : '↻ Oblio'}</button>
         </div>
       </div>
 
+      {incarc && <div role="status" style={{ padding: '8px 16px', fontSize: 'var(--fs-sm)', color: incarc.startsWith('✓') ? 'var(--success)' : 'var(--text-secondary)', borderBottom: '1px solid var(--border-subtle)' }}>{incarc}</div>}
       {vizibile.length > 0 && <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', fontSize: 'var(--fs-sm)', minWidth: '680px' }}>
           <thead>
@@ -87,6 +107,7 @@ export default function FacturiRhVerificare({ firmaId, lunaId }: { firmaId: stri
               <th style={{ padding: '8px', fontWeight: 600 }}>Check-out</th>
               <th style={{ padding: '8px', fontWeight: 600, textAlign: 'right' }}>Brut borderou</th>
               <th style={{ padding: '8px', fontWeight: 600 }}>Factură RH</th>
+              <th style={{ padding: '8px', fontWeight: 600 }}>PDF</th>
               <th style={{ padding: '8px 16px', fontWeight: 600 }}>Stare</th>
             </tr>
           </thead>
@@ -110,6 +131,11 @@ export default function FacturiRhVerificare({ firmaId, lunaId }: { firmaId: stri
                       {' '}· {zi(r.factura.data)} · <span className="num">{bani(r.factura.total)}</span>
                       {r.stare === 'nume' && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.factura.client}</div>}
                     </> : '—'}
+                  </td>
+                  <td style={{ padding: '7px 8px', whiteSpace: 'nowrap' }}>
+                    {d.pdfuri?.[r.rezervare.cod_confirmare]
+                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><VeziButon url={`/api/chitante/document?id=${d.pdfuri[r.rezervare.cod_confirmare].id}`} nume={d.pdfuri[r.rezervare.cod_confirmare].numar} /></span>
+                      : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                   </td>
                   <td style={{ padding: '7px 16px', whiteSpace: 'nowrap' }}>
                     <span className={`badge ${cls}`} title={tip}>{txt}{r.stare === 'suma' && r.diferenta != null ? ` ${r.diferenta > 0 ? '+' : ''}${r.diferenta.toFixed(2)}` : ''}</span>

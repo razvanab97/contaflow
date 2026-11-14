@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { potrivesteFacturiAirbnb, potrivesteDupaCodRezervare, extrageCodRezervareAirbnb } from '@/lib/airbnb-reconciliere'
+import { getFirmaConfig } from '@/lib/firma-config'
+import { esteFacturaRh, importaFacturiRh } from '@/lib/facturi-rh-import'
+import { extractText, getDocumentProxy } from 'unpdf'
 
 export const maxDuration = 60
 
@@ -35,7 +38,27 @@ export async function POST(req: NextRequest) {
     .eq('luna_id', cleanLunaId)
     .like('fisier_path', '%/airbnb-facturi/%')
   if (docsError) return NextResponse.json({ error: docsError.message }, { status: 500 })
-  const orphanDocs = (docs || []).filter(d => !linkedIds.has(d.id))
+  let orphanDocs = (docs || []).filter(d => !linkedIds.has(d.id))
+
+  // Facturile de cazare RH (vanzare, Oblio) incarcate din greseala aici, in locul facturilor de comision
+  // Airbnb: se muta ca facturi de vanzare, impartite si legate de rezervari (vezi lib/facturi-rh-import).
+  let mutateRh = 0
+  const { data: firmaRow } = await sb.from('firme').select('slug,nume').eq('id', cleanFirmaId).maybeSingle()
+  if (firmaRow && getFirmaConfig(firmaRow.slug)?.facturiCazareOblio) {
+    for (const doc of orphanDocs.filter(d => !d.cod_rezervare_airbnb && d.fisier_path && (d.fisier_tip || 'application/pdf') === 'application/pdf')) {
+      const { data: blob } = await sb.storage.from('documente').download(doc.fisier_path)
+      if (!blob) continue
+      const bytes = new Uint8Array(await blob.arrayBuffer())
+      let text = ''
+      try { text = String((await extractText(await getDocumentProxy(new Uint8Array(bytes)), { mergePages: true })).text || '') } catch { continue }
+      if (!esteFacturaRh(text)) continue
+      const r = await importaFacturiRh(sb, { id: cleanFirmaId, prefix: firmaRow.nume.replace(/\s+S\.?R\.?L\.?$/i, '') }, cleanLunaId, bytes)
+      if (!r.length) continue
+      await sb.from('documente').delete().eq('id', doc.id)
+      mutateRh += r.length
+      orphanDocs = orphanDocs.filter(d => d.id !== doc.id)
+    }
+  }
 
   // Codul de rezervare e scris explicit în textul facturii; îl extragem o singură dată
   // per factură (AI) și îl ținem minte, ca reconcilierile următoare să nu-l mai ceară.
@@ -94,6 +117,7 @@ export async function POST(req: NextRequest) {
     dupaSuma: potriviriSuma.length,
     ramanNepotrivite: (rows?.length || 0) - totalPotrivite,
     ramanDeCitit,
+    mutateRh,
   })
 }
 

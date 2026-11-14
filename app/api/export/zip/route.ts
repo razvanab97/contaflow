@@ -24,6 +24,7 @@ function pathToSection(path: string): string {
   if (p.includes('/booking-borderou/')) return 'booking-borderou'
   if (p.includes('/airbnb-facturi/')) return 'airbnb-facturi'
   if (p.includes('/airbnb-borderou/')) return 'airbnb-borderou'
+  if (p.includes('/facturi-rh/')) return 'facturi-rh'
   if (p.includes('/5stardesk/')) return '5stardesk'
   if (p.includes('/trendyol/')) return 'trendyol'
   if (p.includes('/emag-calcul/') || p.includes('/emag-avize/') || p.includes('/emag-facturi/')) return 'emag'
@@ -37,6 +38,7 @@ function sectionLabel(section: string): string {
   const def = MODULE_DEFS[section as keyof typeof MODULE_DEFS]
   if (def) return def.label
   if (section === 'altele') return 'Alte documente'
+  if (section === 'facturi-rh') return 'Facturi emise · cazare (RH)'
   return section
 }
 
@@ -187,6 +189,15 @@ export async function POST(req: NextRequest) {
     if (sectionMap.has('booking-borderou') && !ordered.includes('booking-borderou')) {
       const i = ordered.indexOf('booking-facturi')
       ordered.splice(i >= 0 ? i + 1 : ordered.length, 0, 'booking-borderou')
+    }
+    // Facturile de vanzare RH (cazare, Oblio) imediat dupa borderoul Airbnb pe care il factureaza, in ordinea numerelor
+    if (sectionMap.has('facturi-rh')) {
+      const nr = (e: Entry) => Number(e.name.match(/RH[ _]0*(\d+)/)?.[1] || 0)
+      sectionMap.set('facturi-rh', [...sectionMap.get('facturi-rh')!].sort((a, b) => nr(a) - nr(b)))
+    }
+    if (sectionMap.has('facturi-rh') && !ordered.includes('facturi-rh')) {
+      const i = ordered.indexOf('airbnb-borderou')
+      ordered.splice(i >= 0 ? i + 1 : ordered.length, 0, 'facturi-rh')
     }
     for (const sec of sectionMap.keys()) {
       if (!ordered.includes(sec)) ordered.push(sec)
