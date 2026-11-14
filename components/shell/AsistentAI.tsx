@@ -5,6 +5,7 @@ import { deschideDocument, esteDocumentVizualizabil } from '@/lib/vizualizare'
 import Icon from '@/components/ui/Icon'
 import { pregatesteImagine, faraImagini, limiteazaImagini, MAX_IMAGINI, type ImagineAi } from '@/lib/asistent-imagini'
 import css from './AsistentAI.module.css'
+import { anuntaSarciniSchimbate } from '@/lib/sarcini-eveniment'
 
 type Firma = { id: string; slug: string; nume: string }
 type Actiune = { id: string; nume: string; descriere: string }
@@ -147,7 +148,8 @@ export default function AsistentAI({ open, onClose, firme, firma, luna, cale }: 
     const item = stare.items[index]
     if (item?.tip !== 'confirma' || item.decis || lucru) return
     actualizeaza(s => ({ ...s, items: s.items.map((x, i) => i === index ? { ...item, decis: aproba ? 'da' : 'nu' } : x) }))
-    void pas({ decizii: item.actiuni.map(a => ({ id: a.id, aproba })) })
+    // dupa actiunile aprobate (ex. bifeaza_sarcina) meniul isi recitește bifele modulelor
+    void pas({ decizii: item.actiuni.map(a => ({ id: a.id, aproba })) }).then(() => { if (aproba) anuntaSarciniSchimbate() })
   }
 
   function adaugaFisiere(lista: FileList | File[]) {

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { anuntaSarciniSchimbate } from '@/lib/sarcini-eveniment'
 
 export interface TaskItem {
   key: string
@@ -55,6 +56,7 @@ export default function TaskSection({ tasks, lunaId, culoare, onItemsChange }: P
         setTimeout(() => setCelebrate(false), 1900)
         window.dispatchEvent(new CustomEvent('cf:toast', { detail: { text: 'Modul complet — toate task-urile sunt bifate.', tone: 'success', confetti: true } }))
       }
+      anuntaSarciniSchimbate()
       router.refresh()
     }
     setLoading(null)

@@ -13,6 +13,7 @@ import ExtrasWorkspace from './components/ExtrasWorkspace'
 import NextStepNav from '../NextStepNav'
 import { motivSugerat, ignorareDeVerificat, MOTIV_LABEL, MOTIVE_FIZICE } from '@/lib/tranzactii-reguli'
 import { areAchizitiiProduse } from '@/lib/achizitii-produse'
+import { anuntaSarciniSchimbate } from '@/lib/sarcini-eveniment'
 
 const EXTRAS_UNLOCK_CODES: Record<string, string> = {
   'ab-homes-invest': '48867823',
@@ -272,6 +273,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
           return
         }
       }
+      anuntaSarciniSchimbate()
       setFinalizeMsg({ ok: true, text: value ? 'Salvat: Extras de cont e finalizat și apare bifat în Rezumatul lunii.' : 'Finalizarea a fost anulată.' })
     } catch {
       setFinalizat(previous)

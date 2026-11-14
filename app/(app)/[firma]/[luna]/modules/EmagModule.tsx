@@ -7,6 +7,7 @@ import TaskSection, { TaskItem } from './TaskSection'
 import CopyButton from '@/components/CopyButton'
 import { tint } from '@/lib/colors'
 import BorderouriEmag from './BorderouriEmag'
+import { anuntaSarciniSchimbate } from '@/lib/sarcini-eveniment'
 
 interface Firma { id:string; slug:string; nume:string; culoare:string }
 interface ChecklistItem { id:string; completat:boolean; checklist_templates?:{ titlu:string; descriere?:string; modul:string; ordine:number } }
@@ -607,7 +608,7 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lunaId, taskKey, completat }),
     }).then(res => {
-      if (res.ok) return
+      if (res.ok) { anuntaSarciniSchimbate(); return }
       taskStatusRef.current = { ...taskStatusRef.current, [taskKey]: !completat }
       setModuleTasks(prev => prev.map(t => t.key === taskKey ? { ...t, completat: !completat } : t))
     }).catch(() => {

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { StareFirma } from '@/lib/sistem-lucru'
+import { anuntaSarciniSchimbate } from '@/lib/sarcini-eveniment'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 const CHEIE_EMAIL = 'cf:email-contabil'
@@ -50,7 +51,7 @@ export default function PachetContabil({ firma, lunaId, raspuns }: { firma: Firm
 
   async function marcheazaTrimis() {
     const res = await fetch('/api/tasks/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lunaId, taskKey: 'sistem.pachet_trimis', completat: !s.pachetTrimis }) }).catch(() => null)
-    if (res?.ok) load()
+    if (res?.ok) { anuntaSarciniSchimbate(); load() }
   }
 
   return (

@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { anuntaSarciniSchimbate } from '@/lib/sarcini-eveniment'
 
 // „Plătit” pe un reminder din „De făcut” (calendarul plăților recurente): bifează task-ul lunii. Rămâne pe loc cu
 // „Anulează” până la următoarea încărcare a paginii, ca o bifă greșită să se poată desface.
@@ -13,7 +14,7 @@ export default function MarcheazaPlata({ lunaId, taskKey }: { lunaId: string; ta
     const res = await fetch('/api/tasks/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lunaId, taskKey, completat }) }).catch(() => null)
     setLucru(false)
     if (!res?.ok) { setEroare('Nu s-a putut salva'); return }
-    setGata(completat)
+    setGata(completat); anuntaSarciniSchimbate()
   }
 
   if (gata) {

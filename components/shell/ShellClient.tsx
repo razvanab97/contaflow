@@ -8,6 +8,7 @@ import AsistentAI from './AsistentAI'
 import ProiectPopup, { CHEIE_STARE } from './ProiectPopup'
 import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
 import { etichetaLunaScurta } from '@/lib/accounting-period'
+import { EVENIMENT_SARCINI } from '@/lib/sarcini-eveniment'
 
 interface Props {
   initialFirmeNav: FirmaNav[]
@@ -32,6 +33,13 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
   const [firmeNav, setFirmeNav] = useState(initialFirmeNav)
   const [restanteCount, setRestanteCount] = useState(0)
   const [moduleComplete, setModuleComplete] = useState<Record<string, boolean>>({})
+  // Creste la fiecare bifa salvata (evenimentul „cf:sarcini”) -> meniul isi recitește bifele modulelor
+  const [navRev, setNavRev] = useState(0)
+  useEffect(() => {
+    const f = () => setNavRev(n => n + 1)
+    window.addEventListener(EVENIMENT_SARCINI, f)
+    return () => window.removeEventListener(EVENIMENT_SARCINI, f)
+  }, [])
   const [menuOpen, setMenuOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -71,7 +79,7 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
   const firmaId = firmaAtivaObj?.id
 
   useEffect(() => {
-    if (!firmaId && lunaEfectiva === initialLuna) return
+    if (!firmaId && lunaEfectiva === initialLuna && !navRev) return
     let cancelled = false
     const qs = new URLSearchParams({ luna: lunaEfectiva })
     if (firmaId) qs.set('firmaId', firmaId)
@@ -86,7 +94,7 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [lunaEfectiva, firmaId, firmaSlug, initialLuna])
+  }, [lunaEfectiva, firmaId, firmaSlug, initialLuna, navRev])
 
   // Blocheaza scroll-ul paginii cat timp sertarul de navigatie e deschis pe mobil.
   useEffect(() => {
