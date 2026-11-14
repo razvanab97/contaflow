@@ -117,7 +117,7 @@ async function extrageBorderouriLipsa(sb: ReturnType<typeof getServiceSupabase>,
   const { data: borderouDocs } = await sb.from('documente')
     .select('id,fisier_path,fisier_nume')
     .eq('luna_id', lunaId)
-    .or('fisier_path.like.%/airbnb-borderou/%,fisier_path.like.%/booking-borderou/%,fisier_path.like.%/booking-borderou-lucru/%')
+    .or('fisier_path.like.%/airbnb-borderou/%,fisier_path.like.%/booking-borderou/%,fisier_path.like.%/booking-borderou-contabil/%')
   const { data: existingRez, error: existingRezError } = await sb.from('borderou_rezervari').select('document_id,platforma,cod_rezervare').eq('luna_id', lunaId)
   if (existingRezError) throw existingRezError
   const extractedRezDocIds = new Set((existingRez || []).map(r => r.document_id))
@@ -133,7 +133,7 @@ async function extrageBorderouriLipsa(sb: ReturnType<typeof getServiceSupabase>,
     try { rezervari = await extractInBatches(bytes, PAGES_PER_BATCH, b => extractBorderou(b, platforma)) }
     catch (err) { console.error('[5stardesk] extracție borderou eșuată pentru documentul', doc.id, doc.fisier_nume, err) }
     rezervari = dedupeByCode(rezervari)
-    // Cele doua rapoarte nu sunt doua surse de rezervari; nici reimportul unui sumar nu dubleaza codurile.
+    // Sumarul platilor furnizeaza valoarea bruta de facturat, nu Final amount din Reservation Statement.
     if (platforma === 'booking') rezervari = rezervari.filter(r => {
       const code = normalizeCode(r.codRezervare || '')
       return code && !bookingCodes.has(code)

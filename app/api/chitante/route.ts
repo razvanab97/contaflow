@@ -104,7 +104,7 @@ async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<
       system: BOOKING_CLASSIFICATION_HINT,
       messages: [{ role: 'user', content: [
         source,
-        { type: 'text', text: `Extrage datele documentului. Raspunde DOAR cu JSON: {"furnizor":"emitentul sau platforma","numarDocument":"seria si numarul documentului, exact ca in sursa","suma":123.45,"dataDocument":"AAAA-LL-ZZ","locatie":"apartamentul/adresa/locul de consum, altfel null","codLocatie":"codul proprietatii Booking din antet, altfel null","tipDocumentBooking":"factura sau borderou-contabil sau borderou-plati, altfel null","codRezervare":"codul de confirmare, la Airbnb de obicei HM..., altfel null"}. suma este totalul; pentru Reservation Statement este totalul Final amount, iar pentru sumarul platilor este totalul Net. dataDocument este data emiterii. Lasa null campurile absente. Nu inventa date.` },
+        { type: 'text', text: `Extrage datele documentului. Raspunde DOAR cu JSON: {"furnizor":"emitentul sau platforma","numarDocument":"seria si numarul documentului, exact ca in sursa","suma":123.45,"dataDocument":"AAAA-LL-ZZ","locatie":"apartamentul/adresa/locul de consum, altfel null","codLocatie":"codul proprietatii Booking din antet, altfel null","tipDocumentBooking":"factura sau borderou-rezervari sau borderou-plati, altfel null","codRezervare":"codul de confirmare, la Airbnb de obicei HM..., altfel null"}. suma este totalul; pentru Reservation Statement este totalul Final amount, iar pentru sumarul platilor este totalul Net. dataDocument este data emiterii. Lasa null campurile absente. Nu inventa date.` },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -402,7 +402,8 @@ export async function POST(req: NextRequest) {
     effectiveDocumentType = type
     if (genericExtractie && pdf?.code) genericExtractie.codLocatie = pdf.code
     if (!genericExtractie) genericExtractie = { furnizor: 'Booking.com', numarDocument: null, suma: null, dataDocument: null, locatie: null, codLocatie: pdf?.code || null, tipDocumentBooking: type, codRezervare: null }
-    effectiveDocumentTypeLabel = type === 'borderou-contabil' ? 'Borderou contabil Booking' : type === 'borderou-plati' ? 'Sumar plati Booking - lucru intern' : effectiveDocumentTypeLabel
+    if (pdf?.amount != null) genericExtractie.suma = pdf.amount
+    effectiveDocumentTypeLabel = type === 'borderou-plati' ? 'Borderou contabil Booking - sumar plati' : type === 'borderou-rezervari' ? 'Rezervari Booking - lucru intern' : effectiveDocumentTypeLabel
   }
 
   if (effectiveSection === 'booking-facturi' && file.type === 'application/pdf') {

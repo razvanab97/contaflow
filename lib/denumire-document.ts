@@ -10,7 +10,7 @@ type Sb = ReturnType<typeof import('@/lib/supabase/server').getServiceSupabase>
 
 const TIP_LABEL: Record<string, string> = {
   factura: 'Factura', invoice: 'Factura', bon: 'Bon', chitanta: 'Chitanta', aviz_plata: 'Aviz plata',
-  borderou: 'Borderou', 'borderou-contabil': 'Borderou contabil Booking', 'borderou-plati': 'Sumar plati Booking - lucru intern', stat_plata: 'Stat de plata', pontaj: 'Pontaj', foaie_prezenta: 'Foaie prezenta',
+  borderou: 'Borderou', 'borderou-rezervari': 'Rezervari Booking - lucru intern', 'borderou-plati': 'Borderou contabil Booking - sumar plati', stat_plata: 'Stat de plata', pontaj: 'Pontaj', foaie_prezenta: 'Foaie prezenta',
   centralizator: 'Centralizator', contract: 'Contract', extras: 'Extras de cont', dispozitie: 'Dispozitie de plata',
   altul: 'Document', document: 'Document',
 }

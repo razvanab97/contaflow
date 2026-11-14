@@ -179,15 +179,15 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
           Fiecare proprietate are un cod (numărul unității de cazare din Booking) — facturile de comision și borderourile se grupează automat după acest cod, extras din documentul încărcat.
         </div>
         <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-888888)', lineHeight: 1.5 }}>
-          Borderou contabil (Reservation Statement): inclus în dosarul pentru contabilitate. Sumarul plăților: lucru intern, pentru verificarea rezervărilor și încasărilor; nu intră în PDF-ul sau ZIP-ul contabil. Documentele istorice rămân neschimbate.
+          Reservation Statement: document de lucru intern, exclus din PDF-ul și ZIP-ul contabil. Sumarul plăților: borderou pentru contabilitate, inclus în export; sumele sale sunt folosite și la verificarea facturilor. Documentele istorice rămân neschimbate.
         </p>
         <label style={{ fontSize: 'var(--fs-sm)' }}>
           Afișează documentele: {' '}
           <select value={documentFilter} onChange={e => setDocumentFilter(e.target.value)} style={{ padding: '8px', background: 'var(--c-161616)', color: 'var(--c-eeeeee)', borderRadius: 'var(--r-md)' }}>
             <option value="toate">Toate tipurile</option>
             <option value="factura">Facturi Booking</option>
-            <option value="borderou-contabil">Borderouri pentru contabilitate</option>
-            <option value="borderou-plati">Sumare de plăți · lucru intern</option>
+            <option value="borderou-plati">Sumare de plăți · contabilitate</option>
+            <option value="borderou-rezervari">Reservation Statement · lucru intern</option>
             <option value="borderou">Borderouri istorice</option>
           </select>
         </label>
@@ -224,8 +224,8 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
           {activeLocatii.map(loc => {
             const facturi = docsFacturi.filter(d => d.cod_unitate_booking === loc.cod)
             const borderouri = docsBorderou.filter(d => d.cod_unitate_booking === loc.cod)
-            const contabile = borderouri.filter(d => d.tip_document === 'borderou-contabil').length
-            const lucru = borderouri.filter(d => d.tip_document === 'borderou-plati').length
+            const contabile = borderouri.filter(d => d.tip_document === 'borderou-plati').length
+            const lucru = borderouri.filter(d => d.tip_document === 'borderou-rezervari').length
             const istorice = borderouri.length - contabile - lucru
             const complet = facturi.length > 0 && contabile > 0 && lucru > 0
             return (

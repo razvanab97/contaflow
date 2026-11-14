@@ -108,7 +108,7 @@ async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null
       system: BOOKING_CLASSIFICATION_HINT,
       messages: [{ role: 'user', content: [
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: bytes.toString('base64') } },
-        { type: 'text', text: `Extrage datele documentului PDF. Raspunde DOAR cu JSON: {"furnizor":"emitentul sau platforma","numarDocument":"seria si numarul documentului, exact ca in sursa","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul proprietatii Booking din antet, altfel null","tipDocumentBooking":"factura sau borderou-contabil sau borderou-plati, altfel null"}. suma este totalul; pentru Reservation Statement este totalul Final amount, iar pentru sumarul platilor este totalul Net. Pentru facturi Airbnb copiaza si codul rezervarii daca apare. Lasa null campurile absente. Nu inventa date.` },
+        { type: 'text', text: `Extrage datele documentului PDF. Raspunde DOAR cu JSON: {"furnizor":"emitentul sau platforma","numarDocument":"seria si numarul documentului, exact ca in sursa","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul proprietatii Booking din antet, altfel null","tipDocumentBooking":"factura sau borderou-rezervari sau borderou-plati, altfel null"}. suma este totalul; pentru Reservation Statement este totalul Final amount, iar pentru sumarul platilor este totalul Net. Pentru facturi Airbnb copiaza si codul rezervarii daca apare. Lasa null campurile absente. Nu inventa date.` },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -234,6 +234,7 @@ export async function POST(req: NextRequest) {
     effectiveDocumentType = type
     if (genericExtractie && pdf.code) genericExtractie.codLocatie = pdf.code
     if (!genericExtractie) genericExtractie = { furnizor: 'Booking.com', numarDocument: null, suma: null, dataDocument: null, codLocatie: pdf.code, tipDocumentBooking: type }
+    if (pdf.amount != null) genericExtractie.suma = pdf.amount
   }
   let transaction: { id:string; document_id:string|null; extras_id:string; data_tranzactie:string; descriere_curatata:string|null; descriere:string|null; suma:number } | null = null
   if (transactionId) {

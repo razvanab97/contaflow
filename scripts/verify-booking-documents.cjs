@@ -55,19 +55,22 @@ async function main() {
   const helpers = load('lib/booking-documents.ts')
   assert.equal(helpers.normalizeBookingType('borderou'), null)
   assert.equal(helpers.normalizeBookingType('inventat'), null)
-  assert.equal(helpers.bookingTypeFromText('Reservation Statement - 2026-10 Invoice number'), 'borderou-contabil')
+  assert.equal(helpers.bookingTypeFromText('Reservation Statement - 2026-10 Invoice number'), 'borderou-rezervari')
   assert.equal(helpers.bookingTypeFromText('Booking.com Sumarul plăților pentru octombrie'), 'borderou-plati')
   assert.equal(helpers.bookingTypeFromText('Factura Booking.com Suma totala de plata'), null)
   assert.equal(helpers.bookingTypeFromText('Airbnb Payment statement'), null)
   const readPdf = load('lib/booking-document-pdf.ts').identifyBookingPdf
   const upload = load('app/api/chitante/route.ts').POST
   for (const [name, title, type, section] of [
-    ['reservation_statements_overview_2026-10-7.pdf', 'Reservation Statement - 2026-10\nSkyPort ID: 15331624', 'borderou-contabil', 'booking-borderou-contabil'],
-    ['2026-10-2.pdf', 'Booking.com Sumarul platilor pentru octombrie\nNumarul unitatii de cazare\n15331624', 'borderou-plati', 'booking-borderou-lucru'],
+    ['reservation_statements_overview_2026-10-7.pdf', 'Reservation Statement - 2026-10\nSkyPort ID: 15331624', 'borderou-rezervari', 'booking-borderou-lucru'],
+    ['2026-10-2.pdf', 'Booking.com Sumarul platilor pentru octombrie\nNumarul unitatii de cazare\n15331624', 'borderou-plati', 'booking-borderou-contabil'],
   ]) {
     const original = path.join(os.homedir(), 'Downloads', name)
     const bytes = fs.existsSync(original) ? fs.readFileSync(original) : await fixture(title)
-    assert.deepEqual(await readPdf(bytes), { type, code: '15331624' })
+    const identified = await readPdf(bytes)
+    assert.equal(identified.type, type)
+    assert.equal(identified.code, '15331624')
+    if (fs.existsSync(original)) assert.equal(identified.amount, type === 'borderou-rezervari' ? 4311.92 : 3829.15)
     const fd = new FormData()
     fd.set('file', new File([bytes], name, { type: 'application/pdf' }))
     fd.set('firmaId', 'test-firma'); fd.set('lunaId', 'test-luna'); fd.set('section', 'booking-auto')
@@ -77,7 +80,7 @@ async function main() {
     assert.equal(doc.tip_document, type)
     assert.equal(doc.cod_unitate_booking, '15331624')
     assert.ok(doc.fisier_path.includes(`/${section}/`))
-    assert.equal(doc.in_zip, type === 'borderou-contabil')
+    assert.equal(doc.in_zip, type === 'borderou-plati')
     assert.deepEqual(files.get(doc.fisier_path), bytes)
   }
   aiType = null
@@ -94,14 +97,14 @@ async function main() {
   }
   const verification = fs.readFileSync(path.join(root, 'app/api/5stardesk/verifica/route.ts'), 'utf8')
   const selection = verification.match(/\.or\('([^']+)'\)/)[1]
-  assert.ok(selection.includes('/booking-borderou-lucru/'))
+  assert.ok(selection.includes('/booking-borderou-contabil/'))
   assert.ok(selection.includes('/booking-borderou/'))
-  assert.ok(!selection.includes('/booking-borderou-contabil/'))
+  assert.ok(!selection.includes('/booking-borderou-lucru/'))
   assert.ok(verification.includes('!bookingCodes.has(code)'))
   const documents = [
-    { id: 'accounting', fisier_path: 'f/m/booking-borderou-contabil/a.pdf' },
-    { id: 'working-1', fisier_path: 'f/m/booking-borderou-lucru/b.pdf' },
-    { id: 'working-2', fisier_path: 'f/m/booking-borderou-lucru/c.pdf' },
+    { id: 'internal', fisier_path: 'f/m/booking-borderou-lucru/a.pdf' },
+    { id: 'payments-1', fisier_path: 'f/m/booking-borderou-contabil/b.pdf' },
+    { id: 'payments-2', fisier_path: 'f/m/booking-borderou-contabil/c.pdf' },
   ]
   const reservations = [{ document_id: 'old', platforma: 'booking', cod_rezervare: '111' }]
   const downloaded = []
@@ -136,7 +139,7 @@ async function main() {
   }))
   assert.equal(result.status, 200)
   assert.equal(downloaded.length, 2)
-  assert.ok(downloaded.every(p => p.includes('/booking-borderou-lucru/')))
+  assert.ok(downloaded.every(p => p.includes('/booking-borderou-contabil/')))
   assert.deepEqual(reservations.map(row => row.cod_rezervare), ['111', '222'])
   const exportDownloads = []
   sb = {
@@ -158,12 +161,12 @@ async function main() {
     }))
     assert.equal(exportResult.status, 200)
     const bytes = Buffer.from(await exportResult.arrayBuffer())
-    if (format === 'pdf') assert.equal((await PDFDocument.load(bytes)).getPageCount(), 2)
+    if (format === 'pdf') assert.equal((await PDFDocument.load(bytes)).getPageCount(), 1 + (await PDFDocument.load(files.get(stored[1].fisier_path))).getPageCount())
     else {
       const zip = await require('jszip').loadAsync(bytes)
       const entries = Object.values(zip.files).filter(entry => !entry.dir)
       assert.equal(entries.length, 1)
-      assert.ok(entries[0].name.includes(stored[0].fisier_nume))
+      assert.ok(entries[0].name.includes(stored[1].fisier_nume))
     }
   }
   assert.equal(exportDownloads.length, 2)
