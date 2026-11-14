@@ -137,7 +137,7 @@ export default function AirbnbRezervari({ firmaId, lunaId, mod }: { firmaId: str
                 <tr key={i.id} style={{ borderTop: '1px solid var(--border-subtle)', background: ok ? undefined : 'color-mix(in srgb, var(--warning) 5%, transparent)' }}>
                   <td style={{ padding: '7px 16px' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <CopyButton value={i.cod_confirmare} />
+                      <CopyButton value={i.cod_confirmare} persistKey={`airbnb:${i.cod_confirmare}`} />
                       <span className="num" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{i.cod_confirmare}</span>
                     </span>
                   </td>

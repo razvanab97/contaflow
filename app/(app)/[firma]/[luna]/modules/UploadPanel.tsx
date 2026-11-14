@@ -428,7 +428,7 @@ export default function UploadPanel({
                     <div key={item.id} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'10px', alignItems:'center', padding:'8px 10px', border:'1px solid var(--c-222222)', borderRadius:'var(--r-md)', background:attached ? 'light-dark(rgba(5,150,105,.12), rgba(110,231,176,.06))' : 'var(--c-141414)' }}>
                       <div style={{ minWidth:0 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:'6px', minWidth:0 }}>
-                          <CopyButton value={item.cod_confirmare} />
+                          <CopyButton value={item.cod_confirmare} persistKey={`airbnb:${item.cod_confirmare}`} />
                           <span style={{ fontSize:'var(--fs-sm)', fontWeight:700, color:attached ? 'var(--success)' : 'var(--c-cccccc)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                             {item.cod_confirmare} · {item.oaspete || 'oaspete necitit'} · {formatCurrency(item.suma, item.moneda)}
                           </span>

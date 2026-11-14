@@ -118,7 +118,7 @@ export default function FacturiRhVerificare({ firmaId, lunaId }: { firmaId: stri
                 <tr key={r.rezervare.id} style={{ borderTop: '1px solid var(--border-subtle)', background: r.stare === 'ok' ? undefined : 'color-mix(in srgb, var(--warning) 5%, transparent)' }}>
                   <td style={{ padding: '7px 16px' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <CopyButton value={r.rezervare.cod_confirmare} />
+                      <CopyButton value={r.rezervare.cod_confirmare} persistKey={`airbnb:${r.rezervare.cod_confirmare}`} />
                       <span className="num" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{r.rezervare.cod_confirmare}</span>
                     </span>
                   </td>
