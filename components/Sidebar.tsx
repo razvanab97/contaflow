@@ -71,6 +71,8 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
 
   const firmaObj = firme.find(f => f.slug === firmaAtiva)
   const doneCount = moduleFirma ? moduleFirma.filter(m => moduleComplete?.[m.slug]).length : 0
+  // Sectiunea „in lucru”: primul modul nebifat, in ordinea de lucru a lunii - marcat cu un punct care pulseaza
+  const modulInLucru = moduleFirma?.find(m => !moduleComplete?.[m.slug])?.slug
 
   const firmaLinks = firmaAtiva ? [
     { href: `/${firmaAtiva}/furnizori`, label: 'Furnizori', icon: 'users', match: '/furnizori' },
@@ -159,16 +161,18 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
                 const href = `/${firmaAtiva}/${lunaCurenta}/${m.linkDirect || m.slug}`
                 const isCurrentMod = m.slug === modulActiv || (!!m.linkDirect && m.linkDirect === modulActiv)
                 const isComplete = !!moduleComplete?.[m.slug]
+                const inLucru = m.slug === modulInLucru
                 const link = (
                   <Link key={m.slug} href={href}
                     className={`nav-item${isCurrentMod ? ' is-active' : ''}${isComplete && !isCurrentMod ? ' is-done' : ''}`}
                     aria-current={isCurrentMod ? 'page' : undefined}
-                    title={isComplete ? `${m.label} — complet` : m.label}>
+                    title={isComplete ? `${m.label} — complet` : inLucru ? `${m.label} — în lucru (următorul pas al lunii)` : m.label}>
                     <span className="nav-icon"><Icon name={MODULE_ICONS[m.slug] || 'fileText'} /></span>
                     <span className="nav-text">{m.label}</span>
                     {m.slug === 'facturi-restante' && !!restanteCount && (
                       <span className="badge badge-danger" style={{ height: '18px', padding: '0 6px' }}>{restanteCount}</span>
                     )}
+                    {inLucru && <span className="nav-inlucru" role="status" aria-label="în lucru" />}
                     {isComplete && (
                       <span style={{ color: 'var(--success)', display: 'inline-flex' }} aria-label="complet"><Icon name="check" size={14} strokeWidth={2.25} /></span>
                     )}

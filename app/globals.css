@@ -572,6 +572,10 @@ a.btn-primary:hover { background: color-mix(in oklab, var(--accent-solid) 88%, w
 .nav-item .nav-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-item .nav-meta { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); flex-shrink: 0; }
 .nav-item.is-done .nav-text { color: var(--text-muted); }
+.nav-inlucru { position: relative; width: 8px; height: 8px; margin-right: 3px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.nav-inlucru::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--accent); animation: nav-inlucru-puls 1.8s ease-out infinite; }
+@keyframes nav-inlucru-puls { from { transform: scale(1); opacity: .6; } to { transform: scale(2.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .nav-inlucru::after { animation: none; } }
 
 .app-header {
   position: sticky; top: 0; z-index: 40;
