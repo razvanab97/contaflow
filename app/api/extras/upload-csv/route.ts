@@ -325,9 +325,9 @@ export async function POST(req: NextRequest) {
     const file = fd.get('csv') as File
     const firmaId = fd.get('firmaId') as string
     const lunaId = fd.get('lunaId') as string
-    const selectedValuta = String(fd.get('valuta') || '').toUpperCase()
+    const valutaCeruta = String(fd.get('valuta') || '').toUpperCase()
 
-    if (!file || !firmaId || !lunaId || !selectedValuta)
+    if (!file || !firmaId || !lunaId || !valutaCeruta)
       return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
 
     const text = await file.text()
@@ -335,6 +335,8 @@ export async function POST(req: NextRequest) {
 
     if (parsedData.rows.length === 0)
       return NextResponse.json({ error: 'CSV gol sau format invalid' }, { status: 400 })
+    // „Alt cont” (AUTO): moneda contului se ia din antetul CSV-ului (ex. un al doilea cont RON)
+    const selectedValuta = valutaCeruta === 'AUTO' ? String(parsedData.valuta || parsedData.rows[0]?.valuta || 'RON').toUpperCase() : valutaCeruta
 
     // Group by valuta (either from parsed metadata or default to what's in rows or 'RON')
     const byValuta: Record<string, any[]> = {}

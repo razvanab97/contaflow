@@ -38,6 +38,7 @@ export default function ExtrasHeader({
               return (
                 <button key={e.id} onClick={() => onSelectExtras(e.id)} aria-pressed={active} className="btn btn-sm" style={{ fontWeight:600, borderColor: active ? 'var(--accent)' : undefined, background: active ? 'var(--accent-soft)' : undefined, color: active ? 'var(--accent)' : 'var(--text-secondary)' }}>
                   {e.valuta}{e.iban ? ` ····${e.iban.slice(-6)}` : ''}
+                  {!e.pdf_path && <span title="PDF-ul extrasului nu e atașat — necesar pentru contabil (Importă extras → Atașează PDF)" style={{ marginLeft:'6px', fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--warning)' }}>· fără PDF</span>}
                 </button>
               )
             })}

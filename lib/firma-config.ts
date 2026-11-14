@@ -78,16 +78,16 @@ export interface FirmaConfigDef {
 const AIRBNB_LA_AB_TEXTILE: [string, string] = ['2026-11', '2027-01']
 
 // Ordinea reflectă fluxul logic de lucru al unei luni de contabilitate, nu ordinea în care au
-// fost adăugate modulele în cod: întâi se adună documentele de venit (marketplace-urile, adăugate
-// separat per firmă, înaintea acestei liste comune) și de cheltuială (Inbox Facturi/restante/
-// chitanțe), apoi se emit dispozițiile de plată pe baza lor, apoi HR/acte (independente), abia
-// apoi Extras de cont (are nevoie ca documentele de mai sus să existe deja, ca să aibă ce asocia
-// pe tranzacții), apoi Impozite (calculate pe baza lunii deja complete) și, la final, Raportul
-// lunar - rezumatul, ultimul pas. Ordinea asta e și ordinea afișată în lista de module (poate fi
-// suprascrisă manual per-utilizator din "Setează ordinea", care rămâne neschimbată de asta).
+// fost adăugate modulele în cod: întâi platformele (marketplace / rezervări, adăugate separat per
+// firmă, înaintea acestei liste comune), apoi Extrasul de cont - importat din CSV, el asociază singur
+// facturile deja sosite în Inbox (folder local / Gmail) cu plățile, iar PDF-ul băncii se atașează
+// separat, pentru contabil; documentele adăugate ulterior se asociază la redeschiderea Extrasului.
+// Apoi ce n-are plată (Inbox, restante, chitanțe), dispozițiile, HR/acte, Impozite și, la final,
+// Raportul lunar și mailul contabilului. Ordinea asta e și ordinea afișată în lista de module (poate
+// fi suprascrisă manual per-utilizator din "Setează ordinea", care rămâne neschimbată de asta).
 const COMUNE: ModuleSlug[] = [
-  'inbox-facturi', 'facturi-restante', 'facturi-chitanta', 'dispozitie-plata',
-  'angajati', 'acte-contabile', 'bonuri', 'extras', 'impozite', 'raport-lunar',
+  'extras', 'inbox-facturi', 'facturi-restante', 'facturi-chitanta', 'dispozitie-plata',
+  'angajati', 'acte-contabile', 'bonuri', 'impozite', 'raport-lunar',
   // Mailurile contabilului (ce lipseste / e neclar) - verificate cu AI fata de datele din platforma.
   'mail-contabil',
 ]

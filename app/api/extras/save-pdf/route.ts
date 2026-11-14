@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ibanDinPdf, verificaContPdf } from '@/lib/extras-pdf-cont'
 
 const SB = 'https://aqlmuoaaipbanjdptleg.supabase.co'
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -18,6 +19,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Selectează un fișier PDF' }, { status: 400 })
 
     const buf = Buffer.from(await file.arrayBuffer())
+
+    // PDF-ul trebuie sa fie al acestui cont (IBAN / moneda) - altfel ZIP-ul pentru contabil ar primi
+    // extrasul altui cont, iar al acestuia ar lipsi.
+    const contRes = await fetch(`${SB}/rest/v1/extrase?id=eq.${extrasId}&select=valuta,iban`, { headers: SBH })
+    const [cont] = contRes.ok ? await contRes.json() : []
+    if (!cont) return NextResponse.json({ error: 'Extrasul nu a fost găsit' }, { status: 404 })
+    const ibanPdf = await ibanDinPdf(new Uint8Array(buf), file.name)
+    const refuz = verificaContPdf(ibanPdf, cont)
+    if (refuz) return NextResponse.json({ error: refuz }, { status: 422 })
     const storagePath = `${firmaId}/${lunaId}/${extrasId}_${Date.now()}.pdf`
 
     const upRes = await fetch(`${SB}/storage/v1/object/extrase-pdf/${storagePath}`, {
@@ -30,7 +40,8 @@ export async function POST(req: NextRequest) {
     const dbRes = await fetch(`${SB}/rest/v1/extrase?id=eq.${extrasId}`, {
       method: 'PATCH',
       headers: { ...SBH, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ pdf_path: storagePath, pdf_nume: file.name }),
+      // contul fara IBAN (importat inainte de citirea antetului CSV) il primeste din PDF
+      body: JSON.stringify({ pdf_path: storagePath, pdf_nume: file.name, ...(!cont.iban && ibanPdf ? { iban: ibanPdf } : {}) }),
     })
     if (!dbRes.ok) return NextResponse.json({ error: 'DB: ' + await dbRes.text() }, { status: 500 })
 

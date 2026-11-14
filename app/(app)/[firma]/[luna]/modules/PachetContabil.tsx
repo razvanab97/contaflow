@@ -25,6 +25,7 @@ export default function PachetContabil({ firma, lunaId, raspuns }: { firma: Firm
   const s = d.stare
   const verificari: { ok: boolean; text: string; href: string }[] = [
     { ok: s.extrase > 0, text: s.extrase ? `Extrase încărcate (${s.extrase})` : 'Extrasele lunii nu sunt încărcate', href: `/${firma.slug}/${d.lunaKey}/extras` },
+    ...(s.extrase > 0 ? [{ ok: !s.extraseFaraPdf, text: s.extraseFaraPdf ? `${s.extraseFaraPdf} ${s.extraseFaraPdf === 1 ? 'extras fără PDF-ul băncii' : 'extrase fără PDF-ul băncii'} (atașează-l în Extras PDF)` : 'PDF-ul extraselor atașat (intră în ZIP)', href: `/${firma.slug}/${d.lunaKey}/extras` }] : []),
     { ok: s.txFaraDocument === 0, text: s.txFaraDocument ? `${s.txFaraDocument} tranzacții neasociate în Extras` : 'Toate tranzacțiile au document / notă', href: `/${firma.slug}/${d.lunaKey}/extras` },
     ...(s.deFacturat ? [{ ok: !s.deFacturat.n, text: s.deFacturat.n ? `${s.deFacturat.n} rezervări de facturat în 5StarDesk` : 'Toate rezervările facturate', href: `/${firma.slug}/${d.lunaKey}/5stardesk` }] : []),
     ...(s.stardesk ? [{ ok: !s.stardesk.discrepante && !s.stardesk.faraFactura, text: s.stardesk.discrepante || s.stardesk.faraFactura ? `5StarDesk: ${s.stardesk.faraFactura} fără factură, ${s.stardesk.discrepante} discrepanțe (bifează-le în lista de discrepanțe, cu notă)` : '5StarDesk verificat', href: `/${firma.slug}/${d.lunaKey}/5stardesk` }] : []),

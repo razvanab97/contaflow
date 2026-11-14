@@ -13,6 +13,7 @@ export interface StareFirma {
   lunaId: string | null
   module: string[]
   extrase: number
+  extraseFaraPdf: number
   txTotal: number; txFaraDocument: number; txFaraDocumentVechi: number
   inboxNeasociateVechi: number
   deFacturat: { n: number; total: number; vechi: number } | null
@@ -32,7 +33,7 @@ export async function getStareFirma(sb: Sb, firma: { id: string; slug: string },
   const are = (m: string) => module.includes(m as never)
 
   const [extraseR, inboxR, mailR, stariR] = await Promise.all([
-    lunaId ? sb.from('extrase').select('id').eq('luna_id', lunaId) : Promise.resolve({ data: [] as { id: string }[] }),
+    lunaId ? sb.from('extrase').select('id,pdf_path').eq('luna_id', lunaId) : Promise.resolve({ data: [] as { id: string; pdf_path: string | null }[] }),
     sb.from('documente').select('furnizor').eq('firma_id', firma.id).like('fisier_path', '%/inbox-facturi/%').is('tranzactie_id', null).lt('data_document', zileInUrma(30)).limit(2000),
     sb.from('mail_contabil').select('created_at,puncte').eq('firma_id', firma.id),
     lunaId ? sb.from('task_stari').select('task_key,completat').eq('luna_id', lunaId) : Promise.resolve({ data: [] as { task_key: string; completat: boolean }[] }),
@@ -82,6 +83,8 @@ export async function getStareFirma(sb: Sb, firma: { id: string; slug: string },
   return {
     lunaId, module,
     extrase: extrasIds.length,
+    // PDF-ul bancii (pentru contabil) - importul se face din CSV, PDF-ul se ataseaza separat
+    extraseFaraPdf: (extraseR.data || []).filter(e => !e.pdf_path).length,
     txTotal: (txs || []).length, txFaraDocument: deschise.length, txFaraDocumentVechi: deschise.filter(t => t.data_tranzactie < zileInUrma(14)).length,
     // fara facturile decontate altfel decat prin plata bancara (eMAG/Dante - retinute din aviz; platformele)
     inboxNeasociateVechi: (inboxR.data || []).filter(d => !/dante|emag|airbnb|booking/i.test(String(d.furnizor || '').split('|')[0])).length,
