@@ -18,7 +18,7 @@ interface Filtre {
 
 const SECTIUNI: [string, string][] = [
   ['/inbox-facturi/', 'Inbox Facturi'], ['/facturi-restante/', 'Facturi restante'], ['/facturi-chitanta/', 'Facturi + chitanță'],
-  ['/dispozitii-plata/', 'Dispoziție de plată'], ['/airbnb-facturi/', 'Airbnb · Facturi'], ['/booking-facturi/', 'Booking · Facturi'],
+  ['/dispozitii-plata/', 'Dispoziție de plată'], ['/airbnb-facturi/', 'Airbnb · Facturi comision'], ['/booking-facturi/', 'Booking · Facturi'],
   ['/emag', 'eMAG'], ['/acte-contabile/', 'Acte contabile'], ['/angajati/', 'Documente angajați'], ['/tx/', 'Extras de cont'],
 ]
 const MODUL_PAGINA: [string, string][] = [

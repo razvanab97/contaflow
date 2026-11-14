@@ -386,7 +386,7 @@ export default function UploadPanel({
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', marginBottom:'8px', flexWrap:'wrap' }}>
               <div>
                 <div style={{ fontSize:'var(--fs-sm)', fontWeight:700, color:'var(--c-dddddd)' }}>Facturi cerute de borderoul Airbnb</div>
-                <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)' }}>Se generează automat când încarci CSV-ul în Airbnb · Borderou. PDF-urile puse aici se asociază după cod rezervare sau sumă.</div>
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)' }}>Se generează automat când încarci CSV-ul în Airbnb · Rezervări. PDF-urile puse aici se asociază după cod rezervare sau sumă.</div>
               </div>
               {airbnbExpected.length > 0 && (
                 <div style={{ display:'flex', flexWrap:'wrap', gap:'6px', flexShrink:0 }}>
@@ -414,7 +414,7 @@ export default function UploadPanel({
             {reconcilMessage && <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-aaaaaa)', marginBottom:'8px' }}>{reconcilMessage}</div>}
             {airbnbExpectedError && <div style={{ fontSize:'var(--fs-xs)', color:'var(--danger)' }}>{airbnbExpectedError}</div>}
             {!airbnbExpectedError && airbnbExpected.length === 0 && (
-              <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)' }}>Nu există încă facturi așteptate. Încarcă borderoul CSV Airbnb în modulul „Airbnb · Borderou”.</div>
+              <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-777777)' }}>Nu există încă facturi așteptate. Încarcă borderoul CSV Airbnb în modulul „Airbnb · Rezervări”.</div>
             )}
             {airbnbExpected.length > 0 && showOnlyMissing && airbnbVisibleExpected.length === 0 && (
               <div style={{ fontSize:'var(--fs-xs)', color:'var(--success)' }}>Toate rezervările au factură atașată.</div>

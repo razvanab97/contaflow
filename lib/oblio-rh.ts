@@ -1,7 +1,7 @@
 import { oblioToken, tokenRefuzat } from '@/lib/oblio'
 
 // Seria RH (regim hotelier) a AB Textile in Oblio: facturile de cazare emise din ApartPro. Folosit de ruta pentru
-// ApartPro (/api/oblio/factura-cazare: ultima factura, lista) si de verificarea din „Airbnb · Borderou” (AB Textile).
+// ApartPro (/api/oblio/factura-cazare: ultima factura, lista) si de verificarea din „Airbnb · Rezervări” (AB Textile).
 export const SETARI_RH = { cif: '52575850', serie: 'RH' }
 const SETARI = SETARI_RH
 

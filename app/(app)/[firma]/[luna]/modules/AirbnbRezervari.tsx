@@ -71,7 +71,7 @@ export default function AirbnbRezervari({ firmaId, lunaId, mod }: { firmaId: str
         <span style={{ fontSize: 'var(--fs-sm)' }}>
           {mod === 'borderou'
             ? 'Încarcă mai jos raportul CSV din Airbnb (Câștiguri → Exportă CSV). Fiecare rezervare va apărea aici, cu codul de copiat.'
-            : 'Pasul 1 este modulul „Airbnb · Borderou”: din CSV se creează lista rezervărilor, iar aici apoi se potrivesc facturile de comision.'}
+            : 'Pasul 1 este modulul „Airbnb · Rezervări”: din CSV se creează lista rezervărilor, iar aici apoi se potrivesc facturile de comision.'}
         </span>
       </div>
     )
@@ -87,8 +87,8 @@ export default function AirbnbRezervari({ firmaId, lunaId, mod }: { firmaId: str
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
             <div className={`progress${pct === 100 ? ' is-done' : ''}`} style={{ flex: 1, maxWidth: '220px' }}><span style={{ width: `${pct}%` }} /></div>
             <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
-              <b style={{ color: 'var(--text-primary)' }}>{atasate}/{lista.length}</b> facturi atașate
-              {lipsa.length > 0 && <> · <b style={{ color: 'var(--warning)' }}>{lipsa.length} {lipsa.length === 1 ? 'lipsă' : 'lipsă'}</b></>}
+              <b style={{ color: 'var(--text-primary)' }}>{atasate}/{lista.length}</b> facturi de comision atașate
+              {lipsa.length > 0 && <> · <b style={{ color: 'var(--warning)' }}>{lipsa.length} {lipsa.length === 1 ? 'lipsă' : 'lipsă'} (comision)</b></>}
             </span>
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function AirbnbRezervari({ firmaId, lunaId, mod }: { firmaId: str
       )}
       {mod === 'facturi' && lipsa.length > 0 && (
         <div style={{ padding: '10px 16px', fontSize: 'var(--fs-sm)', color: 'var(--warning)', background: 'var(--warning-soft)' }}>
-          ⚠ {lipsa.length === 1 ? 'O factură lipsește' : `${lipsa.length} facturi lipsesc`} — rezervările fără factură sunt mai jos. Caută-le în Airbnb după cod („Copiază codurile lipsă”) și încarcă PDF-urile: se asociază automat.
+          ⚠ {lipsa.length === 1 ? 'O factură de comision lipsește' : `${lipsa.length} facturi de comision lipsesc`} — rezervările fără factură sunt mai jos. Caută-le în Airbnb după cod („Copiază codurile lipsă”) și încarcă PDF-urile: se asociază automat.
         </div>
       )}
 

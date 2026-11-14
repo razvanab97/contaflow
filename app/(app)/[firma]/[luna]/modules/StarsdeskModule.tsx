@@ -435,7 +435,7 @@ function VerificareRezervari({ firma, lunaId }: { firma: Firma; lunaId: string }
             <div style={{ marginBottom:'8px' }}>
               <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--warning)', textTransform:'uppercase', letterSpacing:'.06em' }}>⚠ Discrepanțe de preț — factură client (5StarDesk)</span>
             </div>
-            <p style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)', marginTop:'-4px', marginBottom:'8px' }}>Rezervarea are factură (vezi eticheta: găsită după cod sau după nume), dar suma diferă de borderou. Rândul spune ce e de făcut: diferența nefacturată se facturează, iar un plus egal cu comisionul Airbnb se explică automat când factura de comision e în Airbnb · Facturi.</p>
+            <p style={{ fontSize:'var(--fs-xs)', color:'var(--c-666666)', marginTop:'-4px', marginBottom:'8px' }}>Rezervarea are factură (vezi eticheta: găsită după cod sau după nume), dar suma diferă de borderou. Rândul spune ce e de făcut: diferența nefacturată se facturează, iar un plus egal cu comisionul Airbnb se explică automat când factura de comision e în Airbnb · Facturi comision.</p>
             <ListaDiscrepante items={result.discrepanteClient} tip="client" sectiune="Discrepanță de preț" onResolved={id=>eliminaDinLista(id,'discrepanteClient')}/>
           </div>
         )}

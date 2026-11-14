@@ -14,7 +14,7 @@ const SECTION_LABELS: Record<string, string> = {
   'facturi-chitanta': 'Facturi + chitanță', 'facturi-restante': 'Facturi restante',
   emag: 'Facturi Dante / eMAG', trendyol: 'Documente Trendyol',
   'booking-facturi': 'Facturi Booking', 'booking-borderou': 'Borderou Booking',
-  'airbnb-facturi': 'Facturi Airbnb', 'airbnb-borderou': 'Borderou Airbnb',
+  'airbnb-facturi': 'Facturi comision Airbnb', 'airbnb-borderou': 'Rezervări Airbnb (borderou)',
   '5stardesk': 'Facturi 5StarDesk',
 }
 const DANTE_CAT_LABELS: Record<string, string> = {

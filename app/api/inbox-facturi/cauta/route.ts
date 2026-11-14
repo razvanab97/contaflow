@@ -23,7 +23,7 @@ function furnizorCurat(furnizor: string | null): string {
 
 const SECTIUNI: [string, string][] = [
   ['/inbox-facturi/', 'Inbox Facturi'], ['/facturi-restante/', 'Facturi restante'], ['/facturi-chitanta/', 'Facturi + chitanță'],
-  ['/dispozitii-plata/', 'Dispoziție de plată'], ['/airbnb-facturi/', 'Airbnb · Facturi'], ['/booking-facturi/', 'Booking · Facturi'],
+  ['/dispozitii-plata/', 'Dispoziție de plată'], ['/airbnb-facturi/', 'Airbnb · Facturi comision'], ['/booking-facturi/', 'Booking · Facturi'],
   ['/emag', 'eMAG'], ['/trendyol/', 'Trendyol'], ['/acte-contabile/', 'Acte contabile'], ['/angajati/', 'Documente angajați'],
   ['/checklist/', 'Documente lună'], ['/achizitii/', 'Achiziții'], ['/tx/', 'Extras de cont'],
 ]

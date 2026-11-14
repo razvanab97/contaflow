@@ -17,14 +17,14 @@ interface Props {
 
 const CONFIG = {
   'airbnb-facturi': {
-    title: 'Airbnb · Facturi',
-    description: 'Pasul 2: facturile de comision Airbnb — se potrivesc automat cu rezervările din borderou (după cod sau sumă)',
-    linkPlaceholder: 'Link factură Airbnb sau PDF',
+    title: 'Airbnb · Facturi comision',
+    description: 'Pasul 2: facturile de comision pe care Airbnb ți le emite ție (taxa de servicii), câte una pe rezervare — se potrivesc automat cu rezervările după cod sau sumă. Facturile de vânzare către clienți nu se pun aici.',
+    linkPlaceholder: 'Link factură de comision Airbnb sau PDF',
     docTypes: [{ value: 'factura', label: 'Factură' }, { value: 'borderou', label: 'Borderou' }],
   },
   'airbnb-borderou': {
-    title: 'Airbnb · Borderou lunar',
-    description: 'Pasul 1: încarcă raportul CSV din Airbnb — fiecare rezervare apare mai sus, cu codul de copiat',
+    title: 'Airbnb · Rezervări',
+    description: 'Pasul 1: încarcă borderoul CSV din Airbnb — din el se creează rezervările lunii, cu codul de copiat',
     linkPlaceholder: 'Link PDF borderou Airbnb',
     docTypes: [{ value: 'borderou', label: 'Borderou' }, { value: 'raport_csv', label: 'Raport CSV' }],
   },

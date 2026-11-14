@@ -8,7 +8,7 @@ import { importaFacturiRh, MODUL_FACTURI_RH } from '@/lib/facturi-rh-import'
 
 export const dynamic = 'force-dynamic'
 
-// „Airbnb · Borderou” la firmele care factureaza cazarea in Oblio (AB Textile, seria RH): rezervarile din CSV-ul
+// „Airbnb · Rezervări” la firmele care factureaza cazarea in Oblio (AB Textile, seria RH): rezervarile din CSV-ul
 // lunii, fiecare cu factura RH gasita in Oblio, plus facturile RH din luna contabila fara rezervare in borderou.
 export async function GET(req: NextRequest) {
   const firmaId = req.nextUrl.searchParams.get('firmaId'), lunaId = req.nextUrl.searchParams.get('lunaId')

@@ -68,7 +68,7 @@ export interface FirmaConfigDef {
   // numai in interval, fara = exista in afara lui. Lunile fara perioada au mereu modulul.
   perioadeModule?: Partial<Record<ModuleSlug, { doar?: [string, string]; fara?: [string, string] }>>
   // Facturile de cazare ale firmei se emit in Oblio (seria RH, din ApartPro), nu in 5StarDesk - in
-  // „Airbnb · Borderou” apare verificarea facturilor RH fata de rezervarile din CSV.
+  // „Airbnb · Rezervări” apare verificarea facturilor RH fata de rezervarile din CSV.
   facturiCazareOblio?: boolean
 }
 
@@ -225,18 +225,18 @@ export const MODULE_DEFS: Record<ModuleSlug, ModuleDef> = {
   },
   'airbnb-facturi': {
     slug: 'airbnb-facturi',
-    label: 'Airbnb · Facturi',
-    description: 'Facturi individuale din platforma Airbnb',
+    label: 'Airbnb · Facturi comision',
+    description: 'Facturile de comision emise de Airbnb către tine, câte una pe rezervare',
     tasks: [
-      { key: 'airbnb_facturi.incarcate', label: 'Facturi Airbnb încărcate' },
+      { key: 'airbnb_facturi.incarcate', label: 'Facturi de comision Airbnb încărcate' },
     ],
   },
   'airbnb-borderou': {
     slug: 'airbnb-borderou',
-    label: 'Airbnb · Borderou',
-    description: 'Centralizator lunar descărcat din Airbnb',
+    label: 'Airbnb · Rezervări',
+    description: 'Rezervările lunii, din CSV-ul Airbnb (borderou) - plus facturile de vânzare emise clienților, unde e cazul',
     tasks: [
-      { key: 'airbnb_borderou.incarcat', label: 'Borderou Airbnb încărcat' },
+      { key: 'airbnb_borderou.incarcat', label: 'Borderou CSV Airbnb încărcat (rezervările lunii)' },
     ],
   },
   '5stardesk': {

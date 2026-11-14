@@ -72,7 +72,7 @@ export default function FacturiRhVerificare({ firmaId, lunaId }: { firmaId: stri
     <div className="card" style={{ overflow: 'hidden' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-primary)' }}>Facturi de cazare RH (Oblio) ↔ borderou</div>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-primary)' }}>Facturi de vânzare RH (emise clienților, Oblio) ↔ rezervări</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
             <div className={`progress${pct === 100 ? ' is-done' : ''}`} style={{ flex: '1 1 120px', maxWidth: '220px' }}><span style={{ width: `${pct}%` }} /></div>
             <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
