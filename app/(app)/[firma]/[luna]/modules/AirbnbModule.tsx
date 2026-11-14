@@ -3,6 +3,8 @@ import TaskSection, { TaskItem } from './TaskSection'
 import UploadPanel from './UploadPanel'
 import OldItemDocs, { ChecklistItem } from './OldItemDocs'
 import AirbnbRezervari from './AirbnbRezervari'
+import FacturiRhVerificare from './FacturiRhVerificare'
+import { getFirmaConfig } from '@/lib/firma-config'
 
 interface Firma { id: string; slug: string; nume: string; culoare: string }
 interface Props {
@@ -39,6 +41,9 @@ export default function AirbnbModule({ firma, lunaId, tasks, section, checklistI
       {/* Pasul 1 (Borderou): rezervarile din CSV, cu codul de copiat. Pasul 2 (Facturi): ce factura
           de comision lipseste dupa asociere, ca sa fie adusa. */}
       <AirbnbRezervari firmaId={firma.id} lunaId={lunaId} mod={section === 'airbnb-borderou' ? 'borderou' : 'facturi'} />
+
+      {/* Firmele care factureaza cazarea in Oblio (AB Textile, seria RH din ApartPro) - in loc de 5StarDesk */}
+      {section === 'airbnb-borderou' && getFirmaConfig(firma.slug)?.facturiCazareOblio && <FacturiRhVerificare firmaId={firma.id} lunaId={lunaId} />}
 
       {sorted.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

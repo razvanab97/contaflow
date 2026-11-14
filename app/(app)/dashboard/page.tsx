@@ -62,7 +62,7 @@ export default async function Dashboard() {
   // Discrepante de pret 5StarDesk (factura gasita, dar suma nu corespunde cu borderoul)
   const discrepanteCounts = await Promise.all(firme.map((f: any) => {
     const lunaData = luniMap[`${f.id}_${LUNA}`]
-    const are5stardesk = getFirmaModules(f.slug).some((m: any) => m.slug === '5stardesk')
+    const are5stardesk = getFirmaModules(f.slug, LUNA).some((m: any) => m.slug === '5stardesk')
     return are5stardesk && lunaData ? getStardeskDiscrepanteCount(lunaData.id) : Promise.resolve(0)
   }))
 
@@ -71,7 +71,7 @@ export default async function Dashboard() {
   const randuri: RandFirma[] = firme.map((f: any, i: number) => {
     const lunaData = luniMap[`${f.id}_${LUNA}`]
     const facute = (lunaData && bifate.get(lunaData.id)) || new Set<string>()
-    const modules = getFirmaModules(f.slug)
+    const modules = getFirmaModules(f.slug, LUNA)
     let urmatorGasit = false
     const module: ModulRand[] = modules.map(m => {
       const href = `/${f.slug}/${LUNA}/${m.slug}`
@@ -82,7 +82,7 @@ export default async function Dashboard() {
     })
     const urm = modules.find(m => module.find(x => x.slug === m.slug)?.stare === 'next')
     const ramase = urm ? urm.tasks.filter(t => !facute.has(t.key)) : []
-    const total = getFirmaTotalTasks(f.slug)
+    const total = getFirmaTotalTasks(f.slug, LUNA)
     const proprietari = proprietariRaw.filter((p: any) => p.firma_id === f.id)
     return {
       id: f.id, slug: f.slug, nume: f.nume, culoare: f.culoare, initiale: ini(f.nume) || f.nume.slice(0, 2).toUpperCase(),

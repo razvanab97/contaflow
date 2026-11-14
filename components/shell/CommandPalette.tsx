@@ -121,7 +121,7 @@ export default function CommandPalette({ open, onClose, firme, firmaAtiva, luna,
     for (const f of firme) {
       const nume = f.nume.replace(' SRL', '')
       list.push({ id: `hub-${f.slug}`, group: 'Firme', title: nume, sub: `Rezumatul lunii · ${etichetaLunaScurta(luna, esteLunaCalendaristica(f.slug))}`, icon: 'calendar', dot: f.culoare, meta: `${f.pct}%`, keywords: 'firma rezumat luna hub', run: ({ newTab }) => go(`/${f.slug}/${luna}`, newTab) })
-      for (const m of getFirmaModules(f.slug)) {
+      for (const m of getFirmaModules(f.slug, luna)) {
         list.push({ id: `mod-${f.slug}-${m.slug}`, group: 'Module', title: m.label, sub: `${nume} · ${m.description}`, icon: MODULE_ICONS[m.slug] || 'fileText', dot: f.culoare, keywords: `${nume} modul`, run: ({ newTab }) => go(`/${f.slug}/${luna}/${m.linkDirect || m.slug}`, newTab) })
       }
       for (const [sub, label, icon] of [['furnizori', 'Furnizori', 'users'], ['date-personale', 'Date personale', 'idCard'], ['model-documente', 'Model documente', 'fileText'], ['facturi-de-asociat', 'Facturi de asociat', 'link']] as const) {

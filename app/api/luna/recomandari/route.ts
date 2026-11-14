@@ -22,6 +22,7 @@ function sectionFromPath(path: string): string {
 }
 
 async function buildSummary(sb: ReturnType<typeof getServiceSupabase>, firmaId: string, firmaSlug: string, firmaNume: string, lunaId: string, lunaLabel: string): Promise<MonthlySummary> {
+  const { data: lunaRow } = await sb.from('luni_contabile').select('luna').eq('id', lunaId).maybeSingle()
   const [{ data: taskStariRaw }, { data: moduleStariRaw }, { data: docsRaw }, { data: extraseRaw }, { count: restanteCount }] = await Promise.all([
     sb.from('task_stari').select('task_key,completat').eq('luna_id', lunaId),
     sb.from('module_stari').select('modul_slug,dezactivat').eq('luna_id', lunaId),
@@ -35,7 +36,7 @@ async function buildSummary(sb: ReturnType<typeof getServiceSupabase>, firmaId: 
 
   const dezactivate = new Set((moduleStariRaw || []).filter((m: any) => m.dezactivat).map((m: any) => m.modul_slug))
 
-  const module: MonthlySummary['module'] = getFirmaModules(firmaSlug).map(m => ({
+  const module: MonthlySummary['module'] = getFirmaModules(firmaSlug, lunaRow?.luna).map(m => ({
     slug: m.slug,
     label: m.label,
     done: m.tasks.filter(t => taskMap[t.key]).length,

@@ -52,7 +52,7 @@ export const getFirmeNavData = cache(async (luna: string) => {
 
   const firmeNav: FirmaNavItem[] = toateFirmele.map((f: any) => {
     const ld = luniMap[`${f.id}_${luna}`]
-    const total = getFirmaTotalTasks(f.slug)
+    const total = getFirmaTotalTasks(f.slug, luna)
     const done = ld ? (taskCount[ld.id]?.done || 0) : 0
     return { id: f.id, slug: f.slug, nume: f.nume, culoare: f.culoare, pct: total > 0 ? Math.round((done / total) * 100) : 0 }
   })

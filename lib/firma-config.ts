@@ -64,7 +64,18 @@ export interface FirmaConfigDef {
   // true = luna e luna calendaristica (ex. "Octombrie 2026"), nu o luna contabila "1-30 Septembrie
   // (lucrat in Octombrie)". Pentru proiecte cu rutina lunara proprie, nu contabilitate.
   lunaCalendaristica?: boolean
+  // Module valabile doar pe o perioada (luni de lucru AAAA-LL, inclusiv capetele): doar = modulul exista
+  // numai in interval, fara = exista in afara lui. Lunile fara perioada au mereu modulul.
+  perioadeModule?: Partial<Record<ModuleSlug, { doar?: [string, string]; fara?: [string, string] }>>
+  // Facturile de cazare ale firmei se emit in Oblio (seria RH, din ApartPro), nu in 5StarDesk - in
+  // „Airbnb · Borderou” apare verificarea facturilor RH fata de rezervarile din CSV.
+  facturiCazareOblio?: boolean
 }
+
+// Airbnb pe AB Textile pentru contabilitatea Octombrie-Decembrie 2026 = lunile de lucru Noiembrie 2026 -
+// Ianuarie 2027 (cerut direct: „Airbnb va fi in firma AB Textile, nu in ABX ca pana acum”, „doar pana in
+// ianuarie”). Booking ramane la ABXHomes. Din Februarie 2027 (contabilizarea lui Ianuarie) revine la ABXHomes.
+const AIRBNB_LA_AB_TEXTILE: [string, string] = ['2026-11', '2027-01']
 
 // Ordinea reflectă fluxul logic de lucru al unei luni de contabilitate, nu ordinea în care au
 // fost adăugate modulele în cod: întâi se adună documentele de venit (marketplace-urile, adăugate
@@ -304,6 +315,7 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
     // potrivite pe ele) -> Booking: ordinea platformelor de rezervare, fiecare genereaza
     // facturile de vânzare ale lunii, utile deja adunate până se ajunge la Extras de cont.
     module: ['5stardesk', 'airbnb-borderou', 'airbnb-facturi', 'booking-facturi', ...COMUNE],
+    perioadeModule: { 'airbnb-borderou': { fara: AIRBNB_LA_AB_TEXTILE }, 'airbnb-facturi': { fara: AIRBNB_LA_AB_TEXTILE } },
     legal: {
       nrRegCom: 'J2025022705009',
       cif: '51540013',
@@ -319,7 +331,9 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
   },
   'ab-textile': {
     slug: 'ab-textile',
-    module: [...COMUNE],
+    module: ['airbnb-borderou', 'airbnb-facturi', ...COMUNE],
+    perioadeModule: { 'airbnb-borderou': { doar: AIRBNB_LA_AB_TEXTILE }, 'airbnb-facturi': { doar: AIRBNB_LA_AB_TEXTILE } },
+    facturiCazareOblio: true,
     legal: {
       nrRegCom: 'J2025073349009',
       cif: '52575850',
@@ -348,14 +362,26 @@ export function getFirmaConfig(slug: string): FirmaConfigDef | undefined {
   return FIRMA_CONFIGS[slug]
 }
 
-export function getFirmaModules(slug: string): ModuleDef[] {
+// luna = luna de lucru (AAAA-LL sau AAAA-LL-ZZ). Fara luna: toate modulele firmei, indiferent de perioada.
+export function modulInLuna(slug: string, modul: string, luna?: string | null): boolean {
   const config = FIRMA_CONFIGS[slug]
-  if (!config) return []
-  return config.module.map(m => MODULE_DEFS[m]).filter(Boolean)
+  if (!config?.module.includes(modul as ModuleSlug)) return false
+  const p = config.perioadeModule?.[modul as ModuleSlug], l = String(luna || '').slice(0, 7)
+  if (!p || !/^\d{4}-\d{2}$/.test(l)) return true
+  const inInterval = (i: [string, string]) => l >= i[0] && l <= i[1]
+  return (!p.doar || inInterval(p.doar)) && (!p.fara || !inInterval(p.fara))
 }
 
-export function getFirmaTotalTasks(slug: string): number {
-  return getFirmaModules(slug).reduce((sum, mod) => sum + mod.tasks.length, 0)
+export function getFirmaModuleSlugs(slug: string, luna?: string | null): ModuleSlug[] {
+  return (FIRMA_CONFIGS[slug]?.module || []).filter(m => modulInLuna(slug, m, luna))
+}
+
+export function getFirmaModules(slug: string, luna?: string | null): ModuleDef[] {
+  return getFirmaModuleSlugs(slug, luna).map(m => MODULE_DEFS[m]).filter(Boolean)
+}
+
+export function getFirmaTotalTasks(slug: string, luna?: string | null): number {
+  return getFirmaModules(slug, luna).reduce((sum, mod) => sum + mod.tasks.length, 0)
 }
 
 // getLegal/getProprietari au fost migrate în DB (tabelele firme + proprietari) —

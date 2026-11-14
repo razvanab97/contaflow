@@ -5,7 +5,7 @@ import MonthNav from '@/components/ui/MonthNav'
 import nextDynamic from 'next/dynamic'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getActiveFirme, getLuniContabile } from '@/lib/queries'
-import { getFirmaConfig, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
+import { getFirmaConfig, MODULE_DEFS, ModuleSlug, modulInLuna, getFirmaModuleSlugs } from '@/lib/firma-config'
 import { etichetaLunaCompleta } from '@/lib/accounting-period'
 import NextStepNav from '../NextStepNav'
 import InitLuna from '../InitLuna'
@@ -39,7 +39,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   const { firma: slug, luna, modul: modulSlug } = await params
 
   const firmaConfig = getFirmaConfig(slug)
-  if (!firmaConfig || !firmaConfig.module.includes(modulSlug as ModuleSlug)) notFound()
+  if (!firmaConfig || !modulInLuna(slug, modulSlug, luna)) notFound()
 
   const modulDef = MODULE_DEFS[modulSlug as ModuleSlug]
   if (!modulDef) notFound()
@@ -108,7 +108,7 @@ export default async function ModulPage({ params }: { params: Promise<{firma:str
   // dezactivate pentru luna asta ("Nu am acest modul"), ca sa nu ghideze utilizatorul spre un
   // modul pe care l-a marcat explicit ca nu se aplica.
   const dezactivateSet = new Set(moduleStariRaw.filter((m: any) => m.dezactivat).map((m: any) => m.modul_slug))
-  const ordineModule = firmaConfig.module
+  const ordineModule = getFirmaModuleSlugs(slug, luna)
   const curIdx = ordineModule.indexOf(modulSlug as ModuleSlug)
   let nextSlug: ModuleSlug | null = null
   for (let i = curIdx + 1; i < ordineModule.length; i++) {

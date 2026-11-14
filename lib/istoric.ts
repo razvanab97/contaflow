@@ -33,7 +33,6 @@ export async function getIstoricLunar(firmaId: string, firmaSlug: string, luna: 
   for (const l of luniRows || []) idByLuna.set(String(l.luna).slice(0, 7), l.id)
   const lunaIds = luni.map(l => idByLuna.get(l)).filter(Boolean) as string[]
 
-  const totalTasks = getFirmaTotalTasks(firmaSlug)
   const doneByLuna = new Map<string, number>()
   const bankByLuna = new Map<string, { in: number; out: number; imp: number }>() // imp = restituiri de imprumut + avans trezorerie
   const txByLuna = new Map<string, TxFlux[]>()
@@ -73,7 +72,7 @@ export async function getIstoricLunar(firmaId: string, firmaSlug: string, luna: 
       incasari: Math.round((bank?.in || 0) * 100) / 100,
       imprumutRestituit: Math.round((bank?.imp || 0) * 100) / 100,
       plati: Math.round(((bank?.out || 0) + (id ? dispozitii.get(id)?.total || 0 : 0)) * 100) / 100,
-      pct: totalTasks > 0 ? Math.min(100, Math.round((done / totalTasks) * 100)) : 0,
+      pct: getFirmaTotalTasks(firmaSlug, l) > 0 ? Math.min(100, Math.round((done / getFirmaTotalTasks(firmaSlug, l)) * 100)) : 0,
       initializata: !!id,
     }
   })

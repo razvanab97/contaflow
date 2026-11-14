@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
-import { oblioToken, tokenRefuzat } from '@/lib/oblio'
+import { tokenRefuzat } from '@/lib/oblio'
+import { cuToken, toateFacturile, listaFacturiRh, TokenExpirat } from '@/lib/oblio-rh'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,30 +47,6 @@ function autorizat(req: NextRequest) {
 // e interzis”): numerotarea unei serii trebuie sa fie cronologica, deci nicio factura noua cu data mai veche. Se citesc
 // TOATE facturile seriei (pagini de 100, fara sa ne bazam pe ordinea intoarsa), inclusiv cele emise direct din Oblio si
 // cele anulate (isi pastreaza numarul si data); ciornele nu au numar si nu conteaza.
-class TokenExpirat extends Error {}
-// apel cu tokenul salvat; daca Oblio il refuza ca expirat, inca o data cu un token nou
-async function cuToken<T>(fn: (token: string) => Promise<T>): Promise<T> {
-  try { return await fn(await oblioToken(SETARI.cif)) } catch (e) {
-    if (!(e instanceof TokenExpirat)) throw e
-    return await fn(await oblioToken(SETARI.cif, true))
-  }
-}
-type FacturaOblio = { seriesName?: string; number?: string | number; issueDate?: string; draft?: number | string | boolean; total?: number | string; currency?: string; canceled?: number | string | boolean; link?: string; client?: { name?: string; cif?: string } }
-// toate facturile din seria RH (pagini de 100)
-async function toateFacturile(token: string): Promise<FacturaOblio[]> {
-  const toate: FacturaOblio[] = []
-  for (let offset = 0, pagini = 0; pagini < 100; offset += 100, pagini++) {
-    const q = new URLSearchParams({ cif: SETARI.cif, seriesName: SETARI.serie, limitPerPage: '100', offset: String(offset), orderBy: 'issueDate', orderDir: 'DESC' })
-    const res = await fetch(`https://www.oblio.eu/api/docs/invoice/list?${q}`, { headers: { Authorization: `Bearer ${token}` } })
-    const out = await res.json().catch(() => ({})) as { status?: number; statusMessage?: string; data?: FacturaOblio[] }
-    if (tokenRefuzat(res.status, out.statusMessage)) throw new TokenExpirat(out.statusMessage || 'token expirat')
-    if (!res.ok || out.status !== 200 || !Array.isArray(out.data)) throw new Error(`Oblio (lista facturilor ${SETARI.serie}): ${out.statusMessage || `eroare ${res.status}`}`)
-    toate.push(...out.data)
-    if (out.data.length < 100) break
-  }
-  return toate
-}
-const da = (v: unknown) => !!v && String(v) !== '0' && String(v).toLowerCase() !== 'false'
 async function ultimaFactura(token: string): Promise<{ data: string; numar: string } | null> {
   let ultima: { data: string; numar: string; nr: number } | null = null
   for (const f of await toateFacturile(token)) {
@@ -89,10 +66,7 @@ export async function GET(req: NextRequest) {
   if (!autorizat(req)) return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
   if (req.nextUrl.searchParams.get('lista')) {
     try {
-      const facturi = (await cuToken(toateFacturile)).filter(f => !da(f.draft)).map(f => ({
-        numar: `${f.seriesName || SETARI.serie} ${f.number ?? ''}`.trim(), data: String(f.issueDate || '').slice(0, 10),
-        total: f.total == null || f.total === '' ? null : Number(f.total), moneda: f.currency || 'RON', client: f.client?.name || '', anulata: da(f.canceled), link: f.link || null,
-      })).sort((a, b) => a.numar.localeCompare(b.numar, 'ro', { numeric: true }))
+      const facturi = await listaFacturiRh()
       return NextResponse.json({ serie: SETARI.serie, facturi })
     } catch (e) {
       return NextResponse.json({ error: e instanceof Error ? e.message : 'Nu am putut citi facturile' }, { status: 502 })

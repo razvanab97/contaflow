@@ -96,7 +96,7 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
     return () => { document.body.style.overflow = prev }
   }, [menuOpen])
 
-  const modules = firmaSlug ? getFirmaModules(firmaSlug) : undefined
+  const modules = firmaSlug ? getFirmaModules(firmaSlug, lunaEfectiva) : undefined
 
   return (
     <div className="app-shell" data-firma={firmaSlug}>

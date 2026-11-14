@@ -94,7 +94,7 @@ export async function executa(name: string, input: Record<string, unknown>, list
       const stare = await getStareFirma(sb, f, luna)
       const { data: stari } = id ? await sb.from('task_stari').select('task_key,completat').eq('luna_id', id) : { data: [] }
       const bifate = new Set(((stari || []) as { task_key: string; completat: boolean }[]).filter(s => s.completat).map(s => s.task_key))
-      const module = getFirmaModules(f.slug).map(m => ({ modul: m.label, link: `/${f.slug}/${luna}/${m.slug}`, sarcini: m.tasks.map(t => ({ task_key: t.key, sarcina: t.label, bifat: bifate.has(t.key) })) }))
+      const module = getFirmaModules(f.slug, luna).map(m => ({ modul: m.label, link: `/${f.slug}/${luna}/${m.slug}`, sarcini: m.tasks.map(t => ({ task_key: t.key, sarcina: t.label, bifat: bifate.has(t.key) })) }))
       return JSON.stringify({ firma: f.nume, luna, perioada: esteLunaCalendaristica(f.slug) ? workMonthLabel(luna) : accountingPeriodLabel(luna), luna_deschisa: !!id, rezumat: { ...stare, lunaId: undefined }, module })
     }
     case 'cauta': {
@@ -134,7 +134,7 @@ export async function executa(name: string, input: Record<string, unknown>, list
     }
     case 'bifeaza_sarcina': {
       const f = firma()!, luna = lunaValida(input.luna)
-      const task = getFirmaModules(f.slug).flatMap(m => m.tasks).find(t => t.key === str(input.task_key))
+      const task = getFirmaModules(f.slug, luna).flatMap(m => m.tasks).find(t => t.key === str(input.task_key))
       if (!task) throw new Error(`Sarcina "${input.task_key}" nu există la ${f.nume}.`)
       const id = await lunaId(sb, f.id, luna)
       if (!id) throw new Error(`Luna ${luna} nu e deschisă pentru ${f.nume}.`)

@@ -76,7 +76,7 @@ export async function getDeFacut(firme: { id: string; slug: string; nume: string
       items.push({ ...base, id: `init-${f.id}`, titlu: calendar ? `Luna ${workMonthLabel(luna)} nu e începută` : 'Luna nu e începută', detaliu: calendar ? 'Pornește luna ca să apară rutina și task-urile' : 'Pornește contabilitatea lunii ca să apară task-urile', href: `/${f.slug}/${luna}`, icon: 'calendar', urgenta: 'normal' })
       return
     }
-    const modules = getFirmaModules(f.slug)
+    const modules = getFirmaModules(f.slug, luna)
     const [{ data: stari }, { data: moduleStari }, { data: extrase }, bonRes, faRes] = await Promise.all([
       sb.from('task_stari').select('task_key,completat').eq('luna_id', l.id),
       sb.from('module_stari').select('modul_slug,dezactivat').eq('luna_id', l.id),

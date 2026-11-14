@@ -40,7 +40,7 @@ export default async function HubPage({ params }: { params: Promise<{firma:strin
 
   const dezactivate = moduleStariRaw.filter((m: any) => m.dezactivat).map((m: any) => m.modul_slug)
 
-  const modules = getFirmaModules(slug)
+  const modules = getFirmaModules(slug, luna)
   const activeModules = modules.filter(m => !dezactivate.includes(m.slug))
   const total = activeModules.reduce((sum, m) => sum + m.tasks.length, 0)
   const done = activeModules.reduce((sum, m) => sum + m.tasks.filter(t => taskMap[t.key]).length, 0)

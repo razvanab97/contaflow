@@ -145,7 +145,6 @@ async function contextFirma(sb: SupabaseClient, firmaId: string, slug: string): 
   const luni = await citeste(sb.from('luni_contabile').select('id,luna').eq('firma_id', firmaId).order('luna', { ascending: false }))
   const recente = luni.slice(0, LUNI_DETALIATE)
   const ids = recente.map(l => l.id as string)
-  const totalTasks = getFirmaTotalTasks(slug)
 
   const [taskuri, extrase, docs, mailuri] = await Promise.all([
     ids.length ? inBucati(ids, x => sb.from('task_stari').select('luna_id,task_key,completat').in('luna_id', x)) : Promise.resolve([]),
@@ -160,7 +159,7 @@ async function contextFirma(sb: SupabaseClient, firmaId: string, slug: string): 
     const key = String(l.luna).slice(0, 7)
     const rand: string[] = [`### Lucrat în ${workMonthLabel(key)} — perioada ${accountingPeriodLabel(key)}`]
     const t = taskuri.filter(x => x.luna_id === l.id)
-    rand.push(`Progres module: ${t.filter(x => x.completat).length}/${totalTasks} sarcini bifate${t.length ? ` (bifate: ${t.filter(x => x.completat).map(x => x.task_key).join(', ') || '—'})` : ''}`)
+    rand.push(`Progres module: ${t.filter(x => x.completat).length}/${getFirmaTotalTasks(slug, key)} sarcini bifate${t.length ? ` (bifate: ${t.filter(x => x.completat).map(x => x.task_key).join(', ') || '—'})` : ''}`)
     const ex = extrase.filter(e => e.luna_id === l.id)
     for (const e of ex) {
       const tx = tranzactii.filter(x => x.extras_id === e.id)

@@ -5,7 +5,7 @@ import BonuriClient from './BonuriClient'
 import InitLuna from '../InitLuna'
 import { dbSelect } from '@/lib/db'
 import { getFirmaBySlug, getActiveFirme, getLuniContabile } from '@/lib/queries'
-import { getFirmaConfig, MODULE_DEFS, ModuleSlug } from '@/lib/firma-config'
+import { getFirmaConfig, MODULE_DEFS, ModuleSlug, modulInLuna, getFirmaModuleSlugs } from '@/lib/firma-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +13,7 @@ export default async function BonuriPage({ params }: { params: Promise<{ firma: 
   const { firma: slug, luna } = await params
 
   const firmaConfig = getFirmaConfig(slug)
-  if (!firmaConfig || !firmaConfig.module.includes('bonuri')) notFound()
+  if (!firmaConfig || !modulInLuna(slug, 'bonuri', luna)) notFound()
 
   const [firma, toateFirmele, luni] = await Promise.all([
     getFirmaBySlug(slug),
@@ -37,7 +37,7 @@ export default async function BonuriPage({ params }: { params: Promise<{ firma: 
   // extras/page.tsx. Bonuri are propria lui pagina dedicata (nu trece prin [modul], la fel ca
   // extras - are UI proprie: camera, calcul, mutare intre firme), deci calculul se repeta aici.
   const dezactivateSet = new Set(moduleStariRaw.filter((m: any) => m.dezactivat).map((m: any) => m.modul_slug))
-  const ordineModule = firmaConfig.module
+  const ordineModule = getFirmaModuleSlugs(slug, luna)
   const curIdx = ordineModule.indexOf('bonuri' as ModuleSlug)
   let nextSlug: ModuleSlug | null = null
   for (let i = curIdx + 1; i < ordineModule.length; i++) {

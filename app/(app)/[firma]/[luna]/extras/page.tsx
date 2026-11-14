@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import SincronizareProiectSrl from '@/components/SincronizareProiectSrl'
 import ExtrasClient from './ExtrasClient'
-import { MODULE_DEFS, getFirmaConfig, ModuleSlug } from '@/lib/firma-config'
+import { MODULE_DEFS, ModuleSlug, getFirmaModuleSlugs } from '@/lib/firma-config'
 import { accountingShortLabel } from '@/lib/accounting-period'
 
 export const dynamic = 'force-dynamic'
@@ -40,9 +40,8 @@ export default async function ExtrasPage({ params }: { params: Promise<{ firma: 
 
   // Pasul urmator in ordinea de lucru a firmei - vezi acelasi calcul in [modul]/page.tsx. Extras
   // are propria lui pagina dedicata (nu trece prin [modul]), deci calculul se repeta aici.
-  const firmaConfig = getFirmaConfig(slug)
   const dezactivateSet = new Set((moduleStariRaw || []).filter((m: any) => m.dezactivat).map((m: any) => m.modul_slug))
-  const ordineModule = firmaConfig?.module || []
+  const ordineModule = getFirmaModuleSlugs(slug, luna)
   const curIdx = ordineModule.indexOf('extras' as ModuleSlug)
   let nextSlug: ModuleSlug | null = null
   for (let i = curIdx + 1; i < ordineModule.length; i++) {
