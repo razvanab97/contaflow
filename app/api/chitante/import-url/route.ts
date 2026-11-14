@@ -1,6 +1,8 @@
 import { isIP } from 'node:net'
 import dns from 'node:dns/promises'
 import { NextRequest, NextResponse } from 'next/server'
+import { BOOKING_CLASSIFICATION_HINT, bookingSection, normalizeBookingType, type BookingDocumentType } from '@/lib/booking-documents'
+import { identifyBookingPdf } from '@/lib/booking-document-pdf'
 import { finalizeazaDocument } from '@/lib/denumire-document'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServiceSupabase } from '@/lib/supabase/server'
@@ -8,7 +10,7 @@ import { syncComandaNote } from '@/lib/comandaNote'
 
 const ACCOUNTING_SECTIONS = new Set([
   'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
-  'booking-facturi', 'booking-borderou', 'booking-auto',
+  'booking-facturi', 'booking-borderou', 'booking-borderou-contabil', 'booking-borderou-lucru', 'booking-auto',
   'airbnb-facturi', 'airbnb-borderou',
   '5stardesk', 'trendyol', 'acte-contabile', 'angajati',
 ])
@@ -95,7 +97,7 @@ function supplierMatch(a?: string | null, b?: string | null) {
   return ca.length >= 4 && cb.length >= 4 && (ca.includes(cb) || cb.includes(ca))
 }
 
-type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; codLocatie: string | null; tipDocumentBooking: 'factura' | 'borderou' | null }
+type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; codLocatie: string | null; tipDocumentBooking: BookingDocumentType | null }
 
 async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null> {
   try {
@@ -103,9 +105,10 @@ async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
+      system: BOOKING_CLASSIFICATION_HINT,
       messages: [{ role: 'user', content: [
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: bytes.toString('base64') } },
-        { type: 'text', text: 'Extrage datele acestei facturi/document PDF. Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului","numarDocument":"seria si numarul documentului sau codul rezervarii, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null","tipDocumentBooking":"factura (daca documentul e o FACTURA de comision Booking.com, cu \'Suma totala de plata\') sau borderou (daca e un centralizator/sumar de plati cu lista de rezervari), altfel null"}. Pentru facturi Airbnb, copiaza si codul rezervarii daca apare. Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+        { type: 'text', text: `Extrage datele documentului PDF. Raspunde DOAR cu JSON: {"furnizor":"emitentul sau platforma","numarDocument":"seria si numarul documentului, exact ca in sursa","suma":123.45,"dataDocument":"AAAA-LL-ZZ","codLocatie":"codul proprietatii Booking din antet, altfel null","tipDocumentBooking":"factura sau borderou-contabil sau borderou-plati, altfel null"}. suma este totalul; pentru Reservation Statement este totalul Final amount, iar pentru sumarul platilor este totalul Net. Pentru facturi Airbnb copiaza si codul rezervarii daca apare. Lasa null campurile absente. Nu inventa date.` },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -118,7 +121,7 @@ async function analyzeGenericPdf(bytes: Buffer): Promise<GenericExtractie | null
       suma: typeof parsed.suma === 'number' ? parsed.suma : null,
       dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
       codLocatie: typeof parsed.codLocatie === 'string' && parsed.codLocatie.trim() ? parsed.codLocatie.trim() : null,
-      tipDocumentBooking: parsed.tipDocumentBooking === 'factura' || parsed.tipDocumentBooking === 'borderou' ? parsed.tipDocumentBooking : null,
+      tipDocumentBooking: normalizeBookingType(parsed.tipDocumentBooking),
     }
   } catch {
     return null
@@ -218,13 +221,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Linkul nu a returnat un fișier PDF' }, { status: 422 })
 
   const sb = getServiceSupabase()
-  const shouldAnalyze = isAccountingSection && (section === 'airbnb-facturi' || section === 'booking-auto')
-  const genericExtractie = shouldAnalyze ? await analyzeGenericPdf(bytes) : null
+  const shouldAnalyze = isAccountingSection && (section === 'airbnb-facturi' || section.startsWith('booking-'))
+  let genericExtractie = shouldAnalyze ? await analyzeGenericPdf(bytes) : null
   // La Booking, un singur link/dropzone primeste si facturi si borderouri - AI-ul decide unde se duce fiecare.
-  const effectiveSection = section === 'booking-auto'
-    ? (genericExtractie?.tipDocumentBooking === 'borderou' ? 'booking-borderou' : 'booking-facturi')
-    : section
-  const effectiveDocumentType = section === 'booking-auto' ? (genericExtractie?.tipDocumentBooking || 'factura') : documentType
+  let effectiveSection = section
+  let effectiveDocumentType = documentType
+  if (section.startsWith('booking-')) {
+    const pdf = await identifyBookingPdf(bytes)
+    const type = pdf.type || genericExtractie?.tipDocumentBooking
+    if (!type) return NextResponse.json({ error: 'Tipul documentului Booking nu a putut fi identificat. Încarcă un PDF lizibil.' }, { status: 422 })
+    effectiveSection = bookingSection(type)
+    effectiveDocumentType = type
+    if (genericExtractie && pdf.code) genericExtractie.codLocatie = pdf.code
+    if (!genericExtractie) genericExtractie = { furnizor: 'Booking.com', numarDocument: null, suma: null, dataDocument: null, codLocatie: pdf.code, tipDocumentBooking: type }
+  }
   let transaction: { id:string; document_id:string|null; extras_id:string; data_tranzactie:string; descriere_curatata:string|null; descriere:string|null; suma:number } | null = null
   if (transactionId) {
     const result = await sb.from('tranzactii')
@@ -268,7 +278,7 @@ export async function POST(req: NextRequest) {
     fisier_nume:fileName,
     fisier_tip:'application/pdf',
     fisier_marime:bytes.length,
-    in_zip:true,
+    in_zip:effectiveSection !== 'booking-borderou-lucru',
   }
   // mode='add': tranzactia poate avea mai multe facturi - nu suprascrie documentul existent, adauga unul nou
   const shouldReplace = mode === 'replace' && !!transaction?.document_id

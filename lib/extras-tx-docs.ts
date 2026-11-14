@@ -25,6 +25,7 @@ export async function getExtrasTxDocs(sb: ReturnType<typeof getServiceSupabase>,
   const txDupaDoc = new Map(txs.filter(t => t.document_id).map(t => [t.document_id as string, t]))
   return [...unice.values()]
     .filter(d => !String(d.fisier_path).includes('/config/'))
+    .filter(d => !String(d.fisier_path).includes('/booking-borderou-lucru/'))
     .map(doc => {
       const tx = (doc.tranzactie_id && txById.get(doc.tranzactie_id)) || txDupaDoc.get(doc.id)
       return { ...doc, extras_id: tx?.extras_id || null, data_tranzactie: tx?.data_tranzactie || '' }

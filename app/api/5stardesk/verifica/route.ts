@@ -117,9 +117,11 @@ async function extrageBorderouriLipsa(sb: ReturnType<typeof getServiceSupabase>,
   const { data: borderouDocs } = await sb.from('documente')
     .select('id,fisier_path,fisier_nume')
     .eq('luna_id', lunaId)
-    .or('fisier_path.like.%/airbnb-borderou/%,fisier_path.like.%/booking-borderou/%')
-  const { data: existingRez } = await sb.from('borderou_rezervari').select('document_id').eq('luna_id', lunaId)
+    .or('fisier_path.like.%/airbnb-borderou/%,fisier_path.like.%/booking-borderou/%,fisier_path.like.%/booking-borderou-lucru/%')
+  const { data: existingRez, error: existingRezError } = await sb.from('borderou_rezervari').select('document_id,platforma,cod_rezervare').eq('luna_id', lunaId)
+  if (existingRezError) throw existingRezError
   const extractedRezDocIds = new Set((existingRez || []).map(r => r.document_id))
+  const bookingCodes = new Set((existingRez || []).filter(r => r.platforma === 'booking').map(r => normalizeCode(r.cod_rezervare)))
 
   for (const doc of borderouDocs || []) {
     if (extractedRezDocIds.has(doc.id)) continue
@@ -131,11 +133,18 @@ async function extrageBorderouriLipsa(sb: ReturnType<typeof getServiceSupabase>,
     try { rezervari = await extractInBatches(bytes, PAGES_PER_BATCH, b => extractBorderou(b, platforma)) }
     catch (err) { console.error('[5stardesk] extracție borderou eșuată pentru documentul', doc.id, doc.fisier_nume, err) }
     rezervari = dedupeByCode(rezervari)
+    // Cele doua rapoarte nu sunt doua surse de rezervari; nici reimportul unui sumar nu dubleaza codurile.
+    if (platforma === 'booking') rezervari = rezervari.filter(r => {
+      const code = normalizeCode(r.codRezervare || '')
+      return code && !bookingCodes.has(code)
+    })
     if (rezervari.length) {
-      await sb.from('borderou_rezervari').insert(rezervari.map(r => ({
+      const { error } = await sb.from('borderou_rezervari').insert(rezervari.map(r => ({
         luna_id: lunaId, firma_id: firmaId, document_id: doc.id, platforma,
         cod_rezervare: r.codRezervare || '', nume_oaspete: r.numeOaspete || '', suma: Number(r.suma) || null,
       })))
+      if (error) throw error
+      if (platforma === 'booking') rezervari.forEach(r => bookingCodes.add(normalizeCode(r.codRezervare || '')))
     }
   }
 }

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { BOOKING_CLASSIFICATION_HINT, bookingSection, normalizeBookingType, type BookingDocumentType } from '@/lib/booking-documents'
+import { identifyBookingPdf } from '@/lib/booking-document-pdf'
 import { finalizeazaDocument } from '@/lib/denumire-document'
 import { PDFDocument } from 'pdf-lib'
 import Anthropic from '@anthropic-ai/sdk'
@@ -12,7 +14,7 @@ const ALLOWED_CATEGORIES = new Set(['utilitati', 'chirie', 'altul'])
 const ALLOWED_DOCUMENT_TYPES = new Set(['factura', 'chitanta', 'borderou', 'raport_csv', 'contract', 'altul'])
 const ALLOWED_SECTIONS = new Set([
   'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
-  'booking-facturi', 'booking-borderou', 'booking-auto',
+  'booking-facturi', 'booking-borderou', 'booking-borderou-contabil', 'booking-borderou-lucru', 'booking-auto',
   'airbnb-facturi', 'airbnb-borderou',
   '5stardesk', 'trendyol', 'acte-contabile', 'angajati',
 ])
@@ -72,7 +74,7 @@ async function analyzeAngajatiDoc(bytes: Uint8Array, mediaType: string): Promise
   }
 }
 
-type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; locatie: string | null; codLocatie: string | null; tipDocumentBooking: 'factura' | 'borderou' | null; codRezervare: string | null }
+type GenericExtractie = { furnizor: string | null; numarDocument: string | null; suma: number | null; dataDocument: string | null; locatie: string | null; codLocatie: string | null; tipDocumentBooking: BookingDocumentType | null; codRezervare: string | null }
 type AirbnbBorderouRow = {
   uniqueKey: string
   codConfirmare: string
@@ -99,9 +101,10 @@ async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
+      system: BOOKING_CLASSIFICATION_HINT,
       messages: [{ role: 'user', content: [
         source,
-        { type: 'text', text: 'Extrage datele acestui document (factura, chitanta, borderou sau alt act contabil). Raspunde DOAR cu JSON: {"furnizor":"numele furnizorului/emitentului sau al platformei","numarDocument":"seria si numarul documentului, copiate exact cum apar","suma":123.45,"dataDocument":"AAAA-LL-ZZ","locatie":"apartamentul/adresa/locul de consum daca apare (ex: Ap. 99), altfel null","codLocatie":"codul unitatii de cazare, doar daca documentul e de la Booking.com (campul \'Numarul unitatii de cazare\'), altfel null","tipDocumentBooking":"factura (daca documentul e o FACTURA de comision Booking.com, cu \'Suma totala de plata\') sau borderou (daca e un centralizator/sumar de plati cu lista de rezervari), altfel null","codRezervare":"codul de confirmare al rezervarii daca apare (la Airbnb incepe de obicei cu HM, ex. HMKWC2ESYN), altfel null"}. "suma" e suma totala. "dataDocument" e data emiterii (format ISO). Lasa null campurile pe care nu le gasesti. Nu inventa date.' },
+        { type: 'text', text: `Extrage datele documentului. Raspunde DOAR cu JSON: {"furnizor":"emitentul sau platforma","numarDocument":"seria si numarul documentului, exact ca in sursa","suma":123.45,"dataDocument":"AAAA-LL-ZZ","locatie":"apartamentul/adresa/locul de consum, altfel null","codLocatie":"codul proprietatii Booking din antet, altfel null","tipDocumentBooking":"factura sau borderou-contabil sau borderou-plati, altfel null","codRezervare":"codul de confirmare, la Airbnb de obicei HM..., altfel null"}. suma este totalul; pentru Reservation Statement este totalul Final amount, iar pentru sumarul platilor este totalul Net. dataDocument este data emiterii. Lasa null campurile absente. Nu inventa date.` },
       ] }],
     })
     const raw = response.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -115,7 +118,7 @@ async function analyzeGenericDoc(bytes: Uint8Array, mediaType: string): Promise<
       dataDocument: typeof parsed.dataDocument === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataDocument) ? parsed.dataDocument : null,
       locatie: typeof parsed.locatie === 'string' ? parsed.locatie : null,
       codLocatie: typeof parsed.codLocatie === 'string' && parsed.codLocatie.trim() ? parsed.codLocatie.trim() : null,
-      tipDocumentBooking: parsed.tipDocumentBooking === 'factura' || parsed.tipDocumentBooking === 'borderou' ? parsed.tipDocumentBooking : null,
+      tipDocumentBooking: normalizeBookingType(parsed.tipDocumentBooking),
       codRezervare: typeof parsed.codRezervare === 'string' && parsed.codRezervare.trim() ? parsed.codRezervare.trim() : null,
     }
   } catch {
@@ -331,7 +334,9 @@ export async function GET(req: NextRequest) {
       // + cele marcate automat platite dupa Extras de cont (din orice luna), ca decizia sa poata fi verificata/anulata
       .or(`luna_id.eq.${lunaId},platit.eq.false,asociere_detalii.like.Plătită automat%`)
   } else {
-    query = query.like('fisier_path', `%/${section}/%`).eq('luna_id', lunaId)
+    query = section === 'booking-borderou'
+      ? query.or('fisier_path.like.%/booking-borderou/%,fisier_path.like.%/booking-borderou-contabil/%,fisier_path.like.%/booking-borderou-lucru/%').eq('luna_id', lunaId)
+      : query.like('fisier_path', `%/${section}/%`).eq('luna_id', lunaId)
   }
 
   const { data, error } = await query
@@ -389,9 +394,15 @@ export async function POST(req: NextRequest) {
   // La Booking, un singur dropzone primeste si facturi si borderouri - AI-ul decide unde
   // se duce fiecare fisier, ca sa nu mai fie nevoie sa le adaugi separat.
   let effectiveSection = section
-  if (section === 'booking-auto') {
-    effectiveSection = genericExtractie?.tipDocumentBooking === 'borderou' ? 'booking-borderou' : 'booking-facturi'
-    if (!effectiveDocumentType) effectiveDocumentType = genericExtractie?.tipDocumentBooking || 'factura'
+  if (section.startsWith('booking-')) {
+    const pdf = file.type === 'application/pdf' ? await identifyBookingPdf(uploadBytes) : null
+    const type = pdf?.type || genericExtractie?.tipDocumentBooking
+    if (!type) return NextResponse.json({ error: 'Tipul documentului Booking nu a putut fi identificat. Încarcă un PDF lizibil: factură, Reservation Statement sau sumarul plăților.' }, { status: 422 })
+    effectiveSection = bookingSection(type)
+    effectiveDocumentType = type
+    if (genericExtractie && pdf?.code) genericExtractie.codLocatie = pdf.code
+    if (!genericExtractie) genericExtractie = { furnizor: 'Booking.com', numarDocument: null, suma: null, dataDocument: null, locatie: null, codLocatie: pdf?.code || null, tipDocumentBooking: type, codRezervare: null }
+    effectiveDocumentTypeLabel = type === 'borderou-contabil' ? 'Borderou contabil Booking' : type === 'borderou-plati' ? 'Sumar plati Booking - lucru intern' : effectiveDocumentTypeLabel
   }
 
   if (effectiveSection === 'booking-facturi' && file.type === 'application/pdf') {
@@ -439,7 +450,7 @@ export async function POST(req: NextRequest) {
       fisier_nume: fileName,
       fisier_tip: isAirbnbCsv ? 'text/csv' : file.type,
       fisier_marime: uploadBytes.length,
-      in_zip: true,
+      in_zip: effectiveSection !== 'booking-borderou-lucru',
     })
     .select('id,fisier_nume,tip_document,furnizor,modul,created_at')
     .single()

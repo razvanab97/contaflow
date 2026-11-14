@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
 
   // Document counts by section
   const docCounts: Record<string, number> = {}
-  const SECTIONS = ['facturi-chitanta', 'facturi-restante', 'trendyol', 'booking-facturi', 'booking-borderou', 'airbnb-facturi', 'airbnb-borderou', '5stardesk']
+  const SECTIONS = ['facturi-chitanta', 'facturi-restante', 'trendyol', 'booking-facturi', 'booking-borderou', 'booking-borderou-contabil', 'booking-borderou-lucru', 'airbnb-facturi', 'airbnb-borderou', '5stardesk']
   for (const doc of docsData) {
     const path = String(doc.fisier_path || '')
     if (path.includes('/emag-calcul/')) { docCounts['emag'] = (docCounts['emag'] || 0) + 1; continue }

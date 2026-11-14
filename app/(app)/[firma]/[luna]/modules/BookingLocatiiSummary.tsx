@@ -2,6 +2,7 @@
 import VeziButon from '@/components/ui/VeziButon'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { tint } from '@/lib/colors'
+import { bookingDocumentLabel } from '@/lib/booking-documents'
 
 function rgb(h: string) { return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}` }
 
@@ -51,6 +52,7 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
   const [uploadBusy, setUploadBusy] = useState(false)
   const [drag, setDrag] = useState(false)
   const [link, setLink] = useState('')
+  const [documentFilter, setDocumentFilter] = useState('toate')
   const fileRef = useRef<HTMLInputElement>(null)
   const r = rgb(culoare)
 
@@ -167,6 +169,7 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
   const activeLocatii = locatii.filter(l => l.activa)
   const facturiFaraLocatie = docsFacturi.filter(d => !d.cod_unitate_booking || !activeLocatii.some(l => l.cod === d.cod_unitate_booking))
   const borderouFaraLocatie = docsBorderou.filter(d => !d.cod_unitate_booking || !activeLocatii.some(l => l.cod === d.cod_unitate_booking))
+  const visibleDoc = (doc: Doc) => documentFilter === 'toate' || doc.tip_document === documentFilter
 
   return (
     <div style={{ background: 'var(--c-111111)', border: '1px solid var(--c-1e1e1e)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
@@ -175,6 +178,19 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
         <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-888888)', lineHeight: 1.45 }}>
           Fiecare proprietate are un cod (numărul unității de cazare din Booking) — facturile de comision și borderourile se grupează automat după acest cod, extras din documentul încărcat.
         </div>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--c-888888)', lineHeight: 1.5 }}>
+          Borderou contabil (Reservation Statement): inclus în dosarul pentru contabilitate. Sumarul plăților: lucru intern, pentru verificarea rezervărilor și încasărilor; nu intră în PDF-ul sau ZIP-ul contabil. Documentele istorice rămân neschimbate.
+        </p>
+        <label style={{ fontSize: 'var(--fs-sm)' }}>
+          Afișează documentele: {' '}
+          <select value={documentFilter} onChange={e => setDocumentFilter(e.target.value)} style={{ padding: '8px', background: 'var(--c-161616)', color: 'var(--c-eeeeee)', borderRadius: 'var(--r-md)' }}>
+            <option value="toate">Toate tipurile</option>
+            <option value="factura">Facturi Booking</option>
+            <option value="borderou-contabil">Borderouri pentru contabilitate</option>
+            <option value="borderou-plati">Sumare de plăți · lucru intern</option>
+            <option value="borderou">Borderouri istorice</option>
+          </select>
+        </label>
       </div>
 
       <div style={{ padding: '18px 22px' }}>
@@ -208,7 +224,10 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
           {activeLocatii.map(loc => {
             const facturi = docsFacturi.filter(d => d.cod_unitate_booking === loc.cod)
             const borderouri = docsBorderou.filter(d => d.cod_unitate_booking === loc.cod)
-            const complet = facturi.length > 0 && borderouri.length > 0
+            const contabile = borderouri.filter(d => d.tip_document === 'borderou-contabil').length
+            const lucru = borderouri.filter(d => d.tip_document === 'borderou-plati').length
+            const istorice = borderouri.length - contabile - lucru
+            const complet = facturi.length > 0 && contabile > 0 && lucru > 0
             return (
               <div key={loc.id} style={{ background: 'var(--c-161616)', border: `1px solid ${complet ? 'rgba(74,222,128,.25)' : 'var(--c-222222)'}`, borderRadius: 'var(--r-md)', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
@@ -218,16 +237,16 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                     <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: complet ? 'var(--success)' : 'var(--warning)', background: complet ? 'rgba(74,222,128,.1)' : 'rgba(251,146,60,.1)', border: `1px solid ${complet ? 'rgba(74,222,128,.3)' : 'rgba(251,146,60,.3)'}`, borderRadius: 'var(--r-full)', padding: '3px 8px' }}>
-                      {facturi.length} factur{facturi.length===1?'ă':'i'} · {borderouri.length} borderou{borderouri.length===1?'':'ri'}
+                      {facturi.length} facturi · {contabile} contabile · {lucru} interne{istorice ? ` · ${istorice} istorice` : ''}
                     </span>
                     <button onClick={() => removeLocatie(loc)} title="Șterge locația" style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
                   </div>
                 </div>
                 {(facturi.length > 0 || borderouri.length > 0) && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {[...facturi, ...borderouri].map(doc => (
+                    {[...facturi, ...borderouri].filter(visibleDoc).map(doc => (
                       <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 9px', background: 'var(--c-0f0f0f)', borderRadius: 'var(--r-sm)' }}>
-                        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{docsFacturi.includes(doc) ? 'factură' : 'borderou'}</span>
+                        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{bookingDocumentLabel(doc.tip_document || (docsFacturi.includes(doc) ? 'factura' : 'borderou'))}</span>
                         <div style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-xs)', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{docLabel(doc)}</div>
                         <VeziButon url={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} />
                         <a href={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} style={{ fontSize: 'var(--fs-xs)', color:'var(--accent)', textDecoration: 'none', flexShrink: 0 }}>↓</a>
@@ -243,7 +262,7 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
 
         <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--c-1a1a1a)' }}>
           <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--c-dddddd)', marginBottom: '4px' }}>Adaugă facturi sau borderouri Booking</div>
-          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)', marginBottom: '10px' }}>Un singur loc pentru ambele — AI-ul recunoaște ce e fiecare fișier și îl pune la proprietatea potrivită.</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-777777)', marginBottom: '10px' }}>Adaugă factura, Reservation Statement și sumarul plăților. Sistemul separă cele trei tipuri și le grupează la proprietatea potrivită. Rezervările se citesc doar din sumarul plăților.</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginBottom: '10px' }}>
             <input value={link} onChange={e => setLink(e.target.value)} placeholder="Link PDF Booking.com" style={{ fontSize: 'var(--fs-sm)', background: 'var(--c-0f0f0f)', border: '1px solid var(--c-2a2a2a)', borderRadius: 'var(--r-md)', padding: '9px 12px', color: 'var(--c-dddddd)', outline: 'none' }}/>
             <button onClick={() => importLink()} disabled={uploadBusy || !link} style={{ padding: '9px 14px', border: 'none', borderRadius: 'var(--r-md)', background:'var(--accent-solid)', color: '#fff', cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, opacity: uploadBusy || !link ? .5 : 1 }}>
@@ -277,9 +296,9 @@ export default function BookingLocatiiSummary({ firmaId, lunaId, culoare }: { fi
               Nealocate unei proprietăți ({facturiFaraLocatie.length + borderouFaraLocatie.length})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {[...facturiFaraLocatie, ...borderouFaraLocatie].map(doc => (
+              {[...facturiFaraLocatie, ...borderouFaraLocatie].filter(visibleDoc).map(doc => (
                 <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 9px', background: 'var(--c-161616)', borderRadius: 'var(--r-sm)' }}>
-                  <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{facturiFaraLocatie.includes(doc) ? 'factură' : 'borderou'}</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--c-666666)', textTransform: 'uppercase', flexShrink: 0 }}>{bookingDocumentLabel(doc.tip_document || (facturiFaraLocatie.includes(doc) ? 'factura' : 'borderou'))}</span>
                   <div style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-xs)', color: 'var(--c-cccccc)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={doc.cod_unitate_booking ? `Cod necunoscut: ${doc.cod_unitate_booking}` : 'Fără cod detectat'}>{docLabel(doc)}</div>
                   <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--c-666666)', flexShrink: 0 }}>{doc.cod_unitate_booking ? `cod ${doc.cod_unitate_booking}` : 'fără cod'}</span>
                   <VeziButon url={`/api/chitante/document?id=${encodeURIComponent(doc.id)}`} />

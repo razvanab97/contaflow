@@ -50,7 +50,7 @@ function pathToSection(path: string): string {
   if (p.includes('/facturi-restante/')) return 'facturi-restante'
   if (p.includes('/inbox-facturi/')) return 'inbox-facturi'
   if (p.includes('/booking-facturi/')) return 'booking-facturi'
-  if (p.includes('/booking-borderou/')) return 'booking-borderou'
+  if (p.includes('/booking-borderou/') || p.includes('/booking-borderou-contabil/')) return 'booking-borderou'
   if (p.includes('/airbnb-facturi/')) return 'airbnb-facturi'
   if (p.includes('/airbnb-borderou/')) return 'airbnb-borderou'
   if (p.includes('/5stardesk/')) return '5stardesk'
@@ -65,6 +65,7 @@ function pathToSection(path: string): string {
 // Verificare directă path → secțiune (gestionează slug-uri diferite față de path, ex. 'emag' vs 'emag-calcul')
 function matchesSection(filePath: string, section: string): boolean {
   const p = String(filePath)
+  if (section === 'booking-borderou') return p.includes('/booking-borderou/') || p.includes('/booking-borderou-contabil/')
   if (section === 'dispozitie-plata') return p.includes('/dispozitii-plata/')
   if (section === 'emag' || section === 'emag-calcul') return p.includes('/emag-calcul/') || p.includes('/emag-avize/') || p.includes('/emag-facturi/')
   return p.includes(`/${section}/`)
@@ -159,6 +160,7 @@ export async function POST(req: NextRequest) {
         .not('fisier_path', 'like', '%/tx/%')
         .not('fisier_path', 'like', '%/checklist/%')
         .not('fisier_path', 'like', '%/config/%')
+        .not('fisier_path', 'like', '%/booking-borderou-lucru/%')
         .not('fisier_path', 'like', '%/dispozitii-plata/resetari/%')
         .order('created_at', { ascending: true })
 

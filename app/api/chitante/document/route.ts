@@ -5,7 +5,7 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 // are voie să șteargă (documentele din emag-avize/dispozitii-plata/etc. au rutele lor proprii)
 const DELETABLE_SECTIONS = [
   'facturi-chitanta', 'facturi-restante', 'inbox-facturi',
-  'booking-facturi', 'booking-borderou',
+  'booking-facturi', 'booking-borderou', 'booking-borderou-contabil', 'booking-borderou-lucru',
   'airbnb-facturi', 'airbnb-borderou',
   '5stardesk', 'trendyol', 'acte-contabile', 'angajati', 'achizitii', 'obligatii',
 ]

@@ -21,7 +21,7 @@ function pathToSection(path: string): string {
   if (p.includes('/facturi-restante/')) return 'facturi-restante'
   if (p.includes('/inbox-facturi/')) return 'inbox-facturi'
   if (p.includes('/booking-facturi/')) return 'booking-facturi'
-  if (p.includes('/booking-borderou/')) return 'booking-borderou'
+  if (p.includes('/booking-borderou/') || p.includes('/booking-borderou-contabil/')) return 'booking-borderou'
   if (p.includes('/airbnb-facturi/')) return 'airbnb-facturi'
   if (p.includes('/airbnb-borderou/')) return 'airbnb-borderou'
   if (p.includes('/facturi-rh/')) return 'facturi-rh'
@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
       .not('fisier_path', 'like', '%/tx/%')
       .not('fisier_path', 'like', '%/checklist/%')
       .not('fisier_path', 'like', '%/config/%')
+      .not('fisier_path', 'like', '%/booking-borderou-lucru/%')
       .not('fisier_path', 'like', '%/dispozitii-plata/resetari/%')
       .order('created_at', { ascending: true })
 

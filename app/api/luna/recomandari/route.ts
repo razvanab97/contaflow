@@ -9,6 +9,8 @@ function sectionFromPath(path: string): string {
   if (p.includes('/facturi-chitanta/')) return 'Facturi + chitanță'
   if (p.includes('/facturi-restante/')) return 'Facturi restante'
   if (p.includes('/booking-facturi/')) return 'Booking · Facturi'
+  if (p.includes('/booking-borderou-contabil/')) return 'Booking · Borderou contabil'
+  if (p.includes('/booking-borderou-lucru/')) return 'Booking · Lucru intern'
   if (p.includes('/booking-borderou/')) return 'Booking · Borderou'
   if (p.includes('/airbnb-facturi/')) return 'Airbnb · Facturi comision'
   if (p.includes('/airbnb-borderou/')) return 'Airbnb · Rezervări'
