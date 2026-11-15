@@ -18,9 +18,11 @@ export interface PlataTrendyol {
   valuta: string
   lei: number                // echivalent lei (din descrierea bancii la incasarile in EUR)
   curs: number | null
-  borderou: { documentId: string; fisier: string; totalVanzator: number } | null
+  borderou: { documentId: string; fisier: string; totalVanzator: number } | null   // primul (compatibilitate)
+  // toate borderourile platite de aceasta incasare - „combined payments” = ordin RO (RON) + ordin BG (EUR)
+  borderouri: { documentId: string; ordin: string | null; fisier: string; totalVanzator: number; valuta: string; lei: number }[]
 }
-export interface TaxaTrendyol { nr: string; tip: string; suma: number; data: string | null; ordin: string | null; facturaIncarcata: boolean }
+export interface TaxaTrendyol { nr: string; tip: string; suma: number; valuta: string; data: string | null; ordin: string | null; facturaIncarcata: boolean }
 export interface ConcluzieTrendyol {
   plati: PlataTrendyol[]
   borderouriFaraIncasare: { documentId: string; ordin: string | null; fisier: string; totalVanzator: number }[]
@@ -72,17 +74,27 @@ export async function getConcluzieTrendyol(lunaId: string): Promise<ConcluzieTre
   // 2. Borderourile incarcate (cate unul pe ordin de plata)
   const { data: docs } = await sb.from('documente').select('id,numar_document,fisier_nume,fisier_path,data_document')
     .eq('luna_id', lunaId).eq('modul', 'trendyol').eq('tip_document', 'borderou')
-  const borderouri: { documentId: string; ordin: string | null; data: string | null; fisier: string; linii: LinieTrendyol[]; totalVanzator: number }[] = []
+  const borderouri: { documentId: string; ordin: string | null; data: string | null; fisier: string; linii: LinieTrendyol[]; totalVanzator: number; valuta: string; curs: number }[] = []
   await Promise.all((docs || []).map(async d => {
     const { data: file } = await sb.storage.from('documente').download(d.fisier_path)
     if (!file) { avertismente.push(`Borderoul ${d.numar_document || d.fisier_nume} nu a putut fi descărcat.`); return }
     try {
       const b = await citesteBorderouTrendyol(new Uint8Array(await file.arrayBuffer()), d.fisier_nume)
-      borderouri.push({ documentId: d.id, ordin: d.numar_document || b.ordinPlata, data: d.data_document || null, fisier: d.fisier_nume, linii: b.linii, totalVanzator: b.totalVanzator })
+      borderouri.push({ documentId: d.id, ordin: d.numar_document || b.ordinPlata, data: d.data_document || null, fisier: d.fisier_nume, linii: b.linii, totalVanzator: b.totalVanzator, valuta: String(b.valuta || 'RON').toUpperCase(), curs: 1 })
     } catch (e) { avertismente.push(`Borderoul ${d.numar_document || d.fisier_nume} nu a putut fi citit: ${e instanceof Error ? e.message : e}`) }
   }))
 
   const folosite = new Set<string>()
+  // borderourile in EUR (Trendyol BG) se trec in lei la cursul bancii al incasarii care le-a platit
+  const leaga = (p: PlataTrendyol, bs: typeof borderouri) => {
+    for (const b of bs) {
+      folosite.add(b.documentId)
+      b.curs = b.valuta === 'RON' ? 1 : (b.valuta === p.valuta && p.curs ? p.curs : 0)
+      if (b.valuta !== 'RON' && !b.curs) avertismente.push(`Borderoul ${b.ordin} e în ${b.valuta}, dar încasarea din ${p.data} nu are cursul băncii — nu poate fi trecut în lei.`)
+    }
+    p.borderouri.push(...bs.map(b => ({ documentId: b.documentId, ordin: b.ordin, fisier: b.fisier, totalVanzator: b.totalVanzator, valuta: b.valuta, lei: r2(b.totalVanzator * b.curs) })))
+    p.borderou = p.borderouri[0] ? { documentId: p.borderouri[0].documentId, fisier: p.borderouri[0].fisier, totalVanzator: p.borderouri[0].totalVanzator } : null
+  }
   const plati: PlataTrendyol[] = credite.map(t => {
     const d = descr(t)
     const ordin = ordinDinDescriere(d)
@@ -91,34 +103,39 @@ export async function getConcluzieTrendyol(lunaId: string): Promise<ConcluzieTre
     if (valuta !== 'RON' && !leiDinDescriere(d)) avertismente.push(`Încasarea Trendyol din ${t.data_tranzactie} (${t.suma} ${valuta}) nu are echivalentul în lei în extras.`)
     const b = ordin ? borderouri.find(x => x.ordin === ordin && !folosite.has(x.documentId)) : undefined
     if (b) folosite.add(b.documentId)
-    return {
+    const p: PlataTrendyol = {
       ordin, data: t.data_tranzactie, suma: Number(t.suma), valuta, lei: r2(lei), curs: cursDinDescriere(d),
-      borderou: b ? { documentId: b.documentId, fisier: b.fisier, totalVanzator: b.totalVanzator } : null,
+      borderou: null, borderouri: [],
     }
+    if (b) leaga(p, [b])
+    return p
   })
-  // Incasarile „Payments services - combined payments” (din oct. 2026) nu mai au numarul ordinului in extras:
-  // se leaga de borderoul ramas nelegat cu data (ordinului) cea mai apropiata, de cel mult 10 zile inaintea
-  // incasarii (ex. ordin 14.10 → incasat 16.10, ordin 21.10 → 23.10).
+  // Incasarile „Payments services - combined payments” (din oct. 2026) nu au numarul ordinului in extras si
+  // platesc IMPREUNA ordinele RO (RON) si BG (EUR) din aceeasi saptamana: primesc toate borderourile ramase
+  // nelegate cu data platii (joia, vezi dataEcapTrendyol) dupa incasarea Trendyol anterioara si pana la
+  // aceasta, max. 10 zile (ex. ordin RO 78092674 + BG 78087238, ambele 15.10 → incasat 16.10).
   const zile = (a: string, b: string) => (Date.parse(a) - Date.parse(b)) / 86400000
-  for (const p of plati) {
-    if (p.borderou || p.ordin) continue
-    const b = borderouri.filter(x => !folosite.has(x.documentId) && x.data && zile(p.data, x.data) >= 0 && zile(p.data, x.data) <= 10)
-      .sort((x, y) => zile(p.data, x.data!) - zile(p.data, y.data!))[0]
-    if (!b) continue
-    folosite.add(b.documentId)
-    p.ordin = b.ordin
-    p.borderou = { documentId: b.documentId, fisier: b.fisier, totalVanzator: b.totalVanzator }
-  }
+  plati.forEach((p, i) => {
+    if (p.borderouri.length || p.ordin) return
+    const anterior = i > 0 ? plati[i - 1].data : ''
+    const bs = borderouri.filter(x => !folosite.has(x.documentId) && x.data && x.data > anterior && zile(p.data, x.data) >= 0 && zile(p.data, x.data) <= 10)
+      .sort((x, y) => (x.valuta === 'RON' ? 0 : 1) - (y.valuta === 'RON' ? 0 : 1) || String(x.data).localeCompare(String(y.data)))
+    if (!bs.length) return
+    leaga(p, bs)
+    p.ordin = bs.map(b => b.ordin).filter(Boolean).join(' + ') || null
+  })
   const borderouriFaraIncasare = borderouri.filter(b => !folosite.has(b.documentId))
     .map(b => ({ documentId: b.documentId, ordin: b.ordin, fisier: b.fisier, totalVanzator: b.totalVanzator }))
   if (borderouriFaraIncasare.length) avertismente.push(`${borderouriFaraIncasare.length} ${borderouriFaraIncasare.length === 1 ? 'borderou nu are' : 'borderouri nu au'} încasarea în extrasul acestei luni: ${borderouriFaraIncasare.map(b => b.ordin || b.fisier).join(', ')}.`)
-  const lipsa = plati.filter(p => !p.borderou)
+  const lipsa = plati.filter(p => !p.borderouri.length)
   if (lipsa.length) avertismente.push(`Lipsesc borderourile pentru ${lipsa.length} ${lipsa.length === 1 ? 'încasare' : 'încasări'}: ${lipsa.map(p => `${p.data.split('-').reverse().join('.')}${p.ordin ? ` (ordin ${p.ordin})` : ''}`).join(', ')} — concluzia e incompletă până le încarci.`)
 
   // 3. Cascada, doar din borderourile legate de o incasare a lunii
   const legate = borderouri.filter(b => folosite.has(b.documentId))
-  const linii = legate.flatMap(b => b.linii.map(l => ({ ...l, ordin: b.ordin })))
-  const sum = (f: (l: LinieTrendyol) => number, cond: (l: LinieTrendyol) => boolean) => r2(linii.filter(cond).reduce((s, l) => s + f(l), 0))
+  // liniile in lei (BG: EUR x cursul incasarii); facturile se compara pe valorile originale (taxa() de mai jos)
+  const linii = legate.flatMap(b => b.linii.map(l => ({ ...l, ordin: b.ordin, curs: b.curs, valuta: b.valuta })))
+  const lei = (v: number, l: { curs: number }) => v * l.curs
+  const sum = (f: (l: LinieTrendyol) => number, cond: (l: LinieTrendyol) => boolean) => r2(linii.filter(cond).reduce((s, l) => s + lei(f(l), l), 0))
   const eProdus = (l: LinieTrendyol) => l.tip === 'vanzare' || l.tip === 'retur' || l.tip === 'reducere' || l.tip === 'ajustare'
   const vanzari = sum(l => l.total, l => l.tip === 'vanzare')
   const retururi = sum(l => l.total, l => l.tip === 'retur')
@@ -127,8 +144,8 @@ export async function getConcluzieTrendyol(lunaId: string): Promise<ConcluzieTre
   const comision = sum(l => l.vanzator - l.total, eProdus)
   const transport = sum(l => l.vanzator, l => l.tip === 'transport')
   const taxe = sum(l => l.vanzator, l => l.tip === 'taxa')
-  const virat = r2(legate.reduce((s, b) => s + b.totalVanzator, 0))
-  const incasatLei = r2(plati.filter(p => p.borderou).reduce((s, p) => s + p.lei, 0))
+  const virat = r2(legate.reduce((s, b) => s + b.totalVanzator * b.curs, 0))
+  const incasatLei = r2(plati.filter(p => p.borderouri.length).reduce((s, p) => s + p.lei, 0))
   const diferentaCurs = legate.length ? r2(incasatLei - virat) : 0
   const incasariFaraBorderou = r2(lipsa.reduce((s, p) => s + p.lei, 0))
 
@@ -136,8 +153,8 @@ export async function getConcluzieTrendyol(lunaId: string): Promise<ConcluzieTre
   const { data: facturiDocs } = await sb.from('documente').select('numar_document,suma,data_document')
     .eq('luna_id', lunaId).eq('tip_document', 'factura').like('fisier_path', '%/trendyol/%')
   const nrIncarcate = new Set((facturiDocs || []).map(f => String(f.numar_document || '').toUpperCase()))
-  const taxa = (l: LinieTrendyol & { ordin: string | null }): TaxaTrendyol => ({
-    nr: l.nr, tip: l.tipOriginal, suma: r2(l.vanzator), data: l.dataPlata, ordin: l.ordin, facturaIncarcata: nrIncarcate.has(l.nr.toUpperCase()),
+  const taxa = (l: LinieTrendyol & { ordin: string | null; valuta: string }): TaxaTrendyol => ({
+    nr: l.nr, tip: l.tipOriginal, suma: r2(l.vanzator), valuta: l.valuta, data: l.dataPlata, ordin: l.ordin, facturaIncarcata: nrIncarcate.has(l.nr.toUpperCase()),
   })
   const facturiTransport = linii.filter(l => l.tip === 'transport').map(taxa)
   const facturiTaxe = linii.filter(l => l.tip === 'taxa').map(taxa)

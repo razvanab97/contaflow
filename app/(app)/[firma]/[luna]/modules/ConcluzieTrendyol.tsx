@@ -29,17 +29,18 @@ function Rand({ label, valoare, detaliu, tare, ton, evidentiat }: { label: strin
 
 function ListaTaxe({ titlu, lista }: { titlu: string; lista: TaxaTrendyol[] }) {
   if (!lista.length) return null
-  const total = lista.reduce((s, f) => s + f.suma, 0)
+  // pe moneda: facturile Trendyol BG sunt in EUR, nu se aduna cu cele RO in RON
+  const totaluri = lista.reduce<Record<string, number>>((t, f) => { const v = f.valuta || 'RON'; t[v] = (t[v] || 0) + f.suma; return t }, {})
   return (
     <div>
-      <div className="eyebrow" style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}><span>{titlu}</span><span className="num">{lei(total)} lei</span></div>
+      <div className="eyebrow" style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}><span>{titlu}</span><span className="num">{Object.entries(totaluri).map(([v, t]) => `${lei(t)} ${v === 'RON' ? 'lei' : v}`).join(' + ')}</span></div>
       {lista.map(f => (
         <div key={f.nr + f.ordin} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '4px 0', borderBottom: '1px solid var(--border-subtle)', fontSize: 'var(--fs-sm)' }}>
           <span style={{ color: 'var(--text-secondary)', minWidth: 0 }}>
             {f.nr} <span style={{ color: 'var(--text-muted)' }}>· {zi(f.data)}{f.tip && !/shipping/i.test(f.tip) ? ` · ${f.tip.replace(/ - BV RO$/i, '').toLowerCase()}` : ''}</span>
           </span>
           <span className="num" style={{ whiteSpace: 'nowrap', color: f.facturaIncarcata ? 'var(--text-primary)' : 'var(--warning)' }} title={f.facturaIncarcata ? 'Factura e încărcată' : 'Factura nu e încărcată în Trendyol · Documente'}>
-            {lei(f.suma)} {f.facturaIncarcata ? '✓' : '⚠'}
+            {lei(f.suma)}{f.valuta && f.valuta !== 'RON' ? ` ${f.valuta}` : ''} {f.facturaIncarcata ? '✓' : '⚠'}
           </span>
         </div>
       ))}
@@ -124,10 +125,12 @@ export default function ConcluzieTrendyol({ lunaId, versiune = 0 }: { lunaId: st
                   <span className="num" style={{ fontWeight: 600, whiteSpace: 'nowrap', color: p.borderou ? 'var(--text-primary)' : 'var(--warning)' }}>{lei(p.lei)} {p.borderou ? '✓' : '⚠'}</span>
                 </div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: p.borderou ? 'var(--text-muted)' : 'var(--warning)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {p.borderou ? <>
-                    <span>borderou: {lei(p.borderou.totalVanzator)} lei</span>
-                    <a href={`/api/trendyol/borderou?download=${encodeURIComponent(p.borderou.documentId)}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>↓ .xlsx</a>
-                  </> : <span>lipsește borderoul {p.ordin ? `PaymentOrderDetail_${p.ordin}_….xlsx` : ''}</span>}
+                  {(p.borderouri || []).length ? (p.borderouri || []).map(b => (
+                    <span key={b.documentId} style={{ display: 'inline-flex', gap: '6px' }}>
+                      <span>borderou {b.ordin}: {b.valuta === 'RON' ? `${lei(b.totalVanzator)} lei` : `${lei(b.totalVanzator)} ${b.valuta} = ${lei(b.lei)} lei`}</span>
+                      <a href={`/api/trendyol/borderou?download=${encodeURIComponent(b.documentId)}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>↓ .xlsx</a>
+                    </span>
+                  )) : <span>lipsește borderoul {p.ordin ? `PaymentOrderDetail_${p.ordin}_….xlsx` : ''}</span>}
                 </div>
               </div>
             ))}

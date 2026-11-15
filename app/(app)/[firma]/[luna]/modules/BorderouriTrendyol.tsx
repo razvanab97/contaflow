@@ -40,7 +40,8 @@ export default function BorderouriTrendyol({ firmaId, lunaId, culoare, onChange 
     await load(); onChange()
   }
 
-  const total = (lista || []).reduce((s, b) => s + (b.suma || 0), 0)
+  // total pe moneda: borderourile Trendyol RO sunt in RON, cele BG in EUR - nu se aduna intre ele
+  const totaluri = (lista || []).reduce<Record<string, number>>((t, b) => { const v = b.valuta || 'RON'; t[v] = (t[v] || 0) + (b.suma || 0); return t }, {})
 
   return (
     <div className="card card-pad">
@@ -69,7 +70,7 @@ export default function BorderouriTrendyol({ firmaId, lunaId, culoare, onChange 
             ))}
             <span style={{ padding: '6px 0', borderTop: '1px solid var(--border)', fontWeight: 650, color: 'var(--text-primary)' }}>Total</span>
             <span style={{ padding: '6px 0', borderTop: '1px solid var(--border)', color: 'var(--text-muted)' }}>{lista.length} {lista.length === 1 ? 'borderou' : 'borderouri'}</span>
-            <span className="num" style={{ textAlign: 'right', padding: '6px 0', borderTop: '1px solid var(--border)', fontWeight: 650 }}>{bani(total)} RON</span>
+            <span className="num" style={{ textAlign: 'right', padding: '6px 0', borderTop: '1px solid var(--border)', fontWeight: 650 }}>{Object.entries(totaluri).map(([v, t]) => `${bani(t)} ${v}`).join(' + ')}</span>
             <span style={{ borderTop: '1px solid var(--border)' }} />
           </div>
         </div>
