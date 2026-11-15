@@ -65,6 +65,8 @@ type ExtractieBon = {
 async function analyzeBon(bytes: Uint8Array, mediaType: string): Promise<ExtractieBon | null> {
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    // Fara data de azi, modelul completa anul dupa propriile date de antrenament (22.10.2026 citit 2025-10-22).
+    const azi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }) // ora Romaniei (bon de la 00:30)
     const source = mediaType === 'application/pdf'
       ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: Buffer.from(bytes).toString('base64') } }
       : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as 'image/jpeg' | 'image/png', data: Buffer.from(bytes).toString('base64') } }
@@ -73,12 +75,13 @@ async function analyzeBon(bytes: Uint8Array, mediaType: string): Promise<Extract
       max_tokens: 500,
       messages: [{ role: 'user', content: [
         source,
-        { type: 'text', text: `Extrage datele acestui bon fiscal (de regula de la o benzinarie sau un magazin). Raspunde DOAR cu JSON: {"comerciant":"numele punctului de lucru/benzinariei emitente (locatia specifica, ex. \\"Petrom Gara Nicolina\\"), nu doar denumirea legala generica a societatii","cuiClient":"DOAR cifrele CUI/CIF-ul clientului, din campul etichetat \\"Client C.U.I./C.I.F.\\" sau \\"C.U.I. client\\" - un numar, eventual precedat de RO","suma":123.45,"dataBon":"AAAA-LL-ZZ","tip":"combustibil sau altul"}.
+        { type: 'text', text: `Data de azi: ${azi}. Extrage datele acestui bon fiscal (de regula de la o benzinarie sau un magazin). Raspunde DOAR cu JSON: {"comerciant":"numele punctului de lucru/benzinariei emitente (locatia specifica, ex. \\"Petrom Gara Nicolina\\"), nu doar denumirea legala generica a societatii","cuiClient":"DOAR cifrele CUI/CIF-ul clientului, din campul etichetat \\"Client C.U.I./C.I.F.\\" sau \\"C.U.I. client\\" - un numar, eventual precedat de RO","suma":123.45,"dataBon":"AAAA-LL-ZZ","tip":"combustibil sau altul"}.
 
 Reguli:
 - "cuiClient" e DOAR sirul de cifre (codul fiscal), niciodata numele firmei. Bonul poate avea si un camp separat "Nume Client" cu numele firmei (ex. "ABXHOMES S.R.L.") - acela NU se pune in "cuiClient", il ignori complet. Daca bonul are explicit o rubrica de CUI/CIF pentru client, cu cifre, pune acele cifre; daca nu gasesti cifre clare pentru CUI-ul clientului, raspunde null. Foarte multe bonuri nu au deloc aceasta rubrica.
 - Nu confunda "cuiClient" cu CUI-ul/CIF-ul emitentului (comerciantului/benzinariei), care apare de obicei in antet si NU trebuie pus in "cuiClient".
 - "comerciant": daca bonul are atat denumirea legala completa (ex. "S.C. OMV PETROM MARKETING S.R.L.") cat si un nume de punct de lucru/locatie (ex. "PETROM GARA NICOLINA"), foloseste punctul de lucru/locatia - e mai util pentru identificare, chiar daca denumirea legala e mai proeminenta vizual.
+- "dataBon": data tiparita pe bon, cu anul citit exact de pe bon (ex. 22.10.2026 -> 2026-10-22); nu presupune anul. Bonul nu poate fi din viitor fata de data de azi.
 - "suma" e suma totala platita (campul "Total"/"Total de plata").
 - "tip" e "combustibil" daca bonul contine produse petroliere (motorina, benzina, GPL, EURO diesel, Premium, Efix, Jet A1 sau similare) sau statia e o benzinarie; altfel "altul".
 - Lasa null campurile pe care nu le gasesti cu certitudine. Nu inventa date.` },
@@ -95,7 +98,8 @@ Reguli:
       // campul CUI cu cel de "Nume Client" aflat imediat langa el si pune numele firmei aici.
       cuiClient: cuiClient && /^(RO)?\d{2,10}$/i.test(cuiClient) ? cuiClient : null,
       suma: typeof parsed.suma === 'number' ? parsed.suma : null,
-      dataBon: typeof parsed.dataBon === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataBon) ? parsed.dataBon : null,
+      // o data din viitor e o citire gresita - mai bine goala (se completeaza in lista) decat gresita
+      dataBon: typeof parsed.dataBon === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.dataBon) && parsed.dataBon <= azi ? parsed.dataBon : null,
       tip: parsed.tip === 'combustibil' ? 'combustibil' : 'altul',
     }
   } catch {
