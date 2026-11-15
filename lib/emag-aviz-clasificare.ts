@@ -25,10 +25,12 @@ export function clasificaAviz(text: string): AvizClasificat | null {
   if (!numar || !d) return null
   const data = `${d[3]}-${d[2]}-${d[1]}`
 
-  // Moneda de pe randul Total decide piata (BG = EUR, HU = HUF); textul in bulgara / maghiara confirma
+  // Moneda de pe randul Total decide piata (BG = EUR/BGN, HU = HUF, RO = RON). Avizele BG descarcate din
+  // marketplace.emag.ro sunt in romana („Total * 185,98 EUR”), deci textul in bulgara nu mai e o conditie.
+  const monedaTotal = text.match(/Total\s*\*?\s*-?[\d.,\s]*\d\s*(RON|EUR|BGN|HUF)\b/)?.[1]
   let piata: PiataAviz
-  if (/\bHUF\b/.test(text) || /Utalási részletező/i.test(text)) piata = 'hu'
-  else if (/[А-Яа-я]{3,}/.test(text) && /\bEUR\b/.test(text)) piata = 'bg'
+  if (monedaTotal === 'HUF' || (!monedaTotal && (/\bHUF\b/.test(text) || /Utalási részletező/i.test(text)))) piata = 'hu'
+  else if (monedaTotal === 'EUR' || monedaTotal === 'BGN' || (!monedaTotal && /[А-Яа-я]{3,}/.test(text) && /\bEUR\b/.test(text))) piata = 'bg'
   else piata = 'ro'
   // Notificarea Heyblu: aviz RO doar cu „Incasari Revolving”, fara nicio factura eMAG (serii *-MKTP-*)
   if (piata === 'ro' && /revolving/i.test(text) && !/\b[A-Z]{1,2}-MKTP-\d+/.test(text)) piata = 'heyblu'

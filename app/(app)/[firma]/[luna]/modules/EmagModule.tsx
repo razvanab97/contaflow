@@ -2,7 +2,7 @@
 import VeziButon from '@/components/ui/VeziButon'
 import { deschideDocument } from '@/lib/vizualizare'
 import ConcluzieEmag from './ConcluzieEmag'
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { Fragment, useState, useCallback, useEffect, useRef } from 'react'
 import TaskSection, { TaskItem } from './TaskSection'
 import CopyButton from '@/components/CopyButton'
 import { tint } from '@/lib/colors'
@@ -706,9 +706,18 @@ export default function EmagModule({ firma, lunaId, tasks, checklistItems }: Pro
         <IncarcaTotZone firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare}
           etichete={Object.fromEntries(moduleTasks.filter(t => t.key.startsWith('emag.aviz_')).map(t => [t.key, t.label.replace(/^Aviz plată |^Notificare plată /, '')]))}
           onChange={loadAvize}/>
-        {moduleTasks.filter(t => t.key.startsWith('emag.aviz_')).map(t => (
-          <AvizUploadRow key={t.key} taskKey={t.key} label={t.label} descriere={t.descriere} data={avizData[t.key]} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} onChange={loadAvize}/>
-        ))}
+        {moduleTasks.filter(t => t.key.startsWith('emag.aviz_')).map(t => {
+          // plati in plus in aceeasi jumatate de luna: „cheie#2”, „cheie#3”... (vezi GET /api/emag/aviz)
+          const extra = Object.keys(avizData).filter(k => k.startsWith(`${t.key}#`)).sort((a, b) => Number(a.split('#')[1]) - Number(b.split('#')[1]))
+          return (
+            <Fragment key={t.key}>
+              <AvizUploadRow taskKey={t.key} label={extra.length ? `${t.label} · plata 1` : t.label} descriere={t.descriere} data={avizData[t.key]} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} onChange={loadAvize}/>
+              {extra.map(k => (
+                <AvizUploadRow key={k} taskKey={t.key} label={`${t.label} · plata ${k.split('#')[1]}`} descriere={`Aviz ${avizData[k]?.avizNumber || ''} — încă o plată eMAG în aceeași jumătate de lună`} data={avizData[k]} firmaId={firma.id} lunaId={lunaId} culoare={firma.culoare} onChange={loadAvize}/>
+              ))}
+            </Fragment>
+          )
+        })}
       </div>
 
       {/* Borderourile eMAG (DP cash/card, DC, extras de cont): data pentru eCap, descarcabile, verificate cu avizele */}

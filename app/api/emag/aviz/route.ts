@@ -124,14 +124,20 @@ export async function GET(req: NextRequest) {
   }))
 
   const result: Record<string, { documentId:string|null; avizNumber:string; fisierNume:string; sumaAviz?:number|null; invoices:typeof facturiEnriched; orphanInvoices?:OrphanInvoice[] }> = {}
+  // eMAG plateste uneori de mai multe ori in aceeasi jumatate de luna (ex. Dante 02.10 si 09.10, Heyblu
+  // saptamanal): primul aviz ramane pe cheia task-ului, urmatoarele pe „cheie#2”, „cheie#3”... (aceleasi
+  // facturi, aceeasi categorie) - interfata le arata ca randuri separate sub task.
   for (const a of avize || []) {
-    result[a.furnizor || ''] = {
+    const baza = a.furnizor || ''
+    let cheie = baza
+    for (let n = 2; result[cheie]; n++) cheie = `${baza}#${n}`
+    result[cheie] = {
       documentId: a.id,
       avizNumber: a.numar_document || '',
       fisierNume: a.fisier_nume,
       sumaAviz: a.suma == null ? null : Number(a.suma),
       invoices: facturiEnriched.filter(f => f.document_id === a.id),
-      orphanInvoices: orphanByTask[a.furnizor || ''] || [],
+      orphanInvoices: cheie === baza ? orphanByTask[baza] || [] : [],
     }
   }
   for (const [taskKey, orphanInvoices] of Object.entries(orphanByTask)) {
@@ -256,14 +262,18 @@ export async function POST(req: NextRequest) {
       inserted = (insertedRows || []).map(row => ({ ...row, valuta }))
     }
 
-    const { data: olderAvize } = await sb.from('documente')
+    // Se inlocuieste doar ACELASI aviz incarcat din nou (acelasi numar). Un aviz cu alt numar in aceeasi
+    // categorie e o plata in plus (eMAG plateste si de 2-4 ori pe luna) - se pastreaza amandoua; inainte
+    // al doilea aviz il stergea pe primul.
+    const { data: olderAvize } = avizNumber ? await sb.from('documente')
       .select('id,fisier_path')
       .eq('firma_id', firmaId)
       .eq('luna_id', lunaId)
       .eq('modul', 'emag')
       .eq('tip_document', 'aviz_plata')
       .eq('furnizor', taskKey)
-      .neq('id', doc.id)
+      .eq('numar_document', avizNumber)
+      .neq('id', doc.id) : { data: [] }
     const olderIds = (olderAvize || []).map(a => a.id)
     if (olderIds.length) {
       await sb.from('emag_avize_facturi').delete().in('document_id', olderIds)
