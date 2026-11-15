@@ -120,6 +120,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tranzacția nu a fost găsită pentru firma selectată' }, { status: 404 })
 
     const orderRef = shortReference(tx.referinta)
+    // Moneda facturii: a contului (plata din contul EUR -> EUR); la plata cu cardul din contul RON a unei sume
+    // in alta moneda („valoare tranzactie: 19.33 EUR”), daca suma introdusa e chiar aceea -> moneda ei.
+    // Inainte nu se salva deloc si ramanea RON (ex. factura Importio 360,67 EUR, OpenAI 19,33 EUR).
+    const valutaCont = String(tx.valuta || 'RON').toUpperCase()
+    const vt = `${tx.descriere || ''}`.match(/valoare\s+tranzac\w*:?\s*([\d.,]+)\s*([A-Z]{3})/i)
+    const sumaVt = vt ? Number(vt[1].replace(/,(?=\d{3}\b)/g, '').replace(',', '.')) : null
+    const valutaDoc = vt && sumaFactura != null && sumaVt != null && Math.abs(sumaVt - sumaFactura) < 0.01 ? vt[2].toUpperCase() : valutaCont
     const documents: { docId: string; filename: string }[] = []
     let primaryDocId = tx.document_id as string | null
 
@@ -153,6 +160,7 @@ export async function POST(req: NextRequest) {
         // suma tranzactiei - folosim suma introdusa pentru ea, nu suma intregii tranzactii,
         // altfel notele/rapoartele ar aduna gresit de mai multe ori acelasi total.
         suma: sumaFactura ?? Math.abs(Number(tx.suma)),
+        valuta: sumaFactura != null ? valutaDoc : valutaCont,
         data_document: tx.data_tranzactie,
         fisier_path: path, fisier_nume: renamedFile, fisier_tip: file.type,
         fisier_marime: buf.length, in_zip: true
