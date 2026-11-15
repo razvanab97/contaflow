@@ -63,3 +63,18 @@ export async function keepOnlyFirstPage(pdfBuffer: Buffer): Promise<Buffer> {
 
   return result
 }
+
+// La export (pachetul pentru contabil, PDF-uri, „Descarcă documentele”): facturile E.ON / Hidroelectrica intra
+// DOAR cu prima pagina, oricum ar fi fost incarcate (unele cai de incarcare - ex. direct pe tranzactie - pastreaza
+// tot PDF-ul). Recunoastere dupa furnizor sau numele fisierului; altfel, la PDF-uri de 3+ pagini, dupa text.
+// Doar pentru documente (nu pentru extrasele bancare, care pot contine textul „E.ON” in tranzactii).
+export async function primaPaginaLaExport(bytes: Buffer, info: { nume?: string | null; furnizor?: string | null; tip?: string | null }): Promise<Buffer> {
+  if (info.tip !== 'application/pdf' && !/\.pdf$/i.test(info.nume || '')) return bytes
+  try {
+    const pagini = (await PDFDocument.load(bytes, { ignoreEncryption: true })).getPageCount()
+    if (pagini <= 1) return bytes
+    const dupaNume = isFirstPageOnlyInvoice(info.furnizor) || isFirstPageOnlyInvoice(info.nume)
+    if (dupaNume || (pagini >= 3 && await isFirstPageOnlyPdf(bytes))) return await keepOnlyFirstPage(bytes)
+  } catch {}
+  return bytes
+}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { PDFDocument } from 'pdf-lib'
 import { getFirmaConfig } from '@/lib/firma-config'
+import { primaPaginaLaExport } from '@/lib/eonInvoice'
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     for (const doc of docs) {
       const { data: file } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!file) continue
-      const bytes = Buffer.from(await file.arrayBuffer())
+      const bytes = await primaPaginaLaExport(Buffer.from(await file.arrayBuffer()), { nume: doc.fisier_nume, tip: doc.fisier_tip })
 
       try {
         if (doc.fisier_tip === 'application/pdf' || doc.fisier_nume?.toLowerCase().endsWith('.pdf')) {

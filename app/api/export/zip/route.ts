@@ -7,6 +7,7 @@ import { generateNotePdfBytes } from '@/lib/notePdf'
 import { generateDiscrepantePdfBytes } from '@/lib/discrepante-lista'
 import { generateBonuriPdfBytes } from '@/lib/bonuriPdf'
 import JSZip from 'jszip'
+import { primaPaginaLaExport } from '@/lib/eonInvoice'
 
 export const maxDuration = 120
 
@@ -71,6 +72,12 @@ function sortEmagDocs<T extends { fisier_path: string; furnizor?: string | null;
   return [...ordered, ...dante]
 }
 
+
+// Factura E.ON / Hidroelectrica -> doar prima pagina (vezi primaPaginaLaExport)
+async function primaPagina(b: Blob, doc: { fisier_nume?: string | null; fisier_tip?: string | null; furnizor?: string | null }): Promise<ArrayBuffer> {
+  const out = await primaPaginaLaExport(Buffer.from(await b.arrayBuffer()), { nume: doc.fisier_nume, tip: doc.fisier_tip, furnizor: doc.furnizor })
+  return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -145,7 +152,7 @@ export async function POST(req: NextRequest) {
       for (const doc of txDocsByExtras.get(e.id) || []) {
         const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
         if (!b) continue
-        sectionMap.get('extras')!.push({ name: doc.fisier_nume, data: await b.arrayBuffer(), fisier_path: doc.fisier_path })
+        sectionMap.get('extras')!.push({ name: doc.fisier_nume, data: await primaPagina(b, doc), fisier_path: doc.fisier_path })
       }
     }
 
@@ -158,7 +165,7 @@ export async function POST(req: NextRequest) {
       const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!b) continue
       if (!sectionMap.has('extras')) sectionMap.set('extras', [])
-      sectionMap.get('extras')!.push({ name: doc.fisier_nume, data: await b.arrayBuffer(), fisier_path: doc.fisier_path })
+      sectionMap.get('extras')!.push({ name: doc.fisier_nume, data: await primaPagina(b, doc), fisier_path: doc.fisier_path })
     }
 
     for (const doc of docs || []) {
@@ -166,7 +173,7 @@ export async function POST(req: NextRequest) {
       const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!b) continue
       if (!sectionMap.has(section)) sectionMap.set(section, [])
-      sectionMap.get(section)!.push({ name: doc.fisier_nume, data: await b.arrayBuffer(), fisier_path: doc.fisier_path, furnizor: doc.furnizor, created_at: doc.created_at })
+      sectionMap.get(section)!.push({ name: doc.fisier_nume, data: await primaPagina(b, doc), fisier_path: doc.fisier_path, furnizor: doc.furnizor, created_at: doc.created_at })
     }
 
     if (firmaId && firmaNume && moduleOrder.includes('bonuri')) {

@@ -7,6 +7,7 @@ import { FIRMA_CONFIGS, MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
 import { generateNotePdfBytes } from '@/lib/notePdf'
 import { generateDiscrepantePdfBytes } from '@/lib/discrepante-lista'
 import { generateBonuriPdfBytes } from '@/lib/bonuriPdf'
+import { primaPaginaLaExport } from '@/lib/eonInvoice'
 
 export const maxDuration = 120
 
@@ -290,7 +291,8 @@ export async function POST(req: NextRequest) {
         }
         const { data } = await sb.storage.from(entry.bucket).download(entry.path)
         if (!data) continue
-        await embedDoc(merged, Buffer.from(await data.arrayBuffer()), entry.type, entry.name)
+        const buf = Buffer.from(await data.arrayBuffer())
+        await embedDoc(merged, entry.bucket === 'documente' ? await primaPaginaLaExport(buf, { nume: entry.name, tip: entry.type, furnizor: entry.furnizor }) : buf, entry.type, entry.name)
       }
       // Notele de pe tranzacții (tab-ul Note din Extras) - o pagină separată, imediat după extras,
       // ca să ajungă și ea la contabilitate o dată cu restul documentelor, nu doar vizibilă în aplicație.
@@ -330,7 +332,7 @@ export async function POST(req: NextRequest) {
       for (const doc of txDocsByExtras.get(s.id) || []) {
         const { data: docBytes } = await sb.storage.from('documente').download(doc.fisier_path)
         if (!docBytes) continue
-        await embedDoc(merged, Buffer.from(await docBytes.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)
+        await embedDoc(merged, await primaPaginaLaExport(Buffer.from(await docBytes.arrayBuffer()), { nume: doc.fisier_nume, tip: doc.fisier_tip }), doc.fisier_tip, doc.fisier_nume)
       }
     }
     const attachedToKnownStatements = new Set((statements || []).map(s => s.id))
@@ -341,7 +343,7 @@ export async function POST(req: NextRequest) {
     for (const doc of remainingExtrasDocs) {
       const { data } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!data) continue
-      await embedDoc(merged, Buffer.from(await data.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)
+      await embedDoc(merged, await primaPaginaLaExport(Buffer.from(await data.arrayBuffer()), { nume: doc.fisier_nume, tip: doc.fisier_tip, furnizor: (doc as { furnizor?: string | null }).furnizor }), doc.fisier_tip, doc.fisier_nume)
     }
     const orderedDocs = (scope?.section === 'emag' || scope?.section === 'emag-calcul')
       ? sortEmagDocs(docs || [])
@@ -349,7 +351,7 @@ export async function POST(req: NextRequest) {
     for (const doc of orderedDocs) {
       const { data } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!data) continue
-      await embedDoc(merged, Buffer.from(await data.arrayBuffer()), doc.fisier_tip, doc.fisier_nume)
+      await embedDoc(merged, await primaPaginaLaExport(Buffer.from(await data.arrayBuffer()), { nume: doc.fisier_nume, tip: doc.fisier_tip, furnizor: (doc as { furnizor?: string | null }).furnizor }), doc.fisier_tip, doc.fisier_nume)
     }
     if (scope?.section === '5stardesk') {
       const b = await generateDiscrepantePdfBytes(lunaId, firmaNume || '', lunaLabel || '')
