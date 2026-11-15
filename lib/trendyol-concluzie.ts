@@ -70,15 +70,15 @@ export async function getConcluzieTrendyol(lunaId: string): Promise<ConcluzieTre
     .sort((a, b) => String(a.data_tranzactie).localeCompare(String(b.data_tranzactie)))
 
   // 2. Borderourile incarcate (cate unul pe ordin de plata)
-  const { data: docs } = await sb.from('documente').select('id,numar_document,fisier_nume,fisier_path')
+  const { data: docs } = await sb.from('documente').select('id,numar_document,fisier_nume,fisier_path,data_document')
     .eq('luna_id', lunaId).eq('modul', 'trendyol').eq('tip_document', 'borderou')
-  const borderouri: { documentId: string; ordin: string | null; fisier: string; linii: LinieTrendyol[]; totalVanzator: number }[] = []
+  const borderouri: { documentId: string; ordin: string | null; data: string | null; fisier: string; linii: LinieTrendyol[]; totalVanzator: number }[] = []
   await Promise.all((docs || []).map(async d => {
     const { data: file } = await sb.storage.from('documente').download(d.fisier_path)
     if (!file) { avertismente.push(`Borderoul ${d.numar_document || d.fisier_nume} nu a putut fi descărcat.`); return }
     try {
       const b = await citesteBorderouTrendyol(new Uint8Array(await file.arrayBuffer()), d.fisier_nume)
-      borderouri.push({ documentId: d.id, ordin: d.numar_document || b.ordinPlata, fisier: d.fisier_nume, linii: b.linii, totalVanzator: b.totalVanzator })
+      borderouri.push({ documentId: d.id, ordin: d.numar_document || b.ordinPlata, data: d.data_document || null, fisier: d.fisier_nume, linii: b.linii, totalVanzator: b.totalVanzator })
     } catch (e) { avertismente.push(`Borderoul ${d.numar_document || d.fisier_nume} nu a putut fi citit: ${e instanceof Error ? e.message : e}`) }
   }))
 
@@ -96,6 +96,19 @@ export async function getConcluzieTrendyol(lunaId: string): Promise<ConcluzieTre
       borderou: b ? { documentId: b.documentId, fisier: b.fisier, totalVanzator: b.totalVanzator } : null,
     }
   })
+  // Incasarile „Payments services - combined payments” (din oct. 2026) nu mai au numarul ordinului in extras:
+  // se leaga de borderoul ramas nelegat cu data (ordinului) cea mai apropiata, de cel mult 10 zile inaintea
+  // incasarii (ex. ordin 14.10 → incasat 16.10, ordin 21.10 → 23.10).
+  const zile = (a: string, b: string) => (Date.parse(a) - Date.parse(b)) / 86400000
+  for (const p of plati) {
+    if (p.borderou || p.ordin) continue
+    const b = borderouri.filter(x => !folosite.has(x.documentId) && x.data && zile(p.data, x.data) >= 0 && zile(p.data, x.data) <= 10)
+      .sort((x, y) => zile(p.data, x.data!) - zile(p.data, y.data!))[0]
+    if (!b) continue
+    folosite.add(b.documentId)
+    p.ordin = b.ordin
+    p.borderou = { documentId: b.documentId, fisier: b.fisier, totalVanzator: b.totalVanzator }
+  }
   const borderouriFaraIncasare = borderouri.filter(b => !folosite.has(b.documentId))
     .map(b => ({ documentId: b.documentId, ordin: b.ordin, fisier: b.fisier, totalVanzator: b.totalVanzator }))
   if (borderouriFaraIncasare.length) avertismente.push(`${borderouriFaraIncasare.length} ${borderouriFaraIncasare.length === 1 ? 'borderou nu are' : 'borderouri nu au'} încasarea în extrasul acestei luni: ${borderouriFaraIncasare.map(b => b.ordin || b.fisier).join(', ')}.`)
