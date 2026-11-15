@@ -28,20 +28,60 @@ export interface RandFirma {
 const CHEIE = 'cf:dashboard-firma-deschisa'
 const fmt = (v: number) => new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 0 }).format(v || 0)
 
-function Incasari({ f }: { f: RandFirma }) {
-  const [serie, setSerie] = useState<number[] | null>(null)
-  useEffect(() => {
-    fetch(`/api/luna/istoric?firmaId=${encodeURIComponent(f.id)}&firmaSlug=${encodeURIComponent(f.slug)}&luna=${encodeURIComponent(f.luna)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setSerie((Array.isArray(d?.istoric) ? d.istoric : []).filter((p: { initializata: boolean; incasari: number; plati: number }) => p.initializata && (p.incasari > 0 || p.plati > 0)).map((p: { incasari: number }) => p.incasari)))
-      .catch(() => setSerie([]))
-  }, [f.id, f.slug, f.luna])
-  if (serie === null) return <div className={css.inc}><span className="skeleton" style={{ height: 14, width: 60 }} /></div>
+// Punctele lunare de incasari/plati ale unei firme (doar lunile incepute, cu miscari in banca), pentru sparkline si total
+export interface PunctInc { luna: string; incasari: number; plati: number }
+
+function Incasari({ f, serie }: { f: RandFirma; serie: PunctInc[] | null | undefined }) {
+  if (!serie) return <div className={css.inc}><span className="skeleton" style={{ height: 14, width: 60 }} /></div>
   if (serie.length < 2) return <div className={css.inc}><span className={css.n} data-ton="zero">—</span></div>
   return (
     <div className={css.inc} title="Încasări pe ultimele luni (lei + valută, echivalent lei)">
-      <span className={css.n}>{fmt(serie[serie.length - 1])}</span>
-      <Sparkline values={serie} color={f.culoare} title="Încasări pe ultimele luni" />
+      <span className={css.n}>{fmt(serie[serie.length - 1].incasari)}</span>
+      <Sparkline values={serie.map(p => p.incasari)} color={f.culoare} title="Încasări pe ultimele luni" />
+    </div>
+  )
+}
+
+const LUNI = ['ian', 'feb', 'mar', 'apr', 'mai', 'iun', 'iul', 'aug', 'sep', 'oct', 'nov', 'dec']
+// luna de lucru AAAA-LL -> luna contabila (cea anterioara), ex. 2026-11 -> „oct 2026”
+const etLuna = (l: string) => { const [a, m] = l.split('-').map(Number); const d = new Date(a, m - 2, 1); return `${LUNI[d.getMonth()]} ${d.getFullYear()}` }
+
+// Randul „Total” de sub firme: suma cifrelor afisate pe fiecare rand (task-uri, restante, incasari) + platile si
+// soldul acelorasi luni; sparkline-ul insumeaza incasarile tuturor firmelor pe aceeasi luna.
+function Total({ firme, serii }: { firme: RandFirma[]; serii: Record<string, PunctInc[] | null> }) {
+  const done = firme.reduce((a, f) => a + f.done, 0), total = firme.reduce((a, f) => a + f.total, 0)
+  const pct = total ? Math.round(done / total * 100) : 0
+  const restante = firme.reduce((a, f) => a + f.restante, 0)
+  const gata = firme.every(f => serii[f.id] !== undefined && serii[f.id] !== null)
+  const afisate = firme.map(f => ({ f, p: (serii[f.id] || []).length >= 2 ? serii[f.id]![serii[f.id]!.length - 1] : null })).filter(x => x.p)
+  // din cifrele rotunjite afisate, ca totalul sa iasa exact cand le aduni de pe ecran
+  const inc = afisate.reduce((a, x) => a + Math.round(x.p!.incasari), 0), plati = afisate.reduce((a, x) => a + Math.round(x.p!.plati), 0), net = inc - plati
+  const luniDif = [...new Set(afisate.map(x => x.p!.luna))]
+  const peLuna = new Map<string, number>()
+  firme.forEach(f => (serii[f.id] || []).forEach(p => peLuna.set(p.luna, (peLuna.get(p.luna) || 0) + p.incasari)))
+  const serieTot = [...peLuna.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v)
+  const detaliu = afisate.map(x => `${x.f.nume}: ${fmt(x.p!.incasari)} lei încasări, ${fmt(x.p!.plati)} lei plăți (${etLuna(x.p!.luna)})`).join('\n')
+  return (
+    <div className={`${css.tot} ${css.cols}`} aria-label="Total pe toate firmele">
+      <div className={css.fn}>
+        <span className={css.glyph} style={{ background: 'var(--text-primary)', color: 'var(--surface)' }}>Σ</span>
+        <div style={{ minWidth: 0 }}><b>Total</b><small className={css.totSub}>{firme.length} firme{luniDif.length === 1 ? ` · ${etLuna(luniDif[0])}` : ''}</small></div>
+      </div>
+      <div className={css.prog} style={{ ['--fc' as string]: 'var(--accent)' }}><div className={css.bar}><b style={{ width: `${pct}%` }} /></div><span>{done}/{total} · {pct}%</span></div>
+      <div className={css.cRest}><span className={css.n} data-ton={restante ? 'bad' : 'zero'}>{restante || '—'}</span></div>
+      <div className={css.inc} title={detaliu || undefined}>
+        {!gata ? <span className="skeleton" style={{ height: 14, width: 60 }} /> : <>
+          <span className={css.n}>{afisate.length ? fmt(inc) : '—'}</span>
+          {serieTot.length >= 2 && <Sparkline values={serieTot} color="var(--accent)" title="Încasări totale pe ultimele luni" />}
+        </>}
+      </div>
+      <div className={css.nxt} title={detaliu || undefined}>
+        {gata && afisate.length > 0 && <>
+          Plăți {fmt(plati)} · <span style={{ color: net >= 0 ? 'var(--success)' : 'var(--danger)' }}>sold {net >= 0 ? '+' : '−'}{fmt(Math.abs(net))}</span>
+          <small>{luniDif.length > 1 ? `atenție: cifre din luni diferite (${luniDif.map(etLuna).join(', ')})` : 'încasări − plăți, lei (valuta la cursul BNR)'}</small>
+        </>}
+      </div>
+      <div />
     </div>
   )
 }
@@ -53,7 +93,7 @@ function termen(z: number | null | undefined) {
   return { text: `în ${z} ${z === 1 ? 'zi' : 'zile'}`, ton: z <= 5 ? 'warn' : 'mute' }
 }
 
-function Rand({ f, deschis, comuta }: { f: RandFirma; deschis: boolean; comuta: (slug: string) => void }) {
+function Rand({ f, deschis, comuta, serie }: { f: RandFirma; deschis: boolean; comuta: (slug: string) => void; serie: PunctInc[] | null | undefined }) {
   const [toate, setToate] = useState(false)
   const vizibile = toate ? f.deFacut : f.deFacut.slice(0, 4)
   const pct = f.total ? Math.round(f.done / f.total * 100) : 0
@@ -74,7 +114,7 @@ function Rand({ f, deschis, comuta }: { f: RandFirma; deschis: boolean; comuta: 
         </div>
         <div className={css.prog}><div className={css.bar}><b style={{ width: `${pct}%` }} /></div><span>{f.done}/{f.total} · {pct}%</span></div>
         <div className={css.cRest}><span className={css.n} data-ton={f.restante ? 'bad' : 'zero'}>{f.restante || '—'}</span></div>
-        <Incasari f={f} />
+        <Incasari f={f} serie={serie} />
         <div className={css.nxt}>{f.urmator ? <>{f.urmator.label}<small>{f.urmator.detaliu}</small></> : <span style={{ color: 'var(--success)' }}>Totul bifat ✓</span>}</div>
         <div className={css.go}>
           <Link href={f.linkLuna} className={`btn btn-sm ${css.btnFirma}`} onClick={e => e.stopPropagation()}>{f.lunaInceputa ? 'Deschide luna' : 'Începe luna'}</Link>
@@ -150,10 +190,25 @@ export default function FirmeTabel({ firme, implicit }: { firme: RandFirma[]; im
     return urm
   }), [])
 
+  // Incasarile tuturor firmelor, citite o data aici (nu in fiecare rand), ca sa se poata face si totalul
+  const [serii, setSerii] = useState<Record<string, PunctInc[] | null>>({})
+  useEffect(() => {
+    let anulat = false
+    firme.forEach(f => {
+      fetch(`/api/luna/istoric?firmaId=${encodeURIComponent(f.id)}&firmaSlug=${encodeURIComponent(f.slug)}&luna=${encodeURIComponent(f.luna)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => (Array.isArray(d?.istoric) ? d.istoric : []).filter((p: { initializata: boolean; incasari: number; plati: number }) => p.initializata && (p.incasari > 0 || p.plati > 0)).map((p: PunctInc) => ({ luna: p.luna, incasari: p.incasari, plati: p.plati })))
+        .catch(() => [])
+        .then(v => { if (!anulat) setSerii(s => ({ ...s, [f.id]: v })) })
+    })
+    return () => { anulat = true }
+  }, [firme])
+
   return (
     <section className={css.tbl} aria-label="Firme">
       <div className={`${css.th} ${css.cols}`} aria-hidden="true"><span>Firmă</span><span>Task-uri lunare</span><span>Restanțe</span><span>Încasări</span><span>Următorul pas</span><span /></div>
-      {firme.map(f => <Rand key={f.id} f={f} deschis={deschis === f.slug} comuta={comuta} />)}
+      {firme.map(f => <Rand key={f.id} f={f} deschis={deschis === f.slug} comuta={comuta} serie={serii[f.id]} />)}
+      {firme.length > 1 && <Total firme={firme} serii={serii} />}
     </section>
   )
 }
