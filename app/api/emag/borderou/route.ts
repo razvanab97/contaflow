@@ -172,6 +172,7 @@ function potrivesteDp(dps: DpPentruPotrivire[], avize: AvizLuna[]): Map<string, 
     for (const tip of ['dp_cash', 'dp_card'] as const) {
       const coada = dps.filter(d => d.tip === tip && d.data && (d.platforma ? d.platforma === platforma : cod === 'ro')).sort((x, y) => x.data!.localeCompare(y.data!))
       let anterior = ''
+      const tinte: { a: AvizLuna; tinta: number; folosit: boolean }[] = []
       for (const a of principale) {
         const hey = tip === 'dp_card' ? heyblu.filter(h => h.data! > anterior && h.data! <= a.data!) : []
         anterior = a.data!
@@ -179,17 +180,31 @@ function potrivesteDp(dps: DpPentruPotrivire[], avize: AvizLuna[]): Map<string, 
         const heySuma = Math.round(hey.reduce((s, h) => s + (h.total || 0), 0) * 100) / 100
         const tinta = tip === 'dp_cash' ? suma(a.linii, RE_AVIZ_CASH) : Math.round((card + revolving + heySuma) * 100) / 100
         if (!tinta) continue
+        const t = { a, tinta, folosit: false }
+        tinte.push(t)
         const eligibile = coada.filter(d => !rez.has(d.id) && d.data! <= plus(a.data!, 3))
         let acc = 0, k = 0
         for (; k < eligibile.length; k++) { acc = Math.round((acc + eligibile[k].incasari) * 100) / 100; if (egal(acc, tinta) || acc > tinta + 0.05) break }
         if (k >= eligibile.length || !egal(acc, tinta)) continue
         const grup = eligibile.slice(0, k + 1)
+        t.folosit = true
         const din = tip === 'dp_cash' ? `Încasări ramburs ${lei(tinta)}`
           : [`card ${lei(card)}`, revolving ? `Revolving ${lei(revolving)}` : '', ...hey.map(h => `Heyblu ${lei(h.total || 0)} din ${zi(h.data!)}`)].filter(Boolean).join(' + ')
         for (const d of grup) {
           const impreuna = grup.length > 1 ? ` · plătit împreună cu ${grup.filter(x => x.id !== d.id).map(x => `DP ${x.nr} (${zi(x.data!)})`).join(', ')}` : ''
           rez.set(d.id, { stare: 'ok' as const, aviz: a.numar, platforma, dataProcesare: a.data, text: `plătit pe ${zi(a.data!)} · avizul ${a.numar}: ${din}${impreuna}` })
         }
+      }
+      // DP-urile ramase: primul aviz neconsumat de la data lor (max. 14 zile) cu suma MAI MARE decat ele -
+      // avizul a platit si altceva (ex. HU 20.10.2026: DP 17.10 + incasari vechi din 2024-2025). Data platii
+      // se stie, dar diferenta ramane de verificat (sold vechi sau un desfasurator lipsa).
+      const ramase = coada.filter(d => !rez.has(d.id))
+      for (const t of tinte.filter(x => !x.folosit)) {
+        const grup = ramase.filter(d => !rez.has(d.id) && d.data! <= plus(t.a.data!, 3) && t.a.data! <= plus(d.data!, 14))
+        const s = Math.round(grup.reduce((x, d) => x + d.incasari, 0) * 100) / 100
+        if (!grup.length || s >= t.tinta) continue
+        const ce = tip === 'dp_cash' ? 'Încasări ramburs' : 'încasări card'
+        for (const d of grup) rez.set(d.id, { stare: 'diferenta' as const, aviz: t.a.numar, platforma, dataProcesare: t.a.data, text: `plătit pe ${zi(t.a.data!)} · avizul ${t.a.numar} are ${ce} ${lei(t.tinta)}, desfășurător${grup.length > 1 ? 'ele' : 'ul'} ${lei(s)} — în plus ${lei(t.tinta - s)}: încasări din alte perioade (ex. sold vechi închis de eMAG) sau un desfășurător lipsă` })
       }
     }
   }
