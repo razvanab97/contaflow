@@ -8,6 +8,7 @@ import { generateDiscrepantePdfBytes } from '@/lib/discrepante-lista'
 import { generateBonuriPdfBytes } from '@/lib/bonuriPdf'
 import JSZip from 'jszip'
 import { primaPaginaLaExport } from '@/lib/eonInvoice'
+import { ordoneazaEmag, textPdf } from '@/lib/emag-ordine'
 
 export const maxDuration = 120
 
@@ -43,34 +44,6 @@ function sectionLabel(section: string): string {
   return section
 }
 
-// Grupeaza avizele eMAG cu facturile lor proprii (dupa furnizor = task_key), in ordinea din MODULE_DEFS;
-// avizul apare inaintea facturilor sale; facturile Dante (emag-calcul) raman la final, cronologic
-function sortEmagDocs<T extends { fisier_path: string; furnizor?: string | null; created_at?: string }>(items: T[]): T[] {
-  const avizOrder = (MODULE_DEFS.emag?.tasks || []).filter(t => t.key.startsWith('emag.aviz_')).map(t => t.key)
-  const avizeAndFacturi = items.filter(d => d.fisier_path.includes('/emag-avize/') || d.fisier_path.includes('/emag-facturi/'))
-  const dante = items.filter(d => d.fisier_path.includes('/emag-calcul/'))
-
-  const byTask = new Map<string, T[]>()
-  for (const d of avizeAndFacturi) {
-    const key = d.furnizor || ''
-    if (!byTask.has(key)) byTask.set(key, [])
-    byTask.get(key)!.push(d)
-  }
-  const orderedKeys = [...avizOrder, ...[...byTask.keys()].filter(k => !avizOrder.includes(k))]
-  const ordered: T[] = []
-  for (const key of orderedKeys) {
-    const group = byTask.get(key) || []
-    group.sort((a, b) => {
-      const aAviz = a.fisier_path.includes('/emag-avize/')
-      const bAviz = b.fisier_path.includes('/emag-avize/')
-      if (aAviz === bAviz) return (a.created_at || '') < (b.created_at || '') ? -1 : 1
-      return aAviz ? -1 : 1
-    })
-    ordered.push(...group)
-  }
-  dante.sort((a, b) => (a.created_at || '') < (b.created_at || '') ? -1 : 1)
-  return [...ordered, ...dante]
-}
 
 
 // Factura E.ON / Hidroelectrica -> doar prima pagina (vezi primaPaginaLaExport)
@@ -116,7 +89,7 @@ export async function POST(req: NextRequest) {
     // fisier_path ramane neschimbat sub /inbox-facturi/ - fara acest filtru ar ajunge in arhiva de
     // doua ori, o data la 'extras' si o data la 'inbox-facturi').
     const { data: docs } = await sb.from('documente')
-      .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor')
+      .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor,numar_document,data_document')
       .eq('luna_id', lunaId)
       .is('tranzactie_id', null)
       .not('fisier_path', 'like', '%/inbox-facturi/%')
@@ -133,7 +106,7 @@ export async function POST(req: NextRequest) {
     if (!extraseFiles.length && !extrasTxDocs.length && !docs?.length)
       return NextResponse.json({ error: 'Nu există documente de descărcat pentru această lună' }, { status: 404 })
 
-    type Entry = { name: string; data?: ArrayBuffer; fisier_path: string; furnizor?: string | null; created_at?: string }
+    type Entry = { name: string; data?: ArrayBuffer; fisier_path: string; furnizor?: string | null; created_at?: string; numar_document?: string | null; data_document?: string | null }
     const sectionMap = new Map<string, Entry[]>()
 
     if (extraseFiles.length) sectionMap.set('extras', [])
@@ -173,7 +146,7 @@ export async function POST(req: NextRequest) {
       const { data: b } = await sb.storage.from('documente').download(doc.fisier_path)
       if (!b) continue
       if (!sectionMap.has(section)) sectionMap.set(section, [])
-      sectionMap.get(section)!.push({ name: doc.fisier_nume, data: await primaPagina(b, doc), fisier_path: doc.fisier_path, furnizor: doc.furnizor, created_at: doc.created_at })
+      sectionMap.get(section)!.push({ name: doc.fisier_nume, data: await primaPagina(b, doc), fisier_path: doc.fisier_path, furnizor: doc.furnizor, created_at: doc.created_at, numar_document: doc.numar_document, data_document: doc.data_document })
     }
 
     if (firmaId && firmaNume && moduleOrder.includes('bonuri')) {
@@ -185,9 +158,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // eMAG: avizele împreună cu facturile lor proprii, în ordinea din task-uri
+    // eMAG: fiecare aviz de plată urmat de facturile din el (vezi lib/emag-ordine.ts)
     if (sectionMap.has('emag')) {
-      sectionMap.set('emag', sortEmagDocs(sectionMap.get('emag')!))
+      sectionMap.set('emag', await ordoneazaEmag(sectionMap.get('emag')!, e => e.data ? textPdf(e.data) : Promise.resolve('')))
     }
 
     // Ordinea secțiunilor după modulele firmei, necunoscutele la final

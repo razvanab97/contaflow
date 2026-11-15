@@ -8,6 +8,13 @@ import { generateNotePdfBytes } from '@/lib/notePdf'
 import { generateDiscrepantePdfBytes } from '@/lib/discrepante-lista'
 import { generateBonuriPdfBytes } from '@/lib/bonuriPdf'
 import { primaPaginaLaExport } from '@/lib/eonInvoice'
+import { ordoneazaEmag, textPdf } from '@/lib/emag-ordine'
+
+// Textul unui aviz eMAG din arhiva (pentru ordinea aviz -> facturile lui)
+async function textAvizDin(d: { fisier_path: string }) {
+  const { data } = await getServiceSupabase().storage.from('documente').download(d.fisier_path)
+  return data ? textPdf(await data.arrayBuffer()) : ''
+}
 
 export const maxDuration = 120
 
@@ -72,34 +79,6 @@ function matchesSection(filePath: string, section: string): boolean {
   return p.includes(`/${section}/`)
 }
 
-// Grupeaza avizele eMAG cu facturile lor proprii (dupa furnizor = task_key), in ordinea din MODULE_DEFS;
-// avizul apare inaintea facturilor sale; facturile Dante (emag-calcul) raman la final, cronologic
-function sortEmagDocs<T extends { fisier_path:string; furnizor?:string|null; created_at?:string }>(items: T[]): T[] {
-  const avizOrder = (MODULE_DEFS.emag?.tasks || []).filter(t => t.key.startsWith('emag.aviz_')).map(t => t.key)
-  const avizeAndFacturi = items.filter(d => d.fisier_path.includes('/emag-avize/') || d.fisier_path.includes('/emag-facturi/'))
-  const dante = items.filter(d => d.fisier_path.includes('/emag-calcul/'))
-
-  const byTask = new Map<string, T[]>()
-  for (const d of avizeAndFacturi) {
-    const key = d.furnizor || ''
-    if (!byTask.has(key)) byTask.set(key, [])
-    byTask.get(key)!.push(d)
-  }
-  const orderedKeys = [...avizOrder, ...[...byTask.keys()].filter(k => !avizOrder.includes(k))]
-  const ordered: T[] = []
-  for (const key of orderedKeys) {
-    const group = byTask.get(key) || []
-    group.sort((a, b) => {
-      const aAviz = a.fisier_path.includes('/emag-avize/')
-      const bAviz = b.fisier_path.includes('/emag-avize/')
-      if (aAviz === bAviz) return (a.created_at || '') < (b.created_at || '') ? -1 : 1
-      return aAviz ? -1 : 1
-    })
-    ordered.push(...group)
-  }
-  dante.sort((a, b) => (a.created_at || '') < (b.created_at || '') ? -1 : 1)
-  return [...ordered, ...dante]
-}
 
 
 async function embedDoc(merged: PDFDocument, bytes: Buffer, type: string, name: string) {
@@ -151,7 +130,7 @@ export async function POST(req: NextRequest) {
   // cele deja asociate unei plati (la exportul complet acelea apar o singura data, la Extras de cont).
   const oSectiune = !!scope?.section && !isExtras
   let docsQuery = sb.from('documente')
-    .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor,data_document')
+    .select('fisier_path,fisier_nume,fisier_tip,created_at,furnizor,data_document,numar_document')
     .eq('luna_id', lunaId)
   if (!oSectiune) docsQuery = docsQuery.is('tranzactie_id', null)
   if (!(oSectiune && scope.section === 'inbox-facturi')) docsQuery = docsQuery.not('fisier_path', 'like', '%/inbox-facturi/%')
@@ -192,7 +171,7 @@ export async function POST(req: NextRequest) {
   if (!scope && firmaSlug) {
     const moduleOrder = FIRMA_CONFIGS[firmaSlug]?.module || []
 
-    type Entry = { path: string; name: string; type: string; bucket: 'documente' | 'extrase-pdf' | 'memory'; bytes?: Uint8Array; furnizor?: string|null; created_at?: string; data_document?: string|null }
+    type Entry = { path: string; name: string; type: string; bucket: 'documente' | 'extrase-pdf' | 'memory'; bytes?: Uint8Array; furnizor?: string|null; created_at?: string; data_document?: string|null; numar_document?: string|null }
     const sectionMap = new Map<string, Entry[]>()
     // Ordinea reala a evenimentului (data de pe document), nu data la care a fost incarcat in
     // sistem - un import in lot (multe facturi vechi adaugate intr-o singura sedinta) ar avea
@@ -244,7 +223,7 @@ export async function POST(req: NextRequest) {
     for (const doc of docs || []) {
       const section = pathToSection(doc.fisier_path)
       if (!sectionMap.has(section)) sectionMap.set(section, [])
-      sectionMap.get(section)!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente', furnizor: doc.furnizor, created_at: doc.created_at, data_document: doc.data_document })
+      sectionMap.get(section)!.push({ path: doc.fisier_path, name: doc.fisier_nume, type: doc.fisier_tip, bucket: 'documente', furnizor: doc.furnizor, created_at: doc.created_at, data_document: doc.data_document, numar_document: doc.numar_document })
     }
     if (exportFirmaId && firmaNume && moduleOrder.includes('bonuri')) {
       const bonuriBytes = await generateBonuriPdfBytes(exportFirmaId, firmaNume)
@@ -252,7 +231,7 @@ export async function POST(req: NextRequest) {
     }
     // Emag: avizele impreuna cu facturile lor proprii, in ordinea din task-uri
     if (sectionMap.has('emag')) {
-      sectionMap.set('emag', sortEmagDocs(sectionMap.get('emag')!.map(e => ({ ...e, fisier_path: e.path }))))
+      sectionMap.set('emag', await ordoneazaEmag(sectionMap.get('emag')!.map(e => ({ ...e, fisier_path: e.path })), textAvizDin))
     }
     // Restul sectiunilor (mai putin extras, care isi are deja ordinea cronologica proprie mai sus,
     // si emag, sortat separat chiar deasupra) - ordonate dupa data reala a documentului.
@@ -346,7 +325,7 @@ export async function POST(req: NextRequest) {
       await embedDoc(merged, await primaPaginaLaExport(Buffer.from(await data.arrayBuffer()), { nume: doc.fisier_nume, tip: doc.fisier_tip, furnizor: (doc as { furnizor?: string | null }).furnizor }), doc.fisier_tip, doc.fisier_nume)
     }
     const orderedDocs = (scope?.section === 'emag' || scope?.section === 'emag-calcul')
-      ? sortEmagDocs(docs || [])
+      ? await ordoneazaEmag(docs || [], textAvizDin)
       : (docs || []).slice().sort((a, b) => String(a.data_document || a.created_at || '').localeCompare(String(b.data_document || b.created_at || '')))
     for (const doc of orderedDocs) {
       const { data } = await sb.storage.from('documente').download(doc.fisier_path)
