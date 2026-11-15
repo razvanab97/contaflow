@@ -830,3 +830,12 @@ mark.hl { background: color-mix(in srgb, var(--brand) 26%, transparent); color: 
 @media (min-width: 900px) {
   .tt-mount .tt-panel { left: calc(100% + 18px); bottom: -4px; width: min(400px, calc(100vw - var(--sidebar-w) - 28px)); }
 }
+
+/* Comutatorul de luna (components/ui/MonthNav.tsx): grila cu lunile anului */
+.month-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; width: 264px; max-width: calc(100vw - 32px); padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-lg, 0 12px 32px -12px rgba(0,0,0,.3)); }
+.month-chip { display: grid; place-items: center; height: 34px; border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 500; color: var(--text-secondary); text-decoration: none; transition: background-color .12s; }
+a.month-chip:hover { background: var(--hover); color: var(--text-primary); }
+.month-chip[data-curenta='true'] { box-shadow: inset 0 0 0 1px var(--accent); color: var(--text-primary); }
+.month-chip[data-activa='true'] { background: var(--accent); color: #fff; font-weight: 650; box-shadow: none; }
+.month-chip[data-off='true'] { color: var(--text-muted); opacity: .4; cursor: default; }
+@media (max-width: 560px) { .month-pop { right: auto; left: 0; } }

@@ -9,6 +9,7 @@ import ProiectPopup, { CHEIE_STARE } from './ProiectPopup'
 import { getFirmaModules, esteLunaCalendaristica } from '@/lib/firma-config'
 import { etichetaLunaScurta } from '@/lib/accounting-period'
 import { EVENIMENT_SARCINI } from '@/lib/sarcini-eveniment'
+import { EVENIMENT_LUNA } from './LunaShell'
 
 interface Props {
   initialFirmeNav: FirmaNav[]
@@ -28,7 +29,14 @@ export default function ShellClient({ initialFirmeNav, initialLuna, children }: 
   const parts = pathname.split('/').filter(Boolean)
   const firmaSlug = parts[0] && parts[0] !== 'dashboard' ? parts[0] : undefined
   const lunaFromPath = firmaSlug && /^\d{4}-\d{2}$/.test(parts[1] || '') ? parts[1] : undefined
-  const lunaEfectiva = lunaFromPath || initialLuna
+  // Luna aleasa pe Dashboard (?luna=, anuntata de LunaShell) - doar cat stai pe Dashboard
+  const [lunaDashboard, setLunaDashboard] = useState<string | null>(null)
+  useEffect(() => {
+    const f = (e: Event) => setLunaDashboard((e as CustomEvent<string>).detail || null)
+    window.addEventListener(EVENIMENT_LUNA, f)
+    return () => window.removeEventListener(EVENIMENT_LUNA, f)
+  }, [])
+  const lunaEfectiva = lunaFromPath || (parts[0] === 'dashboard' && lunaDashboard) || initialLuna
 
   const [firmeNav, setFirmeNav] = useState(initialFirmeNav)
   const [restanteCount, setRestanteCount] = useState(0)
