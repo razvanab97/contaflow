@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     const { data: doc, error } = await sb.from('documente').insert({
       firma_id: firmaId, luna_id: lunaId, modul: 'emag', tip_document: 'borderou',
       furnizor: b.tip, numar_document: b.id, data_document: b.data, suma: b.total, valuta: b.valuta || 'RON',
-      fisier_path: path, fisier_nume: fisierNume, fisier_tip: XLSX_MIME, fisier_marime: bytes.length, in_zip: true,
+      fisier_path: path, fisier_nume: fisierNume, fisier_tip: XLSX_MIME, fisier_marime: bytes.length, in_zip: false,
     }).select('id').single()
     if (error || !doc) { await sb.storage.from('documente').remove([path]); rezultate.push({ fisier: file.name, ok: false, text: error?.message || 'Eroare salvare' }); continue }
     // acelasi borderou (tip + ID) incarcat din nou -> inlocuit

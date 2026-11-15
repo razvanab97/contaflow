@@ -161,6 +161,9 @@ export async function POST(req: NextRequest) {
         .not('fisier_path', 'like', '%/checklist/%')
         .not('fisier_path', 'like', '%/config/%')
         .not('fisier_path', 'like', '%/booking-borderou-lucru/%')
+        // borderourile eMAG (desfasuratoare de plata) si Trendyol (.xlsx) sunt doar pentru lucru / eCap - nu intra in pachetul contabilului
+        .not('fisier_path', 'like', '%/emag-borderou/%')
+        .not('fisier_path', 'like', '%/trendyol-borderou/%')
         .not('fisier_path', 'like', '%/dispozitii-plata/resetari/%')
         .order('created_at', { ascending: true })
 

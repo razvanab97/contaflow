@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const { data: doc, error } = await sb.from('documente').insert({
       firma_id: firmaId, luna_id: lunaId, modul: 'trendyol', tip_document: 'borderou',
       furnizor: 'Trendyol B.V.', numar_document: ordin, data_document: dataPlata, suma: b.totalVanzator, valuta: b.valuta,
-      fisier_path: path, fisier_nume: fisierNume, fisier_tip: XLSX_MIME, fisier_marime: bytes.length, in_zip: true,
+      fisier_path: path, fisier_nume: fisierNume, fisier_tip: XLSX_MIME, fisier_marime: bytes.length, in_zip: false,
     }).select('id').single()
     if (error || !doc) { await sb.storage.from('documente').remove([path]); rezultate.push({ fisier: file.name, ok: false, text: error?.message || 'Eroare salvare' }); continue }
     // acelasi ordin incarcat inainte -> inlocuit
