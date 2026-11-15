@@ -151,6 +151,51 @@ function verifica(b: { tip: TipBorderouEmag; id: string; data: string | null; to
   }
 }
 
+type Verificare = ReturnType<typeof verifica> & { dataProcesare?: string | null }
+interface DpPentruPotrivire { id: string; tip: TipBorderouEmag; nr: string; data: string | null; incasari: number; platforma: string | null }
+
+// eMAG plateste desfasuratoarele cand vrea (din oct. 2026: saptamanal, uneori doua DP-uri intr-o singura
+// plata, ex. DP 17.10 + DP 25.10 platite pe 28.10). Data pentru eCap = data PLATII (avizul), nu „Payout date”.
+// Fiecare aviz (RO / BG / HU, in ordinea datelor) plateste primele DP-uri inca neplatite, cu data <= data
+// avizului (+3 zile toleranta), a caror suma = suma din aviz:
+//  - DP cash  = „Incasari ramburs”;
+//  - DP card  = „Incasari card online” + „Incasari Revolving” din aviz + (RO) notificarile Heyblu separate
+//    venite dupa avizul anterior, pana la data acestui aviz (Heyblu plateste si singur, intre avize).
+function potrivesteDp(dps: DpPentruPotrivire[], avize: AvizLuna[]): Map<string, Verificare> {
+  const rez = new Map<string, Verificare>()
+  const egal = (x: number, y: number) => Math.abs(x - y) < 0.05
+  const plus = (d: string, n: number) => new Date(Date.parse(d) + n * 86400000).toISOString().slice(0, 10)
+  for (const cod of ['ro', 'bg', 'hu']) {
+    const platforma = `eMAG ${cod.toUpperCase()}`
+    const principale = avize.filter(a => a.taskKey.includes(`_${cod}_`) && a.data && a.linii.length).sort((x, y) => x.data!.localeCompare(y.data!))
+    const heyblu = cod === 'ro' ? avize.filter(a => /heyblu/.test(a.taskKey) && a.data && a.total).sort((x, y) => x.data!.localeCompare(y.data!)) : []
+    for (const tip of ['dp_cash', 'dp_card'] as const) {
+      const coada = dps.filter(d => d.tip === tip && d.data && (d.platforma ? d.platforma === platforma : cod === 'ro')).sort((x, y) => x.data!.localeCompare(y.data!))
+      let anterior = ''
+      for (const a of principale) {
+        const hey = tip === 'dp_card' ? heyblu.filter(h => h.data! > anterior && h.data! <= a.data!) : []
+        anterior = a.data!
+        const card = suma(a.linii, RE_AVIZ_CARD, RE_AVIZ_CASH), revolving = suma(a.linii, /revolving/i)
+        const heySuma = Math.round(hey.reduce((s, h) => s + (h.total || 0), 0) * 100) / 100
+        const tinta = tip === 'dp_cash' ? suma(a.linii, RE_AVIZ_CASH) : Math.round((card + revolving + heySuma) * 100) / 100
+        if (!tinta) continue
+        const eligibile = coada.filter(d => !rez.has(d.id) && d.data! <= plus(a.data!, 3))
+        let acc = 0, k = 0
+        for (; k < eligibile.length; k++) { acc = Math.round((acc + eligibile[k].incasari) * 100) / 100; if (egal(acc, tinta) || acc > tinta + 0.05) break }
+        if (k >= eligibile.length || !egal(acc, tinta)) continue
+        const grup = eligibile.slice(0, k + 1)
+        const din = tip === 'dp_cash' ? `Încasări ramburs ${lei(tinta)}`
+          : [`card ${lei(card)}`, revolving ? `Revolving ${lei(revolving)}` : '', ...hey.map(h => `Heyblu ${lei(h.total || 0)} din ${zi(h.data!)}`)].filter(Boolean).join(' + ')
+        for (const d of grup) {
+          const impreuna = grup.length > 1 ? ` · plătit împreună cu ${grup.filter(x => x.id !== d.id).map(x => `DP ${x.nr} (${zi(x.data!)})`).join(', ')}` : ''
+          rez.set(d.id, { stare: 'ok' as const, aviz: a.numar, platforma, dataProcesare: a.data, text: `plătit pe ${zi(a.data!)} · avizul ${a.numar}: ${din}${impreuna}` })
+        }
+      }
+    }
+  }
+  return rez
+}
+
 // GET ?lunaId=… -> lista + verificarea cu avizele · ?download=<id> -> un .xlsx · ?zip=<lunaId> -> toate
 export async function GET(req: NextRequest) {
   const sb = getServiceSupabase()
@@ -159,16 +204,21 @@ export async function GET(req: NextRequest) {
     const { data } = await sb.from('documente').select('id,furnizor,numar_document,data_document,suma,fisier_nume,fisier_path')
       .eq('luna_id', lunaLista).eq('modul', 'emag').eq('tip_document', 'borderou').in('furnizor', ['dp_cash', 'dp_card']).order('data_document')
     const avize = await avizeLuna(sb, lunaLista)
-    const borderouri = await Promise.all((data || []).map(async d => {
-      const tip = d.furnizor as TipBorderouEmag
-      // fisierul se citeste din nou: totalul borderoului (toate liniile), incasarile comparate cu avizul, detaliile
+    // fisierele se citesc din nou: totalul borderoului (toate liniile), incasarile comparate cu avizul, detaliile
+    const citite = await Promise.all((data || []).map(async d => {
       const { data: f } = await sb.storage.from('documente').download(d.fisier_path)
       const citit = f ? await citesteBorderouEmag(new Uint8Array(await f.arrayBuffer()), d.fisier_nume).catch(() => null) : null
-      const total = citit?.total ?? (Number(d.suma) || 0)
-      const v = verifica({ tip, id: d.numar_document || '', data: d.data_document, total, incasari: citit?.incasari, peAviz: citit?.peAviz, platforma: citit?.platforma }, avize)
-      const platforma = citit?.platforma || ('platforma' in v ? v.platforma : null) || null
-      return { id: d.id, tip, eticheta: ETICHETA_BORDEROU_EMAG[tip] || tip, platforma, nr: tip === 'extras_cont' ? null : d.numar_document, data: d.data_document, suma: total, valuta: citit?.valuta || 'RON', incasari: citit?.incasari ?? null, detalii: citit?.detalii || {}, fisier: d.fisier_nume, verificare: v }
+      return { d, tip: d.furnizor as TipBorderouEmag, citit, total: citit?.total ?? (Number(d.suma) || 0) }
     }))
+    const platite = potrivesteDp(citite.map(({ d, tip, citit, total }) => ({ id: d.id, tip, nr: d.numar_document || '', data: d.data_document, incasari: citit?.incasari ?? total, platforma: citit?.platforma || null })), avize)
+    const borderouri = citite.map(({ d, tip, citit, total }) => {
+      let v: Verificare = platite.get(d.id) || verifica({ tip, id: d.numar_document || '', data: d.data_document, total, incasari: citit?.incasari, peAviz: citit?.peAviz, platforma: citit?.platforma }, avize)
+      // DP neplatit in avizele lunii, dar cu un aviz ulterior lipsa: probabil platit in luna urmatoare
+      if (!platite.has(d.id) && v.stare !== 'ok' && d.data_document && !avize.some(a => !/heyblu/.test(a.taskKey) && a.data && a.data >= d.data_document!))
+        v = { stare: 'fara_aviz' as const, text: `nicio plată eMAG după ${zi(d.data_document)} în avizele lunii — desfășurătorul se plătește cu următorul aviz (adaugă-l când apare)` }
+      const platforma = citit?.platforma || ('platforma' in v ? v.platforma : null) || null
+      return { id: d.id, tip, eticheta: ETICHETA_BORDEROU_EMAG[tip] || tip, platforma, nr: tip === 'extras_cont' ? null : d.numar_document, data: d.data_document, dataProcesare: v.dataProcesare || null, suma: total, valuta: citit?.valuta || 'RON', incasari: citit?.incasari ?? null, detalii: citit?.detalii || {}, fisier: d.fisier_nume, verificare: v }
+    })
     // BG (EUR) / HU (HUF): eMAG plateste in LEI - conversia se face la cursul EFECTIV al incasarii avizului
     // din extras (lei primiti / suma avizului, din Concluzia eMAG); daca incasarea nu e inca in extras, curs BNR
     const straine = borderouri.filter(b => b.valuta !== 'RON')

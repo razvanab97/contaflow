@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface Borderou {
-  id: string; tip: string; eticheta: string; platforma: string | null; nr: string | null; data: string | null; suma: number | null; valuta: string; incasari: number | null; curs: number | null; sursaCurs: 'extras' | 'bnr' | null; sumaLei: number | null; incasariLei: number | null; detalii: Record<string, number>; fisier: string
+  id: string; tip: string; eticheta: string; platforma: string | null; nr: string | null; data: string | null; dataProcesare: string | null; suma: number | null; valuta: string; incasari: number | null; curs: number | null; sursaCurs: 'extras' | 'bnr' | null; sumaLei: number | null; incasariLei: number | null; detalii: Record<string, number>; fisier: string
   verificare: { stare: 'ok' | 'diferenta' | 'fara_aviz'; text: string }
 }
 
@@ -57,7 +57,7 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 'var(--fs-base)', fontWeight: 650, color: 'var(--text-primary)' }}>Borderouri eMAG</div>
-          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>Desfășurătoarele de plată (cash + card, pe fiecare jumătate de lună) — cu data pentru eCap, verificate cu avizele</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>Desfășurătoarele de plată (cash + card) — fiecare cu data plății din aviz, pentru eCap. eMAG poate plăti mai multe desfășurătoare odată (ex. DP 17.10 + DP 25.10 pe 28.10)</div>
         </div>
         {!!lista?.length && (
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -70,7 +70,7 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
       {lista === null ? <div className="skeleton" style={{ height: '60px' }} /> : lista.length > 0 && (
         <div style={{ marginBottom: '10px', overflowX: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(92px,auto) minmax(220px,1.4fr) auto auto minmax(180px,2fr) auto', gap: '0 14px', alignItems: 'start', fontSize: 'var(--fs-sm)', minWidth: '760px' }}>
-            <span className="eyebrow">Data borderou</span><span className="eyebrow">Platformă · tip · ID</span><span className="eyebrow" style={{ textAlign: 'right' }}>Total borderou</span><span className="eyebrow" style={{ textAlign: 'right' }}>Încasări (în aviz)</span><span className="eyebrow">Verificare cu avizul</span><span />
+            <span className="eyebrow" title="Data plății din avizul eMAG — data cu care se adaugă desfășurătorul în eCap">Data plății (eCap)</span><span className="eyebrow">Platformă · tip · ID</span><span className="eyebrow" style={{ textAlign: 'right' }}>Total borderou</span><span className="eyebrow" style={{ textAlign: 'right' }}>Încasări (în aviz)</span><span className="eyebrow">Verificare cu avizul</span><span />
             {lista.map((b, i) => (
               <div key={b.id} style={{ display: 'contents' }}>
                 {(i === 0 || lista[i - 1].platforma !== b.platforma) && (
@@ -79,7 +79,10 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
                     <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: 'var(--text-muted)' }}>{b.valuta === 'RON' ? 'lei' : `în lei — eMAG plătește în RON; sumele din fișier (${b.valuta}) convertite la cursul încasării din extras`}</span>
                   </div>
                 )}
-                <span className="num" style={{ ...celula, fontWeight: 650, color: 'var(--text-primary)' }}>{zi(b.data)}</span>
+                <span className="num" style={{ ...celula, fontWeight: 650, color: b.dataProcesare ? 'var(--text-primary)' : 'var(--text-muted)' }} title={b.dataProcesare ? 'Data plății din aviz — pentru eCap' : 'Neplătit încă în avizele lunii — data din desfășurător'}>
+                  {zi(b.dataProcesare || b.data)}
+                  {b.dataProcesare && b.dataProcesare !== b.data && <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: 'var(--text-muted)' }}>DP din {zi(b.data)}</div>}
+                </span>
                 <span style={{ ...celula, color: 'var(--text-secondary)', minWidth: 0 }} title={b.fisier}>
                   <span className="badge" style={{ marginRight: '6px', fontWeight: 700, color: b.platforma ? 'var(--accent)' : 'var(--text-muted)' }}>{b.platforma || 'eMAG ?'}</span>
                   {b.eticheta}{b.nr ? <span style={{ color: 'var(--text-muted)' }}> · {b.nr}</span> : null}
@@ -115,7 +118,7 @@ export default function BorderouriEmag({ firmaId, lunaId, culoare, versiuneAvize
         style={{ border: `1.5px dashed ${drag ? culoare : 'var(--border-hover)'}`, borderRadius: 'var(--r-md)', padding: '14px', textAlign: 'center', cursor: incarc ? 'default' : 'pointer', background: drag ? 'var(--accent-soft)' : 'transparent' }}
       >
         <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 650, color: incarc ? 'var(--text-muted)' : 'var(--accent)' }}>{incarc ? 'Se citesc borderourile…' : '+ Adaugă desfășurătoare de plată (.xlsx) — toate deodată'}</div>
-        {!incarc && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>Fișierele …_dp_….xlsx din eMAG → Financiar — cash și card, pe fiecare jumătate de lună; cash / card se recunoaște singur</div>}
+        {!incarc && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>Fișierele …_dp_….xlsx din eMAG → Financiar → Desfășurătoare — toate ale lunii, cash și card; cash / card și plata din aviz se recunosc singure</div>}
       </div>
       <input ref={fileRef} type="file" multiple accept=".xlsx" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} onChange={e => { if (e.target.files?.length) incarca(e.target.files); e.target.value = '' }} />
       {rez.length > 0 && (
