@@ -17,3 +17,22 @@ export async function sumaRonDinPdf(bytes: Uint8Array): Promise<number | null> {
     return sumaRonDinText(String(text || ''))
   } catch { return null }
 }
+
+// Totalul explicit cu moneda lui: (RON) daca exista; altfel - factura emisa in alta moneda (Trendyol
+// „Shipping invoice … EUR”, comision in EUR) are DOAR „Total amount inc. VAT (EUR)” → suma + valuta EUR.
+// Inainte, aceste facturi se salvau cu suma in EUR dar valuta RON.
+export function totalExplicitDinText(text: string): { suma: number; valuta: string } | null {
+  const ron = sumaRonDinText(text)
+  if (ron != null) return { suma: ron, valuta: 'RON' }
+  const m = text.match(/Total\s+amount\s+inc(?:l|luding)?\.?\s*VAT\s*\((EUR|USD|HUF|BGN|PLN)\)\s*:?\s*([\d.,]+)/i)
+  if (!m) return null
+  const n = Number(m[2].replace(/,(?=\d{3}\b)/g, '').replace(',', '.'))
+  return Number.isFinite(n) && n > 0 ? { suma: Math.round(n * 100) / 100, valuta: m[1].toUpperCase() } : null
+}
+
+export async function totalExplicitDinPdf(bytes: Uint8Array): Promise<{ suma: number; valuta: string } | null> {
+  try {
+    const { text } = await extractText(await getDocumentProxy(new Uint8Array(bytes)), { mergePages: true })
+    return totalExplicitDinText(String(text || ''))
+  } catch { return null }
+}
