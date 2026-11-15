@@ -424,6 +424,7 @@ export async function POST(req: NextRequest) {
   const totalExplicit = !isAirbnbCsv && file.type === 'application/pdf' ? await totalExplicitDinPdf(uploadBytes) : null
   const sumaRonExplicita = totalExplicit?.suma ?? null
   if (sumaRonExplicita != null && genericExtractie) genericExtractie = { ...genericExtractie, suma: sumaRonExplicita }
+  if (totalExplicit?.emitent && !supplier) effectiveSupplier = totalExplicit.emitent
   const details = [effectiveDocumentTypeLabel, genericExtractie?.furnizor, genericExtractie?.numarDocument, supplier, description, reference].filter(Boolean).join(' ')
   const fileName = `${safeFilePart(details, effectiveType)}_${Date.now()}.${extension}`
   const path = `${firmaId}/${lunaId}/${effectiveSection}/${fileName}`

@@ -21,6 +21,13 @@ export async function sumaRonDinPdf(bytes: Uint8Array): Promise<number | null> {
 // Totalul explicit cu moneda lui: (RON) daca exista; altfel - factura emisa in alta moneda (Trendyol
 // „Shipping invoice … EUR”, comision in EUR) are DOAR „Total amount inc. VAT (EUR)” → suma + valuta EUR.
 // Inainte, aceste facturi se salvau cu suma in EUR dar valuta RON.
+// Emitentul platformei scris pe factura. La facturile de comision Trendyol (TYC…) antetul are doar
+// clientul (firma noastra), iar AI-ul lua clientul drept furnizor („AB HOMES INVEST”); Trendyol B.V. apare jos.
+export function emitentPlatformaDinText(text: string): string | null {
+  if (/Trendyol\s+B\.V\./i.test(text) && /NL861934209/.test(text)) return 'Trendyol B.V.'
+  return null
+}
+
 export function totalExplicitDinText(text: string): { suma: number; valuta: string } | null {
   const ron = sumaRonDinText(text)
   if (ron != null) return { suma: ron, valuta: 'RON' }
@@ -30,9 +37,10 @@ export function totalExplicitDinText(text: string): { suma: number; valuta: stri
   return Number.isFinite(n) && n > 0 ? { suma: Math.round(n * 100) / 100, valuta: m[1].toUpperCase() } : null
 }
 
-export async function totalExplicitDinPdf(bytes: Uint8Array): Promise<{ suma: number; valuta: string } | null> {
+export async function totalExplicitDinPdf(bytes: Uint8Array): Promise<{ suma: number; valuta: string; emitent: string | null } | null> {
   try {
     const { text } = await extractText(await getDocumentProxy(new Uint8Array(bytes)), { mergePages: true })
-    return totalExplicitDinText(String(text || ''))
+    const t = String(text || ''), total = totalExplicitDinText(t)
+    return total ? { ...total, emitent: emitentPlatformaDinText(t) } : null
   } catch { return null }
 }
