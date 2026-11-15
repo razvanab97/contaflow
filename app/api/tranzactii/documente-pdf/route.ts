@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { PDFDocument } from 'pdf-lib'
+import { getFirmaConfig } from '@/lib/firma-config'
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,13 +23,17 @@ export async function POST(req: NextRequest) {
 
     let docsQuery = sb
       .from('documente')
-      .select('id,fisier_path,fisier_nume,fisier_tip,created_at,tranzactie_id')
+      .select('id,fisier_path,fisier_nume,fisier_tip,created_at,tranzactie_id,tip_document')
       .eq('luna_id', lunaId)
       .eq('modul', 'extras')
       .eq('in_zip', true)
       .not('tranzactie_id', 'is', null)
     if (transactionIds) docsQuery = docsQuery.in('tranzactie_id', transactionIds)
-    const { data: docs, error } = await docsQuery
+    const { data: docsToate, error } = await docsQuery
+    // La firmele cu opPentruProiect (AB Textile), OP-urile tin de proiect - nu intra in documentele extrasului
+    const { data: lunaFirma } = await sb.from('luni_contabile').select('firme(slug)').eq('id', lunaId).maybeSingle()
+    const slugFirma = (lunaFirma?.firme as { slug?: string } | null)?.slug
+    const docs = slugFirma && getFirmaConfig(slugFirma)?.opPentruProiect ? (docsToate || []).filter(d => d.tip_document !== 'ordin_plata') : docsToate
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!docs?.length) return NextResponse.json({ error: 'Nu există documente asociate tranzacțiilor' }, { status: 400 })

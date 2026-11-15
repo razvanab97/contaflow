@@ -70,6 +70,9 @@ export interface FirmaConfigDef {
   // Facturile de cazare ale firmei se emit in Oblio (seria RH, din ApartPro), nu in 5StarDesk - in
   // „Airbnb · Rezervări” apare verificarea facturilor RH fata de rezervarile din CSV.
   facturiCazareOblio?: boolean
+  // OP-urile (ordine de plata) platite din conturile firmei tin de proiect: nu intra in documentele extrasului
+  // (pachetul pentru contabil, „Descarcă documentele”, PDF-ul Extras); raman in registrul OP-uri, pentru proiect
+  opPentruProiect?: boolean
 }
 
 // Airbnb pe AB Textile pentru contabilitatea Octombrie-Decembrie 2026 = lunile de lucru Noiembrie 2026 -
@@ -334,6 +337,7 @@ export const FIRMA_CONFIGS: Record<string, FirmaConfigDef> = {
     module: ['airbnb-borderou', 'airbnb-facturi', ...COMUNE],
     perioadeModule: { 'airbnb-borderou': { doar: AIRBNB_LA_AB_TEXTILE }, 'airbnb-facturi': { doar: AIRBNB_LA_AB_TEXTILE } },
     facturiCazareOblio: true,
+    opPentruProiect: true,
     legal: {
       nrRegCom: 'J2025073349009',
       cif: '52575850',
