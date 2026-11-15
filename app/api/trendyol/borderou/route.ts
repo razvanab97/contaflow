@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import JSZip from 'jszip'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { citesteBorderouTrendyol, ordinPlataDinNume } from '@/lib/trendyol-borderou'
+import { citesteBorderouTrendyol, dataEcapTrendyol, ordinPlataDinNume } from '@/lib/trendyol-borderou'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const lei = (n: number) => n.toFixed(2).replace('.', ',')
@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
     if (!ordin) { rezultate.push({ fisier: file.name, ok: false, text: 'numele trebuie să fie cel original de la Trendyol: PaymentOrderDetail_<nr. ordin>_….xlsx' }); continue }
     let b
     try { b = await citesteBorderouTrendyol(bytes, file.name) } catch (e) { rezultate.push({ fisier: file.name, ok: false, text: e instanceof Error ? e.message : String(e) }); continue }
-    const dataPlata = (await dataIncasare(sb, lunaId, ordin)) || b.linii.map(l => l.dataPlata).filter(Boolean).sort().pop() || null
+    // data pentru eCap = joia in care Trendyol a platit ordinul (vezi dataEcapTrendyol); incasarea in banca e a doua zi
+    const dataPlata = dataEcapTrendyol(b.linii) || (await dataIncasare(sb, lunaId, ordin))
     const path = `${firmaId}/${lunaId}/trendyol-borderou/PaymentOrderDetail_${ordin}_${Date.now()}.xlsx`
     const { error: upErr } = await sb.storage.from('documente').upload(path, bytes, { contentType: XLSX_MIME })
     if (upErr) { rezultate.push({ fisier: file.name, ok: false, text: upErr.message }); continue }
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ rezultate })
 }
 
-// Data borderoului (pentru eCap) = ziua in care Trendyol a platit, din extrasul lunii: incasarea are in
+// Rezerva, cand borderoul nu are „Payment Date”: ziua incasarii din extras - incasarea are in
 // descriere numarul ordinului de plata („Incasare SEPA 1141353 - 76968338 - TRENDYOL ...”).
 async function dataIncasare(sb: ReturnType<typeof getServiceSupabase>, lunaId: string, ordin: string) {
   const { data: extrase } = await sb.from('extrase').select('id').eq('luna_id', lunaId)
@@ -68,16 +69,9 @@ export async function GET(req: NextRequest) {
   if (lunaLista) {
     const { data: docs } = await sb.from('documente').select('id,numar_document,data_document,suma,valuta,fisier_nume')
       .eq('luna_id', lunaLista).eq('modul', 'trendyol').eq('tip_document', 'borderou').order('data_document')
-    // borderou incarcat inainte de extras: data se corecteaza singura cand plata apare in extras
-    const data = await Promise.all((docs || []).map(async d => {
-      const dinExtras = d.numar_document ? await dataIncasare(sb, lunaLista, d.numar_document) : null
-      if (dinExtras && dinExtras !== d.data_document) {
-        const fisier_nume = d.data_document ? d.fisier_nume.replace(d.data_document.split('-').reverse().join('.'), dinExtras.split('-').reverse().join('.')) : d.fisier_nume
-        await sb.from('documente').update({ data_document: dinExtras, fisier_nume }).eq('id', d.id)
-        return { ...d, data_document: dinExtras, fisier_nume }
-      }
-      return d
-    }))
+    // data_document = data pentru eCap, stabilita la incarcare din borderou (joia platii) - nu se mai
+    // suprascrie cu data incasarii din extras (a doua zi)
+    const data = [...(docs || [])]
     data.sort((a, b) => String(a.data_document).localeCompare(String(b.data_document)))
     return NextResponse.json({ borderouri: (data || []).map(d => ({ id: d.id, ordin: d.numar_document, data: d.data_document, suma: d.suma == null ? null : Number(d.suma), valuta: d.valuta, fisier: d.fisier_nume })) })
   }

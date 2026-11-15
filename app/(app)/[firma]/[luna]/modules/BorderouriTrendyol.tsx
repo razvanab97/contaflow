@@ -55,7 +55,7 @@ export default function BorderouriTrendyol({ firmaId, lunaId, culoare, onChange 
       {lista === null ? <div className="skeleton" style={{ height: '60px' }} /> : lista.length > 0 && (
         <div style={{ marginBottom: '10px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(96px,auto) 1fr auto auto', gap: '4px 14px', alignItems: 'center', fontSize: 'var(--fs-sm)' }}>
-            <span className="eyebrow">Data borderou</span><span className="eyebrow">Ordin de plată</span><span className="eyebrow" style={{ textAlign: 'right' }}>Sumă</span><span />
+            <span className="eyebrow" title="Joia în care Trendyol a plătit ordinul — data cu care se adaugă în eCap (banii intră în bancă a doua zi)">Data plății (eCap)</span><span className="eyebrow">Ordin de plată</span><span className="eyebrow" style={{ textAlign: 'right' }}>Sumă</span><span />
             {lista.map(b => (
               <div key={b.id} style={{ display: 'contents' }}>
                 <span className="num" style={{ fontWeight: 650, color: 'var(--text-primary)', padding: '5px 0', borderTop: '1px solid var(--border-subtle)' }}>{zi(b.data)}</span>

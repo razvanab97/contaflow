@@ -66,3 +66,14 @@ export async function citesteBorderouTrendyol(bytes: Uint8Array | ArrayBuffer, n
   const totalVanzator = Math.round(linii.reduce((s, l) => s + l.vanzator, 0) * 100) / 100
   return { ordinPlata: ordinPlataDinNume(numeFisier), valuta, linii, totalVanzator }
 }
+
+// Data pentru eCap a unui borderou Trendyol = ziua platii ordinului: Trendyol plateste saptamanal, JOIA,
+// tot ce are „Payment Date” pana atunci (ultima e de obicei miercurea), iar banii intra in banca vineri.
+// Regula (confirmata 15.11.2026: 01.10, 08.10, 15.10, 22.10, 29.10) = prima joi >= ultima „Payment Date”.
+export function dataEcapTrendyol(linii: LinieTrendyol[]): string | null {
+  const ultima = linii.map(l => l.dataPlata).filter((d): d is string => !!d).sort().pop()
+  if (!ultima) return null
+  const d = new Date(`${ultima}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + ((4 - d.getUTCDay() + 7) % 7))
+  return d.toISOString().slice(0, 10)
+}
