@@ -9,6 +9,11 @@
 //   5. impozite si taxe catre Trezorerie / ANAF / DGRFP / "impozit"             -> 'impozit'
 //   6. salarii: "salariu" / "salarii" in textul platii (plata salariului, creditare salarii) -> 'salariu'
 //      (dupa impozit: "Trezorerie ... contributii salarii" ramane impozit)
+//   7. imprumutul de la asociat: incasare "Imprumut societate ..." / plata "Restituire imprumut ..."
+//      (contractul de imprumut e la dosar, nu e factura)                       -> 'asociat'
+//   8. "Transfer intern" (BT: intre conturile proprii ale aceleiasi firme)      -> 'transfer_propriu'
+//      (dupa salariu: "Transfer intern ... creditare salarii" ramane salariu)
+// Incasarile Trendyol intra la regula 3 (justificate de raportul de plata Trendyol).
 // Platile intre firmele proprii NU se sar: se fac pe baza de factura, care trebuie atasata.
 //
 // Reguli pentru documente (in lib/inbox-facturi.ts si lib/tranzactii-potrivire.ts):
@@ -31,7 +36,7 @@ export type MotivIgnorare =
 export const MOTIVE_IGNORARE: { key: MotivIgnorare; label: string; scurt: string }[] = [
   { key: 'comision', label: 'Comision bancar', scurt: 'Comision' },
   { key: 'schimb_valutar', label: 'Schimb valutar', scurt: 'Schimb valutar' },
-  { key: 'incasare_platforma', label: 'Încasare platformă (Booking/Airbnb/eMAG)', scurt: 'Încasare platformă' },
+  { key: 'incasare_platforma', label: 'Încasare platformă (Booking/Airbnb/eMAG/Trendyol)', scurt: 'Încasare platformă' },
   { key: 'transfer_propriu', label: 'Transfer între conturi / firme proprii', scurt: 'Transfer propriu' },
   { key: 'asociat', label: 'Asociat (împrumut, avans, restituire)', scurt: 'Asociat' },
   { key: 'impozit', label: 'Plată impozite / taxe (în Plată impozite)', scurt: 'Impozit' },
@@ -52,7 +57,9 @@ export const MOTIVE_FIZICE = new Set<string>(['bon_fizic', 'document_fizic'])
 export const EXPLICATIE_REGULA: Record<string, string> = {
   comision: 'Comisioanele și taxele băncii nu au nevoie de document - apar în extras.',
   schimb_valutar: 'Schimbul valutar între conturile proprii nu are nevoie de document.',
-  incasare_platforma: 'Încasările Booking/Airbnb/eMAG sunt justificate de borderou / avizul de plată.',
+  incasare_platforma: 'Încasările Booking/Airbnb/eMAG/Trendyol sunt justificate de borderou / avizul de plată.',
+  asociat: 'Împrumutul de la asociat (primit sau restituit) e justificat de contractul de împrumut, nu de factură.',
+  transfer_propriu: 'Transferul intern între conturile proprii ale firmei nu are nevoie de document.',
   chirie: 'Chiria plătită unei persoane fizice nu are factură - se sare fără document.',
   impozit: 'Plățile către Trezorerie / ANAF sunt justificate de declarații (vezi Plată impozite).',
   salariu: 'Salariile sunt justificate de statul de plată (vezi Documente angajați).',
@@ -70,7 +77,7 @@ function text(t: TxPentruReguli) {
 // Include si taxele bancare recurente (pachet de cont, rapoarte, alerte SMS) - tot costuri ale bancii.
 const RE_COMISION = /\bcomision\b|\bcomisioane\b|\bcommission\b|taxa (de )?administrare|taxa rapoarte|abonament (cont|pachet|bt)|pachet pj|cost(uri)? (pachet|cont)\b|notificari prin sms|\bbt alert\b/
 const RE_SCHIMB = /schimb valutar|\bexchange\b|conversie valutar|\bfx\b.*(ron|eur|usd)/
-const RE_PLATFORME = /booking\.?com|\bairbnb\b|\bemag\b|dante international/
+const RE_PLATFORME = /booking\.?com|\bairbnb\b|\bemag\b|dante international|\btrendyol\b/
 const RE_CHIRIE = /\bchirie\b|\bchirii\b|\bchiria\b/
 // Chiria catre o firma (SRL, SA, PFA, asociatie) vine cu factura - regula 4 e doar pentru persoane fizice.
 const RE_PERSOANA_JURIDICA = /\bs\.?r\.?l\b|\bs\.?a\b|\bpfa\b|\bi\.?i\b|\bltd\b|\bgmbh\b|asociatia|\bsc\b/
@@ -78,6 +85,12 @@ const RE_PERSOANA_JURIDICA = /\bs\.?r\.?l\b|\bs\.?a\b|\bpfa\b|\bi\.?i\b|\bltd\b|
 const RE_IMPOZIT = /(?<!avans )trezorerie|\banaf\b|d\.?g\.?r\.?f\.?p|\bimpozit/
 // "Salariu septembrie", "Salariu August", "creditare salarii septembrie 2026"
 const RE_SALARIU = /\bsalari(u|i|ul|ile|ului|ilor)?\b/
+// Imprumutul asociatului: "Imprumut societate AB HOMES", "Incasare Instant Imprumut ...", "Restituire imprumut;216;Abunei Andrei"
+// (aceeasi regula ca in Cashflow - vezi tipImprumut din lib/flux-lunar.ts; "avans trezorerie" ramane doar sugestie)
+const RE_IMPRUMUT_PRIMIT = /\bimprumut\b/
+const RE_IMPRUMUT_RESTITUIT = /restituire\s*imprumut/
+// BT: "Transfer intern - canal electronic ..." = intre conturile aceleiasi firme
+const RE_TRANSFER_INTERN = /\btransfer intern\b/
 
 // Regula STANDARD (sarire automata) - vezi lista din capul fisierului. Intoarce motivul sau null.
 export function regulaAutomata(t: TxPentruReguli): MotivIgnorare | null {
@@ -90,6 +103,9 @@ export function regulaAutomata(t: TxPentruReguli): MotivIgnorare | null {
   if (t.tip !== 'credit' && RE_CHIRIE.test(s) && !RE_PERSOANA_JURIDICA.test(s)) return 'chirie'
   if (t.tip !== 'credit' && RE_IMPOZIT.test(s)) return 'impozit'
   if (RE_SALARIU.test(s)) return 'salariu'
+  if (t.tip === 'credit' && RE_IMPRUMUT_PRIMIT.test(s) && !/restituire/.test(s)) return 'asociat'
+  if (t.tip === 'debit' && RE_IMPRUMUT_RESTITUIT.test(s)) return 'asociat'
+  if (RE_TRANSFER_INTERN.test(s)) return 'transfer_propriu'
   return null
 }
 

@@ -214,7 +214,7 @@ export default function ExtrasClient({ firma, lunaId, luna, lunaLabel, extrase: 
   function setMotiv(id: string, motiv: string) { updateNote(id, 'na', motiv) }
 
   // Procesare automata: asocieri fara echivoc + sarirea tranzactiilor standard (comisioane,
-  // schimb valutar, incasari Booking/Airbnb/eMAG). Rulata o data la deschidere si dupa fiecare import.
+  // schimb valutar, incasari Booking/Airbnb/eMAG/Trendyol, imprumut asociat, transfer intern). Rulata o data la deschidere si dupa fiecare import.
   const autoProcess = useCallback(async () => {
     try {
       const res = await fetch('/api/extras/auto-proceseaza', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lunaId }) })

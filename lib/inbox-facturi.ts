@@ -6,6 +6,7 @@ import { isFirstPageOnlyInvoice, isFirstPageOnlyPdf, keepOnlyFirstPage } from '@
 import { finalizeazaDocument } from '@/lib/denumire-document'
 import { diferentaSuma, furnizorInDescriere } from '@/lib/tranzactii-potrivire'
 import { cursuriBnrSigur } from '@/lib/curs-bnr'
+import { citesteEfacturiPdf, extractieEfacturaUnica } from '@/lib/efactura-pdf'
 
 type SupabaseService = ReturnType<typeof import('@/lib/supabase/server').getServiceSupabase>
 
@@ -369,7 +370,8 @@ export async function importInboxDocument({
     }
   }
 
-  let extracted = extractie !== undefined ? extractie : await analyzeInvoice(bytes, mediaType, candidates)
+  // Format e-Factura (export / descarcare din Oblio): citit exact din PDF, fara AI; altfel citire cu AI.
+  let extracted = extractie !== undefined ? extractie : (await extractieEfacturaUnica(bytes, mediaType)) || await analyzeInvoice(bytes, mediaType, candidates)
   if (!fortat && extracted && !extracted.esteFactura) {
     return {
       duplicate: false,
@@ -573,6 +575,9 @@ const PRAG_PAGINI_VERIFICARE_PACHET = 1
 // intoarce paginile fiecaruia. Intoarce null daca e un singur document sau daca verificarea esueaza
 // (in acel caz documentul se proceseaza intreg, nesplit, ca sa nu blocam complet sincronizarea).
 export async function detecteazaDocumenteMultiple(bytes: Uint8Array): Promise<SegmentDocument[] | null> {
+  // Export Oblio „e-Facturi Furnizori”: limitele facturilor se citesc exact din PDF, fara AI.
+  const efacturi = await citesteEfacturiPdf(bytes).catch(() => null)
+  if (efacturi?.length) return efacturi.map(f => ({ pageStart: f.pageStart, pageEnd: f.pageEnd }))
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const response = await client.messages.create({

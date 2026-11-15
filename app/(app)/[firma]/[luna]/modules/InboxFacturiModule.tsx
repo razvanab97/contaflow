@@ -776,6 +776,10 @@ export default function InboxFacturiModule({ firma, lunaId, luna, tasks }: {
             <div style={{ fontSize:'22px', color:firma.culoare, lineHeight:1, marginBottom:'8px' }}>+</div>
             <div style={{ fontSize:'var(--fs-md)', fontWeight:700, color:'var(--c-777777)', marginBottom:'4px' }}>{busy ? 'Se analizează și se repartizează...' : 'Adaugă facturi din email / Oblio'}</div>
             <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)' }}>Poți selecta mai multe PDF/JPG/PNG deodată</div>
+            <div style={{ fontSize:'var(--fs-xs)', color:'var(--c-888888)', marginTop:'8px', lineHeight:1.5 }}>
+              Toate facturile din SPV dintr-o dată: în Oblio → <b>Import/Export → e-Facturi Furnizori (XML+PDF) → Exportă</b>, apoi pune aici PDF-ul descărcat.
+              Se împarte pe facturi și se citește exact (furnizor, număr, dată, total), fără AI; facturile deja existente se sar.
+            </div>
           </div>
           <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', border:0 }} onChange={e => { if (e.target.files) upload(e.target.files); e.target.value='' }}/>
 
