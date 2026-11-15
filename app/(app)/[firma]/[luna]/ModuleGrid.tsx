@@ -57,6 +57,12 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
   useEffect(() => { setOrder(loadOrder(slug, modules)) }, [slug, modules])
 
   const sorted = order.map(s => modules.find(m => m.slug === s)).filter(Boolean) as ModuleDef[]
+  // Lista arata doar zonele lucrate (cel putin o sarcina bifata), in ordinea de lucru; cele neincepute (si cele
+  // marcate „Nu am”) se ascund - raman in meniul lateral si se pot afisa cu „Arată și cele neîncepute”.
+  const [arataToate, setArataToate] = useState(false)
+  const lucrat = (m: ModuleDef) => !dezactivate.includes(m.slug) && m.tasks.some(t => taskMap[t.key])
+  const lucrate = sorted.filter(lucrat), neincepute = sorted.length - lucrate.length
+  const vizibile = arataToate ? sorted : lucrate
 
   function persist(newOrder: string[]) {
     setOrder(newOrder)
@@ -126,7 +132,7 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
       {/* Toolbar */}
       <div className="section-title">
         <h2 style={{ color: reordering ? 'var(--accent)' : undefined }}>
-          {reordering ? 'Trage rândurile sau folosește săgețile' : 'Module lunare'}
+          {reordering ? 'Trage rândurile sau folosește săgețile' : <>Module lucrate <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>· {lucrate.length} din {sorted.length}</span></>}
         </h2>
         <div style={{ display:'flex', gap:'6px' }}>
           {reordering && (
@@ -188,7 +194,12 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
       {/* NORMAL MODE — lista compacta */}
       {!reordering && (
         <div className="module-list stagger">
-          {sorted.map(mod => {
+          {vizibile.length === 0 && (
+            <div className="module-item" style={{ cursor: 'default', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
+              Încă n-ai lucrat la niciun modul luna asta. Începe cu „Următorul pas” de mai sus.
+            </div>
+          )}
+          {vizibile.map(mod => {
             const modTasks = mod.tasks
             const modDone = modTasks.filter(t => taskMap[t.key]).length
             const modTotal = modTasks.length
@@ -287,6 +298,11 @@ export default function ModuleGrid({ modules, firma, luna, slug, lunaId, taskMap
             )
           })}
         </div>
+      )}
+      {!reordering && neincepute > 0 && (
+        <button type="button" onClick={() => setArataToate(v => !v)} className="btn btn-sm btn-ghost" style={{ marginTop: 8, color: 'var(--text-muted)' }} aria-expanded={arataToate}>
+          {arataToate ? 'Ascunde modulele neîncepute' : `+ Arată și cele neîncepute (${neincepute})`}
+        </button>
       )}
     </div>
   )
