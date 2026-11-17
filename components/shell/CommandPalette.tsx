@@ -124,7 +124,11 @@ export default function CommandPalette({ open, onClose, firme, firmaAtiva, luna,
       for (const m of getFirmaModules(f.slug, luna)) {
         list.push({ id: `mod-${f.slug}-${m.slug}`, group: 'Module', title: m.label, sub: `${nume} · ${m.description}`, icon: MODULE_ICONS[m.slug] || 'fileText', dot: f.culoare, keywords: `${nume} modul`, run: ({ newTab }) => go(`/${f.slug}/${luna}/${m.linkDirect || m.slug}`, newTab) })
       }
-      for (const [sub, label, icon] of [['furnizori', 'Furnizori', 'users'], ['date-personale', 'Date personale', 'idCard'], ['model-documente', 'Model documente', 'fileText'], ['facturi-de-asociat', 'Facturi de asociat', 'link']] as const) {
+      const paginiFirma: [string, string, string][] = [['furnizori', 'Furnizori', 'users'], ['date-personale', 'Date personale', 'idCard']]
+      // Contracte colaboratori - doar la firmele reale, nu la proiect
+      if (!esteLunaCalendaristica(f.slug)) paginiFirma.push(['contracte-colaboratori', 'Contracte colaboratori', 'briefcase'])
+      paginiFirma.push(['model-documente', 'Model documente', 'fileText'], ['facturi-de-asociat', 'Facturi de asociat', 'link'])
+      for (const [sub, label, icon] of paginiFirma) {
         list.push({ id: `pg-${f.slug}-${sub}`, group: 'Pagini firmă', title: label, sub: nume, icon, dot: f.culoare, keywords: `${nume} pagina`, run: ({ newTab }) => go(`/${f.slug}/${sub}`, newTab) })
       }
     }

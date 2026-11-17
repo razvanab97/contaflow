@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleDef } from '@/lib/firma-config'
+import { esteLunaCalendaristica } from '@/lib/firma-config'
 import ThemeSelector from './shell/ThemeSelector'
 import Icon, { MODULE_ICONS } from './ui/Icon'
 import ProgressRing from './ui/ProgressRing'
@@ -77,6 +78,8 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
   const firmaLinks = firmaAtiva ? [
     { href: `/${firmaAtiva}/furnizori`, label: 'Furnizori', icon: 'users', match: '/furnizori' },
     { href: `/${firmaAtiva}/date-personale`, label: 'Date personale', icon: 'idCard', match: '/date-personale' },
+    // Contracte colaboratori - doar la firmele reale (AB Textile, ABXHomes, AB Homes Invest), nu la proiect
+    ...(esteLunaCalendaristica(firmaAtiva) ? [] : [{ href: `/${firmaAtiva}/contracte-colaboratori`, label: 'Contracte colaboratori', icon: 'briefcase', match: '/contracte-colaboratori' }]),
     { href: `/${firmaAtiva}/model-documente`, label: 'Model documente', icon: 'fileText', match: '/model-documente' },
     { href: `/${firmaAtiva}/facturi-de-asociat`, label: 'Facturi de asociat', icon: 'link', match: '/facturi-de-asociat' },
   ] : []

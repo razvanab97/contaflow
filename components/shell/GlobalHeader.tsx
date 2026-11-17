@@ -22,6 +22,7 @@ interface Props {
 const PAGINI_FIRMA: Record<string, string> = {
   'furnizori': 'Furnizori',
   'date-personale': 'Date personale',
+  'contracte-colaboratori': 'Contracte colaboratori',
   'model-documente': 'Model documente',
   'facturi-de-asociat': 'Facturi de asociat',
   'bonuri': 'Bonuri',

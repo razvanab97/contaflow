@@ -26,6 +26,7 @@ const SECTIUNI: [string, string][] = [
   ['/dispozitii-plata/', 'Dispoziție de plată'], ['/airbnb-facturi/', 'Airbnb · Facturi comision'], ['/booking-facturi/', 'Booking · Facturi'],
   ['/emag', 'eMAG'], ['/trendyol/', 'Trendyol'], ['/acte-contabile/', 'Acte contabile'], ['/angajati/', 'Documente angajați'],
   ['/checklist/', 'Documente lună'], ['/achizitii/', 'Achiziții'], ['/tx/', 'Extras de cont'],
+  ['/contracte-colaboratori/', 'Contracte colaboratori'],
 ]
 const sectiune = (path: string) => SECTIUNI.find(([k]) => path.includes(k))?.[1] || 'Documente'
 
