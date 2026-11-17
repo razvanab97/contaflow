@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { timingSafeEqual } from 'crypto'
 import { tokenRefuzat } from '@/lib/oblio'
-import { cuToken, toateFacturile, listaFacturiRh, TokenExpirat } from '@/lib/oblio-rh'
+import { cuToken, listaFacturiRh, TokenExpirat } from '@/lib/oblio-rh'
+import { autorizat, ultimaFactura } from '@/lib/factura-cazare'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +29,8 @@ type Cerere = {
   nopti?: number
   persoane?: number
   suma?: number
+  // a cata emitere dupa stornari (0 = prima): cheia de idempotenta trebuie sa difere, altfel Oblio ar intoarce factura stornata
+  reemitere?: number
   // data emiterii aleasa in ApartPro (YYYY-MM-DD, cel mult azi); lipsa = azi
   dataEmitere?: string
   // domiciliul clientului (cerut pentru e-Factura / SPV): tara, judet si localitate reale, din rezervare
@@ -36,28 +38,7 @@ type Cerere = {
   client?: { tara?: string; judet?: string; localitate?: string; adresa?: string; pj?: boolean; cui?: string; firma?: string; regCom?: string; platitorTva?: boolean }
 }
 
-function autorizat(req: NextRequest) {
-  const secret = process.env.APARTPRO_FACTURARE_SECRET || ''
-  const primit = req.headers.get('x-apartpro-secret') || ''
-  if (!secret || primit.length !== secret.length) return false
-  return timingSafeEqual(Buffer.from(primit), Buffer.from(secret))
-}
 
-// Ultima factura din serie, direct din Oblio (cerut direct: „să știm să nu facturăm înapoi de ultima dată facturată -
-// e interzis”): numerotarea unei serii trebuie sa fie cronologica, deci nicio factura noua cu data mai veche. Se citesc
-// TOATE facturile seriei (pagini de 100, fara sa ne bazam pe ordinea intoarsa), inclusiv cele emise direct din Oblio si
-// cele anulate (isi pastreaza numarul si data); ciornele nu au numar si nu conteaza.
-async function ultimaFactura(token: string): Promise<{ data: string; numar: string } | null> {
-  let ultima: { data: string; numar: string; nr: number } | null = null
-  for (const f of await toateFacturile(token)) {
-    if (f.draft && String(f.draft) !== '0') continue
-    const d = String(f.issueDate || '').slice(0, 10)
-    const nr = Number(String(f.number ?? '').replace(/\D/g, '')) || 0
-    // la aceeasi data castiga numarul mai mare (raportat direct: RH 0001 si RH 0002 din 29.10 - aparea RH 0001)
-    if (/^\d{4}-\d{2}-\d{2}$/.test(d) && (!ultima || d > ultima.data || (d === ultima.data && nr > ultima.nr))) ultima = { data: d, nr, numar: `${f.seriesName || SETARI.serie} ${f.number ?? ''}`.trim() }
-  }
-  return ultima && { data: ultima.data, numar: ultima.numar }
-}
 
 // GET = ultima factura din seria RH (pentru ApartPro: se afiseaza la facturare si limiteaza data emiterii)
 // GET ?lista=1 = toate facturile RH cu suma reala din Oblio (cerut direct: „verifică sumele din facturi, nu din aplicație” -
@@ -139,7 +120,7 @@ export async function POST(req: NextRequest) {
       currency: 'RON',
       spvExtern: SETARI.spvExtern,
       // Aceeasi rezervare nu poate fi facturata de doua ori, chiar daca butonul e apasat repetat
-      idempotencyKey: `apartpro-rez-${r.rezervareId}`,
+      idempotencyKey: `apartpro-rez-${r.rezervareId}${Number(r.reemitere) > 0 ? `-r${Math.floor(Number(r.reemitere))}` : ''}`,
       client: {
         // firma: denumire + CIF (cu RO daca e platitoare de TVA) + Reg. Com.; altfel persoana fizica
         ...(pj ? { name: firma, cif: `${r.client?.platitorTva ? 'RO' : ''}${cui}`, ...(r.client?.regCom ? { rc: String(r.client.regCom).trim() } : {}), vatPayer: r.client?.platitorTva ? 1 : 0 } : { name: String(r.numeClient).trim() }),
