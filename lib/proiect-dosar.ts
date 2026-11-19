@@ -80,6 +80,8 @@ export const DOSAR_CONFIGS: Record<DosarSectiune, DosarConfig> = {
     numeLabel: 'Document',
     numePlaceholder: 'Titlu document (ex. Raport misiune socială 2026)',
     tipuri: [
+      { tip: 'atestat_intreprindere_sociala', label: 'Atestat de întreprindere socială', cerut: true, hint: 'Atestatul emis conform Legii 219/2015 — dovada statutului de întreprindere socială' },
+      { tip: 'marca_sociala', label: 'Marca socială (întreprindere socială de inserție)', cerut: true, hint: 'Certificatul / marca socială, valabil 3 ani' },
       { tip: 'misiune_sociala', label: 'Misiunea socială asumată 2026', cerut: true },
       { tip: 'dovada_misiune', label: 'Dovadă realizare misiune socială', cerut: true },
       { tip: 'activitate_sociala', label: 'Activitate cu caracter social (dovezi)' },
