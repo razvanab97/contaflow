@@ -19,6 +19,7 @@ const RUTE: Record<string, { tabel: string; param: string }> = {
   '/api/proiect-documente/download': { tabel: 'proiect_documente', param: 'id' },
   '/api/proiect-workflow/document': { tabel: 'documente', param: 'id' },
   '/api/proiect-dosar': { tabel: 'documente', param: 'download' },
+  '/api/proiect-social': { tabel: 'documente', param: 'download' },
 }
 
 function mimeDin(nume: string, tip?: string | null) {

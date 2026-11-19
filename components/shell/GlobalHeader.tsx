@@ -64,7 +64,9 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMe
   const modulLabel = modulSeg ? (MODULE_DEFS[modulSeg as ModuleSlug]?.label || PAGINI_FIRMA[modulSeg] || modulSeg) : undefined
   // Dosarul proiectului: /<firma>/dosar/<sectiune> -> „Dosar · Angajați” etc.
   const paginaFirma = !lunaInPath && parts[1]
-    ? (parts[1] === 'dosar' ? `Dosar · ${getDosarConfig(parts[2])?.label || 'proiect'}` : PAGINI_FIRMA[parts[1]])
+    ? (parts[1] === 'dosar' ? `Dosar · ${getDosarConfig(parts[2])?.label || 'proiect'}`
+      : parts[1] === 'activitati-sociale' ? 'Activități sociale'
+      : PAGINI_FIRMA[parts[1]])
     : undefined
 
   return (

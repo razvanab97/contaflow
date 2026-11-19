@@ -82,6 +82,7 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
     { href: `/${firmaAtiva}/dosar/angajati`, label: 'Angajați', icon: 'users', match: '/dosar/angajati' },
     { href: `/${firmaAtiva}/dosar/activitate`, label: 'Activitate', icon: 'briefcase', match: '/dosar/activitate' },
     { href: `/${firmaAtiva}/dosar/social`, label: 'Social', icon: 'star', match: '/dosar/social' },
+    { href: `/${firmaAtiva}/activitati-sociale`, label: 'Activități sociale', icon: 'sparkles', match: '/activitati-sociale' },
   ] : []
 
   const firmaLinks = firmaAtiva ? [

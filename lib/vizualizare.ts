@@ -27,7 +27,7 @@ const CAI_VIZUALIZABILE = new Set([
   '/api/chitante/document', '/api/tranzactii/document', '/api/checklist/docs', '/api/emag', '/api/documente-generale',
   '/api/bonuri/download', '/api/facturi-asteptate/download', '/api/model-documente/download', '/api/inbox-facturi/global/document',
   '/api/proiect-documente/download', '/api/extras/pdf-download', '/api/firma-date/download',
-  '/api/proiect-workflow/document', '/api/proiect-dosar',
+  '/api/proiect-workflow/document', '/api/proiect-dosar', '/api/proiect-social',
 ])
 export function esteDocumentVizualizabil(url: string): boolean {
   try { return CAI_VIZUALIZABILE.has(new URL(url, 'http://local').pathname) } catch { return false }
