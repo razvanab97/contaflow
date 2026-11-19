@@ -4,6 +4,7 @@ import { dbSelect } from '@/lib/db'
 import { getFirmaConfig, esteLunaCalendaristica } from '@/lib/firma-config'
 import { getDosarConfig } from '@/lib/proiect-dosar'
 import ProiectDosar from './ProiectDosar'
+import ActivitatiSociale from '@/components/proiect/ActivitatiSociale'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,17 @@ export default async function DosarSectiunePage({ params }: { params: Promise<{ 
         description={cfg.descriere}
       />
       <ProiectDosar firmaId={firma.id} cfg={cfg} />
+      {/* La „Social", sub documente, modulul de activități sociale (zonele misiunii din plan). */}
+      {cfg.sectiune === 'social' && (
+        <section style={{ marginTop: 28, borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+          <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 2px' }}>Activități sociale</h2>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', margin: '0 0 14px' }}>
+            Zonele misiunii sociale (din planul de afaceri), activitățile din fiecare an, indicatorii și documentele.
+            Indicatorul se mișcă doar din activitățile validate.
+          </p>
+          <ActivitatiSociale firmaId={firma.id} />
+        </section>
+      )}
     </main>
   )
 }

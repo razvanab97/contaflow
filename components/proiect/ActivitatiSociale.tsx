@@ -2,9 +2,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { deschideDocument } from '@/lib/vizualizare'
 import {
-  ZONE_SOCIALE, ANI_PROIECT, ETICHETA_STATUS, STATUSURI_ACT, ETICHETA_STARE,
+  ANI_PROIECT, ETICHETA_STATUS, STATUSURI_ACT, ETICHETA_STARE,
   stareaZonei, indicatorZona, rezumatAn, TIPURI_DOC_ACT, etichetaDocAct,
-  type Activitate, type StareZonaRow, type StatusAct, type StareZona,
+  zoneOrdonate, reordoneaza,
+  type Activitate, type StareZonaRow, type StatusAct, type StareZona, type OrdineRow,
 } from '@/lib/proiect-social'
 
 // Modulul „Activități sociale": fiecare zonă (activitate din plan) e o linie în care se adaugă
@@ -27,16 +28,27 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const [migrat, setMigrat] = useState(true)
   const [deschise, setDeschise] = useState<Set<string>>(new Set())
   const [formZona, setFormZona] = useState<string | null>(null)
+  const [ordine, setOrdine] = useState<OrdineRow[]>([])
   const [mesaj, setMesaj] = useState('')
 
   useEffect(() => {
     fetch(`/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`).then(r => r.json())
-      .then(d => { setActs(d.activitati || []); setStari(d.zoneStari || []); setDocs(d.documente || []); setMigrat(d.migrat !== false) })
+      .then(d => { setActs(d.activitati || []); setStari(d.zoneStari || []); setDocs(d.documente || []); setOrdine(d.zoneOrdine || []); setMigrat(d.migrat !== false) })
       .catch(() => setMesaj('Datele nu s-au putut încărca')).finally(() => setIncarcat(true))
   }, [firmaId])
 
   const rez = useMemo(() => rezumatAn(acts, stari, an), [acts, stari, an])
+  const zoneSortate = useMemo(() => zoneOrdonate(ordine), [ordine])
   const api = `/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`
+
+  // Mută o zonă mai sus / mai jos (prioritate) și salvează ordinea întreagă.
+  async function muta(cod: string, directie: 'sus' | 'jos') {
+    const noua = reordoneaza(zoneSortate.map(z => z.cod), cod, directie)
+    setOrdine(noua.map((zona, i) => ({ zona, ordine: i })))
+    const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'ordine-zona', ordine: noua }) })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) setMesaj(d.error || 'Ordinea nu s-a putut salva')
+  }
 
   async function creeaza(zona: string, campuri: Record<string, string>) {
     setMesaj('')
@@ -104,7 +116,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
 
       {/* Zonele */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {ZONE_SOCIALE.map(z => {
+        {zoneSortate.map((z, zi) => {
           const stare = stareaZonei(stari, z.cod, an)
           const ind = indicatorZona(acts, z, an)
           const aleZonei = acts.filter(a => a.zona === z.cod && a.an === an)
@@ -114,6 +126,13 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
             <div key={z.cod} style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', opacity: definitiv ? 0.7 : 1 }}>
               {/* Antet zonă */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, flexWrap: 'wrap' }}>
+                {/* Prioritate: mută zona mai sus / mai jos */}
+                <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, marginTop: -1 }}>
+                  <button onClick={() => muta(z.cod, 'sus')} disabled={zi === 0} title="Mută mai sus (prioritate)" aria-label={`Mută „${z.titlu}" mai sus`}
+                    style={{ ...linkBtn, color: zi === 0 ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: zi === 0 ? 0.4 : 1, lineHeight: 1, fontSize: 'var(--fs-sm)' }}>▲</button>
+                  <button onClick={() => muta(z.cod, 'jos')} disabled={zi === zoneSortate.length - 1} title="Mută mai jos" aria-label={`Mută „${z.titlu}" mai jos`}
+                    style={{ ...linkBtn, color: zi === zoneSortate.length - 1 ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: zi === zoneSortate.length - 1 ? 0.4 : 1, lineHeight: 1, fontSize: 'var(--fs-sm)' }}>▼</button>
+                </div>
                 <button onClick={() => setDeschise(prev => { const n = new Set(prev); n.has(z.cod) ? n.delete(z.cod) : n.add(z.cod); return n })}
                   aria-expanded={open} title={open ? 'Restrânge' : 'Extinde'}
                   style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)', width: 20, flexShrink: 0, marginTop: 2 }}>{open ? '▾' : '▸'}</button>

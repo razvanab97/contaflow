@@ -44,16 +44,18 @@ export async function GET(req: NextRequest) {
     return new NextResponse(Buffer.from(await file.arrayBuffer()), { headers: antet(d.fisier_nume || 'document', d.fisier_tip || file.type, req.nextUrl.searchParams.get('preview') === '1') })
   }
 
-  const [a, z, dd] = await Promise.all([
+  const [a, z, dd, o] = await Promise.all([
     sb.from('activitati_sociale').select(COL_ACT).eq('firma_id', firmaId).order('an', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('zone_sociale_an').select('zona,an,status,nota').eq('firma_id', firmaId),
     sb.from('documente').select(COL_DOC).eq('firma_id', firmaId).eq('modul', MODUL).not('activitate_sociala_id', 'is', null).order('created_at', { ascending: false }),
+    sb.from('zone_sociale').select('zona,ordine').eq('firma_id', firmaId),
   ])
   if (a.error && !tabelLipsa(a.error)) return NextResponse.json({ error: a.error.message }, { status: 500 })
   return NextResponse.json({
     activitati: a.data || [],
     zoneStari: z.data || [],
     documente: dd.data || [],
+    zoneOrdine: o.data || [],
     migrat: !tabelLipsa(a.error),
   })
 }
@@ -90,6 +92,15 @@ export async function POST(req: NextRequest) {
       { onConflict: 'firma_id,zona,an' }).select('zona,an,status,nota').single()
     if (error) return NextResponse.json({ error: tabelLipsa(error) ? 'Rulează migrarea supabase_activitati_sociale.sql' : error.message }, { status: tabelLipsa(error) ? 409 : 500 })
     return NextResponse.json({ stare: data })
+  }
+
+  if (b.actiune === 'ordine-zona') {
+    const coduri = (Array.isArray(b.ordine) ? b.ordine : []).map(String).filter(zonaValida)
+    if (!coduri.length) return NextResponse.json({ error: 'Ordine invalidă' }, { status: 400 })
+    const randuri = coduri.map((zona, i) => ({ firma_id: firmaId, zona, ordine: i }))
+    const { error } = await sb.from('zone_sociale').upsert(randuri, { onConflict: 'firma_id,zona' })
+    if (error) return NextResponse.json({ error: tabelLipsa(error) ? 'Rulează migrarea supabase_activitati_sociale.sql' : error.message }, { status: tabelLipsa(error) ? 409 : 500 })
+    return NextResponse.json({ ok: true, ordine: randuri.map(r => ({ zona: r.zona, ordine: r.ordine })) })
   }
 
   if (b.actiune === 'inregistreaza-doc') {

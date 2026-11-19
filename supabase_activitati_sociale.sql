@@ -43,6 +43,15 @@ create table if not exists zone_sociale_an (
 );
 create index if not exists idx_zone_sociale_an_firma on zone_sociale_an(firma_id);
 
+-- Ordinea (prioritatea) zonelor pentru o firmă — mutarea unei zone mai sus/mai jos în listă.
+-- Lipsa rândului = ordinea din catalog (lib/proiect-social.ts).
+create table if not exists zone_sociale (
+  firma_id uuid not null references firme(id) on delete cascade,
+  zona text not null,
+  ordine int not null default 0,
+  primary key (firma_id, zona)
+);
+
 -- Un document din `documente` poate aparține unei activități sociale (ca `achizitie_id` pentru achiziții).
 alter table documente add column if not exists activitate_sociala_id uuid;
 create index if not exists idx_documente_activitate_sociala on documente(activitate_sociala_id);
@@ -54,3 +63,7 @@ create policy "allow all" on activitati_sociale for all using (true) with check 
 alter table zone_sociale_an enable row level security;
 drop policy if exists "allow all" on zone_sociale_an;
 create policy "allow all" on zone_sociale_an for all using (true) with check (true);
+
+alter table zone_sociale enable row level security;
+drop policy if exists "allow all" on zone_sociale;
+create policy "allow all" on zone_sociale for all using (true) with check (true);

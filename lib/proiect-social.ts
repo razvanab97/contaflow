@@ -43,6 +43,26 @@ export function getZona(cod: string | null | undefined): ZonaSociala | undefined
 export function zonaValida(cod: string | null | undefined): boolean {
   return !!getZona(cod)
 }
+const idxCatalog = (cod: string) => { const i = ZONE_SOCIALE.findIndex(z => z.cod === cod); return i < 0 ? 999 : i }
+
+// Ordinea (prioritatea) zonelor pentru o firmă: rândurile din `zone_sociale` dau ordinea custom;
+// zonele fără rând păstrează ordinea din catalog. Întoarce zonele sortate.
+export interface OrdineRow { zona: string; ordine: number }
+export function zoneOrdonate(ordine: OrdineRow[]): ZonaSociala[] {
+  const map = new Map(ordine.map(o => [o.zona, o.ordine]))
+  const cheie = (z: ZonaSociala) => map.has(z.cod) ? (map.get(z.cod) as number) : 1000 + idxCatalog(z.cod)
+  return [...ZONE_SOCIALE].sort((a, b) => cheie(a) - cheie(b) || idxCatalog(a.cod) - idxCatalog(b.cod))
+}
+// Lista de coduri în ordinea curentă, cu o zonă mutată „sus" sau „jos" (schimb cu vecinul).
+export function reordoneaza(coduriInOrdine: string[], cod: string, directie: 'sus' | 'jos'): string[] {
+  const a = [...coduriInOrdine]
+  const i = a.indexOf(cod)
+  if (i < 0) return a
+  const j = directie === 'sus' ? i - 1 : i + 1
+  if (j < 0 || j >= a.length) return a
+  ;[a[i], a[j]] = [a[j], a[i]]
+  return a
+}
 
 // --- Statusul unei activități ---------------------------------------------------------------
 export const STATUSURI_ACT = ['planificata', 'in_desfasurare', 'finalizata', 'validata'] as const

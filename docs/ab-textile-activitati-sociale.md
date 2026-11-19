@@ -208,7 +208,16 @@ La crearea unei activități într-o zonă se selectează:
 Fiecare activitate primește automat un cod unic, ex. **AS-001/2026**.
 Statusuri activitate: **Planificată · În desfășurare · Finalizată · Validată**.
 
-### 2b. Ciclul de viață al zonelor (nou)
+> **Unde trăiește modulul:** în pagina **„Social"** a dosarului proiectului (nu o intrare separată de
+> meniu) — sub documentele secțiunii (atestat de întreprindere socială, marcă socială, misiune). Un singur
+> loc pentru acte + zone.
+
+### 2a. Prioritatea zonelor (reordonare)
+
+Zonele pot fi aranjate după prioritate cu săgeți ▲/▼ (urcă / coboară în listă). Ordinea se salvează pe
+firmă (în `zone_sociale`), e aceeași pe toți anii; fără rând = ordinea din catalog.
+
+### 2b. Ciclul de viață al zonelor
 
 Fiecare zonă (secțiune) are un ciclu de viață propriu, pe fiecare an:
 - **Deschisă** — se pot adăuga activități și documente.
@@ -287,7 +296,33 @@ structura aplicației existente (proiectul AB Textile din ContaFlow — secțiun
 se propune integrarea modulului fără a afecta funcționalitățile deja dezvoltate. **Nu se inventează**
 indicatori, obligații sau activități — doar catalogul din Partea 1 și documentele aprobate de utilizator.
 
+# Partea 3 — Stadiu și plan de dezvoltare
+
+## Construit (v1)
+Zonele (cu țintă + indicator din activități VALIDATE), activități AS-NNN/AN cu status
+Planificată→În desfășurare→Finalizată→Validată, **atașare** documente (Decizie/Anexă/PV/Dovadă),
+ciclu de viață pe an (deschisă/închisă pe an/închisă definitiv), **prioritizare** zone (▲/▼), rezumat pe an.
+Totul în pagina „Social".
+
+## De dezvoltat (v2) — șabloane de documente per beneficiar  *(cerut 2026-11-20)*
+Pentru zonele cu beneficiari care se repetă (ex. **2.2 stagii** cu 3–4 tineri, **2.3 servicii gratuite** cu
+6 familii), documentele sunt aceleași de la o persoană la alta — diferă doar datele personale. Deci:
+- Se **pre-stabilește un șablon standard** de documente pe zonă (setul de acte + câmpurile care se
+  completează: nume, prenume, date, și ce mai trebuie).
+- Pentru fiecare beneficiar (persoana 1, 2, 3, 4…) se completează **doar câmpurile**, iar documentele se
+  **generează automat** din șablon (Word/PDF), nu se reîncarcă manual.
+- Se **reutilizează și anul următor** (aceleași șabloane, beneficiari noi).
+- Reper tehnic: ContaFlow are deja un motor de generare Word (vezi `templates/`, `scripts/verify-word-generation.cjs`)
+  — de reutilizat. Câmpurile șablonului se definesc per zonă; beneficiarii intră în registrul beneficiarilor.
+
+## De dezvoltat (v2/v3) — restul
+- **Registrul beneficiarilor** cu identificatori unici, permisiuni/roluri, dublă-numărare reală pe
+  persoane/familii distincte (acum indicatorul pe beneficiari e suma pe activitate).
+- **Raport anual de impact** exportabil (Word/PDF) din activitățile validate.
+- **Zone noi din interfață** (acum cele 11 sunt fixe din plan).
+
 ---
 
 *Fișier de referință (cap de listă). Se actualizează pe parcurs — Partea 1 când se schimbă angajamentele
-din plan, Partea 2 când se schimbă modul de implementare. Nimic nu se șterge fără aprobare.*
+din plan, Partea 2 când se schimbă modul de implementare, Partea 3 pe măsură ce se construiește.
+Nimic nu se șterge fără aprobare.*
