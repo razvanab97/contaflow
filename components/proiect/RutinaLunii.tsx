@@ -47,9 +47,9 @@ function Pastila({ ton, children }: { ton: Ton; children: React.ReactNode }) {
   return <span className={`${css.pill} ${TON[ton]}`}>{children}</span>
 }
 
-export default function RutinaLunii({ state, month, next, onEdit, onUpload, assetUrl, onRaport, uploadDisabled = false, salaryArchiveUrl, creditCalculationUrl, salaryPlanUrl, salaryDocumentUrl }: {
+export default function RutinaLunii({ state, month, next, onEdit, onUpload, onDelete, assetUrl, onRaport, uploadDisabled = false, salaryArchiveUrl, creditCalculationUrl, salaryPlanUrl, salaryDocumentUrl }: {
   state: Workflow; month: string; next: Task | null | undefined
-  onEdit: (w: Workflow) => void; onUpload: (files: File[], task: string) => void; assetUrl: (id: string) => string; onRaport: () => void; uploadDisabled?: boolean; salaryArchiveUrl?: string; creditCalculationUrl?: string; salaryPlanUrl?: string; salaryDocumentUrl?: (scope:string,id:string)=>string
+  onEdit: (w: Workflow) => void; onUpload: (files: File[], task: string) => void; onDelete?: (id: string) => void; assetUrl: (id: string) => string; onRaport: () => void; uploadDisabled?: boolean; salaryArchiveUrl?: string; creditCalculationUrl?: string; salaryPlanUrl?: string; salaryDocumentUrl?: (scope:string,id:string)=>string
 }) {
   const azi = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bucharest' }).format(new Date())
   const vizibile = (TASKS as readonly Task[]).filter(t => state.rules[t.key]?.frequency !== 'annual' || Number(month.slice(5, 7)) === state.rules[t.key].month || state.tasks[t.key]?.due).filter(t => state.tasks[t.key])
@@ -188,6 +188,13 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
                           <a href={assetUrl(a.id)} className={css.fileDl} title="Descarcă" aria-label={`Descarcă ${a.name}`} style={{ flexShrink: 0, display: 'inline-flex' }}>
                             <Icon name="download" size={15} />
                           </a>
+                          {onDelete && (
+                            <button type="button" className={css.fileDl} title="Șterge documentul" aria-label={`Șterge ${a.name}`} disabled={uploadDisabled}
+                              onClick={() => { if (confirm(`Ștergi documentul „${a.name}”? Nu se mai poate recupera.`)) onDelete(a.id) }}
+                              style={{ flexShrink: 0, display: 'inline-flex', background: 'transparent', border: 0, padding: 0, cursor: uploadDisabled ? 'default' : 'pointer', opacity: uploadDisabled ? .4 : 1 }}>
+                              <Icon name="close" size={15} />
+                            </button>
+                          )}
                         </div>
                       )
                     })}

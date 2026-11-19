@@ -74,6 +74,17 @@ export default function ProiectWorkflow({firmaId,lunaId,luna,firmaSlug='proiect-
    if(errors.length)setError(errors.join(' '))
   })
  }
+ // Sterge un document din dosar (din starea workflow-ului + storage). Salveaza intai starea curenta pentru versiune.
+ async function deleteAsset(id:string){
+  if(autoSaving||busy)return
+  await run(async()=>{
+   const initial=await save()
+   if(!initial)return
+   const res=await fetch(`/api/proiect-workflow/document?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}&id=${encodeURIComponent(id)}&version=${initial.version}`,{method:'DELETE'})
+   const data=await response(res)
+   setState(data.state);setMessage('Document șters.')
+  })
+ }
  const selected=state?.forms[kind]||defaultDraft(kind,luna)
  function changeDraft(draft:Draft){if(!state)return;const forms={...state.forms,[kind]:draft};if(purchaseId){const shared=Object.fromEntries(Object.entries(draft.fields).filter(([key])=>common.has(key)));for(const k of ['oferta','nota','receptie'] as FormKind[]){if(k===kind)continue;const other=forms[k]||defaultDraft(k);forms[k]={fields:{...other.fields,...shared},lines:other.lines}}}edit({...state,forms})}
  const err=error&&<div role="alert" style={{...box,borderColor:'var(--danger)',color:'var(--danger)'}}>{error} <button style={button} onClick={()=>{if(!dirty||confirm('Reîncarci și renunți la modificările nesalvate?'))void load()}}>Reîncarcă</button></div>
@@ -98,7 +109,7 @@ export default function ProiectWorkflow({firmaId,lunaId,luna,firmaSlug='proiect-
  </div>
  {err}{message&&<div role="status" style={{...hint,color:'var(--success)'}}>{message}{generated?.scope===scope&&<a href={assetUrl(generated.id)} style={{...button,marginLeft:8}}>Descarcă Word · {generated.name}</a>}</div>}
  <fieldset disabled={busy} style={{border:0,padding:0,minWidth:0,display:'grid',gap:16}}>
- {tab==='rutina'&&<RutinaLunii state={state} month={month} next={next} onEdit={edit} onUpload={(files,k)=>void upload(files,k)} uploadDisabled={autoSaving} salaryArchiveUrl={`/api/proiect-workflow/salarizare?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} creditCalculationUrl={`/api/proiect-workflow/creditare?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} salaryPlanUrl={`/api/proiect-workflow/plata-salarii?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} salaryDocumentUrl={(fromScope,id)=>`/api/proiect-workflow/document?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(fromScope)}&id=${encodeURIComponent(id)}`} assetUrl={assetUrl} onRaport={()=>{setKind('raport');setTab('formulare')}}/>}
+ {tab==='rutina'&&<RutinaLunii state={state} month={month} next={next} onEdit={edit} onUpload={(files,k)=>void upload(files,k)} onDelete={(id)=>void deleteAsset(id)} uploadDisabled={autoSaving} salaryArchiveUrl={`/api/proiect-workflow/salarizare?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} creditCalculationUrl={`/api/proiect-workflow/creditare?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} salaryPlanUrl={`/api/proiect-workflow/plata-salarii?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(scope)}`} salaryDocumentUrl={(fromScope,id)=>`/api/proiect-workflow/document?firmaId=${encodeURIComponent(firmaId)}&scope=${encodeURIComponent(fromScope)}&id=${encodeURIComponent(id)}`} assetUrl={assetUrl} onRaport={()=>{setKind('raport');setTab('formulare')}}/>}
  {tab==='formulare'&&purchaseId&&<PurchaseFormEditor firmaId={firmaId} scope={scope} state={state} kind={kind} onKind={setKind} draft={selected!} onDraft={changeDraft} onProfile={profile=>edit({...state,profile})} recommendations={recommendations} productExample={productExample} example={example} purchase={purchase} disabled={autoSaving||busy} assetUrl={assetUrl} onGenerate={()=>void run(async()=>{const missing=validateDraft(kind,selected!,state.profile);if(missing.length)throw new Error('Completează: '+missing.join('; '));const updated={...state,forms:{...state.forms,[kind]:selected!}};const saved=await save(updated);const data=await response(await fetch('/api/proiect-workflow/document',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({firmaId,scope,version:saved!.version,kind})}));setState(data.state);setGenerated({id:data.asset.id,name:data.asset.name,scope});setMessage('Document generat.')})}/>}
  {tab==='formulare'&&!purchaseId&&<>
  <div style={box} className={formStyles.header}>

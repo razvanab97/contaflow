@@ -68,3 +68,18 @@ export async function POST(req:NextRequest){try{
  try{next=await writeWorkflow(prefix,{...state,assets:[...state.assets,asset]},state.version)}catch(e){await sb.from('documente').delete().eq('id',asset.id);await sb.storage.from('documente').remove([path]);throw e}
  return NextResponse.json({state:next,asset,...(namingWarning?{warning:namingWarning}:{})})
  }catch(e){return failure(e)}}
+// Sterge un document din dosar: il scoate din starea workflow-ului (sursa de adevar pentru UI), apoi curata
+// randul din `documente` si fisierul din storage. Daca nu mai exista (sters intre timp), raspunde idempotent.
+export async function DELETE(req:NextRequest){try{
+ sameOrigin(req)
+ const firmaId=req.nextUrl.searchParams.get('firmaId')||'',scope=req.nextUrl.searchParams.get('scope')||'',id=req.nextUrl.searchParams.get('id')||'',version=req.nextUrl.searchParams.get('version')
+ if(!id)throw new WorkflowError('Document lipsă',400)
+ if(scope==='settings')throw new WorkflowError('Documentele aparțin unei luni sau achiziții')
+ const {prefix,sb}=await scopeContext(firmaId,scope),state=await readWorkflow(prefix)
+ if(version!=null&&Number(version)!==state.version)throw new WorkflowError('Date modificate în altă fereastră. Reîncarcă pagina.',409)
+ if(!state.assets.some(a=>a.id===id))return NextResponse.json({state})
+ const next=await writeWorkflow(prefix,{...state,assets:state.assets.filter(a=>a.id!==id)},state.version)
+ await sb.from('documente').delete().eq('id',id)
+ await sb.storage.from('documente').remove([`${prefix}/files/${id}`])
+ return NextResponse.json({state:next})
+ }catch(e){return failure(e)}}
