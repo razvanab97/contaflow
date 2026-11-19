@@ -15,7 +15,8 @@ export async function GET(req:NextRequest){try{
  if(!asset)throw new WorkflowError('Document inexistent',404)
  const {data,error}=await sb.storage.from('documente').download(`${prefix}/files/${asset.id}`)
  if(error||!data)throw new WorkflowError('Descărcarea a eșuat',503)
- return new NextResponse(new Uint8Array(await data.arrayBuffer()),{headers:{'Content-Type':asset.type,'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(asset.name)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}})
+ const inline=req.nextUrl.searchParams.get('preview')==='1'
+ return new NextResponse(new Uint8Array(await data.arrayBuffer()),{headers:{'Content-Type':asset.type,'Content-Disposition':`${inline?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(asset.name)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}})
  }catch(e){return failure(e)}}
 export async function POST(req:NextRequest){try{
  sameOrigin(req)

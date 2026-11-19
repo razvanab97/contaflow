@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { TASKS, STEP_LABELS, blockedBy, type Workflow, type Step } from '@/lib/proiect-workflow'
 import Icon from '@/components/ui/Icon'
+import { deschideDocument } from '@/lib/vizualizare'
 import css from './RutinaLunii.module.css'
 import RegesRecommendations from './RegesRecommendations'
 import SalaryPackageDownload from './SalaryPackageDownload'
@@ -172,15 +173,22 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, asse
                     {docs.map(a => {
                       const ext = (a.name.split('.').pop() || '').toLowerCase()
                       const kind = ext === 'pdf' ? 'pdf' : ['doc', 'docx'].includes(ext) ? 'doc' : 'img'
+                      const sub = a.namingWarning ? <span className={css.fileWarn}>{a.namingWarning}</span> : <span className={css.fileSub}>{a.from ? `Din ${a.from} · ${new Date(a.createdAt).toLocaleDateString('ro-RO')}` : a.originalName ? `Original: ${a.originalName}` : new Date(a.createdAt).toLocaleDateString('ro-RO')}</span>
                       return (
-                        <a key={a.id} href={assetUrl(a.id)} className={css.file} title={a.originalName ? `${a.name} · Original: ${a.originalName}` : a.name}>
-                          <span className={css.fileIcon} data-kind={kind}>{kind === 'pdf' ? 'PDF' : kind === 'doc' ? 'DOC' : 'IMG'}</span>
-                          <span className={css.fileText}>
-                            <span className={css.fileName}>{a.name.replace(/\.[a-z0-9]+$/i, '')}</span>
-                            {a.namingWarning ? <span className={css.fileWarn}>{a.namingWarning}</span> : <span className={css.fileSub}>{a.from ? `Din ${a.from} · ${new Date(a.createdAt).toLocaleDateString('ro-RO')}` : a.originalName ? `Original: ${a.originalName}` : new Date(a.createdAt).toLocaleDateString('ro-RO')}</span>}
-                          </span>
-                          <Icon name="download" size={15} className={css.fileDl} />
-                        </a>
+                        <div key={a.id} className={css.file} title={a.originalName ? `${a.name} · Original: ${a.originalName}` : a.name}>
+                          {/* Click pe document = vizualizare in pop-up (PDF/imagine/Word); sageata descarca. */}
+                          <button type="button" onClick={() => deschideDocument(assetUrl(a.id), a.name)} title={`Vezi ${a.name}`}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left', color: 'inherit', font: 'inherit' }}>
+                            <span className={css.fileIcon} data-kind={kind}>{kind === 'pdf' ? 'PDF' : kind === 'doc' ? 'DOC' : 'IMG'}</span>
+                            <span className={css.fileText}>
+                              <span className={css.fileName}>{a.name.replace(/\.[a-z0-9]+$/i, '')}</span>
+                              {sub}
+                            </span>
+                          </button>
+                          <a href={assetUrl(a.id)} className={css.fileDl} title="Descarcă" aria-label={`Descarcă ${a.name}`} style={{ flexShrink: 0, display: 'inline-flex' }}>
+                            <Icon name="download" size={15} />
+                          </a>
+                        </div>
                       )
                     })}
                   </div>
