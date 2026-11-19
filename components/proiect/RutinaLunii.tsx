@@ -118,7 +118,9 @@ export default function RutinaLunii({ state, month, next, onEdit, onUpload, onDe
             {t.key === 'creditare' && creditCalculationUrl && <CreditProposal url={creditCalculationUrl} assets={state.assets} assetUrl={assetUrl} disabled={uploadDisabled} onSaveScheme={creditScheme => onEdit({ ...state, creditScheme })} />}
             {t.key === 'salarii' && salaryPlanUrl && salaryDocumentUrl && <SalaryPaymentPlan url={salaryPlanUrl} assets={state.assets} documentUrl={salaryDocumentUrl} checks={state.salaryChecks||{}} onChecksChange={salaryChecks=>onEdit({...state,salaryChecks})} disabled={uploadDisabled} />}
             {blocat.length > 0 && (
-              <div role="alert" className={css.blocked}><Icon name="ban" size={15} /> Întâi finalizează: {blocat.join(', ')}. Până atunci poți doar pregăti documentele.</div>
+              <div role="alert" className={css.blocked}><Icon name="ban" size={15} /> {t.key === 'creditare'
+                ? <>Întâi pregătește ({'„'}Primit / pregătit{'”'}): {blocat.join(', ')}. Creditarea se poate iniția fără să aștepți semnătura — nu trebuie finalizate.</>
+                : <>Întâi finalizează: {blocat.join(', ')}. Până atunci poți doar pregăti documentele.</>}</div>
             )}
 
             <div className={css.work}>

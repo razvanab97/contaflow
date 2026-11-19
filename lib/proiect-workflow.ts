@@ -49,7 +49,12 @@ export function activeTasks(state:Workflow, month:string) { return TASKS.filter(
 export function blockedBy(key:string, state:Workflow):string[] {
   const task=TASKS.find(t=>t.key===key)
   const dependencies=task && 'depends' in task ? task.depends : []
-  return dependencies.filter(k=>!(k==='creditare'?['executat','trimis','acceptat','neaplicabil']:['semnat','trimis','acceptat','neaplicabil']).includes(state.tasks[k]?.status)).map(k=>TASKS.find(t=>t.key===k)!.title)
+  // Pragul la care o dependenta nu mai blocheaza: o plata (creditare) e gata abia la executat/trimis/acceptat;
+  // un document e gata la semnat. EXCEPTIE ceruta direct: pentru creditare (urgenta, se poate initia in paralel),
+  // documentele-sursa (stat, pontaj, reges, centralizator) nu mai blocheaza odata ce sunt pregatite („primit"),
+  // chiar daca mai asteapta doar semnatura.
+  const prag=(k:string)=>k==='creditare'?['executat','trimis','acceptat','neaplicabil']:key==='creditare'?['primit','semnat','trimis','acceptat','neaplicabil']:['semnat','trimis','acceptat','neaplicabil']
+  return dependencies.filter(k=>!prag(k).includes(state.tasks[k]?.status)).map(k=>TASKS.find(t=>t.key===k)!.title)
 }
 export function nextTask(state:Workflow, month:string) {
   return [...activeTasks(state,month)].filter(t=>!['trimis','acceptat','neaplicabil'].includes(state.tasks[t.key]?.status)&&!blockedBy(t.key,state).length).sort((a,b)=>(state.tasks[a.key]?.due||'9999').localeCompare(state.tasks[b.key]?.due||'9999'))[0]
