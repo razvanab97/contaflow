@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
-import { LUNI_SHORT, accountingPeriodLabel, accountingWorkLabel, currentWorkMonthKey, maxWorkMonthKey, workMonthLabel } from '@/lib/accounting-period'
+import { LUNI_SHORT, accountingPeriodLabel, accountingWorkLabel, currentWorkMonthKey, etichetaLunaScurta, maxWorkMonthKey, workMonthLabel } from '@/lib/accounting-period'
 import { esteLunaCalendaristica, modulInLuna, type ModuleSlug } from '@/lib/firma-config'
 
 // AAAA-LL +/- n luni, fara Date/fus orar
@@ -19,7 +19,9 @@ const contabilaScurta = (l: string) => { const [a, m] = mutaLuna(l, -1).split('-
 // lunilor viitoare raman inactive. La firme, grila arata luna contabila (octombrie = lucrata in noiembrie); la proiecte, luna calendaristica.
 // Link-ul: `/${slug}/${luna}${suffix}` sau, fara slug, `${prefix}${luna}` (Dashboard: „/dashboard?luna=”).
 // Daca `suffix` e un modul care nu exista in luna aleasa (ex. Airbnb doar in anumite luni), duce la rezumatul lunii.
-export default function MonthNav({ slug, luna, suffix = '', prefix }: { slug?: string; luna: string; suffix?: string; prefix?: string }) {
+// `compact` = doar eticheta + dropdown cu grila (fara sagetile ‹ ›), pentru breadcrumb-ul de sus
+// (GlobalHeader) - cerut direct: „sa se poata selecta luna si de aici de sus, simplu”.
+export default function MonthNav({ slug, luna, suffix = '', prefix, compact = false }: { slug?: string; luna: string; suffix?: string; prefix?: string; compact?: boolean }) {
   const calendar = slug ? esteLunaCalendaristica(slug) : false
   const curenta = currentWorkMonthKey()
   // maxLuna = cea mai avansata luna in care se poate intra (curenta + 1). curenta ramane folosita separat
@@ -50,24 +52,34 @@ export default function MonthNav({ slug, luna, suffix = '', prefix }: { slug?: s
 
   const urm = mutaLuna(luna, 1), anMax = anAfisat(maxLuna)
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '2px', padding: '2px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', maxWidth: '100%' }}>
-      <Link href={href(mutaLuna(luna, -1))} prefetch aria-label="Luna anterioară" title="Luna anterioară" className="btn btn-ghost btn-icon btn-sm">
-        <Icon name="chevronLeft" />
-      </Link>
+    <div ref={ref} style={compact
+      ? { position: 'relative', display: 'inline-flex', alignItems: 'center', minWidth: 0, maxWidth: '100%' }
+      : { position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '2px', padding: '2px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', maxWidth: '100%' }}>
+      {!compact && (
+        <Link href={href(mutaLuna(luna, -1))} prefetch aria-label="Luna anterioară" title="Luna anterioară" className="btn btn-ghost btn-icon btn-sm">
+          <Icon name="chevronLeft" />
+        </Link>
+      )}
       <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-haspopup="dialog" title="Alege luna"
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px', border: 0, borderRadius: 'var(--r-sm)', background: open ? 'var(--hover)' : 'transparent', cursor: 'pointer', minWidth: 0, lineHeight: 1.2, textAlign: 'center', color: 'inherit', font: 'inherit' }}>
-        <span style={{ minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{calendar ? workMonthLabel(luna) : accountingPeriodLabel(luna)}</span>
-          {!calendar && <span style={{ display: 'block', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{accountingWorkLabel(luna)}</span>}
-        </span>
+        style={compact
+          ? { display: 'flex', alignItems: 'center', gap: 6, height: '32px', padding: '0 8px', border: 0, borderRadius: 'var(--r-sm)', background: open ? 'var(--hover)' : 'transparent', cursor: 'pointer', minWidth: 0, color: 'var(--text-primary)', font: 'inherit', fontWeight: 600 }
+          : { display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px', border: 0, borderRadius: 'var(--r-sm)', background: open ? 'var(--hover)' : 'transparent', cursor: 'pointer', minWidth: 0, lineHeight: 1.2, textAlign: 'center', color: 'inherit', font: 'inherit' }}>
+        {compact ? (
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--fs-md)' }}>{etichetaLunaScurta(luna, calendar)}</span>
+        ) : (
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{calendar ? workMonthLabel(luna) : accountingPeriodLabel(luna)}</span>
+            {!calendar && <span style={{ display: 'block', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{accountingWorkLabel(luna)}</span>}
+          </span>
+        )}
         <Icon name="chevronDown" size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
       </button>
-      {urm > maxLuna
+      {!compact && (urm > maxLuna
         ? <span className="btn btn-ghost btn-icon btn-sm" aria-disabled="true" title="Nu poți merge mai departe de luna următoare" style={{ opacity: .35, cursor: 'default' }}><Icon name="chevronRight" /></span>
-        : <Link href={href(urm)} prefetch aria-label="Luna următoare" title="Luna următoare" className="btn btn-ghost btn-icon btn-sm"><Icon name="chevronRight" /></Link>}
+        : <Link href={href(urm)} prefetch aria-label="Luna următoare" title="Luna următoare" className="btn btn-ghost btn-icon btn-sm"><Icon name="chevronRight" /></Link>)}
 
       {open && (
-        <div role="dialog" aria-label="Alege luna" className="month-pop">
+        <div role="dialog" aria-label="Alege luna" className="month-pop" style={compact ? { left: 0, right: 'auto' } : undefined}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => setAn(a => a - 1)} aria-label="Anul anterior"><Icon name="chevronLeft" /></button>
             <b style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }}>{an}</b>

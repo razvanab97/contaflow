@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { FirmaNav } from '@/components/Sidebar'
 import Icon from '@/components/ui/Icon'
-import { MODULE_DEFS, type ModuleSlug, esteLunaCalendaristica } from '@/lib/firma-config'
-import { etichetaLunaScurta } from '@/lib/accounting-period'
+import { MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
+import MonthNav from '@/components/ui/MonthNav'
 
 interface Props {
   firme: FirmaNav[]
@@ -115,11 +115,11 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMe
             {lunaInPath && (
               <>
                 <Icon name="chevronRight" size={14} className="crumb-sep hide-mobile" />
-                {modulLabel ? (
-                  <Link href={`/${firmaAtiva.slug}/${luna}`} className="crumb-link hide-mobile">{etichetaLunaScurta(luna, esteLunaCalendaristica(firmaAtiva.slug))}</Link>
-                ) : (
-                  <span className="crumb-current hide-mobile">{etichetaLunaScurta(luna, esteLunaCalendaristica(firmaAtiva.slug))}</span>
-                )}
+                {/* Luna, selectabila direct din breadcrumb (dropdown cu grila), cerut direct. Pastreaza
+                    modulul curent la schimbarea lunii (suffix). */}
+                <span className="hide-mobile" style={{ display: 'inline-flex', minWidth: 0 }}>
+                  <MonthNav slug={firmaAtiva.slug} luna={luna} suffix={modulSeg ? `/${modulSeg}` : ''} compact />
+                </span>
               </>
             )}
             {(modulLabel || paginaFirma) && (
