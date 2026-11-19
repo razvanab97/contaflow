@@ -22,6 +22,8 @@ function furnizorCurat(furnizor: string | null): string {
 }
 
 const SECTIUNI: [string, string][] = [
+  // Dosarul proiectului - inaintea cheilor generice (ex. /angajati/), ca sa nu fie eclipsate de ele (find = prima potrivire).
+  ['/dosar/angajati/', 'Dosar · Angajați'], ['/dosar/activitate/', 'Dosar · Activitate'], ['/dosar/social/', 'Dosar · Social'],
   ['/inbox-facturi/', 'Inbox Facturi'], ['/facturi-restante/', 'Facturi restante'], ['/facturi-chitanta/', 'Facturi + chitanță'],
   ['/dispozitii-plata/', 'Dispoziție de plată'], ['/airbnb-facturi/', 'Airbnb · Facturi comision'], ['/booking-facturi/', 'Booking · Facturi'],
   ['/emag', 'eMAG'], ['/trendyol/', 'Trendyol'], ['/acte-contabile/', 'Acte contabile'], ['/angajati/', 'Documente angajați'],

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import type { FirmaNav } from '@/components/Sidebar'
 import Icon from '@/components/ui/Icon'
 import { MODULE_DEFS, type ModuleSlug } from '@/lib/firma-config'
+import { getDosarConfig } from '@/lib/proiect-dosar'
 import MonthNav from '@/components/ui/MonthNav'
 
 interface Props {
@@ -61,7 +62,10 @@ export default function GlobalHeader({ firme, firmaAtiva, luna, lunaInPath, onMe
 
   const modulSeg = lunaInPath ? parts[2] : undefined
   const modulLabel = modulSeg ? (MODULE_DEFS[modulSeg as ModuleSlug]?.label || PAGINI_FIRMA[modulSeg] || modulSeg) : undefined
-  const paginaFirma = !lunaInPath && parts[1] ? PAGINI_FIRMA[parts[1]] : undefined
+  // Dosarul proiectului: /<firma>/dosar/<sectiune> -> „Dosar · Angajați” etc.
+  const paginaFirma = !lunaInPath && parts[1]
+    ? (parts[1] === 'dosar' ? `Dosar · ${getDosarConfig(parts[2])?.label || 'proiect'}` : PAGINI_FIRMA[parts[1]])
+    : undefined
 
   return (
     <header className="app-header">

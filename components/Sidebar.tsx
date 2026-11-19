@@ -75,6 +75,15 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
   // Sectiunea „in lucru”: primul modul nebifat, in ordinea de lucru a lunii - marcat cu un punct care pulseaza
   const modulInLucru = moduleFirma?.find(m => !moduleComplete?.[m.slug])?.slug
 
+  // Dosarul proiectului (doar la proiect - luna calendaristica): sectiunile de documente pe tot proiectul,
+  // pentru controlul documentelor si vizita de monitorizare. Achizitiile raman modulul existent (pe luna curenta).
+  const dosarProiect = firmaAtiva && esteLunaCalendaristica(firmaAtiva) ? [
+    { href: `/${firmaAtiva}/${lunaCurenta}/achizitii`, label: 'Achiziții', icon: 'cart', match: '/achizitii' },
+    { href: `/${firmaAtiva}/dosar/angajati`, label: 'Angajați', icon: 'users', match: '/dosar/angajati' },
+    { href: `/${firmaAtiva}/dosar/activitate`, label: 'Activitate', icon: 'briefcase', match: '/dosar/activitate' },
+    { href: `/${firmaAtiva}/dosar/social`, label: 'Social', icon: 'star', match: '/dosar/social' },
+  ] : []
+
   const firmaLinks = firmaAtiva ? [
     { href: `/${firmaAtiva}/furnizori`, label: 'Furnizori', icon: 'users', match: '/furnizori' },
     { href: `/${firmaAtiva}/date-personale`, label: 'Date personale', icon: 'idCard', match: '/date-personale' },
@@ -192,6 +201,24 @@ export default function Sidebar({ firme, lunaCurenta, lunaLabel, firmaAtiva, mod
                   </div>
                 )
                 return link
+              })}
+            </div>
+          )}
+
+          {/* Dosar proiect - sectiunile de documente ale proiectului (control documente / vizita) */}
+          {dosarProiect.length > 0 && (
+            <div className="sidebar-section">
+              <div className="sidebar-label">
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Dosar proiect</span>
+              </div>
+              {dosarProiect.map(l => {
+                const active = pathname.endsWith(l.match)
+                return (
+                  <Link key={l.href} href={l.href} className={`nav-item${active ? ' is-active' : ''}`} aria-current={active ? 'page' : undefined}>
+                    <span className="nav-icon"><Icon name={l.icon} /></span>
+                    <span className="nav-text">{l.label}</span>
+                  </Link>
+                )
               })}
             </div>
           )}
