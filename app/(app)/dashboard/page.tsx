@@ -11,7 +11,7 @@ import { getStardeskDiscrepanteCount } from '@/lib/stardeskVerify'
 import { getFirmaModules, getFirmaTotalTasks } from '@/lib/firma-config'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { platiFaraOp } from '@/lib/ordine-plata-server'
-import { accountingFullLabel, accountingPeriodLabel, currentWorkMonthKey } from '@/lib/accounting-period'
+import { accountingFullLabel, accountingPeriodLabel, currentWorkMonthKey, maxWorkMonthKey } from '@/lib/accounting-period'
 import MonthNav from '@/components/ui/MonthNav'
 import LunaShell from '@/components/shell/LunaShell'
 
@@ -34,9 +34,10 @@ async function documenteFaraSuma(): Promise<number> {
 }
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ luna?: string }> }) {
-  // ?luna=AAAA-LL (din comutatorul de luna) - implicit luna de lucru curenta; lunile viitoare nu se pot alege
-  const curenta = currentWorkMonthKey(), ceruta = (await searchParams)?.luna
-  const LUNA = ceruta && /^\d{4}-(0[1-9]|1[0-2])$/.test(ceruta) && ceruta <= curenta ? ceruta : curenta
+  // ?luna=AAAA-LL (din comutatorul de luna) - implicit luna de lucru curenta; se poate alege pana la o luna
+  // peste cea curenta (maxWorkMonthKey - "avem documente de pus pe luna urmatoare"), nu mai departe in viitor
+  const curenta = currentWorkMonthKey(), maxLuna = maxWorkMonthKey(), ceruta = (await searchParams)?.luna
+  const LUNA = ceruta && /^\d{4}-(0[1-9]|1[0-2])$/.test(ceruta) && ceruta <= maxLuna ? ceruta : curenta
   const [firme, luni] = await Promise.all([
     dbSelect('firme', { eq: { activa: true }, order: 'created_at' }),
     dbSelect('luni_contabile', { select: '*' }),

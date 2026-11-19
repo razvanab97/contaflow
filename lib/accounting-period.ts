@@ -5,6 +5,15 @@ export function currentWorkMonthKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
+// Cea mai avansata luna de lucru selectabila din interfata: luna curenta + 1. Cerut direct - "avem documente
+// de pus pe luna urmatoare", ca sa se poata pregati luna care urmeaza inainte sa inceapa efectiv. Peste ea
+// (doua luni sau mai mult in viitor) nu se poate naviga.
+export function maxWorkMonthKey(date = new Date()) {
+  const [y, m] = currentWorkMonthKey(date).split('-').map(Number)
+  const t = y * 12 + (m - 1) + 1
+  return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`
+}
+
 export function previousMonthKey(workMonth: string) {
   const [year, month] = workMonth.split('-').map(Number)
   const date = new Date(Date.UTC(year, month - 1, 1))

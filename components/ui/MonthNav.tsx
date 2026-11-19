@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
-import { LUNI_SHORT, accountingPeriodLabel, accountingWorkLabel, currentWorkMonthKey, workMonthLabel } from '@/lib/accounting-period'
+import { LUNI_SHORT, accountingPeriodLabel, accountingWorkLabel, currentWorkMonthKey, maxWorkMonthKey, workMonthLabel } from '@/lib/accounting-period'
 import { esteLunaCalendaristica, modulInLuna, type ModuleSlug } from '@/lib/firma-config'
 
 // AAAA-LL +/- n luni, fara Date/fus orar
@@ -14,13 +14,17 @@ export function mutaLuna(luna: string, delta: number) {
 const contabilaScurta = (l: string) => { const [a, m] = mutaLuna(l, -1).split('-'); return `${LUNI_SHORT[Number(m)]} ${a}` }
 
 // Comutator de luna (‹ perioada ›), comun hub-ului, paginilor de modul si Dashboard-ului. Click pe perioada
-// deschide o grila cu lunile anului (salt direct la orice luna, plus „Luna curentă”); lunile viitoare sunt
-// inactive. La firme, grila arata luna contabila (octombrie = lucrata in noiembrie); la proiecte, luna calendaristica.
+// deschide o grila cu lunile anului (salt direct la orice luna, plus „Luna curentă”). Se poate merge pana la o
+// luna peste cea curenta (maxWorkMonthKey) - cerut direct, "avem documente de pus pe luna urmatoare"; restul
+// lunilor viitoare raman inactive. La firme, grila arata luna contabila (octombrie = lucrata in noiembrie); la proiecte, luna calendaristica.
 // Link-ul: `/${slug}/${luna}${suffix}` sau, fara slug, `${prefix}${luna}` (Dashboard: „/dashboard?luna=”).
 // Daca `suffix` e un modul care nu exista in luna aleasa (ex. Airbnb doar in anumite luni), duce la rezumatul lunii.
 export default function MonthNav({ slug, luna, suffix = '', prefix }: { slug?: string; luna: string; suffix?: string; prefix?: string }) {
   const calendar = slug ? esteLunaCalendaristica(slug) : false
   const curenta = currentWorkMonthKey()
+  // maxLuna = cea mai avansata luna in care se poate intra (curenta + 1). curenta ramane folosita separat
+  // pentru evidentierea lunii curente in grila si pentru butonul „↺ Luna curentă”.
+  const maxLuna = maxWorkMonthKey()
   const href = (l: string) => {
     if (!slug) return `${prefix ?? '/dashboard?luna='}${l}`
     const mod = suffix.split('/')[1] as ModuleSlug | undefined
@@ -44,7 +48,7 @@ export default function MonthNav({ slug, luna, suffix = '', prefix }: { slug?: s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const urm = mutaLuna(luna, 1), anMax = anAfisat(curenta)
+  const urm = mutaLuna(luna, 1), anMax = anAfisat(maxLuna)
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '2px', padding: '2px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', maxWidth: '100%' }}>
       <Link href={href(mutaLuna(luna, -1))} prefetch aria-label="Luna anterioară" title="Luna anterioară" className="btn btn-ghost btn-icon btn-sm">
@@ -58,8 +62,8 @@ export default function MonthNav({ slug, luna, suffix = '', prefix }: { slug?: s
         </span>
         <Icon name="chevronDown" size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
       </button>
-      {urm > curenta
-        ? <span className="btn btn-ghost btn-icon btn-sm" aria-disabled="true" title="Luna următoare nu a început încă" style={{ opacity: .35, cursor: 'default' }}><Icon name="chevronRight" /></span>
+      {urm > maxLuna
+        ? <span className="btn btn-ghost btn-icon btn-sm" aria-disabled="true" title="Nu poți merge mai departe de luna următoare" style={{ opacity: .35, cursor: 'default' }}><Icon name="chevronRight" /></span>
         : <Link href={href(urm)} prefetch aria-label="Luna următoare" title="Luna următoare" className="btn btn-ghost btn-icon btn-sm"><Icon name="chevronRight" /></Link>}
 
       {open && (
@@ -73,7 +77,7 @@ export default function MonthNav({ slug, luna, suffix = '', prefix }: { slug?: s
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
             {LUNI_SHORT.slice(1).map((nume, i) => {
               const afis = `${an}-${String(i + 1).padStart(2, '0')}`, lucru = calendar ? afis : mutaLuna(afis, 1)
-              if (lucru > curenta) return <span key={nume} className="month-chip" data-off="true" title="Nu a început încă">{nume}</span>
+              if (lucru > maxLuna) return <span key={nume} className="month-chip" data-off="true" title="Prea departe — doar până la luna următoare">{nume}</span>
               return <Link key={nume} href={href(lucru)} className="month-chip" data-activa={lucru === luna} data-curenta={lucru === curenta}
                 title={calendar ? workMonthLabel(lucru) : `${accountingPeriodLabel(lucru)} · ${accountingWorkLabel(lucru)}`}>{nume}</Link>
             })}
