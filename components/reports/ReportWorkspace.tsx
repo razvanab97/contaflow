@@ -9,6 +9,7 @@ import ReportTabs, { ReportTab } from './ReportTabs'
 import ReportPreview from './ReportPreview'
 import ReportEditor, { CampCustom } from './ReportEditor'
 import ReportHistory from './ReportHistory'
+import { CerereRaportSemnat } from './RapoarteSalvate'
 import ReportFiles from './ReportFiles'
 import { SaveStatus } from './ReportAutosaveStatus'
 import { printReport } from '@/lib/documentWorkspace/reportPresentation'
@@ -404,6 +405,9 @@ export default function ReportWorkspace({ firma, lunaId, tasks, luna, lunaLabel,
         <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', margin: '0 0 0 4px' }}>Apasă pe un rând din raport pentru a-l edita. Textul apare imediat; modificările se salvează automat.</p>
       </div>
       {exportError && <p role="alert" style={{ color: 'var(--danger)' }}>{exportError}</p>}
+
+      {/* dupa generare: cere varianta semnata a lunii, pana e incarcata (ramane apoi in Istoric) */}
+      {doc && !docLoading && <CerereRaportSemnat firmaId={firma.id} fisierNume={doc.fisier_nume}/>}
 
       {docLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
