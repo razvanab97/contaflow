@@ -50,6 +50,8 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
     if (!r.ok) setMesaj(d.error || 'Ordinea nu s-a putut salva')
   }
 
+  const toggle = (cod: string) => setDeschise(prev => { const n = new Set(prev); n.has(cod) ? n.delete(cod) : n.add(cod); return n })
+
   async function creeaza(zona: string, campuri: Record<string, string>) {
     setMesaj('')
     const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, zona, an, ...campuri }) })
@@ -124,17 +126,17 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
           const definitiv = stare === 'inchisa_definitiv'
           return (
             <div key={z.cod} style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', opacity: definitiv ? 0.7 : 1 }}>
-              {/* Antet zonă */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, flexWrap: 'wrap' }}>
+              {/* Antet zonă - click oriunde pe el (în afara controalelor) deschide/închide zona */}
+              <div onClick={() => toggle(z.cod)} data-zona={z.cod}
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, flexWrap: 'wrap', cursor: 'pointer' }}>
                 {/* Prioritate: mută zona mai sus / mai jos */}
                 <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, marginTop: -1 }}>
-                  <button onClick={() => muta(z.cod, 'sus')} disabled={zi === 0} title="Mută mai sus (prioritate)" aria-label={`Mută „${z.titlu}" mai sus`}
+                  <button onClick={e => { e.stopPropagation(); muta(z.cod, 'sus') }} disabled={zi === 0} title="Mută mai sus (prioritate)" aria-label={`Mută „${z.titlu}" mai sus`}
                     style={{ ...linkBtn, color: zi === 0 ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: zi === 0 ? 0.4 : 1, lineHeight: 1, fontSize: 'var(--fs-sm)' }}>▲</button>
-                  <button onClick={() => muta(z.cod, 'jos')} disabled={zi === zoneSortate.length - 1} title="Mută mai jos" aria-label={`Mută „${z.titlu}" mai jos`}
+                  <button onClick={e => { e.stopPropagation(); muta(z.cod, 'jos') }} disabled={zi === zoneSortate.length - 1} title="Mută mai jos" aria-label={`Mută „${z.titlu}" mai jos`}
                     style={{ ...linkBtn, color: zi === zoneSortate.length - 1 ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: zi === zoneSortate.length - 1 ? 0.4 : 1, lineHeight: 1, fontSize: 'var(--fs-sm)' }}>▼</button>
                 </div>
-                <button onClick={() => setDeschise(prev => { const n = new Set(prev); n.has(z.cod) ? n.delete(z.cod) : n.add(z.cod); return n })}
-                  aria-expanded={open} title={open ? 'Restrânge' : 'Extinde'}
+                <button onClick={e => { e.stopPropagation(); toggle(z.cod) }} aria-expanded={open} aria-label={`${open ? 'Restrânge' : 'Extinde'} ${z.titlu}`} title={open ? 'Restrânge' : 'Extinde'}
                   style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)', width: 20, flexShrink: 0, marginTop: 2 }}>{open ? '▾' : '▸'}</button>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
@@ -158,6 +160,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                 </div>
                 {/* Ciclu de viață */}
                 <select value={definitiv ? 'inchisa_definitiv' : stare} aria-label={`Starea zonei ${z.nr} pe ${an}`}
+                  onClick={e => e.stopPropagation()}
                   onChange={e => schimbaStare(z.cod, e.target.value as StareZona)}
                   style={{ ...camp, padding: '4px 6px', fontSize: 'var(--fs-xs)', flexShrink: 0 }}>
                   <option value="deschisa">Deschisă</option>

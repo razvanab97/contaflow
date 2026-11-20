@@ -304,16 +304,25 @@ Planificată→În desfășurare→Finalizată→Validată, **atașare** documen
 ciclu de viață pe an (deschisă/închisă pe an/închisă definitiv), **prioritizare** zone (▲/▼), rezumat pe an.
 Totul în pagina „Social".
 
-## De dezvoltat (v2) — șabloane de documente per beneficiar  *(cerut 2026-11-20)*
-Pentru zonele cu beneficiari care se repetă (ex. **2.2 stagii** cu 3–4 tineri, **2.3 servicii gratuite** cu
-6 familii), documentele sunt aceleași de la o persoană la alta — diferă doar datele personale. Deci:
-- Se **pre-stabilește un șablon standard** de documente pe zonă (setul de acte + câmpurile care se
-  completează: nume, prenume, date, și ce mai trebuie).
-- Pentru fiecare beneficiar (persoana 1, 2, 3, 4…) se completează **doar câmpurile**, iar documentele se
-  **generează automat** din șablon (Word/PDF), nu se reîncarcă manual.
-- Se **reutilizează și anul următor** (aceleași șabloane, beneficiari noi).
-- Reper tehnic: ContaFlow are deja un motor de generare Word (vezi `templates/`, `scripts/verify-word-generation.cjs`)
-  — de reutilizat. Câmpurile șablonului se definesc per zonă; beneficiarii intră în registrul beneficiarilor.
+## De dezvoltat (v2) — sistemul de documente  *(cerut 2026-11-20, detaliat)*
+Toate piesele de mai jos se leagă între ele. Primele șabloane reale: **AB NEXT** (zona 2.2) — vezi
+[[reference_ab_next_sabloane]] / docs/ab-next-sabloane.md.
+
+1. **Șabloane de documente per zonă.** Se încarcă documentul (.docx) o dată, ca șablon; sistemul preia
+   automat informația și câmpurile; le putem corecta manual. Pentru fiecare beneficiar (pers. 1, 2, 3, 4…)
+   se completează doar câmpurile, iar documentele se **generează automat** (Word/PDF). Reutilizabil și anul
+   următor. Reper: motorul Word existent (`templates/`, `scripts/verify-word-generation.cjs`).
+2. **Număr de înregistrare unic pe TOT proiectul social.** Fiecare document primește un nr. de înregistrare
+   (ex. pornind de la 1, 2…), **editabil**, dar proiectul ține numerele **în ordine**, știe care au fost
+   folosite și care urmează — un registru central, fără goluri/duplicate.
+3. **Bază AI per secțiune pentru beneficiari.** Când un document cere un beneficiar, se încarcă **buletinul**
+   sau alte acte justificative, iar AI **extrage datele** (nume, prenume, CNP, domiciliu, data nașterii…) și
+   **editează direct documentul**. ⚠️ Date personale sensibile (CNP) — tratare GDPR atentă (vezi informarea
+   GDPR din șablonul AB NEXT).
+4. **Raport final în timp real.** Raportul anual se completează pe măsură ce se înregistrează beneficiari —
+   imediat ce avem primul voluntar cu contract + date de identificare, apare în tabelul raportului și în
+   indicatori.
+5. **Deschidere pe tot cadranul** — FĂCUT (Update #344): click oriunde pe antetul zonei deschide/închide.
 
 ## De dezvoltat (v2/v3) — restul
 - **Registrul beneficiarilor** cu identificatori unici, permisiuni/roluri, dublă-numărare reală pe
