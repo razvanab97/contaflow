@@ -313,8 +313,9 @@ Toate piesele de mai jos se leagă între ele. Primele șabloane reale: **AB NEX
    se completează doar câmpurile, iar documentele se **generează automat** (Word/PDF). Reutilizabil și anul
    următor. Reper: motorul Word existent (`templates/`, `scripts/verify-word-generation.cjs`).
 2. **Număr de înregistrare unic pe TOT proiectul social.** Fiecare document primește un nr. de înregistrare
-   (ex. pornind de la 1, 2…), **editabil**, dar proiectul ține numerele **în ordine**, știe care au fost
-   folosite și care urmează — un registru central, fără goluri/duplicate.
+   **editabil**, dar proiectul ține numerele **în ordine**, știe care au fost folosite și care urmează — un
+   registru central, fără goluri/duplicate. **Format (decis): SIMPLU — 1, 2, 3…**, un singur șir crescător
+   pe tot proiectul, pentru toate tipurile de documente (nu pe an, nu pe serii).
 3. **Bază AI per secțiune pentru beneficiari.** Când un document cere un beneficiar, se încarcă **buletinul**
    sau alte acte justificative, iar AI **extrage datele** (nume, prenume, CNP, domiciliu, data nașterii…) și
    **editează direct documentul**. ⚠️ Date personale sensibile (CNP) — tratare GDPR atentă (vezi informarea
