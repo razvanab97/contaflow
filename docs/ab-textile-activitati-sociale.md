@@ -304,12 +304,15 @@ Planificată→În desfășurare→Finalizată→Validată, **atașare** documen
 ciclu de viață pe an (deschisă/închisă pe an/închisă definitiv), **prioritizare** zone (▲/▼), rezumat pe an,
 deschidere pe tot cadranul. Totul în pagina „Social".
 
-**GENERATOR de documente (v1, construit):** într-o activitate (zona 2.2 · AB NEXT) — beneficiari (voluntari)
+**GENERATOR de documente (construit):** într-o activitate (zona 2.2 · AB NEXT) — beneficiari (voluntari)
 cu date, din care se generează automat **Decizia** (nivel activitate) și **Contractul** (per voluntar) din
 șabloanele `.docx` (umplute cu datele + marcaje `%%CAMP%%`), fiecare cu **număr de înregistrare** din șirul
-unic al proiectului (1, 2, 3…), editabil. Documentele generate se văd/descarcă pe loc. Șabloane: `templates/ab-next/`
-(+ seed în storage `_sabloane/ab-next/`). Motor: `lib/docxFill.ts`, config `lib/proiect-social-sabloane.ts`.
-Mai lipsesc din punctele de mai jos: **3 (AI din buletin)** și **4 (raport în timp real)**.
+unic al proiectului (1, 2, 3…), editabil. Șabloane: `templates/ab-next/` (+ seed în storage `_sabloane/ab-next/`).
+Motor: `lib/docxFill.ts`, config `lib/proiect-social-sabloane.ts`.
+- **Completare din buletin (AI):** încarci poza CI → Claude vision citește nume/CNP/domiciliu, data nașterii din CNP (`lib/ai/buletin.ts`, `/api/proiect-social/buletin`).
+- **Date comune** pe activitate (perioadă, ore, locul, coordonator, instruire) setate o dată → intră în toate documentele (`activitati_sociale.date_documente`).
+- **Descărcare Word + PDF** (butonul PDF deschide documentul randat și-l trimite la printare / „Salvează ca PDF", via docx-preview — nu LibreOffice pe server).
+Mai lipsește: **raport anual în timp real** (punctul 4).
 
 ## De dezvoltat (v2) — sistemul de documente  *(cerut 2026-11-20, detaliat)*
 Toate piesele de mai jos se leagă între ele. Primele șabloane reale: **AB NEXT** (zona 2.2) — vezi

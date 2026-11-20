@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 // Zonele (activitățile din plan) sunt fixe în lib/proiect-social.ts — aici nu se inventează nimic.
 
 const MODUL = 'activitati_sociale'
-const COL_ACT = 'id,zona,cod,denumire,an,perioada,obiectiv,beneficiari_estimat,beneficiari_realizat,responsabil,parteneri,status,rezultate,validat_la,created_at'
+const COL_ACT = 'id,zona,cod,denumire,an,perioada,obiectiv,beneficiari_estimat,beneficiari_realizat,responsabil,parteneri,status,rezultate,validat_la,date_documente,created_at'
 const COL_DOC = 'id,fisier_nume,fisier_tip,fisier_marime,furnizor,data_document,tip_document,fisier_path,activitate_sociala_id,beneficiar_social_id,nr_inregistrare,created_at'
 const DOCX_TIP = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const TIPURI_FISIER = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
@@ -130,6 +130,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ beneficiar: data })
   }
 
+  // Salvează datele comune ale documentelor pe o activitate (perioadă, ore, coordonator…).
+  if (b.actiune === 'date-documente') {
+    const activitateId = String(b.activitateId || '')
+    const dateIn = (b.date && typeof b.date === 'object') ? b.date as Record<string, unknown> : {}
+    const date: Record<string, string> = {}
+    for (const [k, v] of Object.entries(dateIn)) { if (!/^[A-Z0-9_]{1,30}$/.test(k)) continue; const val = txt(v, 300); if (val) date[k] = val }
+    const { data, error } = await sb.from('activitati_sociale').update({ date_documente: date, updated_at: new Date().toISOString() }).eq('id', activitateId).eq('firma_id', firmaId).select(COL_ACT).single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ activitate: data })
+  }
+
   // Editează numărul de înregistrare al unui document.
   if (b.actiune === 'nr-document') {
     const docId = String(b.docId || ''), nr = (b.nr === null || b.nr === '') ? null : Math.trunc(Number(b.nr))
@@ -145,24 +156,26 @@ export async function POST(req: NextRequest) {
     const activitateId = String(b.activitateId || ''), tip = String(b.tip || '')
     const sablon = getSablon(tip)
     if (!sablon) return NextResponse.json({ error: 'Șablon necunoscut' }, { status: 400 })
-    const { data: act } = await sb.from('activitati_sociale').select('id,an').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle()
+    const { data: act } = await sb.from('activitati_sociale').select('id,an,date_documente').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle()
     if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
 
+    // câmpuri = datele comune ale activității, altfel valorile implicite
+    const comune = (act.date_documente || {}) as Record<string, string>
     const valori: Record<string, string> = {}
-    for (const c of sablon.campuri) if (VALORI_IMPLICITE[c.key]) valori[c.key] = VALORI_IMPLICITE[c.key]
+    for (const c of sablon.campuri) {
+      if (comune[c.key]) valori[c.key] = comune[c.key]
+      else if (VALORI_IMPLICITE[c.key]) valori[c.key] = VALORI_IMPLICITE[c.key]
+    }
+    if (!valori.AN) valori.AN = String(act.an)
     let beneficiarId: string | null = null, titluPersoana = ''
     if (sablon.nivel === 'beneficiar') {
       beneficiarId = String(b.beneficiarId || '')
       const { data: ben } = await sb.from('beneficiari_sociali').select('id,nume,date').eq('id', beneficiarId).eq('firma_id', firmaId).maybeSingle()
       if (!ben) return NextResponse.json({ error: 'Beneficiarul nu a fost găsit' }, { status: 404 })
-      Object.assign(valori, (ben.date || {}) as Record<string, string>)
+      Object.assign(valori, (ben.date || {}) as Record<string, string>) // datele personale au prioritate
       if (!valori.NUME) valori.NUME = ben.nume
-      if (!valori.CONFIRMARE) valori.CONFIRMARE = ben.nume
+      valori.CONFIRMARE = ben.nume
       titluPersoana = ben.nume
-    } else {
-      const camp = (b.campuri && typeof b.campuri === 'object') ? b.campuri as Record<string, unknown> : {}
-      for (const c of sablon.campuri) { const v = txt(camp[c.key], 300); if (v) valori[c.key] = v }
-      if (!valori.AN) valori.AN = String(act.an)
     }
 
     let nr: number

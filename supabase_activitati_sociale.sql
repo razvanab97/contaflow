@@ -22,9 +22,11 @@ create table if not exists activitati_sociale (
     check (status in ('planificata','in_desfasurare','finalizata','validata')),
   rezultate text,
   validat_la timestamptz,
+  date_documente jsonb not null default '{}'::jsonb,  -- câmpuri comune pentru documentele generate (perioadă, ore, coordonator…)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table activitati_sociale add column if not exists date_documente jsonb not null default '{}'::jsonb;
 create index if not exists idx_activitati_sociale_firma on activitati_sociale(firma_id, an);
 create unique index if not exists uq_activitati_sociale_cod on activitati_sociale(firma_id, cod);
 

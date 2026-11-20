@@ -119,7 +119,8 @@ export interface Activitate {
   perioada: string | null; obiectiv: string | null
   beneficiari_estimat: number | null; beneficiari_realizat: number | null
   responsabil: string | null; parteneri: string | null
-  status: StatusAct; rezultate: string | null; validat_la: string | null; created_at: string
+  status: StatusAct; rezultate: string | null; validat_la: string | null
+  date_documente?: Record<string, string>; created_at: string
 }
 
 // Următorul cod AS-NNN/AN pentru o firmă, pe anul dat (secvență per an, din codurile existente).

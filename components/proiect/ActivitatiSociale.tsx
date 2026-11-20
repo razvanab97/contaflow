@@ -96,6 +96,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const removeBenef = (id: string) => setBeneficiari(prev => prev.filter(x => x.id !== id))
   const addGenerat = (d: DocGen) => { setDocs(prev => [d as unknown as Doc, ...prev]); setUrmatorNr(u => Math.max(u, (d.nr_inregistrare || 0) + 1)) }
   const updateNr = (d: DocGen) => setDocs(prev => { const next = prev.map(x => x.id === d.id ? { ...x, nr_inregistrare: d.nr_inregistrare } : x); setUrmatorNr(nrUrmator(next)); return next })
+  const updateDateComune = (id: string, date: Record<string, string>) => setActs(prev => prev.map(x => x.id === id ? { ...x, date_documente: date } : x))
 
   if (!incarcat) return <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>Se încarcă…</div>
 
@@ -191,7 +192,8 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                         beneficiari={beneficiari.filter(b => b.activitate_id === a.id)} urmatorNr={urmatorNr}
                         onModifica={modifica} onSterge={() => stergeAct(a)}
                         onDocNou={nd => setDocs(prev => [...nd, ...prev])} onDocSters={id => setDocs(prev => prev.filter(d => d.id !== id))}
-                        onBeneficiar={upsertBenef} onBeneficiarSters={removeBenef} onGenerat={addGenerat} onNrSchimbat={updateNr} />
+                        onBeneficiar={upsertBenef} onBeneficiarSters={removeBenef} onGenerat={addGenerat} onNrSchimbat={updateNr}
+                        onDateComune={updateDateComune} />
                     ))}
                   </div>
 
@@ -210,13 +212,14 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
 }
 
 // --- O activitate (rând) ---------------------------------------------------------------------
-function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, beneficiari, urmatorNr, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat }: {
+function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, beneficiari, urmatorNr, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat, onDateComune }: {
   a: Activitate; docs: Doc[]; firmaId: string; bazaBeneficiari: boolean; unitate: string; zona: string
   beneficiari: Beneficiar[]; urmatorNr: number
   onModifica: (id: string, patch: Record<string, unknown>) => void; onSterge: () => void
   onDocNou: (d: Doc[]) => void; onDocSters: (id: string) => void
   onBeneficiar: (b: Beneficiar) => void; onBeneficiarSters: (id: string) => void
   onGenerat: (d: DocGen) => void; onNrSchimbat: (d: DocGen) => void
+  onDateComune: (id: string, date: Record<string, string>) => void
 }) {
   // documentele generate din șabloane (au tip_document cunoscut) vs. cele atașate manual
   const docManual = docs.filter(d => !getSablon(d.tip_document))
@@ -317,10 +320,11 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, bene
             ))}
           </div>
 
-          {/* Generator: beneficiari + documente oficiale generate din șabloane */}
-          <GeneratorSocial firmaId={firmaId} activitateId={a.id} an={a.an} zona={zona}
+          {/* Generator: date comune + beneficiari + documente oficiale generate din șabloane */}
+          <GeneratorSocial firmaId={firmaId} activitateId={a.id} an={a.an} zona={zona} dateDocumente={a.date_documente || {}}
             beneficiari={beneficiari} documente={docGenerate} urmatorNr={urmatorNr}
-            onBeneficiar={onBeneficiar} onBeneficiarSters={onBeneficiarSters} onGenerat={onGenerat} onNrSchimbat={onNrSchimbat} />
+            onBeneficiar={onBeneficiar} onBeneficiarSters={onBeneficiarSters} onGenerat={onGenerat} onNrSchimbat={onNrSchimbat}
+            onDateComune={date => onDateComune(a.id, date)} />
         </div>
       )}
     </div>
