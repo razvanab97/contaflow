@@ -52,8 +52,24 @@ create table if not exists zone_sociale (
   primary key (firma_id, zona)
 );
 
--- Un document din `documente` poate aparține unei activități sociale (ca `achizitie_id` pentru achiziții).
+-- Beneficiarii unei activități (ex. voluntarii din AB NEXT). `date` = câmpurile pentru documentele
+-- generate (nume, CNP, domiciliu, perioadă…), flexibile per șablon.
+create table if not exists beneficiari_sociali (
+  id uuid primary key default gen_random_uuid(),
+  firma_id uuid not null references firme(id) on delete cascade,
+  activitate_id uuid not null references activitati_sociale(id) on delete cascade,
+  nume text not null,
+  date jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_beneficiari_sociali_act on beneficiari_sociali(activitate_id);
+
+-- Un document din `documente` poate aparține unei activități sociale (ca `achizitie_id` pentru achiziții),
+-- unui beneficiar, și poate avea un număr de înregistrare (șir unic pe proiectul social).
 alter table documente add column if not exists activitate_sociala_id uuid;
+alter table documente add column if not exists beneficiar_social_id uuid;
+alter table documente add column if not exists nr_inregistrare int;
 create index if not exists idx_documente_activitate_sociala on documente(activitate_sociala_id);
 
 alter table activitati_sociale enable row level security;
@@ -67,3 +83,7 @@ create policy "allow all" on zone_sociale_an for all using (true) with check (tr
 alter table zone_sociale enable row level security;
 drop policy if exists "allow all" on zone_sociale;
 create policy "allow all" on zone_sociale for all using (true) with check (true);
+
+alter table beneficiari_sociali enable row level security;
+drop policy if exists "allow all" on beneficiari_sociali;
+create policy "allow all" on beneficiari_sociali for all using (true) with check (true);

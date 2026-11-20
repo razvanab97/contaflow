@@ -7,11 +7,13 @@ import {
   zoneOrdonate, reordoneaza,
   type Activitate, type StareZonaRow, type StatusAct, type StareZona, type OrdineRow,
 } from '@/lib/proiect-social'
+import { getSablon } from '@/lib/proiect-social-sabloane'
+import GeneratorSocial, { type Beneficiar, type DocGen } from './GeneratorSocial'
 
 // Modulul „Activități sociale": fiecare zonă (activitate din plan) e o linie în care se adaugă
 // activități (AS-NNN/AN) și documente. Indicatorul se mișcă doar din activitățile VALIDATE.
 
-interface Doc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; furnizor: string | null; tip_document: string | null; activitate_sociala_id: string | null; created_at: string }
+interface Doc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; furnizor: string | null; tip_document: string | null; activitate_sociala_id: string | null; beneficiar_social_id?: string | null; nr_inregistrare?: number | null; created_at: string }
 
 const camp: React.CSSProperties = { background: 'var(--surface-sunken)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '6px 9px', fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }
 const btnGhost: React.CSSProperties = { fontSize: 'var(--fs-sm)', fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '5px 9px', cursor: 'pointer', color: 'var(--text-secondary)' }
@@ -29,13 +31,17 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const [deschise, setDeschise] = useState<Set<string>>(new Set())
   const [formZona, setFormZona] = useState<string | null>(null)
   const [ordine, setOrdine] = useState<OrdineRow[]>([])
+  const [beneficiari, setBeneficiari] = useState<Beneficiar[]>([])
+  const [urmatorNr, setUrmatorNr] = useState(1)
   const [mesaj, setMesaj] = useState('')
 
   useEffect(() => {
     fetch(`/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`).then(r => r.json())
-      .then(d => { setActs(d.activitati || []); setStari(d.zoneStari || []); setDocs(d.documente || []); setOrdine(d.zoneOrdine || []); setMigrat(d.migrat !== false) })
+      .then(d => { setActs(d.activitati || []); setStari(d.zoneStari || []); setDocs(d.documente || []); setOrdine(d.zoneOrdine || []); setBeneficiari(d.beneficiari || []); setUrmatorNr(d.urmatorNr || 1); setMigrat(d.migrat !== false) })
       .catch(() => setMesaj('Datele nu s-au putut încărca')).finally(() => setIncarcat(true))
   }, [firmaId])
+
+  const nrUrmator = (docs: { nr_inregistrare?: number | null }[]) => Math.max(0, ...docs.map(d => d.nr_inregistrare || 0)) + 1
 
   const rez = useMemo(() => rezumatAn(acts, stari, an), [acts, stari, an])
   const zoneSortate = useMemo(() => zoneOrdonate(ordine), [ordine])
@@ -84,6 +90,12 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
       return [...rest, { zona, an, status }]
     })
   }
+
+  // Generator: beneficiari + documente generate (din șabloane) + numere de înregistrare
+  const upsertBenef = (b: Beneficiar) => setBeneficiari(prev => prev.some(x => x.id === b.id) ? prev.map(x => x.id === b.id ? b : x) : [...prev, b])
+  const removeBenef = (id: string) => setBeneficiari(prev => prev.filter(x => x.id !== id))
+  const addGenerat = (d: DocGen) => { setDocs(prev => [d as unknown as Doc, ...prev]); setUrmatorNr(u => Math.max(u, (d.nr_inregistrare || 0) + 1)) }
+  const updateNr = (d: DocGen) => setDocs(prev => { const next = prev.map(x => x.id === d.id ? { ...x, nr_inregistrare: d.nr_inregistrare } : x); setUrmatorNr(nrUrmator(next)); return next })
 
   if (!incarcat) return <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>Se încarcă…</div>
 
@@ -175,9 +187,11 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {aleZonei.map(a => (
                       <RandActivitate key={a.id} a={a} docs={docs.filter(d => d.activitate_sociala_id === a.id)} firmaId={firmaId}
-                        bazaBeneficiari={z.baza === 'beneficiari'} unitate={z.unitate}
+                        bazaBeneficiari={z.baza === 'beneficiari'} unitate={z.unitate} zona={z.cod}
+                        beneficiari={beneficiari.filter(b => b.activitate_id === a.id)} urmatorNr={urmatorNr}
                         onModifica={modifica} onSterge={() => stergeAct(a)}
-                        onDocNou={nd => setDocs(prev => [...nd, ...prev])} onDocSters={id => setDocs(prev => prev.filter(d => d.id !== id))} />
+                        onDocNou={nd => setDocs(prev => [...nd, ...prev])} onDocSters={id => setDocs(prev => prev.filter(d => d.id !== id))}
+                        onBeneficiar={upsertBenef} onBeneficiarSters={removeBenef} onGenerat={addGenerat} onNrSchimbat={updateNr} />
                     ))}
                   </div>
 
@@ -196,11 +210,17 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
 }
 
 // --- O activitate (rând) ---------------------------------------------------------------------
-function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, onModifica, onSterge, onDocNou, onDocSters }: {
-  a: Activitate; docs: Doc[]; firmaId: string; bazaBeneficiari: boolean; unitate: string
+function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, beneficiari, urmatorNr, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat }: {
+  a: Activitate; docs: Doc[]; firmaId: string; bazaBeneficiari: boolean; unitate: string; zona: string
+  beneficiari: Beneficiar[]; urmatorNr: number
   onModifica: (id: string, patch: Record<string, unknown>) => void; onSterge: () => void
   onDocNou: (d: Doc[]) => void; onDocSters: (id: string) => void
+  onBeneficiar: (b: Beneficiar) => void; onBeneficiarSters: (id: string) => void
+  onGenerat: (d: DocGen) => void; onNrSchimbat: (d: DocGen) => void
 }) {
+  // documentele generate din șabloane (au tip_document cunoscut) vs. cele atașate manual
+  const docManual = docs.filter(d => !getSablon(d.tip_document))
+  const docGenerate = docs.filter(d => getSablon(d.tip_document)) as unknown as DocGen[]
   const [extins, setExtins] = useState(false)
   const [busy, setBusy] = useState(false)
   const [tipDoc, setTipDoc] = useState<string>('dovada')
@@ -276,7 +296,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, onModifica
           {/* Documente */}
           <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-              <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Documente</strong>
+              <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Documente atașate</strong>
               <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
                 Tip
                 <select value={tipDoc} onChange={e => setTipDoc(e.target.value)} style={{ ...camp, padding: '3px 6px', fontSize: 'var(--fs-xs)' }}>
@@ -286,7 +306,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, onModifica
               <input ref={inputRef} type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={e => incarca(Array.from(e.target.files || []))} />
               <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se încarcă…' : '+ Adaugă document'}</button>
             </div>
-            {docs.map(d => (
+            {docManual.map(d => (
               <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', fontSize: 'var(--fs-sm)' }}>
                 <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>{etichetaDocAct(d.tip_document)}</span>
                 <span style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
@@ -296,6 +316,11 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, onModifica
               </div>
             ))}
           </div>
+
+          {/* Generator: beneficiari + documente oficiale generate din șabloane */}
+          <GeneratorSocial firmaId={firmaId} activitateId={a.id} an={a.an} zona={zona}
+            beneficiari={beneficiari} documente={docGenerate} urmatorNr={urmatorNr}
+            onBeneficiar={onBeneficiar} onBeneficiarSters={onBeneficiarSters} onGenerat={onGenerat} onNrSchimbat={onNrSchimbat} />
         </div>
       )}
     </div>

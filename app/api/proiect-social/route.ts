@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { codNou, statusActValid, stareZonaValida, zonaValida, tipDocActValid, type StatusAct } from '@/lib/proiect-social'
+import { getSablon, caleStorage, VALORI_IMPLICITE } from '@/lib/proiect-social-sabloane'
+import { umpleSablon } from '@/lib/docxFill'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +13,8 @@ export const dynamic = 'force-dynamic'
 
 const MODUL = 'activitati_sociale'
 const COL_ACT = 'id,zona,cod,denumire,an,perioada,obiectiv,beneficiari_estimat,beneficiari_realizat,responsabil,parteneri,status,rezultate,validat_la,created_at'
-const COL_DOC = 'id,fisier_nume,fisier_tip,fisier_marime,furnizor,data_document,tip_document,fisier_path,activitate_sociala_id,created_at'
+const COL_DOC = 'id,fisier_nume,fisier_tip,fisier_marime,furnizor,data_document,tip_document,fisier_path,activitate_sociala_id,beneficiar_social_id,nr_inregistrare,created_at'
+const DOCX_TIP = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const TIPURI_FISIER = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
 
 const prefix = (firmaId: string, actId: string) => `${firmaId}/activitati-sociale/${actId}/`
@@ -44,11 +47,13 @@ export async function GET(req: NextRequest) {
     return new NextResponse(Buffer.from(await file.arrayBuffer()), { headers: antet(d.fisier_nume || 'document', d.fisier_tip || file.type, req.nextUrl.searchParams.get('preview') === '1') })
   }
 
-  const [a, z, dd, o] = await Promise.all([
+  const [a, z, dd, o, b, maxNr] = await Promise.all([
     sb.from('activitati_sociale').select(COL_ACT).eq('firma_id', firmaId).order('an', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('zone_sociale_an').select('zona,an,status,nota').eq('firma_id', firmaId),
     sb.from('documente').select(COL_DOC).eq('firma_id', firmaId).eq('modul', MODUL).not('activitate_sociala_id', 'is', null).order('created_at', { ascending: false }),
     sb.from('zone_sociale').select('zona,ordine').eq('firma_id', firmaId),
+    sb.from('beneficiari_sociali').select('id,activitate_id,nume,date,created_at').eq('firma_id', firmaId).order('created_at', { ascending: true }),
+    sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1),
   ])
   if (a.error && !tabelLipsa(a.error)) return NextResponse.json({ error: a.error.message }, { status: 500 })
   return NextResponse.json({
@@ -56,6 +61,8 @@ export async function GET(req: NextRequest) {
     zoneStari: z.data || [],
     documente: dd.data || [],
     zoneOrdine: o.data || [],
+    beneficiari: b.data || [],
+    urmatorNr: ((maxNr.data?.[0]?.nr_inregistrare as number) || 0) + 1,
     migrat: !tabelLipsa(a.error),
   })
 }
@@ -101,6 +108,85 @@ export async function POST(req: NextRequest) {
     const { error } = await sb.from('zone_sociale').upsert(randuri, { onConflict: 'firma_id,zona' })
     if (error) return NextResponse.json({ error: tabelLipsa(error) ? 'Rulează migrarea supabase_activitati_sociale.sql' : error.message }, { status: tabelLipsa(error) ? 409 : 500 })
     return NextResponse.json({ ok: true, ordine: randuri.map(r => ({ zona: r.zona, ordine: r.ordine })) })
+  }
+
+  // Adaugă sau modifică un beneficiar al unei activități.
+  if (b.actiune === 'beneficiar') {
+    const activitateId = String(b.activitateId || ''), id = b.id ? String(b.id) : null
+    const nume = txt(b.nume, 150)
+    if (!nume) return NextResponse.json({ error: 'Adaugă un nume' }, { status: 400 })
+    const dateIn = (b.date && typeof b.date === 'object') ? b.date as Record<string, unknown> : {}
+    const date: Record<string, string> = {}
+    for (const [k, v] of Object.entries(dateIn)) { if (!/^[A-Z0-9_]{1,30}$/.test(k)) continue; const val = txt(v, 300); if (val) date[k] = val }
+    if (id) {
+      const { data, error } = await sb.from('beneficiari_sociali').update({ nume, date, updated_at: new Date().toISOString() }).eq('id', id).eq('firma_id', firmaId).select('id,activitate_id,nume,date,created_at').single()
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ beneficiar: data })
+    }
+    const { data: act } = await sb.from('activitati_sociale').select('id').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle()
+    if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
+    const { data, error } = await sb.from('beneficiari_sociali').insert({ firma_id: firmaId, activitate_id: activitateId, nume, date }).select('id,activitate_id,nume,date,created_at').single()
+    if (error) return NextResponse.json({ error: tabelLipsa(error) ? 'Rulează migrarea supabase_activitati_sociale.sql' : error.message }, { status: tabelLipsa(error) ? 409 : 500 })
+    return NextResponse.json({ beneficiar: data })
+  }
+
+  // Editează numărul de înregistrare al unui document.
+  if (b.actiune === 'nr-document') {
+    const docId = String(b.docId || ''), nr = (b.nr === null || b.nr === '') ? null : Math.trunc(Number(b.nr))
+    if (!docId) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
+    if (nr !== null && (!Number.isFinite(nr) || nr < 0)) return NextResponse.json({ error: 'Număr invalid' }, { status: 400 })
+    const { data, error } = await sb.from('documente').update({ nr_inregistrare: nr }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC).single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ document: data })
+  }
+
+  // Generează un document dintr-un șablon (umplut cu date + nr. de înregistrare automat).
+  if (b.actiune === 'genereaza') {
+    const activitateId = String(b.activitateId || ''), tip = String(b.tip || '')
+    const sablon = getSablon(tip)
+    if (!sablon) return NextResponse.json({ error: 'Șablon necunoscut' }, { status: 400 })
+    const { data: act } = await sb.from('activitati_sociale').select('id,an').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle()
+    if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
+
+    const valori: Record<string, string> = {}
+    for (const c of sablon.campuri) if (VALORI_IMPLICITE[c.key]) valori[c.key] = VALORI_IMPLICITE[c.key]
+    let beneficiarId: string | null = null, titluPersoana = ''
+    if (sablon.nivel === 'beneficiar') {
+      beneficiarId = String(b.beneficiarId || '')
+      const { data: ben } = await sb.from('beneficiari_sociali').select('id,nume,date').eq('id', beneficiarId).eq('firma_id', firmaId).maybeSingle()
+      if (!ben) return NextResponse.json({ error: 'Beneficiarul nu a fost găsit' }, { status: 404 })
+      Object.assign(valori, (ben.date || {}) as Record<string, string>)
+      if (!valori.NUME) valori.NUME = ben.nume
+      if (!valori.CONFIRMARE) valori.CONFIRMARE = ben.nume
+      titluPersoana = ben.nume
+    } else {
+      const camp = (b.campuri && typeof b.campuri === 'object') ? b.campuri as Record<string, unknown> : {}
+      for (const c of sablon.campuri) { const v = txt(camp[c.key], 300); if (v) valori[c.key] = v }
+      if (!valori.AN) valori.AN = String(act.an)
+    }
+
+    let nr: number
+    if (b.nr != null && b.nr !== '') { nr = Math.trunc(Number(b.nr)); if (!Number.isFinite(nr) || nr < 0) return NextResponse.json({ error: 'Număr invalid' }, { status: 400 }) }
+    else { const { data: mx } = await sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1); nr = ((mx?.[0]?.nr_inregistrare as number) || 0) + 1 }
+    valori.NR_INREG = String(nr)
+    valori.DATA = new Date().toLocaleDateString('ro-RO')
+
+    const { data: tmpl, error: dlErr } = await sb.storage.from('documente').download(caleStorage(sablon))
+    if (dlErr || !tmpl) return NextResponse.json({ error: 'Șablonul nu a putut fi citit din storage' }, { status: 500 })
+    let bytes: Uint8Array
+    try { bytes = await umpleSablon(new Uint8Array(await tmpl.arrayBuffer()), valori) } catch (e) { return NextResponse.json({ error: `Generarea a eșuat: ${e instanceof Error ? e.message : String(e)}` }, { status: 500 }) }
+
+    const numeFisier = `${sablon.label}${titluPersoana ? ' - ' + titluPersoana : ''} - nr ${nr}.docx`
+    const path = `${firmaId}/activitati-sociale/${activitateId}/generat/${Date.now()}_${sablon.tip}.docx`
+    const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(bytes), { contentType: DOCX_TIP })
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+    const { data: doc, error } = await sb.from('documente').insert({
+      firma_id: firmaId, luna_id: null, modul: MODUL, activitate_sociala_id: activitateId, beneficiar_social_id: beneficiarId,
+      nr_inregistrare: nr, tip_document: tip, furnizor: `${sablon.label}${titluPersoana ? ' · ' + titluPersoana : ''}`,
+      data_document: azi(), fisier_path: path, fisier_nume: numeFisier, fisier_tip: DOCX_TIP, fisier_marime: bytes.length, in_zip: false,
+    }).select(COL_DOC).single()
+    if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
+    return NextResponse.json({ document: doc, nr })
   }
 
   if (b.actiune === 'inregistreaza-doc') {
@@ -183,7 +269,15 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // Șterge o activitate (+ documentele ei + fișierele din storage).
+  // Șterge un beneficiar (documentele lui generate rămân în activitate).
+  const beneficiar = req.nextUrl.searchParams.get('beneficiar')
+  if (beneficiar) {
+    const { error } = await sb.from('beneficiari_sociali').delete().eq('id', beneficiar).eq('firma_id', firmaId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
+  // Șterge o activitate (+ documentele ei + beneficiarii + fișierele din storage).
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
   const { data: act } = await sb.from('activitati_sociale').select('id').eq('id', id).eq('firma_id', firmaId).maybeSingle()
