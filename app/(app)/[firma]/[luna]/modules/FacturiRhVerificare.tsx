@@ -23,6 +23,7 @@ export default function FacturiRhVerificare({ firmaId, lunaId }: { firmaId: stri
   const [loading, setLoading] = useState(false)
   const [doarProbleme, setDoarProbleme] = useState(false)
   const [incarc, setIncarc] = useState('')
+  const [descarc, setDescarc] = useState(false)
 
   // PDF-urile facturilor RH (exportul din Oblio, una sau mai multe facturi intr-un fisier) - impartite si
   // salvate ca facturi de vanzare, fiecare legata de rezervarea Airbnb scrisa pe ea.
@@ -35,6 +36,22 @@ export default function FacturiRhVerificare({ firmaId, lunaId }: { firmaId: stri
     const j = res ? await res.json().catch(() => ({})) : {}
     setIncarc(res?.ok ? `✓ ${j.salvate?.length || 0} facturi RH salvate${j.erori?.length ? ` · ${j.erori.join('; ')}` : ''}` : (j.error || 'Încărcarea a eșuat'))
     load()
+  }
+
+  // Descarca toate facturile RH ale lunii intr-un singur ZIP (PDF-urile salvate).
+  async function descarcaToate() {
+    setDescarc(true); setIncarc('Se pregătește arhiva…')
+    try {
+      const res = await fetch(`/api/airbnb/facturi-rh?zip=1&lunaId=${encodeURIComponent(lunaId)}&firmaId=${encodeURIComponent(firmaId)}`)
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setIncarc(j.error || 'Descărcarea a eșuat'); return }
+      const blob = await res.blob()
+      const match = /filename\*=UTF-8''([^;]+)/.exec(res.headers.get('content-disposition') || '')
+      const nume = match ? decodeURIComponent(match[1]) : 'Facturi RH.zip'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = nume; document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url); setIncarc('')
+    } catch { setIncarc('Descărcarea a eșuat') }
+    finally { setDescarc(false) }
   }
 
   const load = useCallback(async () => {
@@ -88,6 +105,10 @@ export default function FacturiRhVerificare({ firmaId, lunaId }: { firmaId: stri
           {probleme.length > 0 && <button className="btn btn-sm" aria-pressed={doarProbleme} onClick={() => setDoarProbleme(v => !v)}
             style={doarProbleme ? { background: 'var(--accent-soft)', borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}>
             {doarProbleme ? 'Arată toate' : `Doar de verificat (${probleme.length})`}
+          </button>}
+          {!!d.pdfTotal && <button className="btn btn-sm" onClick={descarcaToate} disabled={descarc}
+            title="Descarcă toate facturile RH ale lunii, într-un singur ZIP">
+            {descarc ? 'Se pregătește…' : `↓ Descarcă toate (${d.pdfTotal})`}
           </button>}
           <label className="btn btn-sm" title="PDF-ul exportat din Oblio cu facturile RH ale lunii - se împarte pe facturi și se leagă de rezervări">
             ↑ PDF facturi RH{d.pdfTotal ? ` (${d.pdfTotal})` : ''}

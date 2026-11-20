@@ -5,14 +5,49 @@ import { accountingPeriod } from '@/lib/accounting-period'
 import { listaFacturiRh } from '@/lib/oblio-rh'
 import { potrivesteFacturiRh, faraRezervare, type RezervareRh } from '@/lib/cazare-rh-verificare'
 import { importaFacturiRh, MODUL_FACTURI_RH } from '@/lib/facturi-rh-import'
+import JSZip from 'jszip'
 
 export const dynamic = 'force-dynamic'
+
+// Toate facturile RH ale lunii (PDF-urile salvate) intr-un singur ZIP, in ordinea numerelor.
+async function zipFacturiRh(firmaId: string, lunaId: string) {
+  const sb = getServiceSupabase()
+  const [{ data: firma }, { data: luna }, { data: docs, error }] = await Promise.all([
+    sb.from('firme').select('nume').eq('id', firmaId).maybeSingle(),
+    sb.from('luni_contabile').select('luna').eq('id', lunaId).eq('firma_id', firmaId).maybeSingle(),
+    sb.from('documente').select('fisier_path,fisier_nume,numar_document').eq('firma_id', firmaId).eq('luna_id', lunaId).eq('modul', MODUL_FACTURI_RH).not('fisier_path', 'is', null),
+  ])
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!docs?.length) return NextResponse.json({ error: 'Nu există facturi RH de descărcat în această lună' }, { status: 404 })
+  const nr = (s?: string | null) => Number(String(s || '').match(/(\d+)/)?.[1] || 0)
+  const ordonate = [...docs].sort((a, b) => nr(a.numar_document) - nr(b.numar_document))
+  const zip = new JSZip()
+  const folosit = new Set<string>()
+  let adaugate = 0
+  for (const d of ordonate) {
+    if (!d.fisier_path) continue
+    const { data: b } = await sb.storage.from('documente').download(d.fisier_path)
+    if (!b) continue
+    let nume = d.fisier_nume || `${d.numar_document || 'factura'}.pdf`
+    if (folosit.has(nume)) nume = nume.replace(/\.pdf$/i, '') + ` (${adaugate + 1}).pdf` // nume duplicate -> unic in arhiva
+    folosit.add(nume)
+    zip.file(nume, await b.arrayBuffer())
+    adaugate++
+  }
+  if (!adaugate) return NextResponse.json({ error: 'Fișierele facturilor nu s-au putut descărca' }, { status: 500 })
+  const buf = await zip.generateAsync({ type: 'arraybuffer' })
+  const lunaTxt = luna?.luna ? String(luna.luna).slice(0, 7) : lunaId
+  const fisier = `${(firma?.nume || 'Facturi').replace(/\s+S\.?R\.?L\.?$/i, '')} - Facturi RH - ${lunaTxt}.zip`
+  return new NextResponse(buf, { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${fisier.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7E]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(fisier)}` } })
+}
 
 // „Airbnb · Rezervări” la firmele care factureaza cazarea in Oblio (AB Textile, seria RH): rezervarile din CSV-ul
 // lunii, fiecare cu factura RH gasita in Oblio, plus facturile RH din luna contabila fara rezervare in borderou.
 export async function GET(req: NextRequest) {
   const firmaId = req.nextUrl.searchParams.get('firmaId'), lunaId = req.nextUrl.searchParams.get('lunaId')
   if (!firmaId || !lunaId) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
+  // Descarcă toate facturile RH ale lunii, intr-un ZIP (nu trece prin verificarea Oblio).
+  if (req.nextUrl.searchParams.get('zip') === '1') return zipFacturiRh(firmaId, lunaId)
   const sb = getServiceSupabase()
   const [{ data: firma }, { data: luna }, { data: rez, error }] = await Promise.all([
     sb.from('firme').select('slug').eq('id', firmaId).maybeSingle(),
