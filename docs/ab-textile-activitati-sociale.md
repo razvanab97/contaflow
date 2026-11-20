@@ -312,6 +312,7 @@ Motor: `lib/docxFill.ts`, config `lib/proiect-social-sabloane.ts`.
 - **Completare din buletin (AI):** încarci poza CI → Claude vision citește nume/CNP/domiciliu, data nașterii din CNP (`lib/ai/buletin.ts`, `/api/proiect-social/buletin`).
 - **Date comune** pe activitate (perioadă, ore, locul, coordonator, instruire) setate o dată → intră în toate documentele (`activitati_sociale.date_documente`).
 - **Descărcare Word + PDF** (butonul PDF deschide documentul randat și-l trimite la printare / „Salvează ca PDF", via docx-preview — nu LibreOffice pe server).
+- **Auto-generare + UI curat (#347):** documentele apar singure (Decizia când sunt datele comune, Contractul la adăugarea voluntarului) și se actualizează în loc (păstrând nr.). Fără buton „Generează". Fișe de voluntar cu inițiale; câmpurile secundare ale activității sub „Detalii activitate" (pliate la zonele cu generator).
 Mai lipsește: **raport anual în timp real** (punctul 4).
 
 ## De dezvoltat (v2) — sistemul de documente  *(cerut 2026-11-20, detaliat)*

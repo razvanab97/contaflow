@@ -178,8 +178,14 @@ export async function POST(req: NextRequest) {
       titluPersoana = ben.nume
     }
 
+    // document existent pentru (activitate, beneficiar, tip) → îl actualizăm în loc (păstrăm numărul)
+    let existQ = sb.from('documente').select('id,nr_inregistrare,fisier_path').eq('firma_id', firmaId).eq('modul', MODUL).eq('activitate_sociala_id', activitateId).eq('tip_document', tip)
+    existQ = beneficiarId ? existQ.eq('beneficiar_social_id', beneficiarId) : existQ.is('beneficiar_social_id', null)
+    const { data: exist } = await existQ.maybeSingle()
+
     let nr: number
     if (b.nr != null && b.nr !== '') { nr = Math.trunc(Number(b.nr)); if (!Number.isFinite(nr) || nr < 0) return NextResponse.json({ error: 'Număr invalid' }, { status: 400 }) }
+    else if (exist?.nr_inregistrare != null) nr = exist.nr_inregistrare as number
     else { const { data: mx } = await sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1); nr = ((mx?.[0]?.nr_inregistrare as number) || 0) + 1 }
     valori.NR_INREG = String(nr)
     valori.DATA = new Date().toLocaleDateString('ro-RO')
@@ -189,14 +195,22 @@ export async function POST(req: NextRequest) {
     let bytes: Uint8Array
     try { bytes = await umpleSablon(new Uint8Array(await tmpl.arrayBuffer()), valori) } catch (e) { return NextResponse.json({ error: `Generarea a eșuat: ${e instanceof Error ? e.message : String(e)}` }, { status: 500 }) }
 
-    const numeFisier = `${sablon.label}${titluPersoana ? ' - ' + titluPersoana : ''} - nr ${nr}.docx`
     const path = `${firmaId}/activitati-sociale/${activitateId}/generat/${Date.now()}_${sablon.tip}.docx`
     const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(bytes), { contentType: DOCX_TIP })
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
-    const { data: doc, error } = await sb.from('documente').insert({
-      firma_id: firmaId, luna_id: null, modul: MODUL, activitate_sociala_id: activitateId, beneficiar_social_id: beneficiarId,
+    const camp = {
       nr_inregistrare: nr, tip_document: tip, furnizor: `${sablon.label}${titluPersoana ? ' · ' + titluPersoana : ''}`,
-      data_document: azi(), fisier_path: path, fisier_nume: numeFisier, fisier_tip: DOCX_TIP, fisier_marime: bytes.length, in_zip: false,
+      data_document: azi(), fisier_path: path, fisier_nume: `${sablon.label}${titluPersoana ? ' - ' + titluPersoana : ''} - nr ${nr}.docx`,
+      fisier_tip: DOCX_TIP, fisier_marime: bytes.length,
+    }
+    if (exist) {
+      const { data: doc, error } = await sb.from('documente').update(camp).eq('id', exist.id).select(COL_DOC).single()
+      if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
+      if (exist.fisier_path && exist.fisier_path !== path) await sb.storage.from('documente').remove([exist.fisier_path])
+      return NextResponse.json({ document: doc, nr, actualizat: true })
+    }
+    const { data: doc, error } = await sb.from('documente').insert({
+      firma_id: firmaId, luna_id: null, modul: MODUL, activitate_sociala_id: activitateId, beneficiar_social_id: beneficiarId, in_zip: false, ...camp,
     }).select(COL_DOC).single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
     return NextResponse.json({ document: doc, nr })

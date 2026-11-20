@@ -7,7 +7,7 @@ import {
   zoneOrdonate, reordoneaza,
   type Activitate, type StareZonaRow, type StatusAct, type StareZona, type OrdineRow,
 } from '@/lib/proiect-social'
-import { getSablon } from '@/lib/proiect-social-sabloane'
+import { getSablon, sabloanePentruZona } from '@/lib/proiect-social-sabloane'
 import GeneratorSocial, { type Beneficiar, type DocGen } from './GeneratorSocial'
 
 // Modulul „Activități sociale": fiecare zonă (activitate din plan) e o linie în care se adaugă
@@ -94,7 +94,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   // Generator: beneficiari + documente generate (din șabloane) + numere de înregistrare
   const upsertBenef = (b: Beneficiar) => setBeneficiari(prev => prev.some(x => x.id === b.id) ? prev.map(x => x.id === b.id ? b : x) : [...prev, b])
   const removeBenef = (id: string) => setBeneficiari(prev => prev.filter(x => x.id !== id))
-  const addGenerat = (d: DocGen) => { setDocs(prev => [d as unknown as Doc, ...prev]); setUrmatorNr(u => Math.max(u, (d.nr_inregistrare || 0) + 1)) }
+  const addGenerat = (d: DocGen) => { setDocs(prev => { const e = d as unknown as Doc; return prev.some(x => x.id === e.id) ? prev.map(x => x.id === e.id ? e : x) : [e, ...prev] }); setUrmatorNr(u => Math.max(u, (d.nr_inregistrare || 0) + 1)) }
   const updateNr = (d: DocGen) => setDocs(prev => { const next = prev.map(x => x.id === d.id ? { ...x, nr_inregistrare: d.nr_inregistrare } : x); setUrmatorNr(nrUrmator(next)); return next })
   const updateDateComune = (id: string, date: Record<string, string>) => setActs(prev => prev.map(x => x.id === id ? { ...x, date_documente: date } : x))
 
@@ -224,6 +224,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, bene
   // documentele generate din șabloane (au tip_document cunoscut) vs. cele atașate manual
   const docManual = docs.filter(d => !getSablon(d.tip_document))
   const docGenerate = docs.filter(d => getSablon(d.tip_document)) as unknown as DocGen[]
+  const areGenerator = sabloanePentruZona(zona).length > 0
   const [extins, setExtins] = useState(false)
   const [busy, setBusy] = useState(false)
   const [tipDoc, setTipDoc] = useState<string>('dovada')
@@ -276,55 +277,61 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, bene
       </div>
 
       {extins && (
-        <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
-            <label style={lblCol}>Perioada
-              <input defaultValue={a.perioada || ''} placeholder="ex. martie 2026" onBlur={e => onModifica(a.id, { perioada: e.target.value.trim() })} style={camp} /></label>
-            <label style={lblCol}>Responsabil
-              <input defaultValue={a.responsabil || ''} onBlur={e => onModifica(a.id, { responsabil: e.target.value.trim() })} style={camp} /></label>
-            <label style={lblCol}>Parteneri
-              <input defaultValue={a.parteneri || ''} placeholder="AJOFM, DGASPC, Școala…" onBlur={e => onModifica(a.id, { parteneri: e.target.value.trim() })} style={camp} /></label>
-            <label style={lblCol}>Beneficiari estimați
-              <input type="number" min={0} defaultValue={a.beneficiari_estimat ?? ''} onBlur={e => onModifica(a.id, { beneficiari_estimat: e.target.value })} style={camp} /></label>
-            {bazaBeneficiari && (
-              <label style={lblCol}>Beneficiari realizați ({unitate}) · contează la indicator
-                <input type="number" min={0} defaultValue={a.beneficiari_realizat ?? ''} onBlur={e => onModifica(a.id, { beneficiari_realizat: e.target.value })} style={camp} /></label>
-            )}
-          </div>
-          <label style={lblCol}>Obiectiv
-            <textarea defaultValue={a.obiectiv || ''} rows={2} onBlur={e => onModifica(a.id, { obiectiv: e.target.value.trim() })} style={{ ...camp, resize: 'vertical' }} /></label>
-          <label style={lblCol}>Rezultate (pentru procesul-verbal final)
-            <textarea defaultValue={a.rezultate || ''} rows={2} placeholder="Ce s-a realizat efectiv…" onBlur={e => onModifica(a.id, { rezultate: e.target.value.trim() })} style={{ ...camp, resize: 'vertical' }} /></label>
-
-          {/* Documente */}
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-              <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Documente atașate</strong>
-              <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
-                Tip
-                <select value={tipDoc} onChange={e => setTipDoc(e.target.value)} style={{ ...camp, padding: '3px 6px', fontSize: 'var(--fs-xs)' }}>
-                  {TIPURI_DOC_ACT.map(t => <option key={t.tip} value={t.tip}>{t.label}</option>)}
-                </select>
-              </label>
-              <input ref={inputRef} type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={e => incarca(Array.from(e.target.files || []))} />
-              <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se încarcă…' : '+ Adaugă document'}</button>
-            </div>
-            {docManual.map(d => (
-              <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', fontSize: 'var(--fs-sm)' }}>
-                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>{etichetaDocAct(d.tip_document)}</span>
-                <span style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
-                {previzualizabil(d) && <button onClick={() => deschideDocument(urlDoc(d, true), d.fisier_nume)} style={{ ...linkBtn, color: 'var(--accent)' }}>Vezi</button>}
-                <a href={urlDoc(d)} style={{ ...linkBtn, color: 'var(--accent-blue)' }}>Descarcă</a>
-                <button onClick={() => stergeDoc(d)} title="Șterge documentul" aria-label={`Șterge ${d.fisier_nume}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
-              </div>
-            ))}
-          </div>
-
-          {/* Generator: date comune + beneficiari + documente oficiale generate din șabloane */}
+        <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+          {/* Fabrica de documente - vizibilă sus (doar la zonele cu șabloane) */}
           <GeneratorSocial firmaId={firmaId} activitateId={a.id} an={a.an} zona={zona} dateDocumente={a.date_documente || {}}
-            beneficiari={beneficiari} documente={docGenerate} urmatorNr={urmatorNr}
+            beneficiari={beneficiari} documente={docGenerate}
             onBeneficiar={onBeneficiar} onBeneficiarSters={onBeneficiarSters} onGenerat={onGenerat} onNrSchimbat={onNrSchimbat}
             onDateComune={date => onDateComune(a.id, date)} />
+
+          {/* Detalii activitate - strânse când zona are generator, ca să nu încarce */}
+          <details open={!areGenerator}>
+            <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-secondary)', padding: '2px 0' }}>Detalii activitate</summary>
+            <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+                <label style={lblCol}>Perioada
+                  <input defaultValue={a.perioada || ''} placeholder="ex. martie 2026" onBlur={e => onModifica(a.id, { perioada: e.target.value.trim() })} style={camp} /></label>
+                <label style={lblCol}>Responsabil
+                  <input defaultValue={a.responsabil || ''} onBlur={e => onModifica(a.id, { responsabil: e.target.value.trim() })} style={camp} /></label>
+                <label style={lblCol}>Parteneri
+                  <input defaultValue={a.parteneri || ''} placeholder="AJOFM, DGASPC, Școala…" onBlur={e => onModifica(a.id, { parteneri: e.target.value.trim() })} style={camp} /></label>
+                <label style={lblCol}>Beneficiari estimați
+                  <input type="number" min={0} defaultValue={a.beneficiari_estimat ?? ''} onBlur={e => onModifica(a.id, { beneficiari_estimat: e.target.value })} style={camp} /></label>
+                {bazaBeneficiari && (
+                  <label style={lblCol}>Beneficiari realizați ({unitate}) · contează la indicator
+                    <input type="number" min={0} defaultValue={a.beneficiari_realizat ?? ''} onBlur={e => onModifica(a.id, { beneficiari_realizat: e.target.value })} style={camp} /></label>
+                )}
+              </div>
+              <label style={lblCol}>Obiectiv
+                <textarea defaultValue={a.obiectiv || ''} rows={2} onBlur={e => onModifica(a.id, { obiectiv: e.target.value.trim() })} style={{ ...camp, resize: 'vertical' }} /></label>
+              <label style={lblCol}>Rezultate (pentru procesul-verbal final)
+                <textarea defaultValue={a.rezultate || ''} rows={2} placeholder="Ce s-a realizat efectiv…" onBlur={e => onModifica(a.id, { rezultate: e.target.value.trim() })} style={{ ...camp, resize: 'vertical' }} /></label>
+
+              {/* Documente atașate manual */}
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Documente atașate</strong>
+                  <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
+                    Tip
+                    <select value={tipDoc} onChange={e => setTipDoc(e.target.value)} style={{ ...camp, padding: '3px 6px', fontSize: 'var(--fs-xs)' }}>
+                      {TIPURI_DOC_ACT.map(t => <option key={t.tip} value={t.tip}>{t.label}</option>)}
+                    </select>
+                  </label>
+                  <input ref={inputRef} type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={e => incarca(Array.from(e.target.files || []))} />
+                  <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se încarcă…' : '+ Adaugă document'}</button>
+                </div>
+                {docManual.map(d => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', fontSize: 'var(--fs-sm)' }}>
+                    <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>{etichetaDocAct(d.tip_document)}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
+                    {previzualizabil(d) && <button onClick={() => deschideDocument(urlDoc(d, true), d.fisier_nume)} style={{ ...linkBtn, color: 'var(--accent)' }}>Vezi</button>}
+                    <a href={urlDoc(d)} style={{ ...linkBtn, color: 'var(--accent-blue)' }}>Descarcă</a>
+                    <button onClick={() => stergeDoc(d)} title="Șterge documentul" aria-label={`Șterge ${d.fisier_nume}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
         </div>
       )}
     </div>
