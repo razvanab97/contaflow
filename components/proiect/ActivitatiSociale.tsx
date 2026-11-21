@@ -156,11 +156,11 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                   <button onClick={e => { e.stopPropagation(); muta(z.cod, 'jos') }} disabled={zi === zoneSortate.length - 1} title="Mută mai jos" aria-label={`Mută „${z.titlu}" mai jos`}
                     style={{ ...linkBtn, color: zi === zoneSortate.length - 1 ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: zi === zoneSortate.length - 1 ? 0.4 : 1, lineHeight: 1, fontSize: 'var(--fs-sm)' }}>▼</button>
                 </div>
-                <button onClick={e => { e.stopPropagation(); toggle(z.cod) }} aria-expanded={open} aria-label={`${open ? 'Restrânge' : 'Extinde'} ${z.titlu}`} title={open ? 'Restrânge' : 'Extinde'}
-                  style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)', width: 20, flexShrink: 0, marginTop: 2 }}>{open ? '▾' : '▸'}</button>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                    <strong style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, letterSpacing: '-.01em', color: 'var(--text-primary)' }}>{z.nr}. {z.titlu}</strong>
+                    {/* titlul e butonul accesibil de deschidere/închidere; tot antetul reacționează la click (vezi div-ul părinte) */}
+                    <button onClick={e => { e.stopPropagation(); toggle(z.cod) }} aria-expanded={open} aria-label={`${open ? 'Restrânge' : 'Extinde'} ${z.titlu}`}
+                      style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, letterSpacing: '-.01em', color: 'var(--text-primary)', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>{z.nr}. {z.titlu}</button>
                     <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: culoareStare[stare] }}>· {stare === 'inchisa_pe_an' ? `Închisă pe ${an}` : ETICHETA_STARE[stare]}</span>
                   </div>
                   <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Țintă: {z.tintaText}</div>

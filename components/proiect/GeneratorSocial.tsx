@@ -133,6 +133,11 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
   ].map(r => ({ ...r, doc: docPentru(r.benId, r.tip) }))
     .sort((a, b) => (a.doc?.nr_inregistrare ?? 1e9) - (b.doc?.nr_inregistrare ?? 1e9))
 
+  // avertizare de ordine: un document cu nr. mai mare nu ar trebui să aibă data mai devreme decât unul cu nr. mai mic
+  const ordineGresita = new Set<string>()
+  let maxDataDoc = ''
+  for (const r of randuri) { const zi = r.doc?.data_document?.slice(0, 10); if (!zi) continue; if (maxDataDoc && zi < maxDataDoc) ordineGresita.add(r.doc!.id); else if (zi > maxDataDoc) maxDataDoc = zi }
+
   return (
     <div className="gsoc-panel" style={{ marginTop: 12, padding: 16 }}>
       {/* Antet */}
@@ -174,7 +179,14 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
               <div style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.titlu}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginTop: 3 }}>
                 {r.benef?.date?.CNP && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>CNP {r.benef.date.CNP}</span>}
-                {r.doc && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{roData(r.doc.data_document)}</span>}
+                {r.doc && (() => { const gresit = ordineGresita.has(r.doc!.id); return (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <input type="date" key={r.doc!.id + ':' + (r.doc!.data_document || '')} defaultValue={(r.doc!.data_document || '').slice(0, 10)} max="2035-12-31"
+                      onChange={e => { if (e.target.value) genereaza(r.tip, r.benId, false, { dataDoc: e.target.value }) }}
+                      title="Data documentului — o poți schimba pentru fiecare act" aria-label={`Data documentului: ${r.titlu}`}
+                      style={{ ...mono, fontSize: 'var(--fs-xs)', color: gresit ? 'var(--warning)' : 'var(--text-muted)', background: 'transparent', border: `1px solid ${gresit ? 'var(--warning)' : 'transparent'}`, borderRadius: 6, padding: '1px 5px', cursor: 'pointer' }} />
+                    {gresit && <span title="Data e mai devreme decât a unui document cu număr mai mic — verifică ordinea" style={{ color: 'var(--warning)', fontSize: 'var(--fs-sm)', cursor: 'help' }}>⚠</span>}
+                  </span>) })()}
                 {r.doc ? (() => { const d = r.doc!, inLucru = d.stare === 'in_lucru', sb = busy === 's' + d.id
                   return <button onClick={() => schimbaStare(d)} disabled={sb} title="Apasă pentru a comuta: Emis ↔ În lucru"
                     style={{ ...S.okPill, ...(inLucru ? { color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 15%, transparent)' } : {}), border: 'none', cursor: 'pointer', opacity: sb ? 0.5 : 1 }}>
