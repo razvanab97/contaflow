@@ -13,7 +13,7 @@ import GeneratorSocial, { type Beneficiar, type DocGen } from './GeneratorSocial
 // Modulul „Activități sociale": fiecare zonă (activitate din plan) e o linie în care se adaugă
 // activități (AS-NNN/AN) și documente. Indicatorul se mișcă doar din activitățile VALIDATE.
 
-interface Doc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; furnizor: string | null; tip_document: string | null; activitate_sociala_id: string | null; beneficiar_social_id?: string | null; nr_inregistrare?: number | null; created_at: string }
+interface Doc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; furnizor: string | null; tip_document: string | null; activitate_sociala_id: string | null; beneficiar_social_id?: string | null; nr_inregistrare?: number | null; data_document?: string | null; stare?: string | null; created_at: string }
 
 const camp: React.CSSProperties = { background: 'var(--surface-sunken)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '6px 9px', fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }
 const btnGhost: React.CSSProperties = { fontSize: 'var(--fs-sm)', fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '5px 9px', cursor: 'pointer', color: 'var(--text-secondary)' }
@@ -94,7 +94,8 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   // Generator: beneficiari + documente generate (din șabloane) + numere de înregistrare
   const upsertBenef = (b: Beneficiar) => setBeneficiari(prev => prev.some(x => x.id === b.id) ? prev.map(x => x.id === b.id ? b : x) : [...prev, b])
   const removeBenef = (id: string) => setBeneficiari(prev => prev.filter(x => x.id !== id))
-  const addGenerat = (d: DocGen) => { setDocs(prev => { const e = d as unknown as Doc; return prev.some(x => x.id === e.id) ? prev.map(x => x.id === e.id ? e : x) : [e, ...prev] }); setUrmatorNr(u => Math.max(u, (d.nr_inregistrare || 0) + 1)) }
+  // la regenerare, API-ul poate întoarce documentul fără „stare" (coloana nu intră în select-ul de generare) — păstrăm starea curentă din UI
+  const addGenerat = (d: DocGen) => { setDocs(prev => { const e = d as unknown as Doc; return prev.some(x => x.id === e.id) ? prev.map(x => x.id === e.id ? { ...e, stare: e.stare ?? x.stare } : x) : [e, ...prev] }); setUrmatorNr(u => Math.max(u, (d.nr_inregistrare || 0) + 1)) }
   const updateNr = (d: DocGen) => setDocs(prev => { const next = prev.map(x => x.id === d.id ? { ...x, nr_inregistrare: d.nr_inregistrare } : x); setUrmatorNr(nrUrmator(next)); return next })
   const updateDateComune = (id: string, date: Record<string, string>) => setActs(prev => prev.map(x => x.id === id ? { ...x, date_documente: date } : x))
 

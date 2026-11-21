@@ -8,7 +8,7 @@ import { sabloaneBeneficiar, sabloaneActivitate, campuriComune, campuriBeneficia
 // se GENEREAZĂ singure, apar în „Registrul documentelor" și se actualizează în loc.
 
 export interface Beneficiar { id: string; activitate_id: string; nume: string; date: Record<string, string>; created_at: string }
-export interface DocGen { id: string; fisier_nume: string; fisier_tip: string | null; furnizor: string | null; tip_document: string | null; beneficiar_social_id: string | null; nr_inregistrare: number | null; data_document?: string | null; created_at: string }
+export interface DocGen { id: string; fisier_nume: string; fisier_tip: string | null; furnizor: string | null; tip_document: string | null; beneficiar_social_id: string | null; nr_inregistrare: number | null; data_document?: string | null; stare?: string | null; created_at: string }
 
 const disp: React.CSSProperties = { fontFamily: 'var(--font-bricolage), var(--font-geist), system-ui, sans-serif' }
 const mono: React.CSSProperties = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' }
@@ -79,6 +79,16 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
     return false
   }
   const regenNr = (doc: DocGen, nr: string) => genereaza(doc.tip_document || '', doc.beneficiar_social_id, false, { nr }) // editarea nr-ului regenerează documentul
+
+  // comută starea documentului: emis ↔ în lucru (final vs. încă se lucrează)
+  async function schimbaStare(doc: DocGen) {
+    const nou = doc.stare === 'in_lucru' ? 'emis' : 'in_lucru'
+    setBusy('s' + doc.id)
+    const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'stare-doc', docId: doc.id, stare: nou }) })
+    const d = await r.json().catch(() => ({}))
+    setBusy('')
+    if (r.ok && d.document) onGenerat(d.document); else setMesaj(d.error || 'Nu s-a putut schimba starea')
+  }
 
   useEffect(() => {
     if (autoRef.current || disabled || !sabAct.length) return
@@ -165,8 +175,11 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginTop: 3 }}>
                 {r.benef?.date?.CNP && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>CNP {r.benef.date.CNP}</span>}
                 {r.doc && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{roData(r.doc.data_document)}</span>}
-                {r.doc ? <span style={S.okPill}><span className="gsoc-dot" />Emis</span>
-                  : seGen ? <span style={{ ...S.okPill, color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 13%, transparent)' }}><span className="gsoc-dot w" />în lucru</span>
+                {r.doc ? (() => { const d = r.doc!, inLucru = d.stare === 'in_lucru', sb = busy === 's' + d.id
+                  return <button onClick={() => schimbaStare(d)} disabled={sb} title="Apasă pentru a comuta: Emis ↔ În lucru"
+                    style={{ ...S.okPill, ...(inLucru ? { color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 15%, transparent)' } : {}), border: 'none', cursor: 'pointer', opacity: sb ? 0.5 : 1 }}>
+                    <span className={'gsoc-dot' + (inLucru ? ' w' : '')} />{inLucru ? 'În lucru' : 'Emis'}</button> })()
+                  : seGen ? <span style={{ ...S.okPill, color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 13%, transparent)' }}><span className="gsoc-dot w" />se pregătește</span>
                   : <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>neîntocmit</span>}
               </div>
             </div>

@@ -50,7 +50,11 @@ export async function GET(req: NextRequest) {
   const [a, z, dd, o, b, maxNr] = await Promise.all([
     sb.from('activitati_sociale').select(COL_ACT).eq('firma_id', firmaId).order('an', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('zone_sociale_an').select('zona,an,status,nota').eq('firma_id', firmaId),
-    sb.from('documente').select(COL_DOC).eq('firma_id', firmaId).eq('modul', MODUL).not('activitate_sociala_id', 'is', null).order('created_at', { ascending: false }),
+    (async () => { // documentele; dacă migrarea coloanei `stare` n-a rulat încă, reîncearcă fără ea (nu rupe pagina)
+      const q = (col: string) => sb.from('documente').select(col).eq('firma_id', firmaId).eq('modul', MODUL).not('activitate_sociala_id', 'is', null).order('created_at', { ascending: false })
+      const r = await q(COL_DOC + ',stare')
+      return r.error && /stare/i.test(r.error.message || '') ? await q(COL_DOC) : r
+    })(),
     sb.from('zone_sociale').select('zona,ordine').eq('firma_id', firmaId),
     sb.from('beneficiari_sociali').select('id,activitate_id,nume,date,created_at').eq('firma_id', firmaId).order('created_at', { ascending: true }),
     sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1),
@@ -148,6 +152,16 @@ export async function POST(req: NextRequest) {
     if (nr !== null && (!Number.isFinite(nr) || nr < 0)) return NextResponse.json({ error: 'Număr invalid' }, { status: 400 })
     const { data, error } = await sb.from('documente').update({ nr_inregistrare: nr }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC).single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ document: data })
+  }
+
+  // Starea documentului: „în lucru" (încă se lucrează) ↔ „emis" (final). null/absent = emis.
+  if (b.actiune === 'stare-doc') {
+    const docId = String(b.docId || '')
+    const stare = b.stare === 'in_lucru' ? 'in_lucru' : null
+    if (!docId) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
+    const { data, error } = await sb.from('documente').update({ stare }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',stare').single()
+    if (error) return NextResponse.json({ error: /stare/i.test(error.message || '') ? 'Rulează migrarea (lipsește coloana „stare" din documente)' : error.message }, { status: /stare/i.test(error.message || '') ? 409 : 500 })
     return NextResponse.json({ document: data })
   }
 

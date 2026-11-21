@@ -72,6 +72,8 @@ create index if not exists idx_beneficiari_sociali_act on beneficiari_sociali(ac
 alter table documente add column if not exists activitate_sociala_id uuid;
 alter table documente add column if not exists beneficiar_social_id uuid;
 alter table documente add column if not exists nr_inregistrare int;
+-- Starea documentului social: 'in_lucru' (încă se lucrează) sau null/'emis' (final, implicit).
+alter table documente add column if not exists stare text;
 create index if not exists idx_documente_activitate_sociala on documente(activitate_sociala_id);
 
 alter table activitati_sociale enable row level security;
