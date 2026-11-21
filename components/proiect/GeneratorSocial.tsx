@@ -32,11 +32,11 @@ const initiale = (n: string) => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]?
 const azi = () => new Date().toISOString().slice(0, 10)
 const roData = (iso?: string | null) => iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : ''
 
-export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateDocumente, beneficiari, documente, onBeneficiar, onBeneficiarSters, onGenerat, onStergeDoc, onDateComune, disabled }: {
+export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateDocumente, beneficiari, documente, registruHead, onBeneficiar, onBeneficiarSters, onGenerat, onStergeDoc, onDateComune, onResetNumerotare, disabled }: {
   firmaId: string; activitateId: string; an: number; zona: string; dateDocumente: Record<string, string>
-  beneficiari: Beneficiar[]; documente: DocGen[]
+  beneficiari: Beneficiar[]; documente: DocGen[]; registruHead?: { nr: number; data: string | null; urmator: number }
   onBeneficiar: (b: Beneficiar) => void; onBeneficiarSters: (id: string) => void
-  onGenerat: (d: DocGen) => void; onNrSchimbat?: (d: DocGen) => void; onStergeDoc?: (id: string) => void; onDateComune: (date: Record<string, string>) => void; disabled?: boolean
+  onGenerat: (d: DocGen) => void; onNrSchimbat?: (d: DocGen) => void; onStergeDoc?: (id: string) => void; onDateComune: (date: Record<string, string>) => void; onResetNumerotare?: () => void; disabled?: boolean
 }) {
   const sabBen = useMemo(() => sabloaneBeneficiar(zona), [zona])
   const sabAct = useMemo(() => sabloaneActivitate(zona), [zona])
@@ -140,6 +140,21 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
         {areSabloane && <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--accent)', padding: '3px 10px', borderRadius: 999, background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}>auto</span>}
         <span style={{ marginLeft: 'auto', ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>📅 {roData(dataCurenta)}</span>
       </div>
+
+      {/* Capul registrului firmei: ultimul act (nr. + data) și următorul număr liber + resetare */}
+      {registruHead && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '2px 0 8px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
+          <span style={{ ...mono }}>Registru: {registruHead.nr > 0
+            ? <>ultimul act <strong style={{ color: 'var(--text-secondary)' }}>nr. {registruHead.nr}</strong>{registruHead.data ? ` din ${roData(registruHead.data)}` : ''}</>
+            : 'niciun act numerotat încă'}</span>
+          <span aria-hidden style={{ color: 'var(--border-strong)' }}>•</span>
+          <span style={{ ...mono }}>următorul: <strong style={{ color: 'var(--accent)' }}>{registruHead.urmator}</strong></span>
+          {onResetNumerotare && !disabled && (
+            <button onClick={onResetNumerotare} title="Șterge toate numerele din registru ca să renumerotezi de la 1 (se cere confirmare)"
+              style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--border)', borderRadius: 999, padding: '3px 10px', fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer' }}>↺ Resetează numerotarea</button>
+          )}
+        </div>
+      )}
 
       {/* Setări comune */}
       {!!comune.length && (

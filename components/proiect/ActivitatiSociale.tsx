@@ -84,6 +84,27 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const zoneSortate = useMemo(() => zoneOrdonate(ordine), [ordine])
   const api = `/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`
 
+  // Capul registrului firmei (comun tuturor activităților): ultimul act numerotat + următorul număr liber.
+  const registruHead = useMemo(() => {
+    const numerotate = [...docs, ...docsZona].filter(d => d.nr_inregistrare != null)
+    if (!numerotate.length) return { nr: 0, data: null as string | null, urmator: 1 }
+    const ultim = numerotate.reduce((m, d) => ((d.nr_inregistrare || 0) > (m.nr_inregistrare || 0) ? d : m))
+    return { nr: ultim.nr_inregistrare || 0, data: ultim.data_document || null, urmator: (ultim.nr_inregistrare || 0) + 1 }
+  }, [docs, docsZona])
+
+  // „Resetează numerotarea": șterge toate numerele registrului firmei (plecăm de la 0), apoi fiecare act
+  // primește un număr nou la „Pregătește". Documentele rămân — doar numerele dispar.
+  async function reseteazaNumerotare() {
+    if (!confirm('Resetezi numerotarea întregului registru al firmei?\n\nSe șterg TOATE numerele de înregistrare (din toate activitățile) ca să renumerotezi de la 1. Documentele rămân neatinse — doar numerele dispar, iar fiecare primește un număr nou când apeși „Pregătește".\n\nContinui?')) return
+    setMesaj('')
+    const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'reseteaza-numerotare' }) })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) { setMesaj(d.error || 'Nu s-a putut reseta numerotarea'); return }
+    setDocs(prev => prev.map(x => ({ ...x, nr_inregistrare: null })))
+    setDocsZona(prev => prev.map(x => ({ ...x, nr_inregistrare: null })))
+    setUrmatorNr(1)
+  }
+
   // Reordonare prin tragere (drag & drop) sau săgeți de la tastatură: mută zona de la poziția `from` la `to`.
   async function mutaLa(from: number, to: number) {
     const coduri = zoneSortate.map(z => z.cod)
@@ -134,7 +155,12 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const upsertBenef = (b: Beneficiar) => setBeneficiari(prev => prev.some(x => x.id === b.id) ? prev.map(x => x.id === b.id ? b : x) : [...prev, b])
   const removeBenef = (id: string) => setBeneficiari(prev => prev.filter(x => x.id !== id))
   // la regenerare, API-ul poate întoarce documentul fără „stare" (coloana nu intră în select-ul de generare) — păstrăm starea curentă din UI
-  const addGenerat = (d: DocGen) => { setDocs(prev => { const e = d as unknown as Doc; return prev.some(x => x.id === e.id) ? prev.map(x => x.id === e.id ? { ...e, stare: e.stare ?? x.stare } : x) : [e, ...prev] }); setUrmatorNr(u => Math.max(u, (d.nr_inregistrare || 0) + 1)) }
+  const addGenerat = (d: DocGen) => setDocs(prev => {
+    const e = d as unknown as Doc
+    const next = prev.some(x => x.id === e.id) ? prev.map(x => x.id === e.id ? { ...e, stare: e.stare ?? x.stare } : x) : [e, ...prev]
+    setUrmatorNr(nrUrmator(next)) // recalculează (scade și la „↩ Dă înapoi", unde numărul redevine liber)
+    return next
+  })
   const updateNr = (d: DocGen) => setDocs(prev => { const next = prev.map(x => x.id === d.id ? { ...x, nr_inregistrare: d.nr_inregistrare } : x); setUrmatorNr(nrUrmator(next)); return next })
   const updateDateComune = (id: string, date: Record<string, string>) => setActs(prev => prev.map(x => x.id === id ? { ...x, date_documente: date } : x))
   // upsert: documentele noi apar sus, iar cele deja existente (ex. marcate draft) se actualizează pe loc
@@ -263,6 +289,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                       <RandActivitate key={a.id} a={a} docs={docs.filter(d => d.activitate_sociala_id === a.id)} firmaId={firmaId}
                         bazaBeneficiari={z.baza === 'beneficiari'} unitate={z.unitate} zona={z.cod} an={an} definitiv={definitiv}
                         beneficiari={beneficiari.filter(b => b.activitate_id === a.id)} urmatorNr={urmatorNr}
+                        registruHead={registruHead} onResetNumerotare={reseteazaNumerotare}
                         arataDocsZona={ai === 0} sabloaneZona={sabloanePentruZona(z.cod).map(s => ({ tip: s.tip, label: s.label }))}
                         activitatiZona={aleZonei.map(x => ({ id: x.id, denumire: x.denumire }))}
                         docsZona={docsZona.filter(d => d.zona_sociala === z.cod && (d.an_social == null || d.an_social === an))}
@@ -294,9 +321,9 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
 }
 
 // --- O activitate (rând) ---------------------------------------------------------------------
-function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, definitiv, beneficiari, urmatorNr, arataDocsZona, sabloaneZona, activitatiZona, docsZona, onDocZonaAdaugat, onDocZonaSters, onMutaDocZona, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat, onDateComune }: {
+function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, definitiv, beneficiari, urmatorNr, registruHead, onResetNumerotare, arataDocsZona, sabloaneZona, activitatiZona, docsZona, onDocZonaAdaugat, onDocZonaSters, onMutaDocZona, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat, onDateComune }: {
   a: Activitate; docs: Doc[]; firmaId: string; bazaBeneficiari: boolean; unitate: string; zona: string; an: number; definitiv?: boolean
-  beneficiari: Beneficiar[]; urmatorNr: number
+  beneficiari: Beneficiar[]; urmatorNr: number; registruHead?: { nr: number; data: string | null; urmator: number }; onResetNumerotare?: () => void
   arataDocsZona?: boolean; sabloaneZona: { tip: string; label: string }[]; activitatiZona?: { id: string; denumire: string }[]; docsZona: Doc[]
   onDocZonaAdaugat: (ds: Doc[]) => void; onDocZonaSters: (id: string) => void; onMutaDocZona?: (d: Doc) => void
   onModifica: (id: string, patch: Record<string, unknown>) => void; onSterge: () => void
@@ -366,9 +393,9 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
         <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
           {/* Fabrica de documente - vizibilă sus (doar la zonele cu șabloane) */}
           <GeneratorSocial firmaId={firmaId} activitateId={a.id} an={a.an} zona={zona} dateDocumente={a.date_documente || {}}
-            beneficiari={beneficiari} documente={docGenerate}
+            beneficiari={beneficiari} documente={docGenerate} registruHead={registruHead}
             onBeneficiar={onBeneficiar} onBeneficiarSters={onBeneficiarSters} onGenerat={onGenerat} onNrSchimbat={onNrSchimbat}
-            onStergeDoc={onDocSters} onDateComune={date => onDateComune(a.id, date)} />
+            onStergeDoc={onDocSters} onDateComune={date => onDateComune(a.id, date)} onResetNumerotare={onResetNumerotare} />
 
           {/* Detalii activitate - strânse când zona are generator, ca să nu încarce */}
           <details open={!areGenerator}>

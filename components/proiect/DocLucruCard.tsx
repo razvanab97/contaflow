@@ -14,7 +14,8 @@ export interface DocLucru {
   tip_document: string | null; data_document?: string | null; stare?: string | null; nr_inregistrare?: number | null
 }
 interface CampManual { nr: number; eticheta: string }
-interface RezPregatire { completate: number; total: number; manuale: CampManual[] }
+interface RezPregatire { completate: number; total: number; manuale: CampManual[]; nrAtribuit?: number | null }
+export interface AnteriorDoc { path: string; nume: string; marime: number | null; nr: number | null; data: string | null }
 
 const disp: React.CSSProperties = { fontFamily: 'var(--font-bricolage), var(--font-geist), system-ui, sans-serif' }
 const mono: React.CSSProperties = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' }
@@ -31,6 +32,7 @@ export default function DocLucruCard({ firmaId, api, doc, activitati, onActualiz
   const [rez, setRez] = useState<RezPregatire | null>(null)
   const [valori, setValori] = useState<Record<string, string>>({})
   const [mesaj, setMesaj] = useState('')
+  const [anterior, setAnterior] = useState<AnteriorDoc | null>(null) // stare de dinaintea ultimei pregătiri/completări → „↩ Dă înapoi"
   const inLucru = doc.stare === 'in_lucru'
   const titlu = doc.furnizor || doc.fisier_nume
   const urlDoc = (preview = false) => `${api}&download=${doc.id}${preview ? '&preview=1' : ''}`
@@ -40,7 +42,7 @@ export default function DocLucruCard({ firmaId, api, doc, activitati, onActualiz
     try {
       const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'pregateste-doc', docId: doc.id }) })
       const d = await r.json().catch(() => ({}))
-      if (r.ok && d.document) { onActualizat(d.document); setRez({ completate: d.completate || 0, total: d.total || 0, manuale: d.manuale || [] }); setValori({}) }
+      if (r.ok && d.document) { onActualizat(d.document); setRez({ completate: d.completate || 0, total: d.total || 0, manuale: d.manuale || [], nrAtribuit: d.nrAtribuit ?? null }); setValori({}); setAnterior(d.anterior || null) }
       else setMesaj(d.error || 'Nu s-a putut pregăti documentul')
     } catch { setMesaj('Pregătirea a eșuat') } finally { setBusy('') }
   }
@@ -52,9 +54,27 @@ export default function DocLucruCard({ firmaId, api, doc, activitati, onActualiz
     try {
       const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'completeaza-manual', docId: doc.id, campuri }) })
       const d = await r.json().catch(() => ({}))
-      if (r.ok && d.document) { onActualizat(d.document); setRez({ completate: d.completate || 0, total: d.total || 0, manuale: d.manuale || [] }); setValori({}) }
+      if (r.ok && d.document) { onActualizat(d.document); setRez({ completate: d.completate || 0, total: d.total || 0, manuale: d.manuale || [] }); setValori({}); setAnterior(d.anterior || null) }
       else setMesaj(d.error || 'Nu s-a putut completa')
     } catch { setMesaj('Completarea a eșuat') } finally { setBusy('') }
+  }
+  // schimbă data documentului (înainte de „Pregătește", ca numărul să iasă în ordine)
+  async function schimbaData(val: string) {
+    setBusy('d'); setMesaj('')
+    const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'data-doc', docId: doc.id, data: val || null }) })
+    const d = await r.json().catch(() => ({})); setBusy('')
+    if (r.ok && d.document) onActualizat(d.document); else setMesaj(d.error || 'Nu s-a putut salva data')
+  }
+  // „↩ Dă înapoi": revine la starea de dinaintea ultimei pregătiri/completări (fișier + nr. + dată)
+  async function daInapoi() {
+    if (!anterior) return
+    setBusy('u'); setMesaj('')
+    try {
+      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'restaureaza-doc', docId: doc.id, anterior }) })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok && d.document) { onActualizat(d.document); setAnterior(null); setRez(null); setValori({}) }
+      else setMesaj(d.error || 'Nu s-a putut da înapoi')
+    } catch { setMesaj('Operația a eșuat') } finally { setBusy('') }
   }
   async function schimbaStare() {
     setBusy('s')
@@ -82,11 +102,17 @@ export default function DocLucruCard({ firmaId, api, doc, activitati, onActualiz
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titlu}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginTop: 3 }}>
-            {doc.data_document && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{roData(doc.data_document)}</span>}
+            {!disabled
+              ? <input type="date" key={doc.id + ':' + (doc.data_document || '')} defaultValue={(doc.data_document || '').slice(0, 10)} max="2035-12-31" disabled={busy === 'd'}
+                  onChange={e => schimbaData(e.target.value)} title="Data documentului — pune-o înainte de Pregătește, ca numărul să iasă în ordinea corectă" aria-label="Data documentului"
+                  style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', cursor: 'pointer' }} />
+              : doc.data_document && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{roData(doc.data_document)}</span>}
             <button onClick={schimbaStare} disabled={busy === 's'} title="Apasă pentru a comuta: Emis ↔ În lucru"
               style={{ ...pill, color: inLucru ? 'var(--accent-amber, #e0a84a)' : 'var(--accent-green)', background: inLucru ? 'color-mix(in srgb, var(--accent-amber, #e0a84a) 15%, transparent)' : 'color-mix(in srgb, var(--accent-green) 13%, transparent)', opacity: busy === 's' ? 0.5 : 1 }}>
               <span style={{ width: 6, height: 6, borderRadius: 999, background: inLucru ? 'var(--accent-amber, #e0a84a)' : 'var(--accent-green)' }} />{inLucru ? 'În lucru' : 'Emis'}</button>
-            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>pus în lucru dintr-un draft</span>
+            {doc.nr_inregistrare == null
+              ? <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>nr. se dă la „Pregătește"</span>
+              : <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>pus în lucru dintr-un draft</span>}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -97,8 +123,10 @@ export default function DocLucruCard({ firmaId, api, doc, activitati, onActualiz
               {activitati!.map(a => <option key={a.id} value={a.id}>{a.denumire}</option>)}
             </select>
           )}
-          {!disabled && <button onClick={pregateste} disabled={busy === 'p'} className="gsoc-solid" title="AI identifică ce lipsește, completează din datele interne și pregătește ce rămâne de completat manual"
+          {!disabled && <button onClick={pregateste} disabled={busy === 'p'} className="gsoc-solid" title="Dă numărul de înregistrare (următorul liber), apoi AI identifică ce lipsește, completează din datele interne și pregătește ce rămâne de completat manual"
             style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 13px', borderRadius: 999, cursor: 'pointer', opacity: busy === 'p' ? 0.6 : 1 }}>{busy === 'p' ? 'Se pregătește…' : '✨ Pregătește'}</button>}
+          {!disabled && anterior && <button onClick={daInapoi} disabled={busy === 'u'} title="Revine la starea de dinaintea ultimei pregătiri/completări (fișierul, numărul și data)"
+            style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 11px', borderRadius: 999, cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', flexShrink: 0, opacity: busy === 'u' ? 0.6 : 1 }}>↩ {busy === 'u' ? 'Se revine…' : 'Dă înapoi'}</button>}
           <button onClick={() => deschideDocument(urlDoc(true), doc.fisier_nume)} style={ico} title="Vezi">👁</button>
           <a href={urlDoc()} style={word} title="Descarcă Word (editabil)">Word</a>
           <button onClick={() => printeazaDocxPdf(urlDoc(), doc.fisier_nume)} style={{ ...word, cursor: 'pointer' }} title="PDF (pregătit de semnare)">PDF</button>
@@ -108,6 +136,7 @@ export default function DocLucruCard({ firmaId, api, doc, activitati, onActualiz
 
       {rez && (
         <div style={{ borderTop: '1px solid var(--border-subtle)', padding: '11px 13px', fontSize: 'var(--fs-xs)' }}>
+          {rez.nrAtribuit != null && <div style={{ fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>✓ I-am dat numărul de înregistrare <strong>{rez.nrAtribuit}</strong> în registru.</div>}
           <div style={{ fontWeight: 700, color: 'var(--accent-green)' }}>✓ Am completat {rez.completate} {rez.completate === 1 ? 'câmp' : 'câmpuri'} din datele interne{rez.total ? ` (din ${rez.total})` : ''}.</div>
           {rez.manuale.length > 0 ? (
             <div style={{ marginTop: 8 }}>

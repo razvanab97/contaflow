@@ -233,6 +233,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ document: data })
   }
 
+  // Setează data unui act pus în lucru (înainte de „Pregătește", ca să iasă în ordinea corectă în registru).
+  if (b.actiune === 'data-doc') {
+    const docId = String(b.docId || ''), dataNoua = b.data ? dataValida(b.data) : null
+    if (!docId) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
+    if (b.data && !dataNoua) return NextResponse.json({ error: 'Dată invalidă' }, { status: 400 })
+    const { data: d, error } = await sb.from('documente').update({ data_document: dataNoua }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ document: d })
+  }
+
+  // „↩ Dă înapoi": restaurează un act la starea de dinaintea ultimei pregătiri/completări (fișier + nr. + dată).
+  // `anterior` vine exact din răspunsul lui pregateste-doc / completeaza-manual.
+  if (b.actiune === 'restaureaza-doc') {
+    const docId = String(b.docId || '')
+    const a = (b.anterior && typeof b.anterior === 'object') ? b.anterior as Record<string, unknown> : null
+    const path = a ? String(a.path || '') : ''
+    if (!docId || !path) return NextResponse.json({ error: 'Nimic de restaurat' }, { status: 400 })
+    if (!path.startsWith(`${firmaId}/`)) return NextResponse.json({ error: 'Cale invalidă' }, { status: 400 }) // siguranță: doar în folderul firmei
+    const { data: doc } = await sb.from('documente').select('fisier_path').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).maybeSingle()
+    if (!doc) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
+    const { data: f } = await sb.storage.from('documente').download(path) // versiunea anterioară trebuie să existe
+    if (!f) return NextResponse.json({ error: 'Versiunea anterioară nu mai există' }, { status: 410 })
+    const nr = (a!.nr === null || a!.nr === undefined || a!.nr === '') ? null : Math.trunc(Number(a!.nr))
+    const dataDoc = a!.data ? dataValida(a!.data) : null
+    const { data: docNou, error } = await sb.from('documente').update({
+      fisier_path: path, fisier_nume: String(a!.nume || 'document (în lucru).docx'),
+      fisier_marime: (a!.marime == null ? f.size : Math.trunc(Number(a!.marime))) || f.size, fisier_tip: DOCX_TIP,
+      nr_inregistrare: Number.isFinite(nr as number) ? nr : null, data_document: dataDoc,
+    }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (doc.fisier_path && doc.fisier_path !== path) await sb.storage.from('documente').remove([doc.fisier_path]) // ștergem versiunea abandonată
+    return NextResponse.json({ document: docNou })
+  }
+
+  // „Resetează ca să plecăm de la 0": nr_inregistrare = null. Implicit tot registrul firmei; cu
+  // `activitateId`, doar o activitate. Apoi se renumerotează de la 1 pe măsură ce apeși „Pregătește".
+  if (b.actiune === 'reseteaza-numerotare') {
+    const activitateId = b.activitateId ? String(b.activitateId) : ''
+    let q = sb.from('documente').update({ nr_inregistrare: null }).eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null)
+    if (activitateId) q = q.eq('activitate_sociala_id', activitateId)
+    const { data, error } = await q.select('id')
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true, resetate: data?.length || 0 })
+  }
+
   // Starea documentului: „în lucru" (încă se lucrează) ↔ „emis" (final). null/absent = emis.
   if (b.actiune === 'stare-doc') {
     const docId = String(b.docId || '')
@@ -296,15 +341,14 @@ export async function POST(req: NextRequest) {
     if (esteDocx) { try { outBytes = await umpleSablon(inBytes, valori) } catch { outBytes = inBytes } }
     const bazaNume = (sursa.fisier_nume || 'document').replace(/\.docx$/i, '')
     const nume = bazaNume + ' (în lucru).docx'
-    // în registrul activității: nr. de înregistrare automat; altfel document de zonă fără număr
+    // numărul de înregistrare NU se dă acum — se atribuie la „Pregătește" (vezi pregateste-doc),
+    // după ce setezi data, ca să iasă în ordinea corectă în registru.
     const inRegistru = activitateId && act?.id
     const path = `${inRegistru ? prefix(firmaId, act!.id) : prefixZona(firmaId, zonaDoc, anDoc)}${Date.now()}_pus_in_lucru.docx`
     const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(outBytes), { contentType: sursa.fisier_tip || DOCX_TIP })
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
-    let nr: number | null = null
-    if (inRegistru) { const { data: mx } = await sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1); nr = ((mx?.[0]?.nr_inregistrare as number) || 0) + 1 }
     const camp = inRegistru
-      ? { activitate_sociala_id: act!.id, zona_sociala: null, an_social: null, stare: 'in_lucru', tip_document: TIP_LUCRU, nr_inregistrare: nr }
+      ? { activitate_sociala_id: act!.id, zona_sociala: null, an_social: null, stare: 'in_lucru', tip_document: TIP_LUCRU, nr_inregistrare: null }
       : { activitate_sociala_id: null, zona_sociala: zonaDoc, an_social: anDoc, stare: 'in_lucru', tip_document: TIP_LUCRU }
     const { data: doc, error } = await sb.from('documente').insert({
       firma_id: firmaId, luna_id: null, modul: MODUL, este_draft: false, furnizor: bazaNume, data_document: t,
@@ -320,14 +364,29 @@ export async function POST(req: NextRequest) {
   if (b.actiune === 'pregateste-doc') {
     const docId = String(b.docId || '')
     if (!docId) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
-    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip,nr_inregistrare,data_document,activitate_sociala_id').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).maybeSingle()
+    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip,fisier_marime,nr_inregistrare,data_document,activitate_sociala_id').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).maybeSingle()
     if (!doc?.fisier_path) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
     if (!(/\.docx$/i.test(doc.fisier_nume || '') || /wordprocessing/.test(doc.fisier_tip || ''))) return NextResponse.json({ error: 'Doar documentele Word (.docx) pot fi pregătite automat' }, { status: 400 })
     const { data: orig, error: dlErr } = await sb.storage.from('documente').download(doc.fisier_path)
     if (dlErr || !orig) return NextResponse.json({ error: 'Documentul nu a putut fi citit' }, { status: 500 })
     const inBytes = new Uint8Array(await orig.arrayBuffer())
+    // stare de dinainte de pregătire — pentru „↩ Dă înapoi" (restaurăm fișierul + nr. + data)
+    const anterior = { path: doc.fisier_path, nume: doc.fisier_nume, marime: (doc.fisier_marime as number | null) ?? null, nr: (doc.nr_inregistrare as number | null) ?? null, data: (doc.data_document as string | null) ?? null }
+    // numărul de înregistrare se dă ACUM, la „Pregătește": următorul liber din registrul firmei
+    // (dacă actul n-are deja număr și e într-o activitate). Setezi data întâi → iese în ordinea corectă.
+    let nrAtribuit: number | null = null
+    if (doc.nr_inregistrare == null && doc.activitate_sociala_id) {
+      const { data: mx } = await sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1)
+      nrAtribuit = ((mx?.[0]?.nr_inregistrare as number) || 0) + 1
+      await sb.from('documente').update({ nr_inregistrare: nrAtribuit }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL)
+      doc.nr_inregistrare = nrAtribuit // ca AI-ul să scrie numărul corect în document
+    }
     const { context, total } = await extrageContextBlanks(inBytes)
-    if (!total) return NextResponse.json({ error: 'Documentul nu are spații de completat („______") de pregătit.' }, { status: 400 })
+    if (!total) {
+      // n-are spații de completat — doar i-am dat numărul (dacă era cazul); întoarcem starea actuală
+      const { data: docFull } = await sb.from('documente').select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).single()
+      return NextResponse.json({ document: docFull, completate: 0, total: 0, manuale: [], nrAtribuit, anterior: nrAtribuit != null ? anterior : null, faraSpatii: true })
+    }
 
     // date interne ale activității
     const actId = doc.activitate_sociala_id as string | null
@@ -379,8 +438,8 @@ export async function POST(req: NextRequest) {
     const { data: docNou, error } = await sb.from('documente').update({ fisier_path: path, fisier_marime: umplut.bytes.length, fisier_tip: DOCX_TIP })
       .eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
-    if (doc.fisier_path && doc.fisier_path !== path) await sb.storage.from('documente').remove([doc.fisier_path])
-    return NextResponse.json({ document: docNou, completate: umplut.completate, total, manuale })
+    // nu ștergem fișierul anterior — rămâne pentru „↩ Dă înapoi"
+    return NextResponse.json({ document: docNou, completate: umplut.completate, total, manuale, nrAtribuit, anterior })
   }
 
   // „Du în document": completează spațiile rămase manuale cu valorile introduse de utilizator în aplicație.
@@ -390,12 +449,14 @@ export async function POST(req: NextRequest) {
     const campuri = (Array.isArray(b.campuri) ? b.campuri : []) as { nr?: unknown; eticheta?: unknown; valoare?: unknown }[]
     if (!docId) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
     if (!campuri.length) return NextResponse.json({ error: 'Nimic de completat' }, { status: 400 })
-    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip,activitate_sociala_id').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).maybeSingle()
+    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip,fisier_marime,nr_inregistrare,data_document,activitate_sociala_id').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).maybeSingle()
     if (!doc?.fisier_path) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
     if (!(/\.docx$/i.test(doc.fisier_nume || '') || /wordprocessing/.test(doc.fisier_tip || ''))) return NextResponse.json({ error: 'Doar documentele Word (.docx)' }, { status: 400 })
     const { data: orig, error: dlErr } = await sb.storage.from('documente').download(doc.fisier_path)
     if (dlErr || !orig) return NextResponse.json({ error: 'Documentul nu a putut fi citit' }, { status: 500 })
     const inBytes = new Uint8Array(await orig.arrayBuffer())
+    // stare de dinainte — pentru „↩ Dă înapoi"
+    const anterior = { path: doc.fisier_path, nume: doc.fisier_nume, marime: (doc.fisier_marime as number | null) ?? null, nr: (doc.nr_inregistrare as number | null) ?? null, data: (doc.data_document as string | null) ?? null }
     const valori: Record<string, string> = {}
     for (const c of campuri) {
       const nr = Math.trunc(Number(c.nr)); const val = String(c.valoare ?? '').replace(/\s+/g, ' ').trim()
@@ -409,10 +470,10 @@ export async function POST(req: NextRequest) {
     const { data: docNou, error } = await sb.from('documente').update({ fisier_path: path, fisier_marime: umplut.bytes.length, fisier_tip: DOCX_TIP })
       .eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
-    if (doc.fisier_path && doc.fisier_path !== path) await sb.storage.from('documente').remove([doc.fisier_path])
+    // nu ștergem fișierul anterior — rămâne pentru „↩ Dă înapoi"
     // câmpurile rămase (fără valoare introdusă) — renumerotate pe documentul rezultat
     const manuale = campuri.filter(c => !String(c.valoare ?? '').trim()).map(c => ({ nr: umplut.remap[String(Math.trunc(Number(c.nr)))], eticheta: String(c.eticheta ?? '').slice(0, 120) })).filter(m => m.nr != null)
-    return NextResponse.json({ document: docNou, completate: umplut.completate, total: umplut.total, manuale })
+    return NextResponse.json({ document: docNou, completate: umplut.completate, total: umplut.total, manuale, anterior })
   }
 
   // Generează un document dintr-un șablon (umplut cu date + nr. de înregistrare automat).
