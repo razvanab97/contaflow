@@ -38,12 +38,16 @@ create table if not exists zone_sociale_an (
   zona text not null,
   an int not null,
   status text not null default 'deschisa'
-    check (status in ('deschisa','inchisa_pe_an','inchisa_definitiv')),
+    check (status in ('deschisa','in_lucru','inchisa_pe_an','inchisa_definitiv')),
   nota text,
   updated_at timestamptz not null default now(),
   unique (firma_id, zona, an)
 );
 create index if not exists idx_zone_sociale_an_firma on zone_sociale_an(firma_id);
+-- Actualizează constrângerea de status pentru bazele existente (adaugă 'in_lucru'); idempotent.
+alter table zone_sociale_an drop constraint if exists zone_sociale_an_status_check;
+alter table zone_sociale_an add constraint zone_sociale_an_status_check
+  check (status in ('deschisa','in_lucru','inchisa_pe_an','inchisa_definitiv'));
 
 -- Ordinea (prioritatea) zonelor pentru o firmă — mutarea unei zone mai sus/mai jos în listă.
 -- Lipsa rândului = ordinea din catalog (lib/proiect-social.ts).

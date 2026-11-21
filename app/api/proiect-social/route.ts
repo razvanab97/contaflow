@@ -129,7 +129,11 @@ export async function POST(req: NextRequest) {
     const { data, error } = await sb.from('zone_sociale_an').upsert(
       { firma_id: firmaId, zona, an, status, nota: txt(b.nota, 300), updated_at: new Date().toISOString() },
       { onConflict: 'firma_id,zona,an' }).select('zona,an,status,nota').single()
-    if (error) return NextResponse.json({ error: tabelLipsa(error) ? 'Rulează migrarea supabase_activitati_sociale.sql' : error.message }, { status: tabelLipsa(error) ? 409 : 500 })
+    if (error) {
+      // 23514 = check constraint (vechea constrângere nu cunoaște încă 'in_lucru')
+      const migrare = tabelLipsa(error) || error.code === '23514' || /status_check|constraint/i.test(error.message || '')
+      return NextResponse.json({ error: migrare ? 'Rulează migrarea supabase_activitati_sociale.sql (actualizează stările de zonă)' : error.message }, { status: migrare ? 409 : 500 })
+    }
     return NextResponse.json({ stare: data })
   }
 
