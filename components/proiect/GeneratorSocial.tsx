@@ -58,6 +58,7 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
   const [setari, setSetari] = useState(false)
   const [busy, setBusy] = useState('')
   const [mesaj, setMesaj] = useState('')
+  const [pregatit, setPregatit] = useState<Record<string, { completate: number; total: number; manuale: { nr: number; eticheta: string }[] }>>({})
   const autoRef = useRef(false)
   const api = `/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`
   const urlDoc = (id: string, preview = false) => `${api}&download=${id}${preview ? '&preview=1' : ''}`
@@ -126,6 +127,16 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
     if (!confirm(`Scoți din registru documentul „${doc.furnizor || doc.fisier_nume}"?`)) return
     const r = await fetch(`${api}&doc=${doc.id}`, { method: 'DELETE' })
     if (r.ok) onStergeDoc?.(doc.id); else setMesaj('Nu s-a putut șterge')
+  }
+  // „Pregătește": AI identifică spațiile de completat, umple ce poate din datele interne și raportează restul (manual)
+  async function pregatesteDoc(doc: DocGen) {
+    setBusy('p' + doc.id); setMesaj('')
+    try {
+      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'pregateste-doc', docId: doc.id }) })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok && d.document) { onGenerat(d.document); setPregatit(p => ({ ...p, [doc.id]: { completate: d.completate || 0, total: d.total || 0, manuale: d.manuale || [] } })) }
+      else setMesaj(d.error || 'Nu s-a putut pregăti documentul')
+    } catch { setMesaj('Pregătirea a eșuat') } finally { setBusy('') }
   }
 
   const chips = comune.filter(c => dateDocumente?.[c.key]).slice(0, 2)
@@ -221,9 +232,10 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
       })}
 
       {/* Documente puse în lucru dintr-un draft (ex. Raport anual) — acte separate în registru */}
-      {extra.map(d => { const inLucru = d.stare === 'in_lucru', sb = busy === 's' + d.id
+      {extra.map(d => { const inLucru = d.stare === 'in_lucru', sb = busy === 's' + d.id, pb = busy === 'p' + d.id, rez = pregatit[d.id]
         return (
-          <div key={d.id} className="gsoc-row" style={S.row}>
+          <div key={d.id}>
+          <div className="gsoc-row" style={S.row}>
             <span className="gsoc-node">{d.nr_inregistrare != null ? <span className="gsoc-nr" title="Număr de înregistrare">{d.nr_inregistrare}</span> : <span className="gsoc-dot w" />}</span>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.furnizor || d.fisier_nume}</div>
@@ -236,9 +248,26 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+              {!disabled && <button onClick={() => pregatesteDoc(d)} disabled={pb} className="gsoc-solid" title="AI identifică ce lipsește, completează din datele interne și pregătește ce rămâne de completat manual"
+                style={{ ...S.pdf, display: 'inline-flex', alignItems: 'center', gap: 5, opacity: pb ? 0.6 : 1 }}>{pb ? 'Se pregătește…' : '✨ Pregătește'}</button>}
               <ActiuniDoc doc={d} urlDoc={urlDoc} />
               {!disabled && <button onClick={() => stergeLucru(d)} title="Scoate din registru" aria-label={`Șterge ${d.furnizor || d.fisier_nume}`} style={{ ...S.ico, fontSize: 15 }}>×</button>}
             </div>
+          </div>
+          {rez && (
+            <div style={{ margin: '0 0 2px 54px', padding: '10px 13px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 'var(--fs-xs)' }}>
+              <div style={{ fontWeight: 700, color: 'var(--accent-green)' }}>✓ Am completat {rez.completate} {rez.completate === 1 ? 'câmp' : 'câmpuri'} din datele interne{rez.total ? ` (din ${rez.total})` : ''}.</div>
+              {rez.manuale.length > 0
+                ? <div style={{ marginTop: 6 }}>
+                    <div style={{ color: 'var(--text-secondary)', fontWeight: 600, marginBottom: 4 }}>Rămâne de completat manual în document ({rez.manuale.length}):</div>
+                    <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-muted)', display: 'grid', gap: 2 }}>
+                      {rez.manuale.map(m => <li key={m.nr}>{m.eticheta}</li>)}
+                    </ul>
+                    <div style={{ marginTop: 6, color: 'var(--text-muted)' }}>Deschide documentul (Word / Vezi) — câmpurile rămase sunt liniile „______".</div>
+                  </div>
+                : <div style={{ marginTop: 4, color: 'var(--text-muted)' }}>Nu a mai rămas nimic de completat manual.</div>}
+            </div>
+          )}
           </div>) })}
 
       {/* Voluntari */}

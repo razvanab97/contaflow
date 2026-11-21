@@ -543,7 +543,7 @@ function DocumenteZona({ firmaId, zona, an, api, activitateId, docs, sabloane, o
               <span aria-hidden style={{ fontSize: 13 }}>📄</span>
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
               {esteDocxDoc(d) && !disabled && <button onClick={() => marcheaza(d.id, true)} disabled={busy} title="Marchează ca draft reutilizabil (apare la Drafturi standard)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', fontWeight: 700 }}>☆ Draft</button>}
-              {previzualizabil(d) && <button onClick={() => deschideDocument(urlDoc(d, true), d.fisier_nume)} style={{ ...linkBtn, color: 'var(--accent)' }}>Vezi</button>}
+              {(previzualizabil(d) || esteDocxDoc(d)) && <button onClick={() => deschideDocument(urlDoc(d, true), d.fisier_nume)} style={{ ...linkBtn, color: 'var(--accent)' }}>Vezi</button>}
               <a href={urlDoc(d)} title="Descarcă" style={{ ...linkBtn, color: 'var(--accent)' }}>↓</a>
               <button onClick={() => stergeDoc(d)} title="Șterge documentul" aria-label={`Șterge ${d.fisier_nume}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
             </div>
@@ -567,6 +567,7 @@ function DocumenteZona({ firmaId, zona, an, api, activitateId, docs, sabloane, o
             <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: '1px solid color-mix(in srgb, var(--accent) 22%, var(--border))', borderRadius: 'var(--r-md)', background: 'color-mix(in srgb, var(--accent) 5%, var(--surface))' }}>
               <span aria-hidden style={{ fontSize: 14 }}>⭐</span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
+              {(previzualizabil(d) || esteDocxDoc(d)) && <button onClick={() => deschideDocument(urlDoc(d, true), d.fisier_nume)} title="Vezi documentul" style={{ ...linkBtn, color: 'var(--accent)', fontSize: 'var(--fs-xs)', flexShrink: 0 }}>Vezi</button>}
               <button onClick={() => marcheaza(d.id, false)} disabled={busy} title="Scoate din drafturi (redevine document de moment)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', flexShrink: 0 }}>scoate</button>
               <a href={urlDoc(d)} title="Descarcă draftul" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)', flexShrink: 0 }}>↓</a>
               <button onClick={() => puneInLucruDoc(d.id)} disabled={busy} className="gsoc-solid" title="Pune documentul în cadrul de lucru (copie editabilă, cu datele completate)" style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 13px', borderRadius: 999, cursor: 'pointer', flexShrink: 0 }}>{busy ? 'Se lucrează…' : '➕ Pune în lucru'}</button>

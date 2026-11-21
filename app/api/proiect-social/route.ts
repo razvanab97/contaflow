@@ -3,6 +3,8 @@ import { getServiceSupabase } from '@/lib/supabase/server'
 import { codNou, statusActValid, stareZonaValida, zonaValida, tipDocActValid, ZONE_SOCIALE, type StatusAct } from '@/lib/proiect-social'
 import { getSablon, caleStorage, VALORI_IMPLICITE, TIP_LUCRU } from '@/lib/proiect-social-sabloane'
 import { umpleSablon } from '@/lib/docxFill'
+import { extrageContextBlanks, umpleBlanks } from '@/lib/docxBlanks'
+import { analizeazaDocument } from '@/lib/ai/pregateste-doc'
 import JSZip from 'jszip'
 
 export const dynamic = 'force-dynamic'
@@ -298,6 +300,73 @@ export async function POST(req: NextRequest) {
     }).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
     return NextResponse.json({ document: doc })
+  }
+
+  // „Pregătește" un document pus în lucru: AI identifică spațiile de completat („______"), le umple pe cele
+  // pe care le putem deduce din datele interne (nr., data, voluntari, contracte…) și le raportează pe cele
+  // rămase de completat manual (acolo unde n-avem informația internă).
+  if (b.actiune === 'pregateste-doc') {
+    const docId = String(b.docId || '')
+    if (!docId) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
+    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip,nr_inregistrare,data_document,activitate_sociala_id').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).maybeSingle()
+    if (!doc?.fisier_path) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
+    if (!(/\.docx$/i.test(doc.fisier_nume || '') || /wordprocessing/.test(doc.fisier_tip || ''))) return NextResponse.json({ error: 'Doar documentele Word (.docx) pot fi pregătite automat' }, { status: 400 })
+    const { data: orig, error: dlErr } = await sb.storage.from('documente').download(doc.fisier_path)
+    if (dlErr || !orig) return NextResponse.json({ error: 'Documentul nu a putut fi citit' }, { status: 500 })
+    const inBytes = new Uint8Array(await orig.arrayBuffer())
+    const { context, total } = await extrageContextBlanks(inBytes)
+    if (!total) return NextResponse.json({ error: 'Documentul nu are spații de completat („______") de pregătit.' }, { status: 400 })
+
+    // date interne ale activității
+    const actId = doc.activitate_sociala_id as string | null
+    const roData = (iso?: string | null) => iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : ''
+    const linii: string[] = []
+    let act: { denumire?: string; an?: number; perioada?: string; date_documente?: unknown } | null = null
+    if (actId) {
+      const { data: a } = await sb.from('activitati_sociale').select('denumire,an,perioada,date_documente').eq('id', actId).eq('firma_id', firmaId).maybeSingle()
+      act = a
+    }
+    const comune = (act?.date_documente || {}) as Record<string, string>
+    const val = (k: string) => (comune[k] || VALORI_IMPLICITE[k] || '').trim()
+    if (act) linii.push(`- Activitate: ${act.denumire || ''}${act.an ? `, anul ${act.an}` : ''}${act.perioada ? `, perioada ${act.perioada}` : ''}`)
+    if (val('COORDONATOR')) linii.push(`- Coordonator: ${val('COORDONATOR')}`)
+    if (val('LOCUL')) linii.push(`- Locul: ${val('LOCUL')}`)
+    if (val('INSTRUIT_DE')) linii.push(`- Instruit de: ${val('INSTRUIT_DE')}`)
+    linii.push(`- Numărul de înregistrare al acestui document: ${doc.nr_inregistrare ?? '(neatribuit)'}`)
+    linii.push(`- Data documentului (de folosit unde cere „Data"): ${roData(doc.data_document) || roData(azi())}`)
+    if (actId) {
+      const { data: dec } = await sb.from('documente').select('nr_inregistrare,data_document').eq('firma_id', firmaId).eq('modul', MODUL).eq('activitate_sociala_id', actId).eq('tip_document', 'decizie_organizare').order('created_at', { ascending: true }).limit(1)
+      if (dec?.[0]) linii.push(`- Decizia de organizare: nr. ${dec[0].nr_inregistrare ?? '?'}${dec[0].data_document ? ` din ${roData(dec[0].data_document)}` : ''}`)
+      const { data: benef } = await sb.from('beneficiari_sociali').select('id,nume,date').eq('firma_id', firmaId).eq('activitate_id', actId).order('created_at', { ascending: true })
+      const { data: contracte } = await sb.from('documente').select('beneficiar_social_id,nr_inregistrare,data_document').eq('firma_id', firmaId).eq('modul', MODUL).eq('activitate_sociala_id', actId).eq('tip_document', 'contract_voluntariat')
+      const contractPt = new Map((contracte || []).map(c => [c.beneficiar_social_id as string, c]))
+      linii.push(`- Număr voluntari înregistrați: ${(benef || []).length}`)
+      ;(benef || []).forEach((bn, i) => {
+        const d = (bn.date || {}) as Record<string, string>
+        const c = contractPt.get(bn.id)
+        const buc = [
+          `nume: ${bn.nume}`,
+          c ? `contract nr. ${c.nr_inregistrare ?? '?'}${c.data_document ? ` din ${roData(c.data_document)}` : ''}` : 'contract: (negăsit)',
+          d.PERIOADA ? `perioada: ${d.PERIOADA}` : 'perioada: (necompletată)',
+          d.ORE_PROGRAM ? `ore/program: ${d.ORE_PROGRAM}` : 'ore: (necompletate)',
+        ]
+        linii.push(`  ${i + 1}) ${buc.join(' — ')}`)
+      })
+    }
+    const dateInterne = linii.join('\n')
+
+    const rez = await analizeazaDocument(context, total, dateInterne)
+    if (!rez) return NextResponse.json({ error: 'Analiza automată nu a reușit. Încearcă din nou sau completează manual.' }, { status: 502 })
+    const umplut = await umpleBlanks(inBytes, rez.completate)
+
+    const path = `${prefix(firmaId, actId || 'zona')}${Date.now()}_pregatit.docx`
+    const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(umplut.bytes), { contentType: DOCX_TIP })
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+    const { data: docNou, error } = await sb.from('documente').update({ fisier_path: path, fisier_marime: umplut.bytes.length, fisier_tip: DOCX_TIP })
+      .eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
+    if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
+    if (doc.fisier_path && doc.fisier_path !== path) await sb.storage.from('documente').remove([doc.fisier_path])
+    return NextResponse.json({ document: docNou, completate: umplut.completate, total, manuale: rez.manuale })
   }
 
   // Generează un document dintr-un șablon (umplut cu date + nr. de înregistrare automat).
