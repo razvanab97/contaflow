@@ -24,12 +24,15 @@ export async function extrageDateBuletin(bytes: Uint8Array, mediaType: string): 
       ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data } }
       : { type: 'image' as const, source: { type: 'base64' as const, media_type: (mediaType === 'image/png' ? 'image/png' : 'image/jpeg') as 'image/png' | 'image/jpeg', data } }
     const res = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
+      model: 'claude-sonnet-5',
+      max_tokens: 600,
       messages: [{ role: 'user', content: [source, { type: 'text', text:
-        `Act de identitate românesc (carte de identitate / buletin). Extrage DOAR ce scrie pe document.
-Răspunde DOAR cu JSON: {"nume":"NUME și PRENUME complet (ex. Popescu Ion) sau null","cnp":"cele 13 cifre sau null","domiciliu":"adresa de domiciliu completă sau null","dataNasterii":"ZZ.LL.AAAA sau null"}
-"nume" = numele de familie + prenumele, în ordinea firească. Nu inventa: dacă nu se vede clar, pune null.` }] }],
+        `Act de identitate românesc. Poate fi: (a) carte de identitate veche ("buletin"), (b) carte de identitate electronică nouă (CEI/eID, cu cip), sau (c) un PDF generat de aplicația "RO CEI Reader" a MAI, cu câmpuri etichetate (Nume de familie, Prenume, CNP, Data nașterii, Domiciliu etc.). Fotografia poate fi rotită sau pe lateral — rotește-o mental ca s-o citești corect, inclusiv zona MRZ (rândurile cu <<<) din partea de jos/spate.
+
+Extrage DOAR ce scrie efectiv pe document (nu inventa). Răspunde DOAR cu JSON, fără alt text:
+{"numeFamilie":"numele de familie (ex. Popescu) sau null","prenume":"prenumele complet (ex. Ion Andrei) sau null","cnp":"cele 13 cifre, exact ca pe document sau din MRZ, sau null","domiciliu":"adresa de domiciliu completă așa cum e scrisă (ex. Jud.IS Sat.Erbiceni (Com.Erbiceni)) sau null","dataNasterii":"ZZ.LL.AAAA sau null"}
+
+Reguli: "numeFamilie" = câmpul Nume/Nom/Surname. "prenume" = câmpul Prenume/Given names. CNP-ul are exact 13 cifre (pe CEI poate fi scris "CNP/PIN"); dacă nu-l vezi clar pe față, ia-l din MRZ. "domiciliu" e adresa de la Domiciliu/Adresă (nu locul nașterii). Dacă un câmp nu se vede clar, pune null.` }] }],
     })
     const raw = res.content.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
     const m = raw.match(/\{[\s\S]*\}/)
@@ -37,7 +40,10 @@ Răspunde DOAR cu JSON: {"nume":"NUME și PRENUME complet (ex. Popescu Ion) sau 
     const p = JSON.parse(m[0])
     const cnp = typeof p.cnp === 'string' && /^\d{13}$/.test(p.cnp.replace(/\s/g, '')) ? p.cnp.replace(/\s/g, '') : null
     const out: DateBuletin = {}
-    if (typeof p.nume === 'string' && p.nume.trim()) out.NUME = p.nume.replace(/\s+/g, ' ').trim().slice(0, 150)
+    // NUME = Nume de familie + Prenume (ordinea de pe act); acceptă și vechiul câmp "nume" dacă vine așa
+    const curat = (v: unknown) => typeof v === 'string' && v.trim() && !/^null$/i.test(v.trim()) ? v.replace(/\s+/g, ' ').trim() : ''
+    const numeComplet = [curat(p.numeFamilie), curat(p.prenume)].filter(Boolean).join(' ') || curat(p.nume)
+    if (numeComplet) out.NUME = numeComplet.slice(0, 150)
     if (cnp) out.CNP = cnp
     if (typeof p.domiciliu === 'string' && p.domiciliu.trim()) out.DOMICILIU = p.domiciliu.replace(/\s+/g, ' ').trim().slice(0, 300)
     // data nașterii: din CNP (sigur), altfel ce-a citit AI

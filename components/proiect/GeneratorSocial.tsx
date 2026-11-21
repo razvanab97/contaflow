@@ -63,6 +63,11 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
   const urlDoc = (id: string, preview = false) => `${api}&download=${id}${preview ? '&preview=1' : ''}`
   const docPentru = (benId: string | null, tip: string) => documente.find(d => d.beneficiar_social_id === benId && d.tip_document === tip)
   const dataCurenta = dateDocumente?.DATA || azi()
+  // câmpuri comune încă necompletate (Perioada, Ore/program, Instruire…) — se cer în documente
+  const comuneLipsa = useMemo(() => comune.filter(c => !(dateDocumente?.[c.key] || VALORI_IMPLICITE[c.key] || '').trim()), [comune, dateDocumente])
+  const autoSetariRef = useRef(false)
+  // deschide „Setări comune" singur prima dată când lipsesc câmpuri, ca să fie clar că se completează acolo
+  useEffect(() => { if (!autoSetariRef.current && comuneLipsa.length) { autoSetariRef.current = true; setSetari(true) } }, [comuneLipsa.length])
 
   async function genereaza(tip: string, benId: string | null, silent = false, extra: Record<string, unknown> = {}): Promise<boolean> {
     if (!silent) setBusy('g' + (benId || tip))
@@ -134,7 +139,8 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
           <button onClick={() => setSetari(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', width: '100%' }}>
             <span style={{ fontSize: 13 }}>⚙</span>
             <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600 }}>Setări comune</span>
-            {!setari && chips.map(c => <span key={c.key} style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: 999, background: 'var(--surface)', border: '1px solid var(--border)' }}>{dateDocumente[c.key]}</span>)}
+            {comuneLipsa.length > 0 && <span title={`De completat: ${comuneLipsa.map(c => c.label).join(', ')}`} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 14%, transparent)', padding: '2px 8px', borderRadius: 999 }}>completează {comuneLipsa.length}</span>}
+            {!setari && !comuneLipsa.length && chips.map(c => <span key={c.key} style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: 999, background: 'var(--surface)', border: '1px solid var(--border)' }}>{dateDocumente[c.key]}</span>)}
             <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>{setari ? '▴' : '▾'}</span>
           </button>
           {setari && <SetariComune campuri={comune} an={an} dataIni={dataCurenta} initial={dateDocumente} busy={busy === 'comune'} onSalveaza={salveazaComune} onInchide={() => setSetari(false)} />}
