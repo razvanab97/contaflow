@@ -4,7 +4,7 @@ import { deschideDocument } from '@/lib/vizualizare'
 import {
   ANI_PROIECT, ETICHETA_STATUS, STATUSURI_ACT, ETICHETA_STARE,
   stareaZonei, indicatorZona, rezumatAn, TIPURI_DOC_ACT, etichetaDocAct,
-  zoneOrdonate, reordoneaza,
+  zoneOrdonate,
   type Activitate, type StareZonaRow, type StatusAct, type StareZona, type OrdineRow,
 } from '@/lib/proiect-social'
 import { getSablon, sabloanePentruZona } from '@/lib/proiect-social-sabloane'
@@ -35,6 +35,8 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const [deschise, setDeschise] = useState<Set<string>>(new Set())
   const [formZona, setFormZona] = useState<string | null>(null)
   const [ordine, setOrdine] = useState<OrdineRow[]>([])
+  const [dragIdx, setDragIdx] = useState<number | null>(null) // reordonare prin tragere
+  const [dropIdx, setDropIdx] = useState<number | null>(null)
   const [beneficiari, setBeneficiari] = useState<Beneficiar[]>([])
   const [urmatorNr, setUrmatorNr] = useState(1)
   const [mesaj, setMesaj] = useState('')
@@ -51,11 +53,13 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const zoneSortate = useMemo(() => zoneOrdonate(ordine), [ordine])
   const api = `/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`
 
-  // Mută o zonă mai sus / mai jos (prioritate) și salvează ordinea întreagă.
-  async function muta(cod: string, directie: 'sus' | 'jos') {
-    const noua = reordoneaza(zoneSortate.map(z => z.cod), cod, directie)
-    setOrdine(noua.map((zona, i) => ({ zona, ordine: i })))
-    const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'ordine-zona', ordine: noua }) })
+  // Reordonare prin tragere (drag & drop) sau săgeți de la tastatură: mută zona de la poziția `from` la `to`.
+  async function mutaLa(from: number, to: number) {
+    const coduri = zoneSortate.map(z => z.cod)
+    if (from === to || from < 0 || to < 0 || from >= coduri.length || to >= coduri.length) return
+    const [m] = coduri.splice(from, 1); coduri.splice(to, 0, m)
+    setOrdine(coduri.map((zona, i) => ({ zona, ordine: i })))
+    const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'ordine-zona', ordine: coduri }) })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) setMesaj(d.error || 'Ordinea nu s-a putut salva')
   }
@@ -145,17 +149,20 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
           const open = deschise.has(z.cod)
           const definitiv = stare === 'inchisa_definitiv'
           return (
-            <div key={z.cod} style={{ border: `1px solid ${open ? 'color-mix(in srgb, var(--accent) 26%, var(--border))' : 'var(--border)'}`, borderRadius: 'var(--r-lg)', background: open ? 'linear-gradient(170deg, color-mix(in srgb, var(--accent) 5%, var(--surface)), var(--surface))' : 'var(--surface)', opacity: definitiv ? 0.7 : 1, boxShadow: open ? 'var(--pa-card-shadow, none)' : 'none', transition: 'border-color .2s, background .2s' }}>
+            <div key={z.cod}
+              onDragOver={e => { if (dragIdx !== null) { e.preventDefault(); if (dropIdx !== zi) setDropIdx(zi) } }}
+              onDrop={e => { e.preventDefault(); if (dragIdx !== null) mutaLa(dragIdx, zi); setDragIdx(null); setDropIdx(null) }}
+              style={{ border: `1px solid ${dropIdx === zi && dragIdx !== null && dragIdx !== zi ? 'var(--accent)' : open ? 'color-mix(in srgb, var(--accent) 26%, var(--border))' : 'var(--border)'}`, borderRadius: 'var(--r-lg)', background: open ? 'linear-gradient(170deg, color-mix(in srgb, var(--accent) 5%, var(--surface)), var(--surface))' : 'var(--surface)', opacity: definitiv ? 0.7 : dragIdx === zi ? 0.45 : 1, boxShadow: dropIdx === zi && dragIdx !== null && dragIdx !== zi ? '0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent)' : open ? 'var(--pa-card-shadow, none)' : 'none', transition: 'border-color .2s, background .2s, box-shadow .15s' }}>
               {/* Antet zonă - click oriunde pe el (în afara controalelor) deschide/închide zona */}
               <div onClick={() => toggle(z.cod)} data-zona={z.cod}
                 style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, flexWrap: 'wrap', cursor: 'pointer' }}>
-                {/* Prioritate: mută zona mai sus / mai jos */}
-                <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, marginTop: -1 }}>
-                  <button onClick={e => { e.stopPropagation(); muta(z.cod, 'sus') }} disabled={zi === 0} title="Mută mai sus (prioritate)" aria-label={`Mută „${z.titlu}" mai sus`}
-                    style={{ ...linkBtn, color: zi === 0 ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: zi === 0 ? 0.4 : 1, lineHeight: 1, fontSize: 'var(--fs-sm)' }}>▲</button>
-                  <button onClick={e => { e.stopPropagation(); muta(z.cod, 'jos') }} disabled={zi === zoneSortate.length - 1} title="Mută mai jos" aria-label={`Mută „${z.titlu}" mai jos`}
-                    style={{ ...linkBtn, color: zi === zoneSortate.length - 1 ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: zi === zoneSortate.length - 1 ? 0.4 : 1, lineHeight: 1, fontSize: 'var(--fs-sm)' }}>▼</button>
-                </div>
+                {/* Mâner de reordonare: trage ca să schimbi prioritatea (sau săgeți ↑/↓ de la tastatură) */}
+                <span draggable tabIndex={0} role="button" aria-label={`Reordonează „${z.titlu}" — trage sau folosește săgețile sus/jos`} title="Trage ca să reordonezi (ori săgeți ↑/↓)"
+                  onClick={e => e.stopPropagation()}
+                  onDragStart={e => { setDragIdx(zi); e.dataTransfer.effectAllowed = 'move' }}
+                  onDragEnd={() => { setDragIdx(null); setDropIdx(null) }}
+                  onKeyDown={e => { if (e.key === 'ArrowUp') { e.preventDefault(); mutaLa(zi, zi - 1) } else if (e.key === 'ArrowDown') { e.preventDefault(); mutaLa(zi, zi + 1) } }}
+                  style={{ flexShrink: 0, marginTop: 2, cursor: 'grab', color: 'var(--text-muted)', fontSize: 15, lineHeight: 1, userSelect: 'none', letterSpacing: '-3px', padding: '2px 4px 2px 0', borderRadius: 6 }}>⠿</span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                     {/* titlul e butonul accesibil de deschidere/închidere; tot antetul reacționează la click (vezi div-ul părinte) */}
@@ -193,10 +200,13 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                 <div style={{ borderTop: '1px solid var(--border-subtle)', padding: 14 }}>
                   {aleZonei.length === 0 && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: 10 }}>Nicio activitate pe {an} în această zonă.</div>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {aleZonei.map(a => (
+                    {aleZonei.map((a, ai) => (
                       <RandActivitate key={a.id} a={a} docs={docs.filter(d => d.activitate_sociala_id === a.id)} firmaId={firmaId}
-                        bazaBeneficiari={z.baza === 'beneficiari'} unitate={z.unitate} zona={z.cod}
+                        bazaBeneficiari={z.baza === 'beneficiari'} unitate={z.unitate} zona={z.cod} an={an} definitiv={definitiv}
                         beneficiari={beneficiari.filter(b => b.activitate_id === a.id)} urmatorNr={urmatorNr}
+                        arataDocsZona={ai === 0} sabloaneZona={sabloanePentruZona(z.cod).map(s => ({ tip: s.tip, label: s.label }))}
+                        docsZona={docsZona.filter(d => d.zona_sociala === z.cod && (d.an_social == null || d.an_social === an))}
+                        onDocZonaAdaugat={addDocsZona} onDocZonaSters={removeDocZona}
                         onModifica={modifica} onSterge={() => stergeAct(a)}
                         onDocNou={nd => setDocs(prev => [...nd, ...prev])} onDocSters={id => setDocs(prev => prev.filter(d => d.id !== id))}
                         onBeneficiar={upsertBenef} onBeneficiarSters={removeBenef} onGenerat={addGenerat} onNrSchimbat={updateNr}
@@ -204,10 +214,11 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                     ))}
                   </div>
 
-                  <DocumenteZona firmaId={firmaId} zona={z.cod} an={an} api={api}
+                  {/* Documente pe zonă: doar când nu există nicio activitate (altfel apar în interiorul activității) */}
+                  {aleZonei.length === 0 && <DocumenteZona firmaId={firmaId} zona={z.cod} an={an} api={api}
                     sabloane={sabloanePentruZona(z.cod).map(s => ({ tip: s.tip, label: s.label }))}
                     docs={docsZona.filter(d => d.zona_sociala === z.cod && (d.an_social == null || d.an_social === an))}
-                    onAdaugat={addDocsZona} onSters={removeDocZona} disabled={definitiv} />
+                    onAdaugat={addDocsZona} onSters={removeDocZona} disabled={definitiv} />}
 
                   {formZona === z.cod
                     ? <FormActivitate onAnuleaza={() => setFormZona(null)} onSalveaza={c => creeaza(z.cod, c)} />
@@ -224,9 +235,11 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
 }
 
 // --- O activitate (rând) ---------------------------------------------------------------------
-function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, beneficiari, urmatorNr, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat, onDateComune }: {
-  a: Activitate; docs: Doc[]; firmaId: string; bazaBeneficiari: boolean; unitate: string; zona: string
+function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, definitiv, beneficiari, urmatorNr, arataDocsZona, sabloaneZona, docsZona, onDocZonaAdaugat, onDocZonaSters, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat, onDateComune }: {
+  a: Activitate; docs: Doc[]; firmaId: string; bazaBeneficiari: boolean; unitate: string; zona: string; an: number; definitiv?: boolean
   beneficiari: Beneficiar[]; urmatorNr: number
+  arataDocsZona?: boolean; sabloaneZona: { tip: string; label: string }[]; docsZona: Doc[]
+  onDocZonaAdaugat: (ds: Doc[]) => void; onDocZonaSters: (id: string) => void
   onModifica: (id: string, patch: Record<string, unknown>) => void; onSterge: () => void
   onDocNou: (d: Doc[]) => void; onDocSters: (id: string) => void
   onBeneficiar: (b: Beneficiar) => void; onBeneficiarSters: (id: string) => void
@@ -274,18 +287,17 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, bene
 
   return (
     <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-md)', background: 'var(--surface-sunken)', padding: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={() => setExtins(v => !v)} aria-expanded={extins} style={{ ...linkBtn, color: 'var(--text-muted)' }}>{extins ? '▾' : '▸'}</button>
+      {/* Antet activitate - click oriunde pe cadru (nu doar pe caret) deschide/închide toată secțiunea */}
+      <div onClick={() => setExtins(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', cursor: 'pointer' }}>
+        <button onClick={e => { e.stopPropagation(); setExtins(v => !v) }} aria-expanded={extins} aria-label={`${extins ? 'Restrânge' : 'Extinde'} ${a.denumire}`} title={extins ? 'Restrânge' : 'Extinde'} style={{ ...linkBtn, color: 'var(--accent)', fontSize: 'var(--fs-base)' }}>{extins ? '▾' : '▸'}</button>
         <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{a.cod}</span>
-        <input defaultValue={a.denumire} aria-label="Denumire activitate"
-          onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.denumire) onModifica(a.id, { denumire: v }); else e.target.value = a.denumire }}
-          style={{ ...camp, flex: 1, minWidth: 120, fontWeight: 600 }} />
-        <select value={a.status} onChange={e => onModifica(a.id, { status: e.target.value })} aria-label="Status activitate"
+        <strong style={{ ...disp, flex: 1, minWidth: 120, fontSize: 'var(--fs-md)', fontWeight: 700, letterSpacing: '-.01em', color: 'var(--text-primary)' }}>{a.denumire}</strong>
+        <select value={a.status} onClick={e => e.stopPropagation()} onChange={e => onModifica(a.id, { status: e.target.value })} aria-label="Status activitate"
           style={{ ...camp, padding: '4px 6px', fontSize: 'var(--fs-xs)', fontWeight: 700, color: culoareStatus[a.status] }}>
           {STATUSURI_ACT.map(s => <option key={s} value={s}>{ETICHETA_STATUS[s]}</option>)}
         </select>
         {!!docs.length && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>📎 {docs.length}</span>}
-        <button onClick={onSterge} title="Șterge activitatea" aria-label={`Șterge ${a.cod}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
+        <button onClick={e => { e.stopPropagation(); onSterge() }} title="Șterge activitatea" aria-label={`Șterge ${a.cod}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
       </div>
 
       {extins && (
@@ -301,6 +313,8 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, bene
             <summary style={{ cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-secondary)', padding: '2px 0' }}>Detalii activitate</summary>
             <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+                <label style={lblCol}>Denumire activitate
+                  <input defaultValue={a.denumire} onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.denumire) onModifica(a.id, { denumire: v }); else e.target.value = a.denumire }} style={{ ...camp, fontWeight: 600 }} /></label>
                 <label style={lblCol}>Perioada
                   <input defaultValue={a.perioada || ''} placeholder="ex. martie 2026" onBlur={e => onModifica(a.id, { perioada: e.target.value.trim() })} style={camp} /></label>
                 <label style={lblCol}>Responsabil
@@ -344,6 +358,14 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, bene
               </div>
             </div>
           </details>
+
+          {/* Documentele zonei, în interiorul activității (nu separat dedesubt) */}
+          {arataDocsZona && (
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
+              <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 2 }}>Documente</div>
+              <DocumenteZona firmaId={firmaId} zona={zona} an={an} api={api} sabloane={sabloaneZona} docs={docsZona} onAdaugat={onDocZonaAdaugat} onSters={onDocZonaSters} disabled={definitiv} />
+            </div>
+          )}
         </div>
       )}
     </div>
