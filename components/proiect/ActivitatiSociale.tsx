@@ -13,7 +13,7 @@ import GeneratorSocial, { type Beneficiar, type DocGen } from './GeneratorSocial
 // Modulul „Activități sociale": fiecare zonă (activitate din plan) e o linie în care se adaugă
 // activități (AS-NNN/AN) și documente. Indicatorul se mișcă doar din activitățile VALIDATE.
 
-interface Doc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; furnizor: string | null; tip_document: string | null; activitate_sociala_id: string | null; beneficiar_social_id?: string | null; nr_inregistrare?: number | null; data_document?: string | null; stare?: string | null; zona_sociala?: string | null; an_social?: number | null; created_at: string }
+interface Doc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; furnizor: string | null; tip_document: string | null; activitate_sociala_id: string | null; beneficiar_social_id?: string | null; nr_inregistrare?: number | null; data_document?: string | null; stare?: string | null; zona_sociala?: string | null; an_social?: number | null; este_draft?: boolean; created_at: string }
 
 const camp: React.CSSProperties = { background: 'var(--surface-sunken)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '6px 9px', fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }
 const btnGhost: React.CSSProperties = { fontSize: 'var(--fs-sm)', fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '5px 9px', cursor: 'pointer', color: 'var(--text-secondary)' }
@@ -136,7 +136,8 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const addGenerat = (d: DocGen) => { setDocs(prev => { const e = d as unknown as Doc; return prev.some(x => x.id === e.id) ? prev.map(x => x.id === e.id ? { ...e, stare: e.stare ?? x.stare } : x) : [e, ...prev] }); setUrmatorNr(u => Math.max(u, (d.nr_inregistrare || 0) + 1)) }
   const updateNr = (d: DocGen) => setDocs(prev => { const next = prev.map(x => x.id === d.id ? { ...x, nr_inregistrare: d.nr_inregistrare } : x); setUrmatorNr(nrUrmator(next)); return next })
   const updateDateComune = (id: string, date: Record<string, string>) => setActs(prev => prev.map(x => x.id === id ? { ...x, date_documente: date } : x))
-  const addDocsZona = (ds: Doc[]) => setDocsZona(prev => [...ds, ...prev])
+  // upsert: documentele noi apar sus, iar cele deja existente (ex. marcate draft) se actualizează pe loc
+  const addDocsZona = (ds: Doc[]) => setDocsZona(prev => { const ids = new Set(ds.map(d => d.id)); return [...ds, ...prev.filter(p => !ids.has(p.id))] })
   const removeDocZona = (id: string) => setDocsZona(prev => prev.filter(x => x.id !== id))
 
   // toate documentele anului, pentru PDF-ul total (ordonate pe zonă, cu secțiunea = zona)
@@ -470,6 +471,24 @@ function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSt
       if (r.ok && d.document) onAdaugat([d.document]); else setMesaj(d.error || 'Nu s-a putut genera documentul')
     } catch { setMesaj('Generarea a eșuat') } finally { setBusy(false) }
   }
+  // marchează / scoate un document ca „draft" (reutilizabil în zonă)
+  async function marcheaza(docId: string, draft: boolean) {
+    setBusy(true); setMesaj('')
+    try {
+      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'marcheaza-draft', docId, draft }) })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok && d.document) onAdaugat([d.document]); else setMesaj(d.error || 'Nu s-a putut marca')
+    } catch { setMesaj('Operația a eșuat') } finally { setBusy(false) }
+  }
+  // „Pune în lucru" un draft încărcat: creează o copie editabilă (cu marcajele completate din datele activității)
+  async function puneInLucruDoc(docId: string) {
+    setBusy(true); setMesaj('')
+    try {
+      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'pune-in-lucru-doc', docId, zona, an }) })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok && d.document) onAdaugat([d.document]); else setMesaj(d.error || 'Nu s-a putut pune în lucru')
+    } catch { setMesaj('Operația a eșuat') } finally { setBusy(false) }
+  }
 
   async function incarca(files: File[]) {
     if (!files.length) return
@@ -498,15 +517,20 @@ function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSt
     if (r.ok) onSters(d.id)
   }
 
+  const draftDocs = docs.filter(d => d.este_draft)
+  const momentDocs = docs.filter(d => !d.este_draft)
+  const esteDocxDoc = (d: Doc) => /\.docx$/i.test(d.fisier_nume) || /wordprocessing/.test(d.fisier_tip || '')
+
   return (
     <div style={{ marginTop: 10 }}>
-      {/* Documente deja în cadrul de lucru (generate din draft sau încărcate) */}
-      {docs.length > 0 && (
+      {/* Documente „de moment" (atașamente simple) — le poți marca drept draft reutilizabil */}
+      {momentDocs.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-          {docs.map(d => (
+          {momentDocs.map(d => (
             <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
               <span aria-hidden style={{ fontSize: 13 }}>📄</span>
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
+              {esteDocxDoc(d) && !disabled && <button onClick={() => marcheaza(d.id, true)} disabled={busy} title="Marchează ca draft reutilizabil (apare la Drafturi standard)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', fontWeight: 700 }}>☆ Draft</button>}
               {previzualizabil(d) && <button onClick={() => deschideDocument(urlDoc(d, true), d.fisier_nume)} style={{ ...linkBtn, color: 'var(--accent)' }}>Vezi</button>}
               <a href={urlDoc(d)} title="Descarcă" style={{ ...linkBtn, color: 'var(--accent)' }}>↓</a>
               <button onClick={() => stergeDoc(d)} title="Șterge documentul" aria-label={`Șterge ${d.fisier_nume}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
@@ -515,8 +539,8 @@ function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSt
         </div>
       )}
 
-      {/* Drafturi standard: descarci șablonul sau îl „pui în lucru" (copie editabilă în activitate) */}
-      {!disabled && sabloane.length > 0 && (
+      {/* Drafturi standard (șabloane fixe) + drafturile marcate de tine: descarcă ori „Pune în lucru" (copie editabilă) */}
+      {!disabled && (sabloane.length > 0 || draftDocs.length > 0) && (
         <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
           <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Drafturi standard</div>
           {sabloane.map(s => (
@@ -525,6 +549,15 @@ function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSt
               <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
               <a href={`${api}&draft=${encodeURIComponent(s.tip)}&an=${an}`} title="Descarcă draftul (Word)" aria-label={`Descarcă ${s.label}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)', flexShrink: 0 }}>↓</a>
               <button onClick={() => genereazaSablon(s.tip)} disabled={busy} className="gsoc-solid" title="Pune documentul în cadrul de lucru (copie editabilă)" style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 13px', borderRadius: 999, cursor: 'pointer', flexShrink: 0 }}>{busy ? 'Se lucrează…' : '➕ Pune în lucru'}</button>
+            </div>
+          ))}
+          {draftDocs.map(d => (
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: '1px solid color-mix(in srgb, var(--accent) 22%, var(--border))', borderRadius: 'var(--r-md)', background: 'color-mix(in srgb, var(--accent) 5%, var(--surface))' }}>
+              <span aria-hidden style={{ fontSize: 14 }}>⭐</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
+              <button onClick={() => marcheaza(d.id, false)} disabled={busy} title="Scoate din drafturi (redevine document de moment)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', flexShrink: 0 }}>scoate</button>
+              <a href={urlDoc(d)} title="Descarcă draftul" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)', flexShrink: 0 }}>↓</a>
+              <button onClick={() => puneInLucruDoc(d.id)} disabled={busy} className="gsoc-solid" title="Pune documentul în cadrul de lucru (copie editabilă, cu datele completate)" style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 13px', borderRadius: 999, cursor: 'pointer', flexShrink: 0 }}>{busy ? 'Se lucrează…' : '➕ Pune în lucru'}</button>
             </div>
           ))}
         </div>

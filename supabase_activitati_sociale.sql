@@ -81,6 +81,8 @@ alter table documente add column if not exists stare text;
 -- Document atașat direct unei zone (fără activitate): zona + anul.
 alter table documente add column if not exists zona_sociala text;
 alter table documente add column if not exists an_social int;
+-- Document marcat ca „draft" (șablon reutilizabil în zona lui), nu doar atașament de moment.
+alter table documente add column if not exists este_draft boolean not null default false;
 create index if not exists idx_documente_activitate_sociala on documente(activitate_sociala_id);
 create index if not exists idx_documente_zona_sociala on documente(zona_sociala);
 
