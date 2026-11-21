@@ -13,7 +13,7 @@ import GeneratorSocial, { type Beneficiar, type DocGen } from './GeneratorSocial
 // Modulul „Activități sociale": fiecare zonă (activitate din plan) e o linie în care se adaugă
 // activități (AS-NNN/AN) și documente. Indicatorul se mișcă doar din activitățile VALIDATE.
 
-interface Doc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; furnizor: string | null; tip_document: string | null; activitate_sociala_id: string | null; beneficiar_social_id?: string | null; nr_inregistrare?: number | null; data_document?: string | null; stare?: string | null; created_at: string }
+interface Doc { id: string; fisier_nume: string; fisier_tip: string | null; fisier_marime: number | null; furnizor: string | null; tip_document: string | null; activitate_sociala_id: string | null; beneficiar_social_id?: string | null; nr_inregistrare?: number | null; data_document?: string | null; stare?: string | null; zona_sociala?: string | null; an_social?: number | null; created_at: string }
 
 const camp: React.CSSProperties = { background: 'var(--surface-sunken)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '6px 9px', fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }
 const btnGhost: React.CSSProperties = { fontSize: 'var(--fs-sm)', fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '5px 9px', cursor: 'pointer', color: 'var(--text-secondary)' }
@@ -25,6 +25,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const [acts, setActs] = useState<Activitate[]>([])
   const [stari, setStari] = useState<StareZonaRow[]>([])
   const [docs, setDocs] = useState<Doc[]>([])
+  const [docsZona, setDocsZona] = useState<Doc[]>([]) // documente atașate direct unei zone (fără activitate)
   const [an, setAn] = useState<number>(() => { const y = new Date().getFullYear(); return (ANI_PROIECT as readonly number[]).includes(y) ? y : 2026 })
   const [incarcat, setIncarcat] = useState(false)
   const [migrat, setMigrat] = useState(true)
@@ -37,7 +38,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
 
   useEffect(() => {
     fetch(`/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`).then(r => r.json())
-      .then(d => { setActs(d.activitati || []); setStari(d.zoneStari || []); setDocs(d.documente || []); setOrdine(d.zoneOrdine || []); setBeneficiari(d.beneficiari || []); setUrmatorNr(d.urmatorNr || 1); setMigrat(d.migrat !== false) })
+      .then(d => { setActs(d.activitati || []); setStari(d.zoneStari || []); setDocs(d.documente || []); setDocsZona(d.documenteZona || []); setOrdine(d.zoneOrdine || []); setBeneficiari(d.beneficiari || []); setUrmatorNr(d.urmatorNr || 1); setMigrat(d.migrat !== false) })
       .catch(() => setMesaj('Datele nu s-au putut încărca')).finally(() => setIncarcat(true))
   }, [firmaId])
 
@@ -98,6 +99,8 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const addGenerat = (d: DocGen) => { setDocs(prev => { const e = d as unknown as Doc; return prev.some(x => x.id === e.id) ? prev.map(x => x.id === e.id ? { ...e, stare: e.stare ?? x.stare } : x) : [e, ...prev] }); setUrmatorNr(u => Math.max(u, (d.nr_inregistrare || 0) + 1)) }
   const updateNr = (d: DocGen) => setDocs(prev => { const next = prev.map(x => x.id === d.id ? { ...x, nr_inregistrare: d.nr_inregistrare } : x); setUrmatorNr(nrUrmator(next)); return next })
   const updateDateComune = (id: string, date: Record<string, string>) => setActs(prev => prev.map(x => x.id === id ? { ...x, date_documente: date } : x))
+  const addDocsZona = (ds: Doc[]) => setDocsZona(prev => [...ds, ...prev])
+  const removeDocZona = (id: string) => setDocsZona(prev => prev.filter(x => x.id !== id))
 
   if (!incarcat) return <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>Se încarcă…</div>
 
@@ -197,6 +200,10 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                         onDateComune={updateDateComune} />
                     ))}
                   </div>
+
+                  <DocumenteZona firmaId={firmaId} zona={z.cod} an={an} api={api}
+                    docs={docsZona.filter(d => d.zona_sociala === z.cod && (d.an_social == null || d.an_social === an))}
+                    onAdaugat={addDocsZona} onSters={removeDocZona} disabled={definitiv} />
 
                   {formZona === z.cod
                     ? <FormActivitate onAnuleaza={() => setFormZona(null)} onSalveaza={c => creeaza(z.cod, c)} />
@@ -364,6 +371,66 @@ function FormActivitate({ onSalveaza, onAnuleaza }: { onSalveaza: (c: Record<str
         <button onClick={() => denumire.trim() && onSalveaza({ denumire, perioada, obiectiv, beneficiari_estimat: beneficiari, responsabil, parteneri })}
           disabled={!denumire.trim()} style={{ ...btnGhost, color: 'var(--accent)', border: '1px solid var(--accent)', opacity: denumire.trim() ? 1 : 0.5 }}>Creează activitate</button>
       </div>
+    </div>
+  )
+}
+
+// --- Documente atașate direct unei zone (fără activitate) ----------------------------------------
+// „Adaugă document" pe o zonă: încarci un fișier (Word/PDF/imagine) legat de zonă + an, fără să creezi o activitate.
+function DocumenteZona({ firmaId, zona, an, api, docs, onAdaugat, onSters, disabled }: {
+  firmaId: string; zona: string; an: number; api: string; docs: Doc[]
+  onAdaugat: (ds: Doc[]) => void; onSters: (id: string) => void; disabled?: boolean
+}) {
+  const [busy, setBusy] = useState(false)
+  const [mesaj, setMesaj] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const urlDoc = (d: Doc, preview = false) => `${api}&download=${d.id}${preview ? '&preview=1' : ''}`
+
+  async function incarca(files: File[]) {
+    if (!files.length) return
+    setBusy(true); setMesaj('')
+    try {
+      const r = await fetch(api, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, zona, an, fisiere: files.map(f => ({ nume: f.name, tip: f.type, marime: f.size })) }) })
+      const d = await r.json().catch(() => ({}))
+      const incarcate: { path: string; nume: string; tip: string; marime: number }[] = []
+      await Promise.all((d.fisiere || []).map(async (x: { nume: string; path?: string; url?: string; eroare?: string }, i: number) => {
+        if (x.eroare || !x.url || !x.path) return
+        const f = files[i]
+        const up = await fetch(x.url, { method: 'PUT', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f }).catch(() => null)
+        if (up?.ok) incarcate.push({ path: x.path, nume: f.name, tip: f.type, marime: f.size })
+      }))
+      if (incarcate.length) {
+        const r2 = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'inregistreaza-doc', zona, an, incarcate }) })
+        const d2 = await r2.json().catch(() => ({}))
+        if (d2.documente?.length) onAdaugat(d2.documente)
+        if (d2.erori?.length) setMesaj(d2.erori[0]); else if (!d2.documente?.length) setMesaj(d2.error || 'Documentul nu s-a putut înregistra')
+      } else setMesaj('Fișierul nu s-a putut încărca')
+    } catch { setMesaj('Încărcarea a eșuat') } finally { setBusy(false); if (inputRef.current) inputRef.current.value = '' }
+  }
+  async function stergeDoc(d: Doc) {
+    if (!confirm(`Ștergi documentul „${d.fisier_nume}"?`)) return
+    const r = await fetch(`${api}&doc=${d.id}`, { method: 'DELETE' })
+    if (r.ok) onSters(d.id)
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      {docs.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+          {docs.map(d => (
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+              <span aria-hidden style={{ fontSize: 13 }}>📄</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
+              {previzualizabil(d) && <button onClick={() => deschideDocument(urlDoc(d, true), d.fisier_nume)} style={{ ...linkBtn, color: 'var(--accent)' }}>Vezi</button>}
+              <a href={urlDoc(d)} title="Descarcă" style={{ ...linkBtn, color: 'var(--accent)' }}>↓</a>
+              <button onClick={() => stergeDoc(d)} title="Șterge documentul" aria-label={`Șterge ${d.fisier_nume}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input ref={inputRef} type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={e => incarca(Array.from(e.target.files || []))} />
+      {!disabled && <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se încarcă…' : '+ Adaugă document'}</button>}
+      {mesaj && <span style={{ marginLeft: 10, fontSize: 'var(--fs-xs)', color: 'var(--danger)' }}>{mesaj}</span>}
     </div>
   )
 }

@@ -74,7 +74,11 @@ alter table documente add column if not exists beneficiar_social_id uuid;
 alter table documente add column if not exists nr_inregistrare int;
 -- Starea documentului social: 'in_lucru' (încă se lucrează) sau null/'emis' (final, implicit).
 alter table documente add column if not exists stare text;
+-- Document atașat direct unei zone (fără activitate): zona + anul.
+alter table documente add column if not exists zona_sociala text;
+alter table documente add column if not exists an_social int;
 create index if not exists idx_documente_activitate_sociala on documente(activitate_sociala_id);
+create index if not exists idx_documente_zona_sociala on documente(zona_sociala);
 
 alter table activitati_sociale enable row level security;
 drop policy if exists "allow all" on activitati_sociale;

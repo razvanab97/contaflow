@@ -18,6 +18,7 @@ const DOCX_TIP = 'application/vnd.openxmlformats-officedocument.wordprocessingml
 const TIPURI_FISIER = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
 
 const prefix = (firmaId: string, actId: string) => `${firmaId}/activitati-sociale/${actId}/`
+const prefixZona = (firmaId: string, zona: string, an: number) => `${firmaId}/activitati-sociale/zona/${zona}/${an}/` // documente atașate direct unei zone (fără activitate)
 const numeSigur = (n: string) => n.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '_').slice(-90)
 const azi = () => new Date().toISOString().slice(0, 10)
 const txt = (v: unknown, max = 500) => { const s = String(v ?? '').replace(/\s+/g, ' ').trim(); return s ? s.slice(0, max) : null }
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(Buffer.from(await file.arrayBuffer()), { headers: antet(d.fisier_nume || 'document', d.fisier_tip || file.type, req.nextUrl.searchParams.get('preview') === '1') })
   }
 
-  const [a, z, dd, o, b, maxNr] = await Promise.all([
+  const [a, z, dd, o, b, maxNr, dz] = await Promise.all([
     sb.from('activitati_sociale').select(COL_ACT).eq('firma_id', firmaId).order('an', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('zone_sociale_an').select('zona,an,status,nota').eq('firma_id', firmaId),
     (async () => { // documentele; dacă migrarea coloanei `stare` n-a rulat încă, reîncearcă fără ea (nu rupe pagina)
@@ -58,12 +59,17 @@ export async function GET(req: NextRequest) {
     sb.from('zone_sociale').select('zona,ordine').eq('firma_id', firmaId),
     sb.from('beneficiari_sociali').select('id,activitate_id,nume,date,created_at').eq('firma_id', firmaId).order('created_at', { ascending: true }),
     sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1),
+    (async () => { // documente atașate direct unei zone (fără activitate); dacă migrarea n-a rulat, întoarce gol
+      const r = await sb.from('documente').select(COL_DOC + ',zona_sociala,an_social,stare').eq('firma_id', firmaId).eq('modul', MODUL).is('activitate_sociala_id', null).not('zona_sociala', 'is', null).order('created_at', { ascending: false })
+      return r.error ? { data: [] } : r
+    })(),
   ])
   if (a.error && !tabelLipsa(a.error)) return NextResponse.json({ error: a.error.message }, { status: 500 })
   return NextResponse.json({
     activitati: a.data || [],
     zoneStari: z.data || [],
     documente: dd.data || [],
+    documenteZona: dz.data || [],
     zoneOrdine: o.data || [],
     beneficiari: b.data || [],
     urmatorNr: ((maxNr.data?.[0]?.nr_inregistrare as number) || 0) + 1,
@@ -71,18 +77,24 @@ export async function GET(req: NextRequest) {
   })
 }
 
-// URL-uri de încărcare semnate (fișiere mari, direct din browser în storage) pentru o activitate.
+// URL-uri de încărcare semnate (fișiere mari, direct din browser în storage) pentru o activitate SAU o zonă.
 export async function PUT(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { firmaId?: string; activitateId?: string; fisiere?: { nume: string; tip: string; marime: number }[] }
-  if (!b.firmaId || !b.activitateId || !b.fisiere?.length) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
+  const b = await req.json().catch(() => ({})) as { firmaId?: string; activitateId?: string; zona?: string; an?: number; fisiere?: { nume: string; tip: string; marime: number }[] }
+  if (!b.firmaId || !b.fisiere?.length) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
   const sb = getServiceSupabase()
-  const { data: act } = await sb.from('activitati_sociale').select('id').eq('id', b.activitateId).eq('firma_id', b.firmaId).maybeSingle()
-  if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
+  let pfx: string
+  if (b.activitateId) {
+    const { data: act } = await sb.from('activitati_sociale').select('id').eq('id', b.activitateId).eq('firma_id', b.firmaId).maybeSingle()
+    if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
+    pfx = prefix(b.firmaId, b.activitateId)
+  } else if (b.zona && zonaValida(b.zona) && anValid(b.an)) {
+    pfx = prefixZona(b.firmaId, b.zona, anValid(b.an)!)
+  } else return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
   const out = []
   for (const f of b.fisiere.slice(0, 30)) {
     if (!TIPURI_FISIER.has(f.tip)) { out.push({ nume: f.nume, eroare: 'doar PDF, imagini, Word sau Excel' }); continue }
     if (f.marime > 50 * 1024 * 1024) { out.push({ nume: f.nume, eroare: 'mai mare de 50 MB' }); continue }
-    const path = `${prefix(b.firmaId, b.activitateId)}${Date.now()}_${numeSigur(f.nume)}`
+    const path = `${pfx}${Date.now()}_${numeSigur(f.nume)}`
     const { data, error } = await sb.storage.from('documente').createSignedUploadUrl(path)
     out.push(error || !data ? { nume: f.nume, eroare: error?.message || 'nu s-a putut pregăti încărcarea' } : { nume: f.nume, path, url: data.signedUrl })
   }
@@ -235,20 +247,28 @@ export async function POST(req: NextRequest) {
 
   if (b.actiune === 'inregistreaza-doc') {
     const activitateId = String(b.activitateId || '')
+    const zonaDoc = String(b.zona || ''), anDoc = anValid(b.an)
     const incarcate = (b.incarcate as { path: string; nume: string; tip: string; marime: number }[]) || []
-    if (!activitateId || !incarcate.length) return NextResponse.json({ error: 'Nimic de înregistrat' }, { status: 400 })
-    const { data: act } = await sb.from('activitati_sociale').select('id').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle()
-    if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
+    if (!incarcate.length) return NextResponse.json({ error: 'Nimic de înregistrat' }, { status: 400 })
+    // scope: o activitate (activitateId) SAU o zonă (zona + an, document atașat direct zonei)
+    let pfx: string, coloane: Record<string, unknown>
+    if (activitateId) {
+      const { data: act } = await sb.from('activitati_sociale').select('id').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle()
+      if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
+      pfx = prefix(firmaId, activitateId); coloane = { activitate_sociala_id: activitateId }
+    } else if (zonaDoc && zonaValida(zonaDoc) && anDoc) {
+      pfx = prefixZona(firmaId, zonaDoc, anDoc); coloane = { activitate_sociala_id: null, zona_sociala: zonaDoc, an_social: anDoc }
+    } else return NextResponse.json({ error: 'Lipsește activitatea sau zona' }, { status: 400 })
     const tip = tipDocActValid(b.tip)
     const adaugate = [], erori: string[] = []
     for (const f of incarcate) {
-      if (!f.path?.startsWith(prefix(firmaId, activitateId))) { erori.push(`${f.nume}: cale invalidă`); continue }
+      if (!f.path?.startsWith(pfx)) { erori.push(`${f.nume}: cale invalidă`); continue }
       const { data, error } = await sb.from('documente').insert({
-        firma_id: firmaId, luna_id: null, modul: MODUL, activitate_sociala_id: activitateId,
+        firma_id: firmaId, luna_id: null, modul: MODUL, ...coloane,
         tip_document: tip, furnizor: f.nume, data_document: azi(),
         fisier_path: f.path, fisier_nume: f.nume, fisier_tip: f.tip, fisier_marime: f.marime, in_zip: false,
       }).select(COL_DOC).single()
-      if (error) { await sb.storage.from('documente').remove([f.path]); erori.push(`${f.nume}: ${error.message}`); continue }
+      if (error) { await sb.storage.from('documente').remove([f.path]); erori.push(`${f.nume}: ${/zona_sociala|an_social/i.test(error.message) ? 'rulează migrarea (coloane zonă lipsă)' : error.message}`); continue }
       adaugate.push(data)
     }
     return NextResponse.json({ documente: adaugate, erori }, { status: adaugate.length ? 200 : 400 })
