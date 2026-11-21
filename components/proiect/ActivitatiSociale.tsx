@@ -18,6 +18,9 @@ interface Doc { id: string; fisier_nume: string; fisier_tip: string | null; fisi
 const camp: React.CSSProperties = { background: 'var(--surface-sunken)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '6px 9px', fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }
 const btnGhost: React.CSSProperties = { fontSize: 'var(--fs-sm)', fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '5px 9px', cursor: 'pointer', color: 'var(--text-secondary)' }
 const linkBtn: React.CSSProperties = { fontSize: 'var(--fs-sm)', fontWeight: 600, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'none' }
+// font cu caracter (Bricolage) pentru titluri/cifre, ca în fabrica de documente — aspect premium pe toată pagina
+const disp: React.CSSProperties = { fontFamily: 'var(--font-bricolage), var(--font-geist), system-ui, sans-serif' }
+const gradText: React.CSSProperties = { ...disp, color: 'transparent', backgroundImage: 'linear-gradient(135deg, var(--accent-mint, var(--accent)), var(--accent-blue, var(--accent)))', WebkitBackgroundClip: 'text', backgroundClip: 'text' }
 const previzualizabil = (d: Doc) => /pdf|image/.test(d.fisier_tip || '') || /\.(pdf|jpe?g|png|webp)$/i.test(d.fisier_nume)
 const culoareStare: Record<StareZona, string> = { deschisa: 'var(--success)', inchisa_pe_an: 'var(--accent-blue)', inchisa_definitiv: 'var(--text-muted)' }
 
@@ -116,19 +119,19 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>An</span>
         {ANI_PROIECT.map(y => (
-          <button key={y} onClick={() => setAn(y)} style={{ ...btnGhost, ...(y === an ? { color: 'var(--text-primary)', border: '1px solid var(--accent)', background: 'var(--hover)' } : {}) }}>{y}</button>
+          <button key={y} onClick={() => setAn(y)} style={{ ...btnGhost, ...(y === an ? { ...disp, color: 'var(--text-primary)', fontWeight: 700, border: '1px solid color-mix(in srgb, var(--accent) 50%, var(--border))', background: 'color-mix(in srgb, var(--accent) 12%, var(--surface))' } : {}) }}>{y}</button>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
         {[
           { k: 'Activități', v: `${rez.activitatiTotal}` },
           { k: 'Validate', v: `${rez.activitatiValidate}` },
           { k: 'De validat', v: `${rez.deValidat}`, warn: rez.deValidat > 0 },
           { k: 'Ținte atinse', v: `${rez.tinteAtinse}/${rez.zoneCuTinta}` },
         ].map(t => (
-          <div key={t.k} style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface)', padding: '10px 12px' }}>
-            <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: t.warn ? 'var(--warning)' : 'var(--text-primary)' }}>{t.v}</div>
-            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{t.k}</div>
+          <div key={t.k} style={{ position: 'relative', border: '1px solid color-mix(in srgb, var(--accent) 16%, var(--border))', borderRadius: 'var(--r-md)', background: 'linear-gradient(160deg, color-mix(in srgb, var(--accent) 7%, var(--surface)), var(--surface))', padding: '13px 14px', overflow: 'hidden', boxShadow: 'var(--pa-card-shadow, none)' }}>
+            <div style={{ ...(t.warn ? { ...disp, color: 'var(--warning)' } : gradText), fontSize: 'var(--fs-2xl)', fontWeight: 800, lineHeight: 1.05 }}>{t.v}</div>
+            <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: 4 }}>{t.k}</div>
           </div>
         ))}
       </div>
@@ -142,7 +145,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
           const open = deschise.has(z.cod)
           const definitiv = stare === 'inchisa_definitiv'
           return (
-            <div key={z.cod} style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', opacity: definitiv ? 0.7 : 1 }}>
+            <div key={z.cod} style={{ border: `1px solid ${open ? 'color-mix(in srgb, var(--accent) 26%, var(--border))' : 'var(--border)'}`, borderRadius: 'var(--r-lg)', background: open ? 'linear-gradient(170deg, color-mix(in srgb, var(--accent) 5%, var(--surface)), var(--surface))' : 'var(--surface)', opacity: definitiv ? 0.7 : 1, boxShadow: open ? 'var(--pa-card-shadow, none)' : 'none', transition: 'border-color .2s, background .2s' }}>
               {/* Antet zonă - click oriunde pe el (în afara controalelor) deschide/închide zona */}
               <div onClick={() => toggle(z.cod)} data-zona={z.cod}
                 style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, flexWrap: 'wrap', cursor: 'pointer' }}>
@@ -157,7 +160,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                   style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)', width: 20, flexShrink: 0, marginTop: 2 }}>{open ? '▾' : '▸'}</button>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                    <strong style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)' }}>{z.nr}. {z.titlu}</strong>
+                    <strong style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, letterSpacing: '-.01em', color: 'var(--text-primary)' }}>{z.nr}. {z.titlu}</strong>
                     <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: culoareStare[stare] }}>· {stare === 'inchisa_pe_an' ? `Închisă pe ${an}` : ETICHETA_STARE[stare]}</span>
                   </div>
                   <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Țintă: {z.tintaText}</div>
@@ -167,8 +170,8 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                       {z.indicator}: <span style={{ color: 'var(--text-primary)' }}>{ind.realizat}{z.tinta != null ? ` / ${z.tinta}` : ''}</span> {ind.unitate}
                     </span>
                     {z.tinta != null && (
-                      <span style={{ flex: 1, minWidth: 90, height: 6, background: 'var(--surface-sunken)', borderRadius: 999, overflow: 'hidden' }}>
-                        <span style={{ display: 'block', height: '100%', width: `${ind.procent || 0}%`, background: (ind.procent || 0) >= 100 ? 'var(--success)' : 'var(--accent)' }} />
+                      <span style={{ flex: 1, minWidth: 90, height: 7, background: 'var(--surface-sunken)', borderRadius: 999, overflow: 'hidden' }}>
+                        <span style={{ display: 'block', height: '100%', width: `${ind.procent || 0}%`, borderRadius: 999, background: (ind.procent || 0) >= 100 ? 'var(--success)' : 'linear-gradient(90deg, var(--accent-mint, var(--accent)), var(--accent-blue, var(--accent)))', transition: 'width .4s ease' }} />
                       </span>
                     )}
                     {z.tinta != null && <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: (ind.procent || 0) >= 100 ? 'var(--success)' : 'var(--text-muted)' }}>{ind.procent || 0}%</span>}
