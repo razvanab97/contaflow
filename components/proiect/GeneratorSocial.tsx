@@ -3,25 +3,28 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { deschideDocument } from '@/lib/vizualizare'
 import { sabloaneBeneficiar, sabloaneActivitate, campuriComune, campuriBeneficiar, VALORI_IMPLICITE, type SablonCamp } from '@/lib/proiect-social-sabloane'
 
-// Fabrica de documente a unei activități: setezi o dată datele comune (inclusiv data documentelor),
-// adaugi voluntari (din buletin), iar documentele se GENEREAZĂ singure și se actualizează în loc.
+// Fabrica de documente a unei activități (strat premium – vezi proiect-theme.css .gsoc-*):
+// setezi o dată datele comune (inclusiv data actelor), adaugi voluntari (din buletin), iar documentele
+// se GENEREAZĂ singure, apar în „Registrul documentelor" și se actualizează în loc.
 
 export interface Beneficiar { id: string; activitate_id: string; nume: string; date: Record<string, string>; created_at: string }
 export interface DocGen { id: string; fisier_nume: string; fisier_tip: string | null; furnizor: string | null; tip_document: string | null; beneficiar_social_id: string | null; nr_inregistrare: number | null; data_document?: string | null; created_at: string }
 
-const ACC = (p: number, baza = 'transparent') => `color-mix(in srgb, var(--accent) ${p}%, ${baza})`
-const X = {
-  panel: { position: 'relative' as const, marginTop: 12, borderRadius: 16, border: `1px solid ${ACC(20, 'var(--border)')}`, background: `linear-gradient(165deg, ${ACC(7, 'var(--surface)')}, var(--surface) 60%)`, padding: 16, overflow: 'hidden' as const },
-  glow: { position: 'absolute' as const, insetInline: 0, top: 0, height: 2, background: `linear-gradient(90deg, transparent, ${ACC(70)}, transparent)` },
-  row: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, border: '1px solid var(--border)', background: ACC(3, 'var(--surface)') } as React.CSSProperties,
-  iconSq: { width: 36, height: 36, borderRadius: 10, display: 'grid', placeItems: 'center', background: ACC(13, 'var(--surface)'), fontSize: 16, flexShrink: 0 } as React.CSSProperties,
-  pill: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '4px 11px', borderRadius: 999, border: `1px solid ${ACC(32, 'var(--border)')}`, background: ACC(7), color: 'var(--accent)', cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' } as React.CSSProperties,
-  icoBtn: { display: 'inline-grid', placeItems: 'center', width: 28, height: 28, borderRadius: 999, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 } as React.CSSProperties,
-  ghost: { fontSize: 'var(--fs-sm)', fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', borderRadius: 999, padding: '7px 14px', cursor: 'pointer', color: 'var(--text-secondary)' } as React.CSSProperties,
-  primar: { fontSize: 'var(--fs-sm)', fontWeight: 700, border: 'none', borderRadius: 999, padding: '8px 16px', cursor: 'pointer', color: '#fff', background: `linear-gradient(135deg, var(--accent), ${ACC(75, '#4ab08f')})`, boxShadow: `0 2px 10px ${ACC(30)}` } as React.CSSProperties,
-  camp: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 11px', fontSize: 'var(--fs-md)', color: 'var(--text-primary)', width: '100%', boxSizing: 'border-box' as const },
-  lbl: { display: 'flex', flexDirection: 'column' as const, gap: 4, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' },
-  nr: { width: 40, padding: '3px 4px', fontSize: 'var(--fs-xs)', textAlign: 'center' as const, border: `1px solid ${ACC(30, 'var(--border)')}`, borderRadius: 8, background: ACC(6, 'var(--surface)'), color: 'var(--accent)', fontWeight: 800, fontVariantNumeric: 'tabular-nums' as const },
+const disp: React.CSSProperties = { fontFamily: 'var(--font-bricolage), var(--font-geist), system-ui, sans-serif' }
+const mono: React.CSSProperties = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' }
+const GSOFT = (p: number) => `color-mix(in srgb, var(--accent-green) ${p}%, transparent)`
+const S = {
+  row: { display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface)', marginTop: 9 } as React.CSSProperties,
+  ghost: { fontSize: 'var(--fs-sm)', fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', borderRadius: 999, padding: '8px 14px', cursor: 'pointer', color: 'var(--text-secondary)' } as React.CSSProperties,
+  solid: { fontSize: 'var(--fs-sm)', fontWeight: 700, borderRadius: 999, padding: '8px 16px', cursor: 'pointer' } as React.CSSProperties,
+  word: { fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 13px', borderRadius: 999, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', textDecoration: 'none', cursor: 'pointer' } as React.CSSProperties,
+  pdf: { fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 13px', borderRadius: 999, cursor: 'pointer' } as React.CSSProperties,
+  ico: { width: 30, height: 30, borderRadius: 999, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 13 } as React.CSSProperties,
+  camp: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '9px 11px', fontSize: 'var(--fs-md)', color: 'var(--text-primary)', width: '100%', boxSizing: 'border-box' as const },
+  lbl: { display: 'flex', flexDirection: 'column' as const, gap: 5, fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)' },
+  cap: { display: 'flex', alignItems: 'center', gap: 12, padding: '18px 0 10px' } as React.CSSProperties,
+  capT: { ...disp, fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase' as const, color: 'var(--text-muted)' },
+  okPill: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' as const, padding: '4px 9px', borderRadius: 999, color: 'var(--accent-green)', background: GSOFT(13) },
 }
 const initiale = (n: string) => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
 const azi = () => new Date().toISOString().slice(0, 10)
@@ -105,20 +108,29 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
   }
 
   const chips = comune.filter(c => dateDocumente?.[c.key]).slice(0, 2)
+  const voluntarEdit = editeaza && editeaza !== 'nou' ? beneficiari.find(b => b.id === editeaza) : null
+
+  // Registrul documentelor: Decizia + câte un contract per voluntar, ordonate după nr. de înregistrare.
+  type Rand = { key: string; titlu: string; tip: string; benId: string | null; benef: Beneficiar | null; doc?: DocGen }
+  const randuri: Rand[] = [
+    ...sabAct.map(s => ({ key: 'a:' + s.tip, titlu: s.label, tip: s.tip, benId: null, benef: null })),
+    ...beneficiari.flatMap(b => sabBen.map(s => ({ key: b.id + ':' + s.tip, titlu: `${s.label} — ${b.nume}`, tip: s.tip, benId: b.id, benef: b }))),
+  ].map(r => ({ ...r, doc: docPentru(r.benId, r.tip) }))
+    .sort((a, b) => (a.doc?.nr_inregistrare ?? 1e9) - (b.doc?.nr_inregistrare ?? 1e9))
 
   return (
-    <div style={X.panel}>
-      <div style={X.glow} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
-        <span style={{ fontSize: 17, color: 'var(--accent)', filter: `drop-shadow(0 0 6px ${ACC(45)})` }}>✦</span>
-        <strong style={{ fontSize: 'var(--fs-md)', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Documente oficiale</strong>
-        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--accent)', padding: '2px 9px', borderRadius: 999, background: ACC(10), border: `1px solid ${ACC(25, 'transparent')}` }}>auto</span>
-        <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>📅 {roData(dataCurenta)}</span>
+    <div className="gsoc-panel" style={{ marginTop: 12, padding: 16 }}>
+      {/* Antet */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6 }}>
+        <span style={{ fontSize: 17, color: 'var(--accent)', filter: 'drop-shadow(0 0 7px color-mix(in srgb, var(--accent) 45%, transparent))' }}>✦</span>
+        <strong style={{ ...disp, fontSize: 'var(--fs-lg)', fontWeight: 700, letterSpacing: '-.01em', color: 'var(--text-primary)' }}>Documente oficiale</strong>
+        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--accent)', padding: '3px 10px', borderRadius: 999, background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}>auto</span>
+        <span style={{ marginLeft: 'auto', ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>📅 {roData(dataCurenta)}</span>
       </div>
 
-      {/* Setări comune - premium, pliabil */}
+      {/* Setări comune */}
       {!!comune.length && (
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ margin: '8px 0 2px' }}>
           <button onClick={() => setSetari(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', width: '100%' }}>
             <span style={{ fontSize: 13 }}>⚙</span>
             <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600 }}>Setări comune</span>
@@ -129,50 +141,60 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
         </div>
       )}
 
-      {/* Decizia (document de activitate) */}
-      {sabAct.map(s => {
-        const d = docPentru(null, s.tip)
+      {/* Registrul documentelor */}
+      <div style={S.cap}><span style={S.capT}>Registrul documentelor</span><span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, var(--border-strong), transparent)' }} /><span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{documente.length} {documente.length === 1 ? 'act emis' : 'acte emise'}</span></div>
+
+      {randuri.map(r => {
+        const seGen = r.benId ? busy === 'g' + r.benId : busy === 'g' + r.tip
         return (
-          <div key={s.tip} style={{ ...X.row, marginBottom: 8 }}>
-            <span style={X.iconSq}>📄</span>
+          <div key={r.key} className="gsoc-row" style={S.row}>
+            <span className="gsoc-node">
+              {r.doc
+                ? <input className="gsoc-nr" defaultValue={r.doc.nr_inregistrare ?? ''} inputMode="numeric" aria-label="Număr de înregistrare" title="Număr de înregistrare (editabil)"
+                    onBlur={e => { const v = e.target.value.trim(); if (r.doc && v !== String(r.doc.nr_inregistrare ?? '')) regenNr(r.doc, v) }} />
+                : <span className={'gsoc-dot' + (seGen ? ' w' : '')} />}
+            </span>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>{s.label}</div>
-              {d && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>nr {d.nr_inregistrare} · {roData(d.data_document)}</div>}
+              <div style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.titlu}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginTop: 3 }}>
+                {r.benef?.date?.CNP && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>CNP {r.benef.date.CNP}</span>}
+                {r.doc && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{roData(r.doc.data_document)}</span>}
+                {r.doc ? <span style={S.okPill}><span className="gsoc-dot" />Emis</span>
+                  : seGen ? <span style={{ ...S.okPill, color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 13%, transparent)' }}><span className="gsoc-dot w" />în lucru</span>
+                  : <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>neîntocmit</span>}
+              </div>
             </div>
-            {d ? <ActiuniDoc doc={d} urlDoc={urlDoc} onNr={regenNr} /> : <button disabled={disabled || busy === 'g' + s.tip} onClick={() => genereaza(s.tip, null)} style={X.pill}>{busy === 'g' + s.tip ? 'se pregătește…' : 'pregătește'}</button>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+              {r.benId && <button onClick={() => setEditeaza(r.benId)} title="Editează voluntarul" aria-label={`Editează ${r.benef?.nume}`} style={S.ico}>✎</button>}
+              {r.benId && <button onClick={() => r.benef && stergeBenef(r.benef)} title="Șterge voluntarul" aria-label={`Șterge ${r.benef?.nume}`} style={{ ...S.ico, fontSize: 15 }}>×</button>}
+              {r.doc ? (
+                <ActiuniDoc doc={r.doc} urlDoc={urlDoc} />
+              ) : (
+                <button disabled={disabled || seGen} onClick={() => genereaza(r.tip, r.benId)} style={{ ...S.word, color: 'var(--accent)' }}>{seGen ? 'se pregătește…' : 'pregătește'}</button>
+              )}
+            </div>
           </div>
         )
       })}
 
       {/* Voluntari */}
       {!!sabBen.length && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Voluntari</strong>
-            <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--accent)', padding: '1px 8px', borderRadius: 999, background: ACC(10) }}>{beneficiari.length}</span>
-            {editeaza !== 'nou' && <button disabled={disabled} onClick={() => setEditeaza('nou')} style={{ ...X.primar, marginLeft: 'auto' }}>+ Adaugă</button>}
-          </div>
+        <div style={{ marginTop: 6 }}>
+          <div style={S.cap}><span style={S.capT}>Voluntari</span><span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, var(--border-strong), transparent)' }} /><span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{beneficiari.length}{dateDocumente?.NR_VOLUNTARI ? ` / ${dateDocumente.NR_VOLUNTARI}` : ''}</span></div>
 
-          {editeaza === 'nou' && <FormBeneficiar campuri={campBen} firmaId={firmaId} busy={busy === 'benef'} onAnuleaza={() => setEditeaza(null)} onSalveaza={(n, dd) => salveazaBenef(null, n, dd)} />}
-
-          <div style={{ display: 'grid', gap: 8 }}>
-            {beneficiari.map(b => editeaza === b.id
-              ? <FormBeneficiar key={b.id} campuri={campBen} firmaId={firmaId} busy={busy === 'benef'} initial={{ NUME: b.nume, ...b.date }} onAnuleaza={() => setEditeaza(null)} onSalveaza={(n, dd) => salveazaBenef(b.id, n, dd)} />
+          {editeaza === 'nou'
+            ? <FormBeneficiar campuri={campBen} firmaId={firmaId} busy={busy === 'benef'} onAnuleaza={() => setEditeaza(null)} onSalveaza={(n, dd) => salveazaBenef(null, n, dd)} />
+            : voluntarEdit
+              ? <FormBeneficiar campuri={campBen} firmaId={firmaId} busy={busy === 'benef'} initial={{ NUME: voluntarEdit.nume, ...voluntarEdit.date }} onAnuleaza={() => setEditeaza(null)} onSalveaza={(n, dd) => salveazaBenef(voluntarEdit.id, n, dd)} />
               : (
-                <div key={b.id} style={X.row}>
-                  <span style={{ ...X.iconSq, borderRadius: 999, color: '#fff', fontWeight: 800, fontSize: 'var(--fs-sm)', background: `linear-gradient(135deg, var(--accent), ${ACC(70, '#4ab08f')})` }}>{initiale(b.nume) || '•'}</span>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.nume}</div>
-                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{b.date?.CNP ? `CNP ${b.date.CNP}` : 'fără CNP'}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    {sabBen.map(s => { const d = docPentru(b.id, s.tip); return d ? <ActiuniDoc key={s.tip} doc={d} urlDoc={urlDoc} onNr={regenNr} /> : <span key={s.tip} style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{busy === 'g' + b.id ? 'se pregătește…' : '—'}</span> })}
-                    <button onClick={() => setEditeaza(b.id)} title="Editează" aria-label={`Editează ${b.nume}`} style={X.icoBtn}>✎</button>
-                    <button onClick={() => stergeBenef(b)} title="Șterge" aria-label={`Șterge ${b.nume}`} style={{ ...X.icoBtn, fontSize: 15 }}>×</button>
-                  </div>
-                </div>
-              ))}
-          </div>
+                <button disabled={disabled} onClick={() => setEditeaza('nou')} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 15, width: '100%', textAlign: 'left', borderRadius: 'var(--r-md)', border: '1px solid color-mix(in srgb, var(--accent) 22%, var(--border))', background: 'linear-gradient(120deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent)', cursor: 'pointer' }}>
+                  <span className="gsoc-solid" style={{ width: 42, height: 42, borderRadius: 13, display: 'grid', placeItems: 'center', fontSize: 19, flexShrink: 0 }}>📷</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ ...disp, display: 'block', fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)' }}>Înregistrează un voluntar</span>
+                    <span style={{ display: 'block', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Scanează buletinul — datele și contractul se întocmesc singure.</span>
+                  </span>
+                </button>
+              )}
         </div>
       )}
       {mesaj && <div style={{ marginTop: 8, fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>{mesaj}</div>}
@@ -180,39 +202,34 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
   )
 }
 
-// Numărul (editabil) + Vezi / Word / PDF pentru un document.
-function ActiuniDoc({ doc, urlDoc, onNr }: { doc: DocGen; urlDoc: (id: string, p?: boolean) => string; onNr: (d: DocGen, nr: string) => void }) {
+// Vezi / Word / PDF pentru un document.
+function ActiuniDoc({ doc, urlDoc }: { doc: DocGen; urlDoc: (id: string, p?: boolean) => string }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
-        nr
-        <input defaultValue={doc.nr_inregistrare ?? ''} aria-label="Număr de înregistrare" title="Număr de înregistrare (editabil)" inputMode="numeric"
-          onBlur={e => { const v = e.target.value.trim(); if (v !== String(doc.nr_inregistrare ?? '')) onNr(doc, v) }} style={X.nr} />
-      </span>
-      <button onClick={() => deschideDocument(urlDoc(doc.id, true), doc.fisier_nume)} style={X.icoBtn} title="Vezi">👁</button>
-      <a href={urlDoc(doc.id)} style={X.pill} title="Descarcă Word (editabil)">Word</a>
-      <button onClick={() => printeazaPdf(urlDoc(doc.id), doc.fisier_nume)} style={X.pill} title="PDF (pregătit de semnare)">PDF</button>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+      <button onClick={() => deschideDocument(urlDoc(doc.id, true), doc.fisier_nume)} style={S.ico} title="Vezi">👁</button>
+      <a href={urlDoc(doc.id)} style={S.word} title="Descarcă Word (editabil)">Word</a>
+      <button className="gsoc-solid" onClick={() => printeazaPdf(urlDoc(doc.id), doc.fisier_nume)} style={S.pdf} title="PDF (pregătit de semnare)">PDF</button>
     </span>
   )
 }
 
-// Setări comune: data documentelor (calendar) + câmpurile comune.
+// Setări comune: data actelor (calendar) + câmpurile comune.
 function SetariComune({ campuri, an, dataIni, initial, busy, onSalveaza, onInchide }: { campuri: SablonCamp[]; an: number; dataIni: string; initial: Record<string, string>; busy: boolean; onSalveaza: (d: Record<string, string>) => void; onInchide: () => void }) {
   const [val, setVal] = useState<Record<string, string>>(() => ({ AN: String(an), ...VALORI_IMPLICITE, ...initial, DATA: dataIni }))
   const set = (k: string, v: string) => setVal(p => ({ ...p, [k]: v }))
   return (
-    <div style={{ borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', padding: 12, marginTop: 8, display: 'grid', gap: 10 }}>
-      <label style={{ ...X.lbl, maxWidth: 220 }}>📅 Data documentelor
-        <input type="date" value={val.DATA || ''} onChange={e => set('DATA', e.target.value)} style={X.camp} /></label>
+    <div style={{ borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface)', padding: 12, marginTop: 8, display: 'grid', gap: 10 }}>
+      <label style={{ ...S.lbl, maxWidth: 220 }}>📅 Data actelor
+        <input type="date" value={val.DATA || ''} onChange={e => set('DATA', e.target.value)} style={S.camp} /></label>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
         {campuri.map(c => (
-          <label key={c.key} style={X.lbl}>{c.label}
-            <input value={val[c.key] || ''} onChange={e => set(c.key, e.target.value)} style={X.camp} /></label>
+          <label key={c.key} style={S.lbl}>{c.label}
+            <input value={val[c.key] || ''} onChange={e => set(c.key, e.target.value)} style={S.camp} /></label>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button onClick={onInchide} style={X.ghost}>Anulează</button>
-        <button disabled={busy} onClick={() => onSalveaza(val)} style={X.primar}>{busy ? 'Se salvează…' : 'Salvează setările'}</button>
+        <button onClick={onInchide} style={S.ghost}>Anulează</button>
+        <button className="gsoc-solid" disabled={busy} onClick={() => onSalveaza(val)} style={S.solid}>{busy ? 'Se salvează…' : 'Salvează setările'}</button>
       </div>
     </div>
   )
@@ -243,21 +260,21 @@ function FormBeneficiar({ campuri, firmaId, busy, initial, onSalveaza, onAnuleaz
   }
 
   return (
-    <div style={{ borderRadius: 12, border: `1px solid ${ACC(40, 'var(--border)')}`, background: ACC(5, 'var(--surface)'), padding: 12, marginBottom: 8, display: 'grid', gap: 10 }}>
+    <div style={{ borderRadius: 'var(--r-md)', border: '1px solid color-mix(in srgb, var(--accent) 40%, var(--border))', background: 'color-mix(in srgb, var(--accent) 5%, var(--surface))', padding: 13, marginTop: 4, display: 'grid', gap: 11 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <input ref={inputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => dinBuletin(e.target.files?.[0])} />
-        <button type="button" disabled={incarc} onClick={() => inputRef.current?.click()} style={{ ...X.primar, display: 'inline-flex', alignItems: 'center', gap: 6 }}>📷 {incarc ? 'Se citește…' : 'Scanează buletinul'}</button>
+        <button type="button" className="gsoc-solid" disabled={incarc} onClick={() => inputRef.current?.click()} style={{ ...S.solid, display: 'inline-flex', alignItems: 'center', gap: 6 }}>📷 {incarc ? 'Se citește…' : 'Scanează buletinul'}</button>
         <span style={{ fontSize: 'var(--fs-xs)', color: info.startsWith('✓') ? 'var(--success)' : 'var(--text-muted)' }}>{info || 'sau completează manual'}</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
         {campuri.map(c => (
-          <label key={c.key} style={X.lbl}>{c.label}
-            <input value={val[c.key] || ''} onChange={e => set(c.key, e.target.value)} style={X.camp} /></label>
+          <label key={c.key} style={S.lbl}>{c.label}
+            <input value={val[c.key] || ''} onChange={e => set(c.key, e.target.value)} style={S.camp} /></label>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button onClick={onAnuleaza} style={X.ghost}>Anulează</button>
-        <button disabled={!nume.trim() || busy} onClick={() => nume.trim() && onSalveaza(nume.trim(), val)} style={{ ...X.primar, opacity: nume.trim() && !busy ? 1 : 0.5 }}>{busy ? 'Se pregătește…' : 'Salvează — documentele apar singure'}</button>
+        <button onClick={onAnuleaza} style={S.ghost}>Anulează</button>
+        <button className="gsoc-solid" disabled={!nume.trim() || busy} onClick={() => nume.trim() && onSalveaza(nume.trim(), val)} style={{ ...S.solid, opacity: nume.trim() && !busy ? 1 : 0.5 }}>{busy ? 'Se pregătește…' : 'Salvează — documentele apar singure'}</button>
       </div>
     </div>
   )

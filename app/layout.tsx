@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
-import { Inter, Geist, Geist_Mono } from 'next/font/google'
+import { Inter, Geist, Geist_Mono, Bricolage_Grotesque } from 'next/font/google'
 import './globals.css'
 // Strat premium doar pentru PROIECT AB Textile (activ prin data-firma pe .app-shell).
 import './proiect-theme.css'
@@ -15,6 +15,8 @@ const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable
 // cifrele se aliniaza ca intr-un terminal financiar. Textul curent ramane pe Inter.
 const geist = Geist({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-geist' })
 const geistMono = Geist_Mono({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-geist-mono' })
+// Titluri cu caracter pentru stratul premium al proiectului (fabrica de documente).
+const bricolage = Bricolage_Grotesque({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-bricolage', weight: ['600', '700', '800'] })
 
 export const metadata: Metadata = {
   title: 'ContaFlow',
@@ -33,7 +35,7 @@ try {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ro" suppressHydrationWarning className={`${inter.variable} ${geist.variable} ${geistMono.variable}`}>
+    <html lang="ro" suppressHydrationWarning className={`${inter.variable} ${geist.variable} ${geistMono.variable} ${bricolage.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
