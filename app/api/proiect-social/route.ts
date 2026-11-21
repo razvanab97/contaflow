@@ -187,8 +187,11 @@ export async function POST(req: NextRequest) {
     if (b.nr != null && b.nr !== '') { nr = Math.trunc(Number(b.nr)); if (!Number.isFinite(nr) || nr < 0) return NextResponse.json({ error: 'Număr invalid' }, { status: 400 }) }
     else if (exist?.nr_inregistrare != null) nr = exist.nr_inregistrare as number
     else { const { data: mx } = await sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1); nr = ((mx?.[0]?.nr_inregistrare as number) || 0) + 1 }
+    // data documentului: aleasă (b.dataDoc) > datele comune (DATA) > azi
+    const iso = (s: unknown) => (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)) ? s : null
+    const dataIso = iso(b.dataDoc) || iso(comune.DATA) || azi()
     valori.NR_INREG = String(nr)
-    valori.DATA = new Date().toLocaleDateString('ro-RO')
+    valori.DATA = `${dataIso.slice(8, 10)}.${dataIso.slice(5, 7)}.${dataIso.slice(0, 4)}`
 
     const { data: tmpl, error: dlErr } = await sb.storage.from('documente').download(caleStorage(sablon))
     if (dlErr || !tmpl) return NextResponse.json({ error: 'Șablonul nu a putut fi citit din storage' }, { status: 500 })
@@ -200,7 +203,7 @@ export async function POST(req: NextRequest) {
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
     const camp = {
       nr_inregistrare: nr, tip_document: tip, furnizor: `${sablon.label}${titluPersoana ? ' · ' + titluPersoana : ''}`,
-      data_document: azi(), fisier_path: path, fisier_nume: `${sablon.label}${titluPersoana ? ' - ' + titluPersoana : ''} - nr ${nr}.docx`,
+      data_document: dataIso, fisier_path: path, fisier_nume: `${sablon.label}${titluPersoana ? ' - ' + titluPersoana : ''} - nr ${nr}.docx`,
       fisier_tip: DOCX_TIP, fisier_marime: bytes.length,
     }
     if (exist) {
