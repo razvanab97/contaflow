@@ -497,9 +497,8 @@ function DocumenteZona({ firmaId, zona, an, api, activitateId, activitati, docs,
   async function puneInLucruDoc(docId: string) {
     setBusy(true); setMesaj('')
     try {
-      // atașăm la activitate (→ Registrul de sus) doar dacă zona are registru (șabloane); altfel rămâne document de zonă
-      const catreRegistru = sabloane.length > 0 ? activitateId : undefined
-      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'pune-in-lucru-doc', docId, zona, an, activitateId: catreRegistru }) })
+      // atașăm la activitate (→ cadrul „Documente oficiale" de sus) ori de câte ori documentele sunt afișate într-o activitate; altfel document de zonă
+      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'pune-in-lucru-doc', docId, zona, an, activitateId }) })
       const d = await r.json().catch(() => ({}))
       if (r.ok && d.document) { if (d.document.activitate_sociala_id && onPusInLucru) onPusInLucru([d.document]); else onAdaugat([d.document]) }
       else setMesaj(d.error || 'Nu s-a putut pune în lucru')
@@ -558,6 +557,7 @@ function DocumenteZona({ firmaId, zona, an, api, activitateId, activitati, docs,
           <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Documente în lucru</div>
           {lucruDocs.map(d => (
             <DocLucruCard key={d.id} firmaId={firmaId} api={api} doc={d as unknown as DocLucru}
+              activitati={activ} onMutaInActivitate={onMutaInActivitate ? (nd => onMutaInActivitate(nd as unknown as Doc)) : undefined}
               onActualizat={nd => onAdaugat([nd as unknown as Doc])} onSters={onSters} disabled={disabled} />
           ))}
         </div>

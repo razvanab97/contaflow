@@ -85,7 +85,9 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
     if (areComune && lipsesc.length) { autoRef.current = true; lipsesc.forEach(s => void genereaza(s.tip, null, true)) }
   }, [documente, dateDocumente, sabAct, disabled]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!sabBen.length && !sabAct.length) return null
+  // Cadrul „Documente oficiale" apare la ORICE activitate (chiar fără șabloane): acolo intră documentele
+  // puse în lucru. Zonele cu șabloane (ex. 2.2) au în plus generarea automată + voluntarii.
+  const areSabloane = sabBen.length > 0 || sabAct.length > 0
 
   async function salveazaComune(date: Record<string, string>) {
     setBusy('comune'); setMesaj('')
@@ -135,7 +137,7 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6 }}>
         <span style={{ fontSize: 17, color: 'var(--accent)', filter: 'drop-shadow(0 0 7px color-mix(in srgb, var(--accent) 45%, transparent))' }}>✦</span>
         <strong style={{ ...disp, fontSize: 'var(--fs-lg)', fontWeight: 700, letterSpacing: '-.01em', color: 'var(--text-primary)' }}>Documente oficiale</strong>
-        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--accent)', padding: '3px 10px', borderRadius: 999, background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}>auto</span>
+        {areSabloane && <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--accent)', padding: '3px 10px', borderRadius: 999, background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}>auto</span>}
         <span style={{ marginLeft: 'auto', ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>📅 {roData(dataCurenta)}</span>
       </div>
 
@@ -155,6 +157,12 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
 
       {/* Registrul documentelor */}
       <div style={S.cap}><span style={S.capT}>Registrul documentelor</span><span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, var(--border-strong), transparent)' }} /><span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{documente.length} {documente.length === 1 ? 'act emis' : 'acte emise'}</span></div>
+
+      {randuri.length === 0 && extra.length === 0 && (
+        <div style={{ ...S.row, color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', justifyContent: 'center' }}>
+          Niciun act încă. Pune un document „în lucru" (din „Drafturi standard", mai jos) ca să apară aici.
+        </div>
+      )}
 
       {randuri.map(r => {
         const seGen = r.benId ? busy === 'g' + r.benId : busy === 'g' + r.tip

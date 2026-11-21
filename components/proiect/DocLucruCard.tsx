@@ -23,9 +23,9 @@ const ico: React.CSSProperties = { width: 30, height: 30, borderRadius: 999, bor
 const word: React.CSSProperties = { fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 13px', borderRadius: 999, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', textDecoration: 'none', cursor: 'pointer', flexShrink: 0 }
 const pill: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', padding: '4px 9px', borderRadius: 999, border: 'none', cursor: 'pointer' }
 
-export default function DocLucruCard({ firmaId, api, doc, onActualizat, onSters, disabled }: {
-  firmaId: string; api: string; doc: DocLucru
-  onActualizat: (d: DocLucru) => void; onSters: (id: string) => void; disabled?: boolean
+export default function DocLucruCard({ firmaId, api, doc, activitati, onActualizat, onSters, onMutaInActivitate, disabled }: {
+  firmaId: string; api: string; doc: DocLucru; activitati?: { id: string; denumire: string }[]
+  onActualizat: (d: DocLucru) => void; onSters: (id: string) => void; onMutaInActivitate?: (d: DocLucru) => void; disabled?: boolean
 }) {
   const [busy, setBusy] = useState('')
   const [rez, setRez] = useState<RezPregatire | null>(null)
@@ -67,6 +67,12 @@ export default function DocLucruCard({ firmaId, api, doc, onActualizat, onSters,
     const r = await fetch(`${api}&doc=${doc.id}`, { method: 'DELETE' })
     if (r.ok) onSters(doc.id); else setMesaj('Nu s-a putut șterge')
   }
+  async function muta(actId: string) {
+    setBusy('m'); setMesaj('')
+    const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'muta-doc-activitate', docId: doc.id, activitateId: actId }) })
+    const d = await r.json().catch(() => ({})); setBusy('')
+    if (r.ok && d.document) onMutaInActivitate?.(d.document); else setMesaj(d.error || 'Nu s-a putut muta')
+  }
 
   return (
     <div style={{ border: '1px solid color-mix(in srgb, var(--accent) 22%, var(--border))', borderRadius: 'var(--r-md)', background: 'color-mix(in srgb, var(--accent) 4%, var(--surface))', overflow: 'hidden' }}>
@@ -84,6 +90,13 @@ export default function DocLucruCard({ firmaId, api, doc, onActualizat, onSters,
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {!disabled && onMutaInActivitate && (activitati?.length ?? 0) > 0 && (
+            <select value="" onChange={e => { if (e.target.value) muta(e.target.value) }} disabled={busy === 'm'} title="Mută documentul în cadrul unei activități"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 7px', fontSize: 'var(--fs-xs)', color: 'var(--accent)', fontWeight: 700, maxWidth: 150, cursor: 'pointer' }}>
+              <option value="">→ activitate…</option>
+              {activitati!.map(a => <option key={a.id} value={a.id}>{a.denumire}</option>)}
+            </select>
+          )}
           {!disabled && <button onClick={pregateste} disabled={busy === 'p'} className="gsoc-solid" title="AI identifică ce lipsește, completează din datele interne și pregătește ce rămâne de completat manual"
             style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 13px', borderRadius: 999, cursor: 'pointer', opacity: busy === 'p' ? 0.6 : 1 }}>{busy === 'p' ? 'Se pregătește…' : '✨ Pregătește'}</button>}
           <button onClick={() => deschideDocument(urlDoc(true), doc.fisier_nume)} style={ico} title="Vezi">👁</button>
