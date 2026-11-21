@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
-import { codNou, statusActValid, stareZonaValida, zonaValida, tipDocActValid, type StatusAct } from '@/lib/proiect-social'
+import { codNou, statusActValid, stareZonaValida, zonaValida, tipDocActValid, ZONE_SOCIALE, type StatusAct } from '@/lib/proiect-social'
 import { getSablon, caleStorage, VALORI_IMPLICITE } from '@/lib/proiect-social-sabloane'
 import { umpleSablon } from '@/lib/docxFill'
+import JSZip from 'jszip'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120
 
 // Modulul „Activități sociale" al proiectului AB Textile: activitățile create în fiecare zonă
 // (AS-NNN/AN), ciclul de viață al zonelor pe an și documentele atașate unei activități (în tabelul
@@ -62,6 +64,46 @@ export async function GET(req: NextRequest) {
     let bytes: Uint8Array
     try { bytes = await umpleSablon(new Uint8Array(await tmpl.arrayBuffer()), valori) } catch { return NextResponse.json({ error: 'Generarea a eșuat' }, { status: 500 }) }
     return new NextResponse(Buffer.from(bytes), { headers: antet(`${sablon.label}.docx`, DOCX_TIP, req.nextUrl.searchParams.get('preview') === '1') })
+  }
+
+  // Descarcă documentele ca ZIP: o activitate (zip=activitate&activitateId=Y) sau tot anul (zip=tot&an=Z, pe foldere de zonă/activitate)
+  const zipMod = req.nextUrl.searchParams.get('zip')
+  if (zipMod) {
+    const numeZona = (cod: string) => { const z = ZONE_SOCIALE.find(x => x.cod === cod); return z ? `${z.nr} ${z.titlu}` : cod }
+    const sigur = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w .-]+/g, '_').trim().slice(0, 80) || 'document'
+    const intrari: { path: string; nume: string; folder: string }[] = []
+    let numeZip = 'Documente-sociale'
+    if (zipMod === 'activitate') {
+      const activitateId = String(req.nextUrl.searchParams.get('activitateId') || '')
+      const { data: act } = await sb.from('activitati_sociale').select('cod,denumire').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle()
+      if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
+      const { data } = await sb.from('documente').select('fisier_path,fisier_nume').eq('firma_id', firmaId).eq('modul', MODUL).eq('activitate_sociala_id', activitateId).order('created_at', { ascending: true })
+      for (const d of data || []) if (d.fisier_path) intrari.push({ path: d.fisier_path, nume: d.fisier_nume || 'document', folder: '' })
+      numeZip = sigur(`${act.cod} ${act.denumire}`)
+    } else if (zipMod === 'tot') {
+      const an = anValid(req.nextUrl.searchParams.get('an')) || new Date().getFullYear()
+      const { data: acts } = await sb.from('activitati_sociale').select('id,cod,denumire,zona').eq('firma_id', firmaId).eq('an', an)
+      const actMap = new Map((acts || []).map(a => [a.id, a]))
+      const actIds = (acts || []).map(a => a.id)
+      if (actIds.length) {
+        const { data } = await sb.from('documente').select('fisier_path,fisier_nume,activitate_sociala_id').eq('firma_id', firmaId).eq('modul', MODUL).in('activitate_sociala_id', actIds)
+        for (const d of data || []) { if (!d.fisier_path) continue; const a = actMap.get(d.activitate_sociala_id as string); intrari.push({ path: d.fisier_path, nume: d.fisier_nume || 'document', folder: a ? `${sigur(numeZona(a.zona))}/${sigur(a.cod + ' ' + a.denumire)}` : 'Activitati' }) }
+      }
+      const { data: dz } = await sb.from('documente').select('fisier_path,fisier_nume,zona_sociala').eq('firma_id', firmaId).eq('modul', MODUL).is('activitate_sociala_id', null).not('zona_sociala', 'is', null).eq('an_social', an)
+      for (const d of dz || []) if (d.fisier_path) intrari.push({ path: d.fisier_path, nume: d.fisier_nume || 'document', folder: sigur(numeZona(d.zona_sociala as string)) })
+      numeZip = `Activitati-sociale ${an}`
+    } else return NextResponse.json({ error: 'Parametru zip invalid' }, { status: 400 })
+    if (!intrari.length) return NextResponse.json({ error: 'Nu există documente de descărcat' }, { status: 404 })
+    const zip = new JSZip(); const folosite = new Set<string>()
+    for (const it of intrari) {
+      const { data: f } = await sb.storage.from('documente').download(it.path)
+      if (!f) continue
+      let nume = (it.folder ? it.folder + '/' : '') + it.nume
+      let i = 2; while (folosite.has(nume)) { const p = nume.lastIndexOf('.'); nume = p > 0 ? `${nume.slice(0, p)} (${i})${nume.slice(p)}` : `${nume} (${i})`; i++ }
+      folosite.add(nume); zip.file(nume, await f.arrayBuffer())
+    }
+    const bytes = await zip.generateAsync({ type: 'uint8array' })
+    return new NextResponse(Buffer.from(bytes), { headers: antet(`${numeZip}.zip`, 'application/zip', false) })
   }
 
   const [a, z, dd, o, b, maxNr, dz] = await Promise.all([

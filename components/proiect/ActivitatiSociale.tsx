@@ -4,7 +4,7 @@ import { deschideDocument } from '@/lib/vizualizare'
 import {
   ANI_PROIECT, ETICHETA_STATUS, STATUSURI_ACT, ETICHETA_STARE,
   stareaZonei, indicatorZona, rezumatAn, TIPURI_DOC_ACT, etichetaDocAct,
-  zoneOrdonate,
+  zoneOrdonate, ZONE_SOCIALE,
   type Activitate, type StareZonaRow, type StatusAct, type StareZona, type OrdineRow,
 } from '@/lib/proiect-social'
 import { getSablon, sabloanePentruZona } from '@/lib/proiect-social-sabloane'
@@ -23,6 +23,36 @@ const disp: React.CSSProperties = { fontFamily: 'var(--font-bricolage), var(--fo
 const gradText: React.CSSProperties = { ...disp, color: 'transparent', backgroundImage: 'linear-gradient(135deg, var(--accent-mint, var(--accent)), var(--accent-blue, var(--accent)))', WebkitBackgroundClip: 'text', backgroundClip: 'text' }
 const previzualizabil = (d: Doc) => /pdf|image/.test(d.fisier_tip || '') || /\.(pdf|jpe?g|png|webp)$/i.test(d.fisier_nume)
 const culoareStare: Record<StareZona, string> = { deschisa: 'var(--success)', in_lucru: 'var(--warning)', inchisa_pe_an: 'var(--accent-blue)', inchisa_definitiv: 'var(--text-muted)' }
+const esc = (s: string) => s.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] || c))
+
+// Un singur PDF din mai multe documente, cu câte o foaie de separare între ele (randare Word în browser + printare → „Salvează ca PDF").
+async function descarcaPdfDocumente(items: { id: string; nume: string; tip?: string | null; sectiune?: string }[], api: string, titlu: string) {
+  if (!items.length) { alert('Nu există documente de inclus.'); return }
+  const w = window.open('', '_blank')
+  if (!w) { alert('Permite ferestrele pop-up pentru a genera PDF-ul.'); return }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titlu)}</title><style>body{margin:0;font-family:system-ui,sans-serif;color:#111}.sep{page-break-before:always;display:flex;align-items:center;justify-content:center;min-height:70vh;text-align:center}.sep .s{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#888;margin-bottom:8px}.sep h2{font-size:22px;margin:0}.doc{page-break-before:always;padding:0 6mm}.doc:first-child{page-break-before:avoid}img{max-width:100%}@page{margin:14mm}</style></head><body><div id="c" style="padding:20px;font-size:14px;color:#555">Se pregătește… (${items.length} documente)</div></body></html>`)
+  w.document.close()
+  try {
+    const { renderAsync } = await import('docx-preview')
+    const c = w.document.getElementById('c'); if (c) { c.textContent = ''; c.removeAttribute('style') }
+    for (const it of items) {
+      const sep = w.document.createElement('div'); sep.className = 'sep'
+      sep.innerHTML = `<div><div class="s">${esc(it.sectiune || '')}</div><h2>${esc(it.nume)}</h2></div>`; c?.appendChild(sep)
+      const url = `${api}&download=${it.id}`
+      const wrap = w.document.createElement('div'); wrap.className = 'doc'; c?.appendChild(wrap)
+      const isDocx = /\.docx$/i.test(it.nume) || /wordprocessing/.test(it.tip || '')
+      const isImg = /^image\//.test(it.tip || '') || /\.(jpe?g|png|webp)$/i.test(it.nume)
+      if (isDocx) {
+        try { await renderAsync(await (await fetch(url)).blob(), wrap, undefined, { inWrapper: false }) } catch { wrap.innerHTML = '<p style="color:#888">(nu s-a putut randa — vezi în ZIP)</p>' }
+      } else if (isImg) {
+        const img = w.document.createElement('img'); img.src = url; wrap.appendChild(img)
+      } else {
+        wrap.innerHTML = `<p style="color:#888">„${esc(it.nume)}" (PDF/alt format) e în pachetul ZIP — nu se include în PDF-ul combinat.</p>`
+      }
+    }
+    w.focus(); setTimeout(() => w.print(), 900)
+  } catch { w.document.body.innerHTML = '<p style="font-family:sans-serif;padding:20px">Nu s-a putut genera PDF-ul.</p>' }
+}
 
 export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const [acts, setActs] = useState<Activitate[]>([])
@@ -109,6 +139,16 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const addDocsZona = (ds: Doc[]) => setDocsZona(prev => [...ds, ...prev])
   const removeDocZona = (id: string) => setDocsZona(prev => prev.filter(x => x.id !== id))
 
+  // toate documentele anului, pentru PDF-ul total (ordonate pe zonă, cu secțiunea = zona)
+  const itemsTot = () => {
+    const zMap = new Map(ZONE_SOCIALE.map(z => [z.cod, `${z.nr} ${z.titlu}`]))
+    const actMap = new Map(acts.map(a => [a.id, a]))
+    const codDoc = (d: Doc) => (d.activitate_sociala_id ? actMap.get(d.activitate_sociala_id)?.zona : d.zona_sociala) || ''
+    const alAnului = (d: Doc) => d.activitate_sociala_id ? actMap.get(d.activitate_sociala_id)?.an === an : (d.an_social == null || d.an_social === an)
+    return [...docs, ...docsZona].filter(alAnului).sort((a, b) => codDoc(a).localeCompare(codDoc(b)))
+      .map(d => ({ id: d.id, nume: d.fisier_nume, tip: d.fisier_tip, sectiune: zMap.get(codDoc(d)) || codDoc(d) }))
+  }
+
   if (!incarcat) return <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>Se încarcă…</div>
 
   return (
@@ -138,6 +178,12 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
             <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: 4 }}>{t.k}</div>
           </div>
         ))}
+      </div>
+
+      {/* Descarcă tot (toate secțiunile): ZIP (pe foldere) + PDF total cu foi de separare */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <a href={`${api}&zip=tot&an=${an}`} title="Toate documentele anului, pe foldere de zonă" style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-primary)' }}>⬇ Descarcă tot ({an}) · ZIP</a>
+        <button onClick={() => descarcaPdfDocumente(itemsTot(), api, `Activități sociale ${an}`)} style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-primary)' }}>⬇ Descarcă tot ({an}) · PDF</button>
       </div>
 
       {/* Zonele */}
@@ -298,6 +344,8 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
           {STATUSURI_ACT.map(s => <option key={s} value={s}>{ETICHETA_STATUS[s]}</option>)}
         </select>
         {!!docs.length && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>📎 {docs.length}</span>}
+        {!!docs.length && <a href={`${api}&zip=activitate&activitateId=${a.id}`} onClick={e => e.stopPropagation()} title="Descarcă documentele activității (ZIP)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', fontWeight: 700 }}>ZIP</a>}
+        {!!docs.length && <button onClick={e => { e.stopPropagation(); descarcaPdfDocumente(docs.map(d => ({ id: d.id, nume: d.fisier_nume, tip: d.fisier_tip, sectiune: `${a.cod} · ${a.denumire}` })), api, `${a.cod} ${a.denumire}`) }} title="Descarcă documentele activității (PDF, cu foi de separare)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', fontWeight: 700 }}>PDF</button>}
         <button onClick={e => { e.stopPropagation(); onSterge() }} title="Șterge activitatea" aria-label={`Șterge ${a.cod}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
       </div>
 
