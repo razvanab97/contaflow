@@ -167,6 +167,8 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
 
       {randuri.map(r => {
         const seGen = r.benId ? busy === 'g' + r.benId : busy === 'g' + r.tip
+        // câmpuri ale voluntarului încă goale, care apar în document (ex. telefon/e-mail) — de completat
+        const lipsaBenef = r.benef ? campBen.filter(c => !String((c.key === 'NUME' ? r.benef!.nume : r.benef!.date?.[c.key]) || '').trim()) : []
         return (
           <div key={r.key} className="gsoc-row" style={S.row}>
             <span className="gsoc-node">
@@ -193,6 +195,7 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
                     <span className={'gsoc-dot' + (inLucru ? ' w' : '')} />{inLucru ? 'În lucru' : 'Emis'}</button> })()
                   : seGen ? <span style={{ ...S.okPill, color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 13%, transparent)' }}><span className="gsoc-dot w" />se pregătește</span>
                   : <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>neîntocmit</span>}
+                {r.benId && lipsaBenef.length > 0 && <button onClick={() => setEditeaza(r.benId)} title={`De completat în document: ${lipsaBenef.map(c => c.label).join(', ')}`} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 14%, transparent)', border: 'none', padding: '3px 9px', borderRadius: 999, cursor: 'pointer' }}>completează {lipsaBenef.length <= 2 ? lipsaBenef.map(c => c.label.toLowerCase()).join(', ') : `${lipsaBenef.length} câmpuri`}</button>}
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>

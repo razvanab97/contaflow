@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
       firma_id: firmaId, luna_id: null, modul: MODUL, activitate_sociala_id: null, zona_sociala: zonaDoc, an_social: anDoc,
       tip_document: tip, furnizor: sablon.label, data_document: t,
       fisier_path: path, fisier_nume: `${sablon.label}.docx`, fisier_tip: DOCX_TIP, fisier_marime: bytes.length, in_zip: false,
-    }).select(COL_DOC).single()
+    }).select(COL_DOC + ',zona_sociala,an_social').single() // include zona/an ca documentul nou să treacă filtrul din UI
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: /zona_sociala|an_social/i.test(error.message) ? 'Rulează migrarea (coloane zonă lipsă)' : error.message }, { status: /zona_sociala|an_social/i.test(error.message) ? 409 : 500 }) }
     return NextResponse.json({ document: doc })
   }
@@ -287,6 +287,7 @@ export async function POST(req: NextRequest) {
       pfx = prefixZona(firmaId, zonaDoc, anDoc); coloane = { activitate_sociala_id: null, zona_sociala: zonaDoc, an_social: anDoc }
     } else return NextResponse.json({ error: 'Lipsește activitatea sau zona' }, { status: 400 })
     const tip = tipDocActValid(b.tip)
+    const selCols = activitateId ? COL_DOC : COL_DOC + ',zona_sociala,an_social' // doc de zonă → întoarce și zona/an, ca să treacă filtrul din UI
     const adaugate = [], erori: string[] = []
     for (const f of incarcate) {
       if (!f.path?.startsWith(pfx)) { erori.push(`${f.nume}: cale invalidă`); continue }
@@ -294,7 +295,7 @@ export async function POST(req: NextRequest) {
         firma_id: firmaId, luna_id: null, modul: MODUL, ...coloane,
         tip_document: tip, furnizor: f.nume, data_document: azi(),
         fisier_path: f.path, fisier_nume: f.nume, fisier_tip: f.tip, fisier_marime: f.marime, in_zip: false,
-      }).select(COL_DOC).single()
+      }).select(selCols).single()
       if (error) { await sb.storage.from('documente').remove([f.path]); erori.push(`${f.nume}: ${/zona_sociala|an_social/i.test(error.message) ? 'rulează migrarea (coloane zonă lipsă)' : error.message}`); continue }
       adaugate.push(data)
     }
