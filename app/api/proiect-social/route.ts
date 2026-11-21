@@ -245,6 +245,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ document: doc, nr })
   }
 
+  // Generează un document editabil dintr-un șablon, direct într-o zonă (fără activitate/beneficiar).
+  // Se completează AN + DATA (azi) + valorile implicite (coordonator, locul…); restul marcajelor rămân linii de completat în Word.
+  if (b.actiune === 'genereaza-zona') {
+    const zonaDoc = String(b.zona || ''), anDoc = anValid(b.an), tip = String(b.tip || '')
+    const sablon = getSablon(tip)
+    if (!sablon) return NextResponse.json({ error: 'Șablon necunoscut' }, { status: 400 })
+    if (!zonaDoc || !zonaValida(zonaDoc) || !anDoc) return NextResponse.json({ error: 'Zonă sau an invalid' }, { status: 400 })
+    const valori: Record<string, string> = { AN: String(anDoc) }
+    for (const c of sablon.campuri) if (VALORI_IMPLICITE[c.key]) valori[c.key] = VALORI_IMPLICITE[c.key]
+    const t = azi()
+    valori.DATA = `${t.slice(8, 10)}.${t.slice(5, 7)}.${t.slice(0, 4)}`
+    const { data: tmpl, error: dlErr } = await sb.storage.from('documente').download(caleStorage(sablon))
+    if (dlErr || !tmpl) return NextResponse.json({ error: 'Șablonul nu a putut fi citit din storage' }, { status: 500 })
+    let bytes: Uint8Array
+    try { bytes = await umpleSablon(new Uint8Array(await tmpl.arrayBuffer()), valori) } catch (e) { return NextResponse.json({ error: `Generarea a eșuat: ${e instanceof Error ? e.message : String(e)}` }, { status: 500 }) }
+    const path = `${prefixZona(firmaId, zonaDoc, anDoc)}${Date.now()}_${sablon.tip}.docx`
+    const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(bytes), { contentType: DOCX_TIP })
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+    const { data: doc, error } = await sb.from('documente').insert({
+      firma_id: firmaId, luna_id: null, modul: MODUL, activitate_sociala_id: null, zona_sociala: zonaDoc, an_social: anDoc,
+      tip_document: tip, furnizor: sablon.label, data_document: t,
+      fisier_path: path, fisier_nume: `${sablon.label}.docx`, fisier_tip: DOCX_TIP, fisier_marime: bytes.length, in_zip: false,
+    }).select(COL_DOC).single()
+    if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: /zona_sociala|an_social/i.test(error.message) ? 'Rulează migrarea (coloane zonă lipsă)' : error.message }, { status: /zona_sociala|an_social/i.test(error.message) ? 409 : 500 }) }
+    return NextResponse.json({ document: doc })
+  }
+
   if (b.actiune === 'inregistreaza-doc') {
     const activitateId = String(b.activitateId || '')
     const zonaDoc = String(b.zona || ''), anDoc = anValid(b.an)

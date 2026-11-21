@@ -205,6 +205,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                   </div>
 
                   <DocumenteZona firmaId={firmaId} zona={z.cod} an={an} api={api}
+                    sabloane={sabloanePentruZona(z.cod).map(s => ({ tip: s.tip, label: s.label }))}
                     docs={docsZona.filter(d => d.zona_sociala === z.cod && (d.an_social == null || d.an_social === an))}
                     onAdaugat={addDocsZona} onSters={removeDocZona} disabled={definitiv} />
 
@@ -380,14 +381,25 @@ function FormActivitate({ onSalveaza, onAnuleaza }: { onSalveaza: (c: Record<str
 
 // --- Documente atașate direct unei zone (fără activitate) ----------------------------------------
 // „Adaugă document" pe o zonă: încarci un fișier (Word/PDF/imagine) legat de zonă + an, fără să creezi o activitate.
-function DocumenteZona({ firmaId, zona, an, api, docs, onAdaugat, onSters, disabled }: {
-  firmaId: string; zona: string; an: number; api: string; docs: Doc[]
+function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSters, disabled }: {
+  firmaId: string; zona: string; an: number; api: string; docs: Doc[]; sabloane: { tip: string; label: string }[]
   onAdaugat: (ds: Doc[]) => void; onSters: (id: string) => void; disabled?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [mesaj, setMesaj] = useState('')
+  const [meniu, setMeniu] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const urlDoc = (d: Doc, preview = false) => `${api}&download=${d.id}${preview ? '&preview=1' : ''}`
+
+  // generează un document editabil dintr-un șablon (draft) existent al zonei, direct în sistem
+  async function genereazaSablon(tip: string) {
+    setMeniu(false); setBusy(true); setMesaj('')
+    try {
+      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'genereaza-zona', zona, an, tip }) })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok && d.document) onAdaugat([d.document]); else setMesaj(d.error || 'Nu s-a putut genera documentul')
+    } catch { setMesaj('Generarea a eșuat') } finally { setBusy(false) }
+  }
 
   async function incarca(files: File[]) {
     if (!files.length) return
@@ -432,7 +444,24 @@ function DocumenteZona({ firmaId, zona, an, api, docs, onAdaugat, onSters, disab
         </div>
       )}
       <input ref={inputRef} type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={e => incarca(Array.from(e.target.files || []))} />
-      {!disabled && <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se încarcă…' : '+ Adaugă document'}</button>}
+      {!disabled && (sabloane.length ? (
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <button onClick={() => setMeniu(v => !v)} disabled={busy} aria-expanded={meniu} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se lucrează…' : '+ Adaugă document'} {!busy && (meniu ? '▴' : '▾')}</button>
+          {meniu && <>
+            <div onClick={() => setMeniu(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+            <div style={{ position: 'absolute', zIndex: 20, top: '100%', left: 0, marginTop: 6, minWidth: 250, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', boxShadow: 'var(--pa-card-shadow, 0 8px 24px rgba(0,0,0,.25))', padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '5px 8px 3px' }}>Din șablon (editabil)</div>
+              {sabloane.map(s => (
+                <button key={s.tip} onClick={() => genereazaSablon(s.tip)} style={{ ...linkBtn, textAlign: 'left', padding: '8px', borderRadius: 'var(--r-sm)', color: 'var(--text-primary)', fontWeight: 600 }}>📄 {s.label}</button>
+              ))}
+              <div style={{ height: 1, background: 'var(--border-subtle, var(--border))', margin: '4px 2px' }} />
+              <button onClick={() => { setMeniu(false); inputRef.current?.click() }} style={{ ...linkBtn, textAlign: 'left', padding: '8px', borderRadius: 'var(--r-sm)', color: 'var(--text-secondary)' }}>⬆ Încarcă un fișier din calculator…</button>
+            </div>
+          </>}
+        </div>
+      ) : (
+        <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se încarcă…' : '+ Adaugă document'}</button>
+      ))}
       {mesaj && <span style={{ marginLeft: 10, fontSize: 'var(--fs-xs)', color: 'var(--danger)' }}>{mesaj}</span>}
     </div>
   )
