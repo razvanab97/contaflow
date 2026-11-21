@@ -252,6 +252,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ document: data })
   }
 
+  // Mută un document atașat unei zone în interiorul unei activități (îl leagă de activitate).
+  if (b.actiune === 'muta-doc-activitate') {
+    const docId = String(b.docId || ''), activitateId = String(b.activitateId || '')
+    if (!docId || !activitateId) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
+    const { data: act } = await sb.from('activitati_sociale').select('id').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle()
+    if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
+    const { data, error } = await sb.from('documente').update({ activitate_sociala_id: activitateId, zona_sociala: null, an_social: null, este_draft: false })
+      .eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ document: data })
+  }
+
   // „Pune în lucru" un document (draft încărcat): îi completează marcajele %%...%% cu datele zonei/activității
   // și salvează o copie editabilă. Dacă se dă `activitateId`, copia intră în REGISTRUL activității (act „în lucru");
   // altfel rămâne un document de zonă (comportamentul vechi).

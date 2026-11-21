@@ -140,6 +140,8 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   // upsert: documentele noi apar sus, iar cele deja existente (ex. marcate draft) se actualizează pe loc
   const addDocsZona = (ds: Doc[]) => setDocsZona(prev => { const ids = new Set(ds.map(d => d.id)); return [...ds, ...prev.filter(p => !ids.has(p.id))] })
   const removeDocZona = (id: string) => setDocsZona(prev => prev.filter(x => x.id !== id))
+  // mutarea unui document din zonă într-o activitate: iese din docsZona și intră în docs (al activității)
+  const mutaDocZonaInActivitate = (doc: Doc) => { setDocsZona(prev => prev.filter(d => d.id !== doc.id)); setDocs(prev => [doc, ...prev.filter(d => d.id !== doc.id)]) }
 
   // toate documentele anului, pentru PDF-ul total (ordonate pe zonă, cu secțiunea = zona)
   const itemsTot = () => {
@@ -262,8 +264,9 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                         bazaBeneficiari={z.baza === 'beneficiari'} unitate={z.unitate} zona={z.cod} an={an} definitiv={definitiv}
                         beneficiari={beneficiari.filter(b => b.activitate_id === a.id)} urmatorNr={urmatorNr}
                         arataDocsZona={ai === 0} sabloaneZona={sabloanePentruZona(z.cod).map(s => ({ tip: s.tip, label: s.label }))}
+                        activitatiZona={aleZonei.map(x => ({ id: x.id, denumire: x.denumire }))}
                         docsZona={docsZona.filter(d => d.zona_sociala === z.cod && (d.an_social == null || d.an_social === an))}
-                        onDocZonaAdaugat={addDocsZona} onDocZonaSters={removeDocZona}
+                        onDocZonaAdaugat={addDocsZona} onDocZonaSters={removeDocZona} onMutaDocZona={mutaDocZonaInActivitate}
                         onModifica={modifica} onSterge={() => stergeAct(a)}
                         onDocNou={nd => setDocs(prev => [...nd, ...prev])} onDocSters={id => setDocs(prev => prev.filter(d => d.id !== id))}
                         onBeneficiar={upsertBenef} onBeneficiarSters={removeBenef} onGenerat={addGenerat} onNrSchimbat={updateNr}
@@ -291,11 +294,11 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
 }
 
 // --- O activitate (rând) ---------------------------------------------------------------------
-function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, definitiv, beneficiari, urmatorNr, arataDocsZona, sabloaneZona, docsZona, onDocZonaAdaugat, onDocZonaSters, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat, onDateComune }: {
+function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, definitiv, beneficiari, urmatorNr, arataDocsZona, sabloaneZona, activitatiZona, docsZona, onDocZonaAdaugat, onDocZonaSters, onMutaDocZona, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat, onDateComune }: {
   a: Activitate; docs: Doc[]; firmaId: string; bazaBeneficiari: boolean; unitate: string; zona: string; an: number; definitiv?: boolean
   beneficiari: Beneficiar[]; urmatorNr: number
-  arataDocsZona?: boolean; sabloaneZona: { tip: string; label: string }[]; docsZona: Doc[]
-  onDocZonaAdaugat: (ds: Doc[]) => void; onDocZonaSters: (id: string) => void
+  arataDocsZona?: boolean; sabloaneZona: { tip: string; label: string }[]; activitatiZona?: { id: string; denumire: string }[]; docsZona: Doc[]
+  onDocZonaAdaugat: (ds: Doc[]) => void; onDocZonaSters: (id: string) => void; onMutaDocZona?: (d: Doc) => void
   onModifica: (id: string, patch: Record<string, unknown>) => void; onSterge: () => void
   onDocNou: (d: Doc[]) => void; onDocSters: (id: string) => void
   onBeneficiar: (b: Beneficiar) => void; onBeneficiarSters: (id: string) => void
@@ -422,7 +425,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
           {arataDocsZona && (
             <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
               <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 2 }}>Documente</div>
-              <DocumenteZona firmaId={firmaId} zona={zona} an={an} api={api} activitateId={a.id} sabloane={sabloaneZona} docs={docsZona} onAdaugat={onDocZonaAdaugat} onSters={onDocZonaSters} onPusInLucru={d => onDocNou(d)} disabled={definitiv} />
+              <DocumenteZona firmaId={firmaId} zona={zona} an={an} api={api} activitateId={a.id} activitati={activitatiZona} sabloane={sabloaneZona} docs={docsZona} onAdaugat={onDocZonaAdaugat} onSters={onDocZonaSters} onPusInLucru={d => onDocNou(d)} onMutaInActivitate={onMutaDocZona} disabled={definitiv} />
             </div>
           )}
         </div>
@@ -462,9 +465,9 @@ function FormActivitate({ onSalveaza, onAnuleaza }: { onSalveaza: (c: Record<str
 
 // --- Documente atașate direct unei zone (fără activitate) ----------------------------------------
 // „Adaugă document" pe o zonă: încarci un fișier (Word/PDF/imagine) legat de zonă + an, fără să creezi o activitate.
-function DocumenteZona({ firmaId, zona, an, api, activitateId, docs, sabloane, onAdaugat, onSters, onPusInLucru, disabled }: {
-  firmaId: string; zona: string; an: number; api: string; activitateId?: string; docs: Doc[]; sabloane: { tip: string; label: string }[]
-  onAdaugat: (ds: Doc[]) => void; onSters: (id: string) => void; onPusInLucru?: (ds: Doc[]) => void; disabled?: boolean
+function DocumenteZona({ firmaId, zona, an, api, activitateId, activitati, docs, sabloane, onAdaugat, onSters, onPusInLucru, onMutaInActivitate, disabled }: {
+  firmaId: string; zona: string; an: number; api: string; activitateId?: string; activitati?: { id: string; denumire: string }[]; docs: Doc[]; sabloane: { tip: string; label: string }[]
+  onAdaugat: (ds: Doc[]) => void; onSters: (id: string) => void; onPusInLucru?: (ds: Doc[]) => void; onMutaInActivitate?: (d: Doc) => void; disabled?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [mesaj, setMesaj] = useState('')
@@ -529,8 +532,18 @@ function DocumenteZona({ firmaId, zona, an, api, activitateId, docs, sabloane, o
     const r = await fetch(`${api}&doc=${d.id}`, { method: 'DELETE' })
     if (r.ok) onSters(d.id)
   }
+  // mută un document al zonei în interiorul unei activități (îl leagă de activitate)
+  async function mutaInActivitate(d: Doc, actId: string) {
+    setBusy(true); setMesaj('')
+    try {
+      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'muta-doc-activitate', docId: d.id, activitateId: actId }) })
+      const dd = await r.json().catch(() => ({}))
+      if (r.ok && dd.document) onMutaInActivitate?.(dd.document); else setMesaj(dd.error || 'Nu s-a putut muta')
+    } catch { setMesaj('Mutarea a eșuat') } finally { setBusy(false) }
+  }
 
   const esteDocxDoc = (d: Doc) => /\.docx$/i.test(d.fisier_nume) || /wordprocessing/.test(d.fisier_tip || '')
+  const activ = activitati || []
   // document „pus în lucru" la nivel de zonă (copie editabilă) — are cardul de lucru (Pregătește + completare)
   const esteLucru = (d: Doc) => d.tip_document === TIP_LUCRU || d.stare === 'in_lucru' || /\(în lucru\)\.docx$/i.test(d.fisier_nume)
   const lucruDocs = docs.filter(d => !d.este_draft && esteLucru(d))
@@ -550,13 +563,23 @@ function DocumenteZona({ firmaId, zona, an, api, activitateId, docs, sabloane, o
         </div>
       )}
 
-      {/* Documente „de moment" (atașamente simple) — le poți marca drept draft reutilizabil */}
+      {/* Documente „de moment" (atașamente simple) — le poți marca draft, muta într-o activitate, vedea sau șterge */}
       {momentDocs.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+          {!disabled && activ.length === 0 && (
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>Ca să pui documentele într-o activitate, creează mai întâi o activitate (butonul „+ Activitate nouă" de mai jos), apoi apasă „→ activitate" pe fiecare document.</div>
+          )}
           {momentDocs.map(d => (
-            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
               <span aria-hidden style={{ fontSize: 13 }}>📄</span>
-              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
+              <span style={{ flex: 1, minWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
+              {!disabled && activ.length > 0 && (
+                <select value="" onChange={e => { if (e.target.value) mutaInActivitate(d, e.target.value) }} disabled={busy} title="Mută documentul într-o activitate"
+                  style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '3px 6px', fontSize: 'var(--fs-xs)', color: 'var(--accent)', fontWeight: 700, maxWidth: 160, cursor: 'pointer' }}>
+                  <option value="">→ activitate…</option>
+                  {activ.map(a => <option key={a.id} value={a.id}>{a.denumire}</option>)}
+                </select>
+              )}
               {esteDocxDoc(d) && !disabled && <button onClick={() => marcheaza(d.id, true)} disabled={busy} title="Marchează ca draft reutilizabil (apare la Drafturi standard)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', fontWeight: 700 }}>☆ Draft</button>}
               {(previzualizabil(d) || esteDocxDoc(d)) && <button onClick={() => deschideDocument(urlDoc(d, true), d.fisier_nume)} style={{ ...linkBtn, color: 'var(--accent)' }}>Vezi</button>}
               <a href={urlDoc(d)} title="Descarcă" style={{ ...linkBtn, color: 'var(--accent)' }}>↓</a>
