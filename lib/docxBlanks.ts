@@ -63,14 +63,17 @@ export async function extrageContextBlanks(bytes: Uint8Array | ArrayBuffer | Buf
 }
 
 // Umple spațiile cu valorile date (cheie = numărul spațiului). Cele fără valoare rămân linii de completat.
-export async function umpleBlanks(bytes: Uint8Array | ArrayBuffer | Buffer, valori: Record<string, string>): Promise<{ bytes: Uint8Array; completate: number; total: number }> {
+// `remap` = numărul vechi al unui spațiu rămas (necompletat) -> numărul lui în documentul rezultat (renumerotat),
+// ca să putem adresa aceleași spații și după o completare parțială.
+export async function umpleBlanks(bytes: Uint8Array | ArrayBuffer | Buffer, valori: Record<string, string>): Promise<{ bytes: Uint8Array; completate: number; total: number; remap: Record<string, number> }> {
   const { zip, nume, xml } = await incarca(bytes)
-  let completate = 0
+  let completate = 0, ramase = 0
+  const remap: Record<string, number> = {}
   const { xml: nou, total } = parcurge(xml, idx => {
     const v = valori[String(idx)]
     if (v != null && String(v).trim() !== '') { completate++; return String(v) }
-    return null
+    ramase++; remap[String(idx)] = ramase; return null
   })
   zip.file(nume, nou)
-  return { bytes: await zip.generateAsync({ type: 'uint8array' }), completate, total }
+  return { bytes: await zip.generateAsync({ type: 'uint8array' }), completate, total, remap }
 }

@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { deschideDocument } from '@/lib/vizualizare'
+import { printeazaDocxPdf } from '@/lib/docxPrint'
+import DocLucruCard, { type DocLucru } from './DocLucruCard'
 import { sabloaneBeneficiar, sabloaneActivitate, campuriComune, campuriBeneficiar, VALORI_IMPLICITE, TIP_LUCRU, type SablonCamp } from '@/lib/proiect-social-sabloane'
 
 // Fabrica de documente a unei activități (strat premium – vezi proiect-theme.css .gsoc-*):
@@ -30,20 +32,6 @@ const initiale = (n: string) => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]?
 const azi = () => new Date().toISOString().slice(0, 10)
 const roData = (iso?: string | null) => iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : ''
 
-async function printeazaPdf(url: string, nume: string) {
-  const w = window.open('', '_blank')
-  if (!w) { alert('Permite ferestrele pop-up pentru a salva PDF-ul.'); return }
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${nume.replace(/[<>&]/g, '')}</title><style>body{margin:0}@page{margin:16mm}</style></head><body><div id="c">Se pregătește…</div></body></html>`)
-  w.document.close()
-  try {
-    const { renderAsync } = await import('docx-preview')
-    const blob = await (await fetch(url)).blob()
-    const c = w.document.getElementById('c'); if (c) c.textContent = ''
-    await renderAsync(blob, c as HTMLElement, undefined, { inWrapper: false, ignoreWidth: false, ignoreHeight: false })
-    w.focus(); setTimeout(() => w.print(), 400)
-  } catch { w.document.body.innerHTML = '<p style="font-family:sans-serif;padding:20px">Nu s-a putut randa. Descarcă Word.</p>' }
-}
-
 export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateDocumente, beneficiari, documente, onBeneficiar, onBeneficiarSters, onGenerat, onStergeDoc, onDateComune, disabled }: {
   firmaId: string; activitateId: string; an: number; zona: string; dateDocumente: Record<string, string>
   beneficiari: Beneficiar[]; documente: DocGen[]
@@ -58,7 +46,6 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
   const [setari, setSetari] = useState(false)
   const [busy, setBusy] = useState('')
   const [mesaj, setMesaj] = useState('')
-  const [pregatit, setPregatit] = useState<Record<string, { completate: number; total: number; manuale: { nr: number; eticheta: string }[] }>>({})
   const autoRef = useRef(false)
   const api = `/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`
   const urlDoc = (id: string, preview = false) => `${api}&download=${id}${preview ? '&preview=1' : ''}`
@@ -121,22 +108,6 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
     if (!confirm(`Ștergi pe „${b.nume}"? (documentele deja generate rămân)`)) return
     const r = await fetch(`${api}&beneficiar=${b.id}`, { method: 'DELETE' })
     if (r.ok) onBeneficiarSters(b.id); else setMesaj('Nu s-a putut șterge')
-  }
-  // scoate din registru un document „pus în lucru" (draft)
-  async function stergeLucru(doc: DocGen) {
-    if (!confirm(`Scoți din registru documentul „${doc.furnizor || doc.fisier_nume}"?`)) return
-    const r = await fetch(`${api}&doc=${doc.id}`, { method: 'DELETE' })
-    if (r.ok) onStergeDoc?.(doc.id); else setMesaj('Nu s-a putut șterge')
-  }
-  // „Pregătește": AI identifică spațiile de completat, umple ce poate din datele interne și raportează restul (manual)
-  async function pregatesteDoc(doc: DocGen) {
-    setBusy('p' + doc.id); setMesaj('')
-    try {
-      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'pregateste-doc', docId: doc.id }) })
-      const d = await r.json().catch(() => ({}))
-      if (r.ok && d.document) { onGenerat(d.document); setPregatit(p => ({ ...p, [doc.id]: { completate: d.completate || 0, total: d.total || 0, manuale: d.manuale || [] } })) }
-      else setMesaj(d.error || 'Nu s-a putut pregăti documentul')
-    } catch { setMesaj('Pregătirea a eșuat') } finally { setBusy('') }
   }
 
   const chips = comune.filter(c => dateDocumente?.[c.key]).slice(0, 2)
@@ -231,44 +202,13 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
         )
       })}
 
-      {/* Documente puse în lucru dintr-un draft (ex. Raport anual) — acte separate în registru */}
-      {extra.map(d => { const inLucru = d.stare === 'in_lucru', sb = busy === 's' + d.id, pb = busy === 'p' + d.id, rez = pregatit[d.id]
-        return (
-          <div key={d.id}>
-          <div className="gsoc-row" style={S.row}>
-            <span className="gsoc-node">{d.nr_inregistrare != null ? <span className="gsoc-nr" title="Număr de înregistrare">{d.nr_inregistrare}</span> : <span className="gsoc-dot w" />}</span>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.furnizor || d.fisier_nume}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginTop: 3 }}>
-                {d.data_document && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{roData(d.data_document)}</span>}
-                <button onClick={() => schimbaStare(d)} disabled={sb} title="Apasă pentru a comuta: Emis ↔ În lucru"
-                  style={{ ...S.okPill, ...(inLucru ? { color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 15%, transparent)' } : {}), border: 'none', cursor: 'pointer', opacity: sb ? 0.5 : 1 }}>
-                  <span className={'gsoc-dot' + (inLucru ? ' w' : '')} />{inLucru ? 'În lucru' : 'Emis'}</button>
-                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>pus în lucru dintr-un draft</span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-              {!disabled && <button onClick={() => pregatesteDoc(d)} disabled={pb} className="gsoc-solid" title="AI identifică ce lipsește, completează din datele interne și pregătește ce rămâne de completat manual"
-                style={{ ...S.pdf, display: 'inline-flex', alignItems: 'center', gap: 5, opacity: pb ? 0.6 : 1 }}>{pb ? 'Se pregătește…' : '✨ Pregătește'}</button>}
-              <ActiuniDoc doc={d} urlDoc={urlDoc} />
-              {!disabled && <button onClick={() => stergeLucru(d)} title="Scoate din registru" aria-label={`Șterge ${d.furnizor || d.fisier_nume}`} style={{ ...S.ico, fontSize: 15 }}>×</button>}
-            </div>
-          </div>
-          {rez && (
-            <div style={{ margin: '0 0 2px 54px', padding: '10px 13px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 'var(--fs-xs)' }}>
-              <div style={{ fontWeight: 700, color: 'var(--accent-green)' }}>✓ Am completat {rez.completate} {rez.completate === 1 ? 'câmp' : 'câmpuri'} din datele interne{rez.total ? ` (din ${rez.total})` : ''}.</div>
-              {rez.manuale.length > 0
-                ? <div style={{ marginTop: 6 }}>
-                    <div style={{ color: 'var(--text-secondary)', fontWeight: 600, marginBottom: 4 }}>Rămâne de completat manual în document ({rez.manuale.length}):</div>
-                    <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-muted)', display: 'grid', gap: 2 }}>
-                      {rez.manuale.map(m => <li key={m.nr}>{m.eticheta}</li>)}
-                    </ul>
-                    <div style={{ marginTop: 6, color: 'var(--text-muted)' }}>Deschide documentul (Word / Vezi) — câmpurile rămase sunt liniile „______".</div>
-                  </div>
-                : <div style={{ marginTop: 4, color: 'var(--text-muted)' }}>Nu a mai rămas nimic de completat manual.</div>}
-            </div>
-          )}
-          </div>) })}
+      {/* Documente puse în lucru dintr-un draft (ex. Raport anual) — card separat, cu „Pregătește" + zonă de completat */}
+      {extra.map(d => (
+        <div key={d.id} style={{ marginTop: 9 }}>
+          <DocLucruCard firmaId={firmaId} api={api} doc={d as unknown as DocLucru}
+            onActualizat={nd => onGenerat(nd as unknown as DocGen)} onSters={id => onStergeDoc?.(id)} disabled={disabled} />
+        </div>
+      ))}
 
       {/* Voluntari */}
       {!!sabBen.length && (
@@ -301,7 +241,7 @@ function ActiuniDoc({ doc, urlDoc }: { doc: DocGen; urlDoc: (id: string, p?: boo
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
       <button onClick={() => deschideDocument(urlDoc(doc.id, true), doc.fisier_nume)} style={S.ico} title="Vezi">👁</button>
       <a href={urlDoc(doc.id)} style={S.word} title="Descarcă Word (editabil)">Word</a>
-      <button className="gsoc-solid" onClick={() => printeazaPdf(urlDoc(doc.id), doc.fisier_nume)} style={S.pdf} title="PDF (pregătit de semnare)">PDF</button>
+      <button className="gsoc-solid" onClick={() => printeazaDocxPdf(urlDoc(doc.id), doc.fisier_nume)} style={S.pdf} title="PDF (pregătit de semnare)">PDF</button>
     </span>
   )
 }

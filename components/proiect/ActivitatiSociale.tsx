@@ -9,6 +9,7 @@ import {
 } from '@/lib/proiect-social'
 import { getSablon, sabloanePentruZona, TIP_LUCRU } from '@/lib/proiect-social-sabloane'
 import GeneratorSocial, { type Beneficiar, type DocGen } from './GeneratorSocial'
+import DocLucruCard, { type DocLucru } from './DocLucruCard'
 
 // Modulul „Activități sociale": fiecare zonă (activitate din plan) e o linie în care se adaugă
 // activități (AS-NNN/AN) și documente. Indicatorul se mișcă doar din activitățile VALIDATE.
@@ -529,12 +530,26 @@ function DocumenteZona({ firmaId, zona, an, api, activitateId, docs, sabloane, o
     if (r.ok) onSters(d.id)
   }
 
-  const draftDocs = docs.filter(d => d.este_draft)
-  const momentDocs = docs.filter(d => !d.este_draft)
   const esteDocxDoc = (d: Doc) => /\.docx$/i.test(d.fisier_nume) || /wordprocessing/.test(d.fisier_tip || '')
+  // document „pus în lucru" la nivel de zonă (copie editabilă) — are cardul de lucru (Pregătește + completare)
+  const esteLucru = (d: Doc) => d.tip_document === TIP_LUCRU || d.stare === 'in_lucru' || /\(în lucru\)\.docx$/i.test(d.fisier_nume)
+  const lucruDocs = docs.filter(d => !d.este_draft && esteLucru(d))
+  const draftDocs = docs.filter(d => d.este_draft)
+  const momentDocs = docs.filter(d => !d.este_draft && !esteLucru(d))
 
   return (
     <div style={{ marginTop: 10 }}>
+      {/* Documente puse în lucru — card cu „Pregătește" (AI) + zonă de completat manual */}
+      {lucruDocs.length > 0 && (
+        <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Documente în lucru</div>
+          {lucruDocs.map(d => (
+            <DocLucruCard key={d.id} firmaId={firmaId} api={api} doc={d as unknown as DocLucru}
+              onActualizat={nd => onAdaugat([nd as unknown as Doc])} onSters={onSters} disabled={disabled} />
+          ))}
+        </div>
+      )}
+
       {/* Documente „de moment" (atașamente simple) — le poți marca drept draft reutilizabil */}
       {momentDocs.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>

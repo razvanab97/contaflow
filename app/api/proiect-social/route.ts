@@ -293,7 +293,7 @@ export async function POST(req: NextRequest) {
     if (inRegistru) { const { data: mx } = await sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1); nr = ((mx?.[0]?.nr_inregistrare as number) || 0) + 1 }
     const camp = inRegistru
       ? { activitate_sociala_id: act!.id, zona_sociala: null, an_social: null, stare: 'in_lucru', tip_document: TIP_LUCRU, nr_inregistrare: nr }
-      : { activitate_sociala_id: null, zona_sociala: zonaDoc, an_social: anDoc, tip_document: 'dovada' }
+      : { activitate_sociala_id: null, zona_sociala: zonaDoc, an_social: anDoc, stare: 'in_lucru', tip_document: TIP_LUCRU }
     const { data: doc, error } = await sb.from('documente').insert({
       firma_id: firmaId, luna_id: null, modul: MODUL, este_draft: false, furnizor: bazaNume, data_document: t,
       fisier_path: path, fisier_nume: nume, fisier_tip: sursa.fisier_tip || DOCX_TIP, fisier_marime: outBytes.length, in_zip: false, ...camp,
@@ -358,6 +358,8 @@ export async function POST(req: NextRequest) {
     const rez = await analizeazaDocument(context, total, dateInterne)
     if (!rez) return NextResponse.json({ error: 'Analiza automată nu a reușit. Încearcă din nou sau completează manual.' }, { status: 502 })
     const umplut = await umpleBlanks(inBytes, rez.completate)
+    // renumerotează câmpurile manuale pe documentul rezultat (spațiile auto-completate au dispărut)
+    const manuale = rez.manuale.filter(m => umplut.remap[String(m.nr)] != null).map(m => ({ nr: umplut.remap[String(m.nr)], eticheta: m.eticheta }))
 
     const path = `${prefix(firmaId, actId || 'zona')}${Date.now()}_pregatit.docx`
     const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(umplut.bytes), { contentType: DOCX_TIP })
@@ -366,7 +368,39 @@ export async function POST(req: NextRequest) {
       .eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
     if (doc.fisier_path && doc.fisier_path !== path) await sb.storage.from('documente').remove([doc.fisier_path])
-    return NextResponse.json({ document: docNou, completate: umplut.completate, total, manuale: rez.manuale })
+    return NextResponse.json({ document: docNou, completate: umplut.completate, total, manuale })
+  }
+
+  // „Du în document": completează spațiile rămase manuale cu valorile introduse de utilizator în aplicație.
+  // `campuri` = [{nr, eticheta, valoare}] cu numerotarea curentă a documentului (de la pregateste-doc/completeaza-manual).
+  if (b.actiune === 'completeaza-manual') {
+    const docId = String(b.docId || '')
+    const campuri = (Array.isArray(b.campuri) ? b.campuri : []) as { nr?: unknown; eticheta?: unknown; valoare?: unknown }[]
+    if (!docId) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
+    if (!campuri.length) return NextResponse.json({ error: 'Nimic de completat' }, { status: 400 })
+    const { data: doc } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip,activitate_sociala_id').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).maybeSingle()
+    if (!doc?.fisier_path) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
+    if (!(/\.docx$/i.test(doc.fisier_nume || '') || /wordprocessing/.test(doc.fisier_tip || ''))) return NextResponse.json({ error: 'Doar documentele Word (.docx)' }, { status: 400 })
+    const { data: orig, error: dlErr } = await sb.storage.from('documente').download(doc.fisier_path)
+    if (dlErr || !orig) return NextResponse.json({ error: 'Documentul nu a putut fi citit' }, { status: 500 })
+    const inBytes = new Uint8Array(await orig.arrayBuffer())
+    const valori: Record<string, string> = {}
+    for (const c of campuri) {
+      const nr = Math.trunc(Number(c.nr)); const val = String(c.valoare ?? '').replace(/\s+/g, ' ').trim()
+      if (Number.isFinite(nr) && nr >= 1 && val) valori[String(nr)] = val.slice(0, 300)
+    }
+    if (!Object.keys(valori).length) return NextResponse.json({ error: 'Completează cel puțin un câmp.' }, { status: 400 })
+    const umplut = await umpleBlanks(inBytes, valori)
+    const path = `${prefix(firmaId, (doc.activitate_sociala_id as string) || 'zona')}${Date.now()}_completat.docx`
+    const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(umplut.bytes), { contentType: DOCX_TIP })
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+    const { data: docNou, error } = await sb.from('documente').update({ fisier_path: path, fisier_marime: umplut.bytes.length, fisier_tip: DOCX_TIP })
+      .eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
+    if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
+    if (doc.fisier_path && doc.fisier_path !== path) await sb.storage.from('documente').remove([doc.fisier_path])
+    // câmpurile rămase (fără valoare introdusă) — renumerotate pe documentul rezultat
+    const manuale = campuri.filter(c => !String(c.valoare ?? '').trim()).map(c => ({ nr: umplut.remap[String(Math.trunc(Number(c.nr)))], eticheta: String(c.eticheta ?? '').slice(0, 120) })).filter(m => m.nr != null)
+    return NextResponse.json({ document: docNou, completate: umplut.completate, total: umplut.total, manuale })
   }
 
   // Generează un document dintr-un șablon (umplut cu date + nr. de înregistrare automat).
