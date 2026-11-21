@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { deschideDocument } from '@/lib/vizualizare'
-import { sabloaneBeneficiar, sabloaneActivitate, campuriComune, campuriBeneficiar, VALORI_IMPLICITE, type SablonCamp } from '@/lib/proiect-social-sabloane'
+import { sabloaneBeneficiar, sabloaneActivitate, campuriComune, campuriBeneficiar, VALORI_IMPLICITE, TIP_LUCRU, type SablonCamp } from '@/lib/proiect-social-sabloane'
 
 // Fabrica de documente a unei activități (strat premium – vezi proiect-theme.css .gsoc-*):
 // setezi o dată datele comune (inclusiv data actelor), adaugi voluntari (din buletin), iar documentele
@@ -44,11 +44,11 @@ async function printeazaPdf(url: string, nume: string) {
   } catch { w.document.body.innerHTML = '<p style="font-family:sans-serif;padding:20px">Nu s-a putut randa. Descarcă Word.</p>' }
 }
 
-export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateDocumente, beneficiari, documente, onBeneficiar, onBeneficiarSters, onGenerat, onDateComune, disabled }: {
+export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateDocumente, beneficiari, documente, onBeneficiar, onBeneficiarSters, onGenerat, onStergeDoc, onDateComune, disabled }: {
   firmaId: string; activitateId: string; an: number; zona: string; dateDocumente: Record<string, string>
   beneficiari: Beneficiar[]; documente: DocGen[]
   onBeneficiar: (b: Beneficiar) => void; onBeneficiarSters: (id: string) => void
-  onGenerat: (d: DocGen) => void; onNrSchimbat?: (d: DocGen) => void; onDateComune: (date: Record<string, string>) => void; disabled?: boolean
+  onGenerat: (d: DocGen) => void; onNrSchimbat?: (d: DocGen) => void; onStergeDoc?: (id: string) => void; onDateComune: (date: Record<string, string>) => void; disabled?: boolean
 }) {
   const sabBen = useMemo(() => sabloaneBeneficiar(zona), [zona])
   const sabAct = useMemo(() => sabloaneActivitate(zona), [zona])
@@ -121,6 +121,12 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
     const r = await fetch(`${api}&beneficiar=${b.id}`, { method: 'DELETE' })
     if (r.ok) onBeneficiarSters(b.id); else setMesaj('Nu s-a putut șterge')
   }
+  // scoate din registru un document „pus în lucru" (draft)
+  async function stergeLucru(doc: DocGen) {
+    if (!confirm(`Scoți din registru documentul „${doc.furnizor || doc.fisier_nume}"?`)) return
+    const r = await fetch(`${api}&doc=${doc.id}`, { method: 'DELETE' })
+    if (r.ok) onStergeDoc?.(doc.id); else setMesaj('Nu s-a putut șterge')
+  }
 
   const chips = comune.filter(c => dateDocumente?.[c.key]).slice(0, 2)
   const voluntarEdit = editeaza && editeaza !== 'nou' ? beneficiari.find(b => b.id === editeaza) : null
@@ -132,6 +138,9 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
     ...beneficiari.flatMap(b => sabBen.map(s => ({ key: b.id + ':' + s.tip, titlu: `${s.label} — ${b.nume}`, tip: s.tip, benId: b.id, benef: b }))),
   ].map(r => ({ ...r, doc: docPentru(r.benId, r.tip) }))
     .sort((a, b) => (a.doc?.nr_inregistrare ?? 1e9) - (b.doc?.nr_inregistrare ?? 1e9))
+
+  // documente „puse în lucru" dintr-un draft — apar în registru ca acte separate (nu dintr-un rând de șablon)
+  const extra = documente.filter(d => d.tip_document === TIP_LUCRU)
 
   // avertizare de ordine: un document cu nr. mai mare nu ar trebui să aibă data mai devreme decât unul cu nr. mai mic
   const ordineGresita = new Set<string>()
@@ -210,6 +219,27 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
           </div>
         )
       })}
+
+      {/* Documente puse în lucru dintr-un draft (ex. Raport anual) — acte separate în registru */}
+      {extra.map(d => { const inLucru = d.stare === 'in_lucru', sb = busy === 's' + d.id
+        return (
+          <div key={d.id} className="gsoc-row" style={S.row}>
+            <span className="gsoc-node">{d.nr_inregistrare != null ? <span className="gsoc-nr" title="Număr de înregistrare">{d.nr_inregistrare}</span> : <span className="gsoc-dot w" />}</span>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.furnizor || d.fisier_nume}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginTop: 3 }}>
+                {d.data_document && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{roData(d.data_document)}</span>}
+                <button onClick={() => schimbaStare(d)} disabled={sb} title="Apasă pentru a comuta: Emis ↔ În lucru"
+                  style={{ ...S.okPill, ...(inLucru ? { color: 'var(--accent-amber, #e0a84a)', background: 'color-mix(in srgb, var(--accent-amber, #e0a84a) 15%, transparent)' } : {}), border: 'none', cursor: 'pointer', opacity: sb ? 0.5 : 1 }}>
+                  <span className={'gsoc-dot' + (inLucru ? ' w' : '')} />{inLucru ? 'În lucru' : 'Emis'}</button>
+                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>pus în lucru dintr-un draft</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+              <ActiuniDoc doc={d} urlDoc={urlDoc} />
+              {!disabled && <button onClick={() => stergeLucru(d)} title="Scoate din registru" aria-label={`Șterge ${d.furnizor || d.fisier_nume}`} style={{ ...S.ico, fontSize: 15 }}>×</button>}
+            </div>
+          </div>) })}
 
       {/* Voluntari */}
       {!!sabBen.length && (

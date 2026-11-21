@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase/server'
 import { codNou, statusActValid, stareZonaValida, zonaValida, tipDocActValid, ZONE_SOCIALE, type StatusAct } from '@/lib/proiect-social'
-import { getSablon, caleStorage, VALORI_IMPLICITE } from '@/lib/proiect-social-sabloane'
+import { getSablon, caleStorage, VALORI_IMPLICITE, TIP_LUCRU } from '@/lib/proiect-social-sabloane'
 import { umpleSablon } from '@/lib/docxFill'
 import JSZip from 'jszip'
 
@@ -250,32 +250,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ document: data })
   }
 
-  // „Pune în lucru" un document (draft încărcat): îi completează marcajele %%...%% cu datele zonei/activității și salvează o copie editabilă în zonă.
+  // „Pune în lucru" un document (draft încărcat): îi completează marcajele %%...%% cu datele zonei/activității
+  // și salvează o copie editabilă. Dacă se dă `activitateId`, copia intră în REGISTRUL activității (act „în lucru");
+  // altfel rămâne un document de zonă (comportamentul vechi).
   if (b.actiune === 'pune-in-lucru-doc') {
     const docId = String(b.docId || '')
     const zonaDoc = String(b.zona || ''), anDoc = anValid(b.an)
+    const activitateId = b.activitateId ? String(b.activitateId) : ''
     if (!docId || !zonaDoc || !zonaValida(zonaDoc) || !anDoc) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
     const { data: sursa } = await sb.from('documente').select('fisier_path,fisier_nume,fisier_tip').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).maybeSingle()
     if (!sursa?.fisier_path) return NextResponse.json({ error: 'Documentul nu a fost găsit' }, { status: 404 })
+    // activitatea țintă: cea cerută (validată pe firmă) ori, în lipsă, prima activitate a zonei (doar pentru date)
+    let act: { id: string; date_documente: unknown } | null = null
+    if (activitateId) {
+      const { data } = await sb.from('activitati_sociale').select('id,date_documente').eq('id', activitateId).eq('firma_id', firmaId).eq('zona', zonaDoc).maybeSingle()
+      if (!data) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
+      act = data
+    } else {
+      const { data } = await sb.from('activitati_sociale').select('id,date_documente').eq('firma_id', firmaId).eq('zona', zonaDoc).eq('an', anDoc).order('created_at', { ascending: true }).limit(1)
+      act = data?.[0] || null
+    }
     const { data: orig, error: dlErr } = await sb.storage.from('documente').download(sursa.fisier_path)
     if (dlErr || !orig) return NextResponse.json({ error: 'Documentul nu a putut fi citit' }, { status: 500 })
     const inBytes = new Uint8Array(await orig.arrayBuffer())
     const esteDocx = /\.docx$/i.test(sursa.fisier_nume || '') || /wordprocessing/.test(sursa.fisier_tip || '')
-    // câmpuri comune ale activității zonei (dacă există o activitate) + implicite + agregat
-    const { data: act } = await sb.from('activitati_sociale').select('id,date_documente').eq('firma_id', firmaId).eq('zona', zonaDoc).eq('an', anDoc).order('created_at', { ascending: true }).limit(1)
-    const comune = (act?.[0]?.date_documente || {}) as Record<string, string>
+    const comune = (act?.date_documente || {}) as Record<string, string>
     const valori: Record<string, string> = { ...VALORI_IMPLICITE, ...comune, AN: String(anDoc) }
     const t = azi(); valori.DATA = `${t.slice(8, 10)}.${t.slice(5, 7)}.${t.slice(0, 4)}`
-    if (act?.[0]?.id) { const { count } = await sb.from('beneficiari_sociali').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('activitate_id', act[0].id); if (count != null) valori.NR_VOLUNTARI = String(count) }
+    if (act?.id) { const { count } = await sb.from('beneficiari_sociali').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('activitate_id', act.id); if (count != null) valori.NR_VOLUNTARI = String(count) }
     let outBytes: Uint8Array = inBytes
     if (esteDocx) { try { outBytes = await umpleSablon(inBytes, valori) } catch { outBytes = inBytes } }
-    const path = `${prefixZona(firmaId, zonaDoc, anDoc)}${Date.now()}_pus_in_lucru.docx`
+    const bazaNume = (sursa.fisier_nume || 'document').replace(/\.docx$/i, '')
+    const nume = bazaNume + ' (în lucru).docx'
+    // în registrul activității: nr. de înregistrare automat; altfel document de zonă fără număr
+    const inRegistru = activitateId && act?.id
+    const path = `${inRegistru ? prefix(firmaId, act!.id) : prefixZona(firmaId, zonaDoc, anDoc)}${Date.now()}_pus_in_lucru.docx`
     const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(outBytes), { contentType: sursa.fisier_tip || DOCX_TIP })
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
-    const nume = (sursa.fisier_nume || 'document').replace(/\.docx$/i, '') + ' (în lucru).docx'
+    let nr: number | null = null
+    if (inRegistru) { const { data: mx } = await sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1); nr = ((mx?.[0]?.nr_inregistrare as number) || 0) + 1 }
+    const camp = inRegistru
+      ? { activitate_sociala_id: act!.id, zona_sociala: null, an_social: null, stare: 'in_lucru', tip_document: TIP_LUCRU, nr_inregistrare: nr }
+      : { activitate_sociala_id: null, zona_sociala: zonaDoc, an_social: anDoc, tip_document: 'dovada' }
     const { data: doc, error } = await sb.from('documente').insert({
-      firma_id: firmaId, luna_id: null, modul: MODUL, activitate_sociala_id: null, zona_sociala: zonaDoc, an_social: anDoc, este_draft: false,
-      tip_document: 'dovada', furnizor: nume, data_document: t, fisier_path: path, fisier_nume: nume, fisier_tip: sursa.fisier_tip || DOCX_TIP, fisier_marime: outBytes.length, in_zip: false,
+      firma_id: firmaId, luna_id: null, modul: MODUL, este_draft: false, furnizor: bazaNume, data_document: t,
+      fisier_path: path, fisier_nume: nume, fisier_tip: sursa.fisier_tip || DOCX_TIP, fisier_marime: outBytes.length, in_zip: false, ...camp,
     }).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
     return NextResponse.json({ document: doc })

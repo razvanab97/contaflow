@@ -7,7 +7,7 @@ import {
   zoneOrdonate, ZONE_SOCIALE,
   type Activitate, type StareZonaRow, type StatusAct, type StareZona, type OrdineRow,
 } from '@/lib/proiect-social'
-import { getSablon, sabloanePentruZona } from '@/lib/proiect-social-sabloane'
+import { getSablon, sabloanePentruZona, TIP_LUCRU } from '@/lib/proiect-social-sabloane'
 import GeneratorSocial, { type Beneficiar, type DocGen } from './GeneratorSocial'
 
 // Modulul „Activități sociale": fiecare zonă (activitate din plan) e o linie în care se adaugă
@@ -160,6 +160,14 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
         </div>
       )}
 
+      {/* Avertisment vizibil sus (ex. „în lucru" nu se salvează pentru că n-a rulat migrarea constrângerii de stare) */}
+      {mesaj && (
+        <div role="alert" style={{ border: '1px solid var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, var(--surface))', borderRadius: 'var(--r-md)', padding: '10px 12px', marginBottom: 14, fontSize: 'var(--fs-sm)', color: 'var(--text-primary)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span style={{ flex: 1 }}>{mesaj}</span>
+          <button onClick={() => setMesaj('')} aria-label="Închide avertismentul" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
+        </div>
+      )}
+
       {/* Selector an + rezumat */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>An</span>
@@ -277,7 +285,6 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
           )
         })}
       </div>
-      {mesaj && <div style={{ marginTop: 12, fontSize: 'var(--fs-sm)', color: 'var(--danger)' }}>{mesaj}</div>}
     </div>
   )
 }
@@ -294,9 +301,10 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
   onGenerat: (d: DocGen) => void; onNrSchimbat: (d: DocGen) => void
   onDateComune: (id: string, date: Record<string, string>) => void
 }) {
-  // documentele generate din șabloane (au tip_document cunoscut) vs. cele atașate manual
-  const docManual = docs.filter(d => !getSablon(d.tip_document))
-  const docGenerate = docs.filter(d => getSablon(d.tip_document)) as unknown as DocGen[]
+  // în registru: documentele din șabloane (tip_document cunoscut) + drafturile „puse în lucru" (TIP_LUCRU); restul = atașate manual
+  const ptRegistru = (d: Doc) => !!getSablon(d.tip_document) || d.tip_document === TIP_LUCRU
+  const docManual = docs.filter(d => !ptRegistru(d))
+  const docGenerate = docs.filter(ptRegistru) as unknown as DocGen[]
   const areGenerator = sabloanePentruZona(zona).length > 0
   const [extins, setExtins] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -356,7 +364,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
           <GeneratorSocial firmaId={firmaId} activitateId={a.id} an={a.an} zona={zona} dateDocumente={a.date_documente || {}}
             beneficiari={beneficiari} documente={docGenerate}
             onBeneficiar={onBeneficiar} onBeneficiarSters={onBeneficiarSters} onGenerat={onGenerat} onNrSchimbat={onNrSchimbat}
-            onDateComune={date => onDateComune(a.id, date)} />
+            onStergeDoc={onDocSters} onDateComune={date => onDateComune(a.id, date)} />
 
           {/* Detalii activitate - strânse când zona are generator, ca să nu încarce */}
           <details open={!areGenerator}>
@@ -413,7 +421,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
           {arataDocsZona && (
             <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
               <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 2 }}>Documente</div>
-              <DocumenteZona firmaId={firmaId} zona={zona} an={an} api={api} sabloane={sabloaneZona} docs={docsZona} onAdaugat={onDocZonaAdaugat} onSters={onDocZonaSters} disabled={definitiv} />
+              <DocumenteZona firmaId={firmaId} zona={zona} an={an} api={api} activitateId={a.id} sabloane={sabloaneZona} docs={docsZona} onAdaugat={onDocZonaAdaugat} onSters={onDocZonaSters} onPusInLucru={d => onDocNou(d)} disabled={definitiv} />
             </div>
           )}
         </div>
@@ -453,9 +461,9 @@ function FormActivitate({ onSalveaza, onAnuleaza }: { onSalveaza: (c: Record<str
 
 // --- Documente atașate direct unei zone (fără activitate) ----------------------------------------
 // „Adaugă document" pe o zonă: încarci un fișier (Word/PDF/imagine) legat de zonă + an, fără să creezi o activitate.
-function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSters, disabled }: {
-  firmaId: string; zona: string; an: number; api: string; docs: Doc[]; sabloane: { tip: string; label: string }[]
-  onAdaugat: (ds: Doc[]) => void; onSters: (id: string) => void; disabled?: boolean
+function DocumenteZona({ firmaId, zona, an, api, activitateId, docs, sabloane, onAdaugat, onSters, onPusInLucru, disabled }: {
+  firmaId: string; zona: string; an: number; api: string; activitateId?: string; docs: Doc[]; sabloane: { tip: string; label: string }[]
+  onAdaugat: (ds: Doc[]) => void; onSters: (id: string) => void; onPusInLucru?: (ds: Doc[]) => void; disabled?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [mesaj, setMesaj] = useState('')
@@ -480,13 +488,17 @@ function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSt
       if (r.ok && d.document) onAdaugat([d.document]); else setMesaj(d.error || 'Nu s-a putut marca')
     } catch { setMesaj('Operația a eșuat') } finally { setBusy(false) }
   }
-  // „Pune în lucru" un draft încărcat: creează o copie editabilă (cu marcajele completate din datele activității)
+  // „Pune în lucru" un draft încărcat: creează o copie editabilă (cu marcajele completate din datele activității).
+  // Cu o activitate, copia intră în Registrul documentelor de mai sus (act „în lucru"); altfel rămâne document de zonă.
   async function puneInLucruDoc(docId: string) {
     setBusy(true); setMesaj('')
     try {
-      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'pune-in-lucru-doc', docId, zona, an }) })
+      // atașăm la activitate (→ Registrul de sus) doar dacă zona are registru (șabloane); altfel rămâne document de zonă
+      const catreRegistru = sabloane.length > 0 ? activitateId : undefined
+      const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'pune-in-lucru-doc', docId, zona, an, activitateId: catreRegistru }) })
       const d = await r.json().catch(() => ({}))
-      if (r.ok && d.document) onAdaugat([d.document]); else setMesaj(d.error || 'Nu s-a putut pune în lucru')
+      if (r.ok && d.document) { if (d.document.activitate_sociala_id && onPusInLucru) onPusInLucru([d.document]); else onAdaugat([d.document]) }
+      else setMesaj(d.error || 'Nu s-a putut pune în lucru')
     } catch { setMesaj('Operația a eșuat') } finally { setBusy(false) }
   }
 

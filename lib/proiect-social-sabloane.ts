@@ -14,6 +14,10 @@ export interface SablonDef {
 
 const STORAGE_PREFIX = '_sabloane/'
 
+// tip_document pentru un draft „pus în lucru" (copie editabilă a unui draft încărcat), legat de o activitate.
+// Apare în „Registrul documentelor" ca act separat (nu dintr-un rând de șablon) — vezi GeneratorSocial.
+export const TIP_LUCRU = 'document_lucru'
+
 export const SABLOANE: SablonDef[] = [
   {
     tip: 'decizie_organizare', zona: 'ZS-2.2', label: 'Decizie de organizare',
