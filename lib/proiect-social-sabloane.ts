@@ -34,12 +34,13 @@ export const SABLOANE: SablonDef[] = [
       { key: 'DOMICILIU', label: 'Domiciliu' },
       { key: 'CNP', label: 'CNP' },
       { key: 'CONTACT', label: 'Telefon / e-mail' },
+      // date per voluntar (voluntariat de scurtă durată — perioada/orele/instruirea diferă de la om la om)
+      { key: 'PERIOADA', label: 'Perioada (1-3 zile)' },
+      { key: 'ORE_PROGRAM', label: 'Ore / program' },
+      { key: 'DATA_INSTRUIRE', label: 'Data instruirii' },
       // date comune (de activitate — se setează o dată)
-      { key: 'PERIOADA', label: 'Perioada', comun: true },
-      { key: 'ORE_PROGRAM', label: 'Ore / program', comun: true },
       { key: 'LOCUL', label: 'Locul', comun: true },
       { key: 'COORDONATOR', label: 'Coordonator', comun: true },
-      { key: 'DATA_INSTRUIRE', label: 'Data instruirii', comun: true },
       { key: 'INSTRUIT_DE', label: 'Instruit de', comun: true },
     ],
   },

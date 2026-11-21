@@ -48,6 +48,22 @@ export async function GET(req: NextRequest) {
     return new NextResponse(Buffer.from(await file.arrayBuffer()), { headers: antet(d.fisier_nume || 'document', d.fisier_tip || file.type, req.nextUrl.searchParams.get('preview') === '1') })
   }
 
+  // Descarcă un draft (șablon standard) completat cu valorile implicite, fără să-l salveze în sistem
+  const draftTip = req.nextUrl.searchParams.get('draft')
+  if (draftTip) {
+    const sablon = getSablon(draftTip)
+    if (!sablon) return NextResponse.json({ error: 'Șablon necunoscut' }, { status: 404 })
+    const an = anValid(req.nextUrl.searchParams.get('an')) || new Date().getFullYear()
+    const valori: Record<string, string> = { AN: String(an) }
+    for (const c of sablon.campuri) if (VALORI_IMPLICITE[c.key]) valori[c.key] = VALORI_IMPLICITE[c.key]
+    const t = azi(); valori.DATA = `${t.slice(8, 10)}.${t.slice(5, 7)}.${t.slice(0, 4)}`
+    const { data: tmpl, error } = await sb.storage.from('documente').download(caleStorage(sablon))
+    if (error || !tmpl) return NextResponse.json({ error: 'Șablonul nu a putut fi citit' }, { status: 500 })
+    let bytes: Uint8Array
+    try { bytes = await umpleSablon(new Uint8Array(await tmpl.arrayBuffer()), valori) } catch { return NextResponse.json({ error: 'Generarea a eșuat' }, { status: 500 }) }
+    return new NextResponse(Buffer.from(bytes), { headers: antet(`${sablon.label}.docx`, DOCX_TIP, req.nextUrl.searchParams.get('preview') === '1') })
+  }
+
   const [a, z, dd, o, b, maxNr, dz] = await Promise.all([
     sb.from('activitati_sociale').select(COL_ACT).eq('firma_id', firmaId).order('an', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('zone_sociale_an').select('zona,an,status,nota').eq('firma_id', firmaId),

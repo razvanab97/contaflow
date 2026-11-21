@@ -186,7 +186,7 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
                     <input type="date" key={r.doc!.id + ':' + (r.doc!.data_document || '')} defaultValue={(r.doc!.data_document || '').slice(0, 10)} max="2035-12-31"
                       onChange={e => { if (e.target.value) genereaza(r.tip, r.benId, false, { dataDoc: e.target.value }) }}
                       title="Data documentului — o poți schimba pentru fiecare act" aria-label={`Data documentului: ${r.titlu}`}
-                      style={{ ...mono, fontSize: 'var(--fs-xs)', color: gresit ? 'var(--warning)' : 'var(--text-muted)', background: 'transparent', border: `1px solid ${gresit ? 'var(--warning)' : 'transparent'}`, borderRadius: 6, padding: '1px 5px', cursor: 'pointer' }} />
+                      style={{ ...mono, fontSize: 'var(--fs-xs)', color: gresit ? 'var(--warning)' : 'var(--text-secondary)', background: 'var(--surface)', border: `1px solid ${gresit ? 'var(--warning)' : 'var(--border)'}`, borderRadius: 6, padding: '2px 6px', cursor: 'pointer' }} />
                     {gresit && <span title="Data e mai devreme decât a unui document cu număr mai mic — verifică ordinea" style={{ color: 'var(--warning)', fontSize: 'var(--fs-sm)', cursor: 'help' }}>⚠</span>}
                   </span>) })()}
                 {r.doc ? (() => { const d = r.doc!, inLucru = d.stare === 'in_lucru', sb = busy === 's' + d.id

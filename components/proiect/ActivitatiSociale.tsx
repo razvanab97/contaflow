@@ -22,7 +22,7 @@ const linkBtn: React.CSSProperties = { fontSize: 'var(--fs-sm)', fontWeight: 600
 const disp: React.CSSProperties = { fontFamily: 'var(--font-bricolage), var(--font-geist), system-ui, sans-serif' }
 const gradText: React.CSSProperties = { ...disp, color: 'transparent', backgroundImage: 'linear-gradient(135deg, var(--accent-mint, var(--accent)), var(--accent-blue, var(--accent)))', WebkitBackgroundClip: 'text', backgroundClip: 'text' }
 const previzualizabil = (d: Doc) => /pdf|image/.test(d.fisier_tip || '') || /\.(pdf|jpe?g|png|webp)$/i.test(d.fisier_nume)
-const culoareStare: Record<StareZona, string> = { deschisa: 'var(--success)', inchisa_pe_an: 'var(--accent-blue)', inchisa_definitiv: 'var(--text-muted)' }
+const culoareStare: Record<StareZona, string> = { deschisa: 'var(--success)', in_lucru: 'var(--warning)', inchisa_pe_an: 'var(--accent-blue)', inchisa_definitiv: 'var(--text-muted)' }
 
 export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   const [acts, setActs] = useState<Activitate[]>([])
@@ -191,6 +191,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                   onChange={e => schimbaStare(z.cod, e.target.value as StareZona)}
                   style={{ ...camp, padding: '4px 6px', fontSize: 'var(--fs-xs)', flexShrink: 0 }}>
                   <option value="deschisa">Deschisă</option>
+                  <option value="in_lucru">În lucru</option>
                   <option value="inchisa_pe_an">Închisă pe {an}</option>
                   <option value="inchisa_definitiv">Închisă definitiv</option>
                 </select>
@@ -409,13 +410,12 @@ function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSt
 }) {
   const [busy, setBusy] = useState(false)
   const [mesaj, setMesaj] = useState('')
-  const [meniu, setMeniu] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const urlDoc = (d: Doc, preview = false) => `${api}&download=${d.id}${preview ? '&preview=1' : ''}`
 
   // generează un document editabil dintr-un șablon (draft) existent al zonei, direct în sistem
   async function genereazaSablon(tip: string) {
-    setMeniu(false); setBusy(true); setMesaj('')
+    setBusy(true); setMesaj('')
     try {
       const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'genereaza-zona', zona, an, tip }) })
       const d = await r.json().catch(() => ({}))
@@ -452,8 +452,9 @@ function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSt
 
   return (
     <div style={{ marginTop: 10 }}>
+      {/* Documente deja în cadrul de lucru (generate din draft sau încărcate) */}
       {docs.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
           {docs.map(d => (
             <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
               <span aria-hidden style={{ fontSize: 13 }}>📄</span>
@@ -465,25 +466,25 @@ function DocumenteZona({ firmaId, zona, an, api, docs, sabloane, onAdaugat, onSt
           ))}
         </div>
       )}
-      <input ref={inputRef} type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={e => incarca(Array.from(e.target.files || []))} />
-      {!disabled && (sabloane.length ? (
-        <div style={{ position: 'relative', display: 'inline-block' }}>
-          <button onClick={() => setMeniu(v => !v)} disabled={busy} aria-expanded={meniu} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se lucrează…' : '+ Adaugă document'} {!busy && (meniu ? '▴' : '▾')}</button>
-          {meniu && <>
-            <div onClick={() => setMeniu(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
-            <div style={{ position: 'absolute', zIndex: 20, top: '100%', left: 0, marginTop: 6, minWidth: 250, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', boxShadow: 'var(--pa-card-shadow, 0 8px 24px rgba(0,0,0,.25))', padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '5px 8px 3px' }}>Din șablon (editabil)</div>
-              {sabloane.map(s => (
-                <button key={s.tip} onClick={() => genereazaSablon(s.tip)} style={{ ...linkBtn, textAlign: 'left', padding: '8px', borderRadius: 'var(--r-sm)', color: 'var(--text-primary)', fontWeight: 600 }}>📄 {s.label}</button>
-              ))}
-              <div style={{ height: 1, background: 'var(--border-subtle, var(--border))', margin: '4px 2px' }} />
-              <button onClick={() => { setMeniu(false); inputRef.current?.click() }} style={{ ...linkBtn, textAlign: 'left', padding: '8px', borderRadius: 'var(--r-sm)', color: 'var(--text-secondary)' }}>⬆ Încarcă un fișier din calculator…</button>
+
+      {/* Drafturi standard: descarci șablonul sau îl „pui în lucru" (copie editabilă în activitate) */}
+      {!disabled && sabloane.length > 0 && (
+        <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Drafturi standard</div>
+          {sabloane.map(s => (
+            <div key={s.tip} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface)' }}>
+              <span aria-hidden style={{ fontSize: 14 }}>📄</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+              <a href={`${api}&draft=${encodeURIComponent(s.tip)}&an=${an}`} title="Descarcă draftul (Word)" aria-label={`Descarcă ${s.label}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)', flexShrink: 0 }}>↓</a>
+              <button onClick={() => genereazaSablon(s.tip)} disabled={busy} className="gsoc-solid" title="Pune documentul în cadrul de lucru (copie editabilă)" style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 13px', borderRadius: 999, cursor: 'pointer', flexShrink: 0 }}>{busy ? 'Se lucrează…' : '➕ Pune în lucru'}</button>
             </div>
-          </>}
+          ))}
         </div>
-      ) : (
-        <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se încarcă…' : '+ Adaugă document'}</button>
-      ))}
+      )}
+
+      {/* Încărcare fișier propriu */}
+      <input ref={inputRef} type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={e => incarca(Array.from(e.target.files || []))} />
+      {!disabled && <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se încarcă…' : '⬆ Încarcă un fișier din calculator'}</button>}
       {mesaj && <span style={{ marginLeft: 10, fontSize: 'var(--fs-xs)', color: 'var(--danger)' }}>{mesaj}</span>}
     </div>
   )

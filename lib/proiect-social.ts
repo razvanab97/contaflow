@@ -77,10 +77,10 @@ export function statusActValid(s: unknown): StatusAct {
 export const CONTRIBUIE_LA_INDICATOR = (s: StatusAct) => s === 'validata'
 
 // --- Starea (ciclul de viață al) unei zone pe un an -----------------------------------------
-export const STARI_ZONA = ['deschisa', 'inchisa_pe_an', 'inchisa_definitiv'] as const
+export const STARI_ZONA = ['deschisa', 'in_lucru', 'inchisa_pe_an', 'inchisa_definitiv'] as const
 export type StareZona = typeof STARI_ZONA[number]
 export const ETICHETA_STARE: Record<StareZona, string> = {
-  deschisa: 'Deschisă', inchisa_pe_an: 'Închisă pe an (realizată)', inchisa_definitiv: 'Închisă definitiv',
+  deschisa: 'Deschisă', in_lucru: 'În lucru', inchisa_pe_an: 'Închisă pe an (realizată)', inchisa_definitiv: 'Închisă definitiv',
 }
 export function stareZonaValida(s: unknown): StareZona {
   return (STARI_ZONA as readonly string[]).includes(String(s)) ? s as StareZona : 'deschisa'
