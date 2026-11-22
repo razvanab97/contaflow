@@ -6,6 +6,7 @@ import { umpleSablon } from '@/lib/docxFill'
 import { extrageContextBlanks, umpleBlanks } from '@/lib/docxBlanks'
 import { analizeazaDocument } from '@/lib/ai/pregateste-doc'
 import { extragePerioadaPostari } from '@/lib/ai/perioada-postari'
+import { stampeazaInregistrare } from '@/lib/docxStamp'
 import JSZip from 'jszip'
 
 export const dynamic = 'force-dynamic'
@@ -264,6 +265,23 @@ export async function POST(req: NextRequest) {
     }
     const { data, error } = await sb.from('documente').update({ nr_inregistrare: nr }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // dacă e un document Word, scriem (sau scoatem, la nr. gol) numărul și ÎN fișier — ștampilă sus-dreapta
+    const d = data as { fisier_nume?: string | null; fisier_tip?: string | null; fisier_path?: string | null; data_document?: string | null; activitate_sociala_id?: string | null }
+    const esteDocx = /\.docx$/i.test(d.fisier_nume || '') || /wordprocessing/.test(d.fisier_tip || '')
+    if (esteDocx && d.fisier_path) {
+      const vechiPath = d.fisier_path
+      const { data: orig } = await sb.storage.from('documente').download(vechiPath)
+      if (orig) {
+        const stamped = await stampeazaInregistrare(new Uint8Array(await orig.arrayBuffer()), nr, d.data_document ?? null)
+        const path = `${prefix(firmaId, d.activitate_sociala_id || 'zona')}${Date.now()}_nr.docx`
+        const up = await sb.storage.from('documente').upload(path, Buffer.from(stamped), { contentType: DOCX_TIP })
+        if (!up.error) {
+          const { data: dn } = await sb.from('documente').update({ fisier_path: path, fisier_marime: stamped.length }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
+          if (vechiPath !== path) await sb.storage.from('documente').remove([vechiPath])
+          if (dn) return NextResponse.json({ document: dn })
+        }
+      }
+    }
     return NextResponse.json({ document: data })
   }
 
@@ -485,7 +503,16 @@ export async function POST(req: NextRequest) {
     }
     const { context, total } = await extrageContextBlanks(inBytes)
     if (!total) {
-      // n-are spații de completat — doar i-am dat numărul (dacă era cazul); întoarcem starea actuală
+      // n-are spații de completat; dacă are număr, îl ștampilăm în document (să apară și în Word)
+      if (doc.nr_inregistrare != null) {
+        const stamped = await stampeazaInregistrare(inBytes, doc.nr_inregistrare as number, doc.data_document as string | null)
+        const path = `${prefix(firmaId, (doc.activitate_sociala_id as string) || 'zona')}${Date.now()}_pregatit.docx`
+        const up = await sb.storage.from('documente').upload(path, Buffer.from(stamped), { contentType: DOCX_TIP })
+        if (!up.error) {
+          const { data: dn } = await sb.from('documente').update({ fisier_path: path, fisier_marime: stamped.length, fisier_tip: DOCX_TIP }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
+          return NextResponse.json({ document: dn, completate: 0, total: 0, manuale: [], nrAtribuit, anterior: nrAtribuit != null ? anterior : null, faraSpatii: true })
+        }
+      }
       const { data: docFull } = await sb.from('documente').select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).single()
       return NextResponse.json({ document: docFull, completate: 0, total: 0, manuale: [], nrAtribuit, anterior: nrAtribuit != null ? anterior : null, faraSpatii: true })
     }
@@ -533,11 +560,13 @@ export async function POST(req: NextRequest) {
     const umplut = await umpleBlanks(inBytes, rez.completate)
     // renumerotează câmpurile manuale pe documentul rezultat (spațiile auto-completate au dispărut)
     const manuale = rez.manuale.filter(m => umplut.remap[String(m.nr)] != null).map(m => ({ nr: umplut.remap[String(m.nr)], eticheta: m.eticheta }))
+    // ștampilăm numărul de înregistrare (+ data) ÎN document, ca să apară și în Word, nu doar în registru
+    const finalBytes = doc.nr_inregistrare != null ? await stampeazaInregistrare(umplut.bytes, doc.nr_inregistrare as number, doc.data_document as string | null) : umplut.bytes
 
     const path = `${prefix(firmaId, actId || 'zona')}${Date.now()}_pregatit.docx`
-    const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(umplut.bytes), { contentType: DOCX_TIP })
+    const { error: upErr } = await sb.storage.from('documente').upload(path, Buffer.from(finalBytes), { contentType: DOCX_TIP })
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
-    const { data: docNou, error } = await sb.from('documente').update({ fisier_path: path, fisier_marime: umplut.bytes.length, fisier_tip: DOCX_TIP })
+    const { data: docNou, error } = await sb.from('documente').update({ fisier_path: path, fisier_marime: finalBytes.length, fisier_tip: DOCX_TIP })
       .eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
     if (error) { await sb.storage.from('documente').remove([path]); return NextResponse.json({ error: error.message }, { status: 500 }) }
     // nu ștergem fișierul anterior — rămâne pentru „↩ Dă înapoi"
