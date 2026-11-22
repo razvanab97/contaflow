@@ -28,11 +28,11 @@ ${context}
 
 Reguli:
 - Dacă un spațiu se completează clar dintr-o dată internă de mai sus (ex. numărul de înregistrare, data, numele unui voluntar, numărul contractului, numărul de voluntari), pune-l la „completate".
-- Dacă un spațiu cere o informație pe care NU o avem în datele interne (ex. ore efective, perioada unui voluntar necompletată, o semnătură, un câmp despre care nu știm nimic), pune-l la „manuale", cu o etichetă scurtă despre ce trebuie completat acolo (ex. „Ore efective — voluntar 1").
+- Dacă un spațiu cere o informație pe care NU o avem în datele interne (ex. o semnătură, perioada unui voluntar necompletată, un câmp despre care nu știm nimic), pune-l la „manuale", cu o etichetă scurtă despre ce trebuie completat acolo (ex. „Semnătură — voluntar 1").
 - La tabele cu mai multe rânduri decât voluntari avem, rândurile în plus rămân goale — NU le pune la „manuale" și nu inventa voluntari.
-- La „manuale" pune DOAR câmpurile care chiar trebuie completate cu o informație reală pe care n-o avem (ex. ore efective, perioada unui voluntar). Nu pune rânduri goale de tabel, spații decorative sau semnături.
+- La „manuale" pune DOAR câmpurile care chiar trebuie completate cu o informație reală pe care n-o avem (ex. perioada unui voluntar necompletată, o dată lipsă). Nu pune rânduri goale de tabel, spații decorative sau semnături.
 - Datele se scriu în formatul din document (ex. data ca ZZ.LL.AAAA dacă așa apare). Nu repeta textul deja existent, completează doar spațiul.
-- Fii atent la coloane: potrivește valoarea cu antetul coloanei (Voluntar / Perioada / Ore / Contract nr.).
+- Fii atent la coloane: potrivește valoarea cu antetul coloanei (Voluntar / Perioada / Ore / Contract nr.). La coloana „Ore efective" (sau doar „Ore") pune TOTALUL de ore lucrate — valoarea „ore efective (total…)" din datele interne (perioada în zile × ore/program), NU orele pe zi. „Perioada" rămâne numărul de zile; „ore/program" sunt orele pe zi.
 - Ține etichetele de la „manuale" scurte (2-5 cuvinte).
 
 Răspunde DOAR cu JSON, fără alt text, „completate" primul:

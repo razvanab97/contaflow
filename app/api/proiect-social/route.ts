@@ -541,15 +541,22 @@ export async function POST(req: NextRequest) {
       const { data: contracte } = await sb.from('documente').select('beneficiar_social_id,nr_inregistrare,data_document').eq('firma_id', firmaId).eq('modul', MODUL).eq('activitate_sociala_id', actId).eq('tip_document', 'contract_voluntariat')
       const contractPt = new Map((contracte || []).map(c => [c.beneficiar_social_id as string, c]))
       linii.push(`- Număr voluntari înregistrați: ${(benef || []).length}`)
+      // „Ore efective" în tabelul de participare = totalul real (perioada în zile × ore/program), nu orele pe zi.
+      // Îl calculăm aici când ambele sunt un număr curat, ca AI-ul să nu pună doar orele/zi în coloana „Ore efective".
+      const numZ = (s?: string): number | null => { const m = String(s ?? '').trim().replace(',', '.').match(/^(\d+(?:\.\d+)?)\s*(?:zi|zile|ore|or[ăa]|h)?\.?$/i); return m ? Number(m[1]) : null }
+      const fmtOre = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',')
       ;(benef || []).forEach((bn, i) => {
         const d = (bn.date || {}) as Record<string, string>
         const c = contractPt.get(bn.id)
+        const zile = numZ(d.PERIOADA), orePeZi = numZ(d.ORE_PROGRAM)
+        const oreEf = zile != null && orePeZi != null ? zile * orePeZi : null
         const buc = [
           `nume: ${bn.nume}`,
           c ? `contract nr. ${c.nr_inregistrare ?? '?'}${c.data_document ? ` din ${roData(c.data_document)}` : ''}` : 'contract: (negăsit)',
           d.PERIOADA ? `perioada: ${d.PERIOADA}` : 'perioada: (necompletată)',
-          d.ORE_PROGRAM ? `ore/program: ${d.ORE_PROGRAM}` : 'ore: (necompletate)',
-        ]
+          d.ORE_PROGRAM ? `ore/program (pe zi): ${d.ORE_PROGRAM}` : 'ore/program: (necompletate)',
+          oreEf != null ? `ore efective (total = perioada × ore/program) = ${fmtOre(oreEf)}` : null,
+        ].filter((x): x is string => !!x)
         linii.push(`  ${i + 1}) ${buc.join(' — ')}`)
       })
     }
