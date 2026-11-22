@@ -180,6 +180,54 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
       .map(d => ({ id: d.id, nume: d.fisier_nume, tip: d.fisier_tip, sectiune: zMap.get(codDoc(d)) || codDoc(d) }))
   }
 
+  // Raport anual al ÎNTREGII misiuni sociale: adună la zi din toate zonele (indicatori, activități,
+  // beneficiari, documente). Se generează din starea curentă → mereu reflectă tot anul. Deschide o
+  // fereastră de printare (Salvează ca PDF). Reachable de oriunde (butonul sus + din fiecare activitate).
+  function raportAnual() {
+    const w = window.open('', '_blank')
+    if (!w) { setMesaj('Permite ferestrele pop-up pentru a genera raportul.'); return }
+    const E = (s: unknown) => esc(String(s ?? ''))
+    const dataAzi = new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })
+    const sectiuni = zoneSortate.map(z => {
+      const stare = stareaZonei(stari, z.cod, an)
+      const ind = indicatorZona(acts, z, an)
+      const aleZonei = acts.filter(a => a.zona === z.cod && a.an === an)
+      const randuri = aleZonei.map(a => {
+        const nd = docs.filter(d => d.activitate_sociala_id === a.id).length
+        const nb = beneficiari.filter(b => b.activitate_id === a.id).length
+        return `<tr><td>${E(a.cod)}</td><td>${E(a.denumire)}</td><td>${E(ETICHETA_STATUS[a.status])}</td><td>${E(a.perioada || '—')}</td><td class="c">${nb || '—'}</td><td class="c">${nd || '—'}</td><td>${E(a.rezultate || '')}</td></tr>`
+      }).join('')
+      const stareLabel = stare === 'inchisa_pe_an' ? `Închisă pe ${an}` : ETICHETA_STARE[stare]
+      const procent = z.tinta != null ? ` (${ind.procent || 0}%)` : ''
+      const tintaStr = z.tinta != null ? ` / ${z.tinta}` : ''
+      return `<section class="zona"><h2>${E(z.nr)}. ${E(z.titlu)}</h2>`
+        + `<div class="meta"><b>Țintă:</b> ${E(z.tintaText)} &nbsp;·&nbsp; <b>Stare:</b> ${E(stareLabel)} &nbsp;·&nbsp; <b>${E(z.indicator)}:</b> ${ind.realizat}${tintaStr} ${E(ind.unitate)}${procent}</div>`
+        + (aleZonei.length
+          ? `<table><thead><tr><th>Cod</th><th>Denumire</th><th>Status</th><th>Perioadă</th><th class="c">Benef.</th><th class="c">Doc.</th><th>Rezultate</th></tr></thead><tbody>${randuri}</tbody></table>`
+          : `<div class="gol">— nicio activitate pe ${an}</div>`)
+        + `</section>`
+    }).join('')
+    const html = `<!doctype html><html lang="ro"><head><meta charset="utf-8"><title>Raport anual ${an}</title><style>`
+      + `*{box-sizing:border-box}body{font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;margin:0;font-size:12px;line-height:1.5}`
+      + `.wrap{max-width:820px;margin:0 auto;padding:28px}h1{font-size:22px;margin:0 0 2px;color:#0f3d2e}.sub{color:#555;margin-bottom:10px;font-size:12px}`
+      + `.rez{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 20px}.rez div{border:1px solid #cdddd4;border-radius:8px;padding:8px 14px;min-width:116px}`
+      + `.rez b{display:block;font-size:20px;color:#0f3d2e}.rez span{font-size:11px;color:#667085;text-transform:uppercase;letter-spacing:.04em}`
+      + `section.zona{margin:0 0 16px;page-break-inside:avoid}h2{font-size:14px;color:#0f3d2e;border-bottom:2px solid #0f3d2e;padding-bottom:3px;margin:16px 0 6px}`
+      + `.meta{color:#444;margin-bottom:6px;font-size:11.5px}.gol{color:#999;font-style:italic;padding:3px 0}`
+      + `table{width:100%;border-collapse:collapse;margin-top:4px}th,td{border:1px solid #ccd3cf;padding:5px 7px;text-align:left;vertical-align:top}`
+      + `th{background:#eef4f1;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}td{font-size:11px}td.c,th.c{text-align:center}`
+      + `.foot{margin-top:22px;color:#889;font-size:10.5px;border-top:1px solid #ddd;padding-top:8px}`
+      + `@media print{.wrap{max-width:none;padding:0}@page{margin:16mm}}`
+      + `</style></head><body><div class="wrap">`
+      + `<h1>Raport anual — Misiunea socială</h1>`
+      + `<div class="sub">Anul ${an} · generat la ${E(dataAzi)} · date la zi din aplicație</div>`
+      + `<div class="rez"><div><b>${rez.activitatiTotal}</b><span>Activități</span></div><div><b>${rez.activitatiValidate}</b><span>Validate</span></div><div><b>${rez.deValidat}</b><span>De validat</span></div><div><b>${rez.tinteAtinse}/${rez.zoneCuTinta}</b><span>Ținte atinse</span></div></div>`
+      + sectiuni
+      + `<div class="foot">Raport generat automat din „Activități sociale". Indicatorii reflectă doar activitățile validate.</div>`
+      + `</div></body></html>`
+    w.document.write(html); w.document.close(); w.focus(); setTimeout(() => w.print(), 400)
+  }
+
   if (!incarcat) return <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>Se încarcă…</div>
 
   return (
@@ -223,6 +271,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         <a href={`${api}&zip=tot&an=${an}`} title="Toate documentele anului, pe foldere de zonă" style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-primary)' }}>⬇ Descarcă tot ({an}) · ZIP</a>
         <button onClick={() => descarcaPdfDocumente(itemsTot(), api, `Activități sociale ${an}`)} style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-primary)' }}>⬇ Descarcă tot ({an}) · PDF</button>
+        <button onClick={raportAnual} title="Raport anual al întregii misiuni sociale, cu datele la zi din toate zonele (deschide pentru printare / Salvează ca PDF)" style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 45%, var(--border))', background: 'color-mix(in srgb, var(--accent) 8%, var(--surface))' }}>📄 Raport anual ({an})</button>
       </div>
 
       {/* Zonele */}
@@ -290,7 +339,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
                       <RandActivitate key={a.id} a={a} docs={docs.filter(d => d.activitate_sociala_id === a.id)} firmaId={firmaId}
                         bazaBeneficiari={z.baza === 'beneficiari'} unitate={z.unitate} zona={z.cod} an={an} definitiv={definitiv}
                         beneficiari={beneficiari.filter(b => b.activitate_id === a.id)} urmatorNr={urmatorNr}
-                        registruHead={registruHead} onResetNumerotare={reseteazaNumerotare}
+                        registruHead={registruHead} onResetNumerotare={reseteazaNumerotare} onRaportAnual={raportAnual}
                         arataDocsZona={ai === 0} sabloaneZona={sabloanePentruZona(z.cod).map(s => ({ tip: s.tip, label: s.label }))}
                         activitatiZona={aleZonei.map(x => ({ id: x.id, denumire: x.denumire }))}
                         docsZona={docsZona.filter(d => d.zona_sociala === z.cod && (d.an_social == null || d.an_social === an))}
@@ -322,9 +371,9 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
 }
 
 // --- O activitate (rând) ---------------------------------------------------------------------
-function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, definitiv, beneficiari, urmatorNr, registruHead, onResetNumerotare, arataDocsZona, sabloaneZona, activitatiZona, docsZona, onDocZonaAdaugat, onDocZonaSters, onMutaDocZona, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat, onDateComune }: {
+function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, definitiv, beneficiari, urmatorNr, registruHead, onResetNumerotare, onRaportAnual, arataDocsZona, sabloaneZona, activitatiZona, docsZona, onDocZonaAdaugat, onDocZonaSters, onMutaDocZona, onModifica, onSterge, onDocNou, onDocSters, onBeneficiar, onBeneficiarSters, onGenerat, onNrSchimbat, onDateComune }: {
   a: Activitate; docs: Doc[]; firmaId: string; bazaBeneficiari: boolean; unitate: string; zona: string; an: number; definitiv?: boolean
-  beneficiari: Beneficiar[]; urmatorNr: number; registruHead?: { nr: number; data: string | null; urmator: number }; onResetNumerotare?: () => void
+  beneficiari: Beneficiar[]; urmatorNr: number; registruHead?: { nr: number; data: string | null; urmator: number }; onResetNumerotare?: () => void; onRaportAnual?: () => void
   arataDocsZona?: boolean; sabloaneZona: { tip: string; label: string }[]; activitatiZona?: { id: string; denumire: string }[]; docsZona: Doc[]
   onDocZonaAdaugat: (ds: Doc[]) => void; onDocZonaSters: (id: string) => void; onMutaDocZona?: (d: Doc) => void
   onModifica: (id: string, patch: Record<string, unknown>) => void; onSterge: () => void
@@ -399,7 +448,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
           <GeneratorSocial firmaId={firmaId} activitateId={a.id} an={a.an} zona={zona} dateDocumente={a.date_documente || {}}
             beneficiari={beneficiari} documente={docGenerate} registruHead={registruHead} areActePostari={areActePostari}
             onBeneficiar={onBeneficiar} onBeneficiarSters={onBeneficiarSters} onGenerat={onGenerat} onNrSchimbat={onNrSchimbat}
-            onStergeDoc={onDocSters} onDateComune={date => onDateComune(a.id, date)} onResetNumerotare={onResetNumerotare} />
+            onStergeDoc={onDocSters} onDateComune={date => onDateComune(a.id, date)} onResetNumerotare={onResetNumerotare} onRaportAnual={onRaportAnual} />
 
           {/* Detalii activitate - strânse când zona are generator, ca să nu încarce */}
           <details open={!areGenerator}>
