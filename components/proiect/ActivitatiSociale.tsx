@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { deschideDocument } from '@/lib/vizualizare'
 import {
   ANI_PROIECT, ETICHETA_STATUS, STATUSURI_ACT, ETICHETA_STARE,
-  stareaZonei, indicatorZona, rezumatAn, TIPURI_DOC_ACT, etichetaDocAct,
+  stareaZonei, indicatorZona, rezumatAn, TIPURI_DOC_ACT,
   zoneOrdonate, ZONE_SOCIALE,
   type Activitate, type StareZonaRow, type StatusAct, type StareZona, type OrdineRow,
 } from '@/lib/proiect-social'
@@ -395,7 +395,6 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
   const [tipDoc, setTipDoc] = useState<string>('dovada')
   const inputRef = useRef<HTMLInputElement>(null)
   const api = `/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`
-  const urlDoc = (d: Doc, preview = false) => `${api}&download=${d.id}${preview ? '&preview=1' : ''}`
 
   async function incarca(files: File[]) {
     if (!files.length) return
@@ -416,11 +415,6 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
         if (d2.documente?.length) onDocNou(d2.documente)
       }
     } finally { setBusy(false); if (inputRef.current) inputRef.current.value = '' }
-  }
-  async function stergeDoc(d: Doc) {
-    if (!confirm(`Ștergi documentul „${d.fisier_nume}"?`)) return
-    const r = await fetch(`${api}&doc=${d.id}`, { method: 'DELETE' })
-    if (r.ok) onDocSters(d.id)
   }
 
   const culoareStatus: Record<StatusAct, string> = { planificata: 'var(--text-muted)', in_desfasurare: 'var(--accent)', finalizata: 'var(--warning)', validata: 'var(--success)' }
@@ -446,7 +440,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
         <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
           {/* Fabrica de documente - vizibilă sus (doar la zonele cu șabloane) */}
           <GeneratorSocial firmaId={firmaId} activitateId={a.id} an={a.an} zona={zona} dateDocumente={a.date_documente || {}}
-            beneficiari={beneficiari} documente={docGenerate} registruHead={registruHead} areActePostari={areActePostari}
+            beneficiari={beneficiari} documente={docGenerate} documenteAtasate={docManual as unknown as DocGen[]} registruHead={registruHead} areActePostari={areActePostari}
             onBeneficiar={onBeneficiar} onBeneficiarSters={onBeneficiarSters} onGenerat={onGenerat} onNrSchimbat={onNrSchimbat}
             onStergeDoc={onDocSters} onDateComune={date => onDateComune(a.id, date)} onResetNumerotare={onResetNumerotare} onRaportAnual={onRaportAnual} />
 
@@ -488,15 +482,11 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
                   <input ref={inputRef} type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={e => incarca(Array.from(e.target.files || []))} />
                   <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...linkBtn, color: 'var(--accent)' }}>{busy ? 'Se încarcă…' : '+ Adaugă document'}</button>
                 </div>
-                {docManual.map(d => (
-                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', fontSize: 'var(--fs-sm)' }}>
-                    <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>{etichetaDocAct(d.tip_document)}</span>
-                    <span style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</span>
-                    {previzualizabil(d) && <button onClick={() => deschideDocument(urlDoc(d, true), d.fisier_nume)} style={{ ...linkBtn, color: 'var(--accent)' }}>Vezi</button>}
-                    <a href={urlDoc(d)} style={{ ...linkBtn, color: 'var(--accent-blue)' }}>Descarcă</a>
-                    <button onClick={() => stergeDoc(d)} title="Șterge documentul" aria-label={`Șterge ${d.fisier_nume}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
-                  </div>
-                ))}
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
+                  {docManual.length > 0
+                    ? `${docManual.length} ${docManual.length === 1 ? 'document apare' : 'documente apar'} sus, în „Documente oficiale" (cu Vezi / Descarcă / șterge).`
+                    : 'Documentele încărcate aici apar sus, în „Documente oficiale".'}
+                </div>
               </div>
             </div>
           </details>

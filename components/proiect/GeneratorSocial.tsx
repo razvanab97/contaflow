@@ -4,6 +4,7 @@ import { deschideDocument } from '@/lib/vizualizare'
 import { printeazaDocxPdf } from '@/lib/docxPrint'
 import DocLucruCard, { type DocLucru } from './DocLucruCard'
 import DatePostari from './DatePostari'
+import { etichetaDocAct } from '@/lib/proiect-social'
 import { sabloaneBeneficiar, sabloaneActivitate, campuriComune, campuriBeneficiar, VALORI_IMPLICITE, TIP_LUCRU, type SablonCamp } from '@/lib/proiect-social-sabloane'
 
 // Fabrica de documente a unei activități (strat premium – vezi proiect-theme.css .gsoc-*):
@@ -33,9 +34,9 @@ const initiale = (n: string) => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]?
 const azi = () => new Date().toISOString().slice(0, 10)
 const roData = (iso?: string | null) => iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : ''
 
-export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateDocumente, beneficiari, documente, registruHead, areActePostari, onBeneficiar, onBeneficiarSters, onGenerat, onStergeDoc, onDateComune, onResetNumerotare, onRaportAnual, disabled }: {
+export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateDocumente, beneficiari, documente, documenteAtasate, registruHead, areActePostari, onBeneficiar, onBeneficiarSters, onGenerat, onStergeDoc, onDateComune, onResetNumerotare, onRaportAnual, disabled }: {
   firmaId: string; activitateId: string; an: number; zona: string; dateDocumente: Record<string, string>
-  beneficiari: Beneficiar[]; documente: DocGen[]; registruHead?: { nr: number; data: string | null; urmator: number }; areActePostari?: boolean
+  beneficiari: Beneficiar[]; documente: DocGen[]; documenteAtasate?: DocGen[]; registruHead?: { nr: number; data: string | null; urmator: number }; areActePostari?: boolean
   onBeneficiar: (b: Beneficiar) => void; onBeneficiarSters: (id: string) => void
   onGenerat: (d: DocGen) => void; onNrSchimbat?: (d: DocGen) => void; onStergeDoc?: (id: string) => void; onDateComune: (date: Record<string, string>) => void; onResetNumerotare?: () => void; onRaportAnual?: () => void; disabled?: boolean
 }) {
@@ -77,6 +78,13 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
     const d = await r.json().catch(() => ({}))
     setBusy('')
     if (r.ok && d.document) onGenerat(d.document); else setMesaj(d.error || 'Nu s-a putut schimba starea')
+  }
+
+  // șterge un document atașat (dovadă) din registru
+  async function stergeAtasat(d: DocGen) {
+    if (!confirm(`Ștergi documentul „${d.fisier_nume}"?`)) return
+    const r = await fetch(`${api}&doc=${d.id}`, { method: 'DELETE' })
+    if (r.ok) onStergeDoc?.(d.id); else setMesaj('Nu s-a putut șterge')
   }
 
   // marchează un voluntar/beneficiar „finalizat" ↔ nu — contează la indicatorul zonei (fără validarea activității)
@@ -135,6 +143,9 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
 
   // documente „puse în lucru" dintr-un draft — apar în registru ca acte separate (nu dintr-un rând de șablon)
   const extra = documente.filter(d => d.tip_document === TIP_LUCRU)
+  // documente atașate (dovezi încărcate: acorduri, procese-verbale, liste…) — apar tot aici, în registru
+  const atasate = documenteAtasate || []
+  const totalActe = documente.length + atasate.length
 
   // avertizare de ordine: un document cu nr. mai mare nu ar trebui să aibă data mai devreme decât unul cu nr. mai mic
   const ordineGresita = new Set<string>()
@@ -187,9 +198,9 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
       )}
 
       {/* Registrul documentelor */}
-      <div style={S.cap}><span style={S.capT}>Registrul documentelor</span><span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, var(--border-strong), transparent)' }} /><span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{documente.length} {documente.length === 1 ? 'act emis' : 'acte emise'}</span></div>
+      <div style={S.cap}><span style={S.capT}>Registrul documentelor</span><span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, var(--border-strong), transparent)' }} /><span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{totalActe} {totalActe === 1 ? 'act' : 'acte'}</span></div>
 
-      {randuri.length === 0 && extra.length === 0 && (
+      {randuri.length === 0 && extra.length === 0 && atasate.length === 0 && (
         <div style={{ ...S.row, color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', justifyContent: 'center' }}>
           Niciun act încă. Pune un document „în lucru" (din „Drafturi standard", mai jos) ca să apară aici.
         </div>
@@ -254,6 +265,34 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
             onActualizat={nd => onGenerat(nd as unknown as DocGen)} onSters={id => onStergeDoc?.(id)} disabled={disabled} />
         </div>
       ))}
+
+      {/* Documente atașate (dovezi încărcate: acorduri, procese-verbale, liste…) — în registru, cu Vezi / Descarcă / șterge */}
+      {atasate.length > 0 && (
+        <>
+          {atasate.map(d => {
+            const isDocx = /\.docx$/i.test(d.fisier_nume) || /wordprocessing/.test(d.fisier_tip || '')
+            const isPrev = /pdf|image/.test(d.fisier_tip || '') || /\.(pdf|jpe?g|png|webp)$/i.test(d.fisier_nume) || isDocx
+            return (
+              <div key={d.id} className="gsoc-row" style={S.row}>
+                <span className="gsoc-node" style={{ fontSize: 14 }}>📎</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginTop: 3 }}>
+                    <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{etichetaDocAct(d.tip_document)}</span>
+                    {d.data_document && <span style={{ ...mono, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{roData(d.data_document)}</span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+                  {isPrev && <button onClick={() => deschideDocument(urlDoc(d.id, true), d.fisier_nume)} style={S.ico} title="Vezi">👁</button>}
+                  <a href={urlDoc(d.id)} style={S.word} title="Descarcă">Descarcă</a>
+                  {isDocx && <button className="gsoc-solid" onClick={() => printeazaDocxPdf(urlDoc(d.id), d.fisier_nume)} style={S.pdf} title="PDF (pregătit de semnare)">PDF</button>}
+                  {!disabled && <button onClick={() => stergeAtasat(d)} title="Șterge documentul" aria-label={`Șterge ${d.fisier_nume}`} style={{ ...S.ico, fontSize: 15 }}>×</button>}
+                </div>
+              </div>
+            )
+          })}
+        </>
+      )}
 
       {/* Voluntari */}
       {!!sabBen.length && (
