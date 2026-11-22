@@ -40,6 +40,38 @@ function perioadaRo(prima: string, ultima: string | null): string {
   if (a.y === b.y) return `${a.d} ${LUNI_RO[a.m - 1]} – ${b.d} ${LUNI_RO[b.m - 1]} ${a.y}`
   return `${a.d} ${LUNI_RO[a.m - 1]} ${a.y} – ${b.d} ${LUNI_RO[b.m - 1]} ${b.y}`
 }
+// Text simplu dintr-un .docx (fără marcaje) — ca să citim „fapte" din documentele surori ale activității
+// (ex. procesele-verbale ale atelierelor conțin Data și Durata, de care are nevoie Raportul de sinteză).
+async function textDinDocx(bytes: Uint8Array): Promise<string> {
+  try {
+    const zip = await JSZip.loadAsync(bytes)
+    const f = zip.file('word/document.xml'); if (!f) return ''
+    let x = await f.async('string')
+    x = x.replace(/<\/w:tc>/g, '\x01').replace(/<\/w:tr>/g, '\x02').replace(/<\/w:p>/g, '\x03')
+    x = x.replace(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g, (_m, t) => '\x00' + t + '\x00')
+    x = x.replace(/<[^>]+>/g, '').replace(/\x00/g, '')
+    x = x.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#10;/g, ' ')
+    x = x.replace(/\x01/g, ' | ').replace(/[\x02\x03]/g, '\n')
+    return x.split('\n').map(l => l.replace(/[ \t]+/g, ' ').trim()).filter(Boolean).join('\n').slice(0, 6000)
+  } catch { return '' }
+}
+// Scoate faptele etichetate dintr-un document soră (Atelierul N, Data, Durata, Locul, Nr. participanți).
+function fapteDinText(nume: string, text: string): string | null {
+  const g = (re: RegExp) => { const m = text.match(re); return m ? m[1].replace(/\s+/g, ' ').trim() : null }
+  const atelier = g(/\b(Atelierul\s*\d+)/i)
+  const data = g(/\bData:\s*([0-3]?\d[.\/][01]?\d[.\/]\d{4})/i)
+  const durata = g(/\bDurata:\s*([^\n|]{1,22}?(?:ore|or[ăa]|minute|zile?|h))\b/i)
+  const locul = g(/\bLocul:\s*([^\n|]{1,60})/i)
+  const particip = g(/\b(?:Nr\.?\s*participan[țt]i|Num[ăa]r\s*participan[țt]i|Participan[țt]e?\s*vizate)\s*[:\-]?\s*(\d{1,4})/i)
+  const buc: string[] = []
+  if (atelier) buc.push(atelier)
+  if (data) buc.push(`Data: ${data}`)
+  if (durata) buc.push(`Durata: ${durata}`)
+  if (locul) buc.push(`Locul: ${locul}`)
+  if (particip) buc.push(`Nr. participanți: ${particip}`)
+  if (!data && !durata && !particip) return null // nimic util de reținut
+  return `  • din „${nume}": ${buc.join(' — ')}`
+}
 const dataValida = (d: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? String(d) : null
 const intPoz = (v: unknown): number | null => { const n = Math.trunc(Number(v)); return Number.isFinite(n) && n >= 0 ? n : null }
 const anValid = (v: unknown): number | null => { const n = Math.trunc(Number(v)); return n >= 2024 && n <= 2035 ? n : null }
@@ -559,6 +591,21 @@ export async function POST(req: NextRequest) {
         ].filter((x): x is string => !!x)
         linii.push(`  ${i + 1}) ${buc.join(' — ')}`)
       })
+      // Fapte din CELELALTE documente Word ale activității (ex. procesele-verbale ale atelierelor au Data și Durata).
+      // Un raport de sinteză (ex. „Ateliere desfășurate") le folosește ca să umple Data/Durata fiecărui atelier.
+      const { data: surori } = await sb.from('documente').select('id,fisier_nume,fisier_path,fisier_tip').eq('firma_id', firmaId).eq('modul', MODUL).eq('activitate_sociala_id', actId).neq('id', docId)
+      const docxSurori = (surori || []).filter(s => s.fisier_path && (/\.docx$/i.test(s.fisier_nume || '') || /wordprocessing/.test(s.fisier_tip || ''))).slice(0, 12)
+      const fapte: string[] = []
+      for (const s of docxSurori) {
+        const { data: fb } = await sb.storage.from('documente').download(s.fisier_path as string)
+        if (!fb) continue
+        const linie = fapteDinText(s.fisier_nume || 'document', await textDinDocx(new Uint8Array(await fb.arrayBuffer())))
+        if (linie) fapte.push(linie)
+      }
+      if (fapte.length) {
+        linii.push('- Fapte din celelalte documente ale activității (folosește-le pentru tabelele de sinteză din acest document — ex. coloanele Data și Durata din „Ateliere desfășurate"; potrivește rândul după „Atelierul N" sau după temă):')
+        linii.push(...fapte)
+      }
     }
     const dateInterne = linii.join('\n')
 

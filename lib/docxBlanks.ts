@@ -7,14 +7,26 @@ import JSZip from 'jszip'
 
 const RE_WT = /(<w:t(?:\s[^>]*)?>)([\s\S]*?)(<\/w:t>)/g // noduri de text Word
 const RE_BLANK = /_{3,}/g                                // un „spațiu de completat" = 3+ liniuțe de subliniere
+// Unele șabloane nu folosesc liniuțe, ci textul-indiciu „De completat" / „Data de completat" / „Durata: De completat".
+// Tratăm și asta ca spațiu de completat: tot nodul (sau partea de după „etichetă:") e locul de umplut.
+// Prefix acceptat: gol, „Data", sau o etichetă scurtă care se termină cu „:". Astfel nu prindem text din proză
+// de genul „documentele sunt de completat de către…".
+const RE_PLACEHOLDER = /^(\s*(?:[^:：\n]{0,40}[:：]\s*)?)(?:data\s+)?de\s+completat\.?\s*$/i
+const prefixPlaceholder = (text: string): string | null => { const m = String(text).match(RE_PLACEHOLDER); return m ? (m[1] ?? '') : null }
 const escXml = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const unesc = (s: string) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#10;/g, ' ')
 
 // Parcurge nodurile de text în ordine și, pentru fiecare „spațiu de completat", cheamă onBlank(idx).
-// Dacă onBlank întoarce un string, înlocuiește liniuțele cu el; dacă întoarce null, le lasă neatinse.
+// Dacă onBlank întoarce un string, înlocuiește spațiul cu el; dacă întoarce null, îl lasă neatins.
 function parcurge(xml: string, onBlank: (idx: number) => string | null): { xml: string; total: number } {
   let idx = 0
   const out = xml.replace(RE_WT, (_full, open, text, close) => {
+    const pre = prefixPlaceholder(text) // tot nodul e un indiciu „(…: )(Data )de completat"
+    if (pre !== null) {
+      idx++
+      const rep = onBlank(idx)
+      return rep == null || rep === '' ? open + text + close : open + escXml(pre + String(rep)) + close
+    }
     const nou = String(text).replace(RE_BLANK, (g: string) => {
       idx++
       const rep = onBlank(idx)

@@ -33,6 +33,8 @@ Reguli:
 - La „manuale" pune DOAR câmpurile care chiar trebuie completate cu o informație reală pe care n-o avem (ex. perioada unui voluntar necompletată, o dată lipsă). Nu pune rânduri goale de tabel, spații decorative sau semnături.
 - Datele se scriu în formatul din document (ex. data ca ZZ.LL.AAAA dacă așa apare). Nu repeta textul deja existent, completează doar spațiul.
 - Fii atent la coloane: potrivește valoarea cu antetul coloanei (Voluntar / Perioada / Ore / Contract nr.). La coloana „Ore efective" (sau doar „Ore") pune TOTALUL de ore lucrate — valoarea „ore efective (total…)" din datele interne (perioada în zile × ore/program), NU orele pe zi. „Perioada" rămâne numărul de zile; „ore/program" sunt orele pe zi.
+- Dacă documentul e un raport/sinteză cu un tabel de activități (ex. „Ateliere desfășurate", cu coloane Data / Durata / Nr. participanți), ia Data și Durata fiecărui rând din secțiunea „Fapte din celelalte documente ale activității" de mai sus — potrivește rândul după „Atelierul N" sau după temă. Dacă pentru un atelier nu găsești acolo faptul cerut, lasă-l la „manuale".
+- Unele spații NU sunt linii „______", ci textul-indiciu „De completat" / „Data de completat" (deja marcat cu ⟦N⟧). Tratează-le la fel: completează-le dacă avem valoarea potrivită pentru coloana/eticheta lor, altfel lasă-le la „manuale".
 - Ține etichetele de la „manuale" scurte (2-5 cuvinte).
 
 Răspunde DOAR cu JSON, fără alt text, „completate" primul:
