@@ -250,12 +250,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ activitate: data })
   }
 
-  // Editează numărul de înregistrare al unui document.
+  // Editează numărul de înregistrare al unui document. `nr: 'urmator'` → următorul liber din registru.
   if (b.actiune === 'nr-document') {
-    const docId = String(b.docId || ''), nr = (b.nr === null || b.nr === '') ? null : Math.trunc(Number(b.nr))
+    const docId = String(b.docId || '')
     if (!docId) return NextResponse.json({ error: 'Document lipsă' }, { status: 400 })
-    if (nr !== null && (!Number.isFinite(nr) || nr < 0)) return NextResponse.json({ error: 'Număr invalid' }, { status: 400 })
-    const { data, error } = await sb.from('documente').update({ nr_inregistrare: nr }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC).single()
+    let nr: number | null
+    if (b.nr === 'urmator') {
+      const { data: mx } = await sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1)
+      nr = ((mx?.[0]?.nr_inregistrare as number) || 0) + 1
+    } else {
+      nr = (b.nr === null || b.nr === '') ? null : Math.trunc(Number(b.nr))
+      if (nr !== null && (!Number.isFinite(nr) || nr < 0)) return NextResponse.json({ error: 'Număr invalid' }, { status: 400 })
+    }
+    const { data, error } = await sb.from('documente').update({ nr_inregistrare: nr }).eq('id', docId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ document: data })
   }

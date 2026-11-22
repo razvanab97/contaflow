@@ -86,6 +86,13 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
     const r = await fetch(`${api}&doc=${d.id}`, { method: 'DELETE' })
     if (r.ok) onStergeDoc?.(d.id); else setMesaj('Nu s-a putut șterge')
   }
+  // numărul de înregistrare al unui document atașat: `val` text (editabil) sau 'urmator' (următorul liber)
+  async function nrAtasat(d: DocGen, val: string) {
+    setBusy('n' + d.id); setMesaj('')
+    const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'nr-document', docId: d.id, nr: val === '' ? null : val }) })
+    const dd = await r.json().catch(() => ({})); setBusy('')
+    if (r.ok && dd.document) onGenerat(dd.document); else setMesaj(dd.error || 'Nu s-a putut salva numărul')
+  }
 
   // marchează un voluntar/beneficiar „finalizat" ↔ nu — contează la indicatorul zonei (fără validarea activității)
   async function schimbaFinalizat(bn: Beneficiar) {
@@ -274,7 +281,12 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
             const isPrev = /pdf|image/.test(d.fisier_tip || '') || /\.(pdf|jpe?g|png|webp)$/i.test(d.fisier_nume) || isDocx
             return (
               <div key={d.id} className="gsoc-row" style={S.row}>
-                <span className="gsoc-node" style={{ fontSize: 14 }}>📎</span>
+                <span className="gsoc-node" style={{ fontSize: 14 }}>
+                  {d.nr_inregistrare != null
+                    ? <input className="gsoc-nr" key={d.id + ':' + d.nr_inregistrare} defaultValue={d.nr_inregistrare} inputMode="numeric" aria-label="Număr de înregistrare" title="Număr de înregistrare (editabil)"
+                        onBlur={e => { const v = e.target.value.trim(); if (v !== String(d.nr_inregistrare ?? '')) nrAtasat(d, v) }} />
+                    : '📎'}
+                </span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ ...disp, fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fisier_nume}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginTop: 3 }}>
@@ -283,6 +295,8 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+                  {!disabled && d.nr_inregistrare == null && <button onClick={() => nrAtasat(d, 'urmator')} disabled={busy === 'n' + d.id} className="gsoc-solid" title="Dă numărul de înregistrare (următorul liber din registru)"
+                    style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, padding: '7px 11px', borderRadius: 999, cursor: 'pointer', opacity: busy === 'n' + d.id ? 0.6 : 1 }}>✦ {busy === 'n' + d.id ? '…' : 'dă nr.'}</button>}
                   {isPrev && <button onClick={() => deschideDocument(urlDoc(d.id, true), d.fisier_nume)} style={S.ico} title="Vezi">👁</button>}
                   <a href={urlDoc(d.id)} style={S.word} title="Descarcă">Descarcă</a>
                   {isDocx && <button className="gsoc-solid" onClick={() => printeazaDocxPdf(urlDoc(d.id), d.fisier_nume)} style={S.pdf} title="PDF (pregătit de semnare)">PDF</button>}
