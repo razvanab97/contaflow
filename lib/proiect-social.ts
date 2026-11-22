@@ -135,21 +135,31 @@ export interface Indicator { realizat: number; tinta: number | null; procent: nu
 
 // Indicatorul unei zone pe un an: din activitățile VALIDATE (fără cele planificate/în lucru).
 // `beneficiari` → suma beneficiarilor realizați; `activitati` → numărul activităților validate.
-export function indicatorZona(acts: Activitate[], zona: ZonaSociala, an: number): Indicator {
-  const validate = acts.filter(a => a.zona === zona.cod && a.an === an && CONTRIBUIE_LA_INDICATOR(a.status))
-  const realizat = zona.baza === 'beneficiari'
-    ? validate.reduce((s, a) => s + (a.beneficiari_realizat || 0), 0)
-    : validate.length
+export function indicatorZona(acts: Activitate[], zona: ZonaSociala, an: number, beneficiari?: { activitate_id: string; finalizat?: boolean | null }[]): Indicator {
+  const aleZonei = acts.filter(a => a.zona === zona.cod && a.an === an)
+  let realizat: number
+  if (zona.baza === 'beneficiari') {
+    // zone care numără PERSOANE (tineri, familii…): numărăm persoanele marcate „finalizat" din activitățile
+    // zonei — NU cerem validarea activității (progres real 2/4). Dacă nu sunt persoane înregistrate, cădem
+    // pe numărul manual „beneficiari realizați" al activităților (tot fără validare).
+    const actIds = new Set(aleZonei.map(a => a.id))
+    const inZona = (beneficiari || []).filter(b => actIds.has(b.activitate_id))
+    realizat = inZona.length > 0
+      ? inZona.filter(b => b.finalizat).length
+      : aleZonei.reduce((s, a) => s + (a.beneficiari_realizat || 0), 0)
+  } else {
+    realizat = aleZonei.filter(a => CONTRIBUIE_LA_INDICATOR(a.status)).length // zone care numără ACTIVITĂȚI: doar cele validate
+  }
   const procent = zona.tinta ? Math.min(100, Math.round((realizat / zona.tinta) * 100)) : null
   return { realizat, tinta: zona.tinta, procent, unitate: zona.unitate }
 }
 
 // Rezumat pe un an: câte zone au ținta atinsă, câte activități (total / validate), nr. beneficiari.
-export function rezumatAn(acts: Activitate[], stari: StareZonaRow[], an: number) {
+export function rezumatAn(acts: Activitate[], stari: StareZonaRow[], an: number, beneficiari?: { activitate_id: string; finalizat?: boolean | null }[]) {
   const aleAnului = acts.filter(a => a.an === an)
   const zoneActive = ZONE_SOCIALE.filter(z => stareaZonei(stari, z.cod, an) !== 'inchisa_definitiv')
   const cuTinta = zoneActive.filter(z => z.tinta != null)
-  const atinse = cuTinta.filter(z => { const i = indicatorZona(acts, z, an); return (i.procent || 0) >= 100 }).length
+  const atinse = cuTinta.filter(z => { const i = indicatorZona(acts, z, an, beneficiari); return (i.procent || 0) >= 100 }).length
   return {
     an,
     activitatiTotal: aleAnului.length,

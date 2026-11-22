@@ -10,7 +10,7 @@ import { sabloaneBeneficiar, sabloaneActivitate, campuriComune, campuriBeneficia
 // setezi o dată datele comune (inclusiv data actelor), adaugi voluntari (din buletin), iar documentele
 // se GENEREAZĂ singure, apar în „Registrul documentelor" și se actualizează în loc.
 
-export interface Beneficiar { id: string; activitate_id: string; nume: string; date: Record<string, string>; created_at: string }
+export interface Beneficiar { id: string; activitate_id: string; nume: string; date: Record<string, string>; created_at: string; finalizat?: boolean | null }
 export interface DocGen { id: string; fisier_nume: string; fisier_tip: string | null; furnizor: string | null; tip_document: string | null; beneficiar_social_id: string | null; nr_inregistrare: number | null; data_document?: string | null; stare?: string | null; created_at: string }
 
 const disp: React.CSSProperties = { fontFamily: 'var(--font-bricolage), var(--font-geist), system-ui, sans-serif' }
@@ -77,6 +77,15 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
     const d = await r.json().catch(() => ({}))
     setBusy('')
     if (r.ok && d.document) onGenerat(d.document); else setMesaj(d.error || 'Nu s-a putut schimba starea')
+  }
+
+  // marchează un voluntar/beneficiar „finalizat" ↔ nu — contează la indicatorul zonei (fără validarea activității)
+  async function schimbaFinalizat(bn: Beneficiar) {
+    setBusy('f' + bn.id)
+    const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firmaId, actiune: 'beneficiar-finalizat', id: bn.id, finalizat: !bn.finalizat }) })
+    const d = await r.json().catch(() => ({}))
+    setBusy('')
+    if (r.ok && d.beneficiar) onBeneficiar(d.beneficiar); else setMesaj(d.error || 'Nu s-a putut marca')
   }
 
   useEffect(() => {
@@ -220,6 +229,9 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+              {r.benId && r.benef && (() => { const fin = !!r.benef!.finalizat, bf = busy === 'f' + r.benId
+                return <button onClick={() => r.benef && schimbaFinalizat(r.benef)} disabled={bf} title={fin ? 'Finalizat — contează la indicatorul zonei. Click ca să scoți.' : 'Marchează finalizat — persoana intră la indicatorul zonei (nu e nevoie să validezi activitatea).'}
+                  style={{ ...S.okPill, border: fin ? 'none' : '1px solid var(--border)', cursor: 'pointer', opacity: bf ? 0.5 : 1, ...(fin ? {} : { color: 'var(--text-muted)', background: 'var(--surface)' }) }}>{fin ? '✓ finalizat' : '○ finalizat'}</button> })()}
               {r.benId && <button onClick={() => setEditeaza(r.benId)} title="Editează voluntarul" aria-label={`Editează ${r.benef?.nume}`} style={S.ico}>✎</button>}
               {r.benId && <button onClick={() => r.benef && stergeBenef(r.benef)} title="Șterge voluntarul" aria-label={`Șterge ${r.benef?.nume}`} style={{ ...S.ico, fontSize: 15 }}>×</button>}
               {r.doc ? (

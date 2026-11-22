@@ -81,7 +81,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
 
   const nrUrmator = (docs: { nr_inregistrare?: number | null }[]) => Math.max(0, ...docs.map(d => d.nr_inregistrare || 0)) + 1
 
-  const rez = useMemo(() => rezumatAn(acts, stari, an), [acts, stari, an])
+  const rez = useMemo(() => rezumatAn(acts, stari, an, beneficiari), [acts, stari, an, beneficiari])
   const zoneSortate = useMemo(() => zoneOrdonate(ordine), [ordine])
   const api = `/api/proiect-social?firmaId=${encodeURIComponent(firmaId)}`
 
@@ -190,7 +190,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
     const dataAzi = new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })
     const sectiuni = zoneSortate.map(z => {
       const stare = stareaZonei(stari, z.cod, an)
-      const ind = indicatorZona(acts, z, an)
+      const ind = indicatorZona(acts, z, an, beneficiari)
       const aleZonei = acts.filter(a => a.zona === z.cod && a.an === an)
       const randuri = aleZonei.map(a => {
         const nd = docs.filter(d => d.activitate_sociala_id === a.id).length
@@ -278,7 +278,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {zoneSortate.map((z, zi) => {
           const stare = stareaZonei(stari, z.cod, an)
-          const ind = indicatorZona(acts, z, an)
+          const ind = indicatorZona(acts, z, an, beneficiari)
           const aleZonei = acts.filter(a => a.zona === z.cod && a.an === an)
           const open = deschise.has(z.cod)
           const definitiv = stare === 'inchisa_definitiv'

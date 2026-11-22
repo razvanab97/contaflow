@@ -130,7 +130,11 @@ export async function GET(req: NextRequest) {
       return r.error ? await q(COL_DOC) : r
     })(),
     sb.from('zone_sociale').select('zona,ordine').eq('firma_id', firmaId),
-    sb.from('beneficiari_sociali').select('id,activitate_id,nume,date,created_at').eq('firma_id', firmaId).order('created_at', { ascending: true }),
+    (async () => { // beneficiari; dacă migrarea coloanei `finalizat` n-a rulat încă, reîncearcă fără ea
+      const q = (col: string) => sb.from('beneficiari_sociali').select(col).eq('firma_id', firmaId).order('created_at', { ascending: true })
+      const r = await q('id,activitate_id,nume,date,finalizat,created_at')
+      return r.error ? await q('id,activitate_id,nume,date,created_at') : r
+    })(),
     sb.from('documente').select('nr_inregistrare').eq('firma_id', firmaId).eq('modul', MODUL).not('nr_inregistrare', 'is', null).order('nr_inregistrare', { ascending: false }).limit(1),
     (async () => { // documente atașate direct unei zone (fără activitate); dacă migrarea n-a rulat, întoarce gol
       const q = (col: string) => sb.from('documente').select(col).eq('firma_id', firmaId).eq('modul', MODUL).is('activitate_sociala_id', null).not('zona_sociala', 'is', null).order('created_at', { ascending: false })
@@ -222,6 +226,16 @@ export async function POST(req: NextRequest) {
     if (!act) return NextResponse.json({ error: 'Activitatea nu a fost găsită' }, { status: 404 })
     const { data, error } = await sb.from('beneficiari_sociali').insert({ firma_id: firmaId, activitate_id: activitateId, nume, date }).select('id,activitate_id,nume,date,created_at').single()
     if (error) return NextResponse.json({ error: tabelLipsa(error) ? 'Rulează migrarea supabase_activitati_sociale.sql' : error.message }, { status: tabelLipsa(error) ? 409 : 500 })
+    return NextResponse.json({ beneficiar: data })
+  }
+
+  // Marchează o persoană (voluntar/beneficiar) ca „finalizat" ↔ nefinalizat. Indicatorul zonelor pe
+  // persoane numără cei finalizați, fără validarea activității.
+  if (b.actiune === 'beneficiar-finalizat') {
+    const id = String(b.id || '')
+    if (!id) return NextResponse.json({ error: 'Beneficiar lipsă' }, { status: 400 })
+    const { data, error } = await sb.from('beneficiari_sociali').update({ finalizat: !!b.finalizat, updated_at: new Date().toISOString() }).eq('id', id).eq('firma_id', firmaId).select('id,activitate_id,nume,date,finalizat,created_at').single()
+    if (error) return NextResponse.json({ error: /finalizat/i.test(error.message || '') ? 'Rulează migrarea (lipsește coloana „finalizat" din beneficiari)' : error.message }, { status: /finalizat/i.test(error.message || '') ? 409 : 500 })
     return NextResponse.json({ beneficiar: data })
   }
 

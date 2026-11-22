@@ -70,6 +70,8 @@ create table if not exists beneficiari_sociali (
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_beneficiari_sociali_act on beneficiari_sociali(activitate_id);
+-- „finalizat": persoana (tânăr/familie…) a terminat; indicatorul zonelor pe persoane îi numără pe cei finalizați.
+alter table beneficiari_sociali add column if not exists finalizat boolean not null default false;
 
 -- Un document din `documente` poate aparține unei activități sociale (ca `achizitie_id` pentru achiziții),
 -- unui beneficiar, și poate avea un număr de înregistrare (șir unic pe proiectul social).
