@@ -37,9 +37,14 @@ async function descarcaPdfDocumente(items: { id: string; nume: string; tip?: str
   try {
     const { renderAsync } = await import('docx-preview')
     const c = w.document.getElementById('c'); if (c) { c.textContent = ''; c.removeAttribute('style') }
+    // foaie de separare DOAR când se schimbă secțiunea (activitatea/proiectul), nu între documentele aceleiași activități
+    let prevSectiune: string | null = null
     for (const it of items) {
-      const sep = w.document.createElement('div'); sep.className = 'sep'
-      sep.innerHTML = `<div><div class="s">${esc(it.sectiune || '')}</div><h2>${esc(it.nume)}</h2></div>`; c?.appendChild(sep)
+      if (it.sectiune && it.sectiune !== prevSectiune) {
+        const sep = w.document.createElement('div'); sep.className = 'sep'
+        sep.innerHTML = `<div><div class="s">Activitate</div><h2>${esc(it.sectiune)}</h2></div>`; c?.appendChild(sep)
+        prevSectiune = it.sectiune
+      }
       const url = `${api}&download=${it.id}`
       const wrap = w.document.createElement('div'); wrap.className = 'doc'; c?.appendChild(wrap)
       const isDocx = /\.docx$/i.test(it.nume) || /wordprocessing/.test(it.tip || '')
@@ -170,14 +175,28 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
   // mutarea unui document din zonă într-o activitate: iese din docsZona și intră în docs (al activității)
   const mutaDocZonaInActivitate = (doc: Doc) => { setDocsZona(prev => prev.filter(d => d.id !== doc.id)); setDocs(prev => [doc, ...prev.filter(d => d.id !== doc.id)]) }
 
-  // toate documentele anului, pentru PDF-ul total (ordonate pe zonă, cu secțiunea = zona)
+  // toate documentele anului, pentru PDF-ul total: grupate pe ACTIVITATE, ordonate după numărul de
+  // înregistrare (foaia de separare apare doar la schimbarea activității — vezi descarcaPdfDocumente)
   const itemsTot = () => {
-    const zMap = new Map(ZONE_SOCIALE.map(z => [z.cod, `${z.nr} ${z.titlu}`]))
     const actMap = new Map(acts.map(a => [a.id, a]))
-    const codDoc = (d: Doc) => (d.activitate_sociala_id ? actMap.get(d.activitate_sociala_id)?.zona : d.zona_sociala) || ''
     const alAnului = (d: Doc) => d.activitate_sociala_id ? actMap.get(d.activitate_sociala_id)?.an === an : (d.an_social == null || d.an_social === an)
-    return [...docs, ...docsZona].filter(alAnului).sort((a, b) => codDoc(a).localeCompare(codDoc(b)))
-      .map(d => ({ id: d.id, nume: d.fisier_nume, tip: d.fisier_tip, sectiune: zMap.get(codDoc(d)) || codDoc(d) }))
+    const grupKey = (d: Doc) => d.activitate_sociala_id || ('zona:' + (d.zona_sociala || ''))
+    const grupNume = (d: Doc) => {
+      const a = d.activitate_sociala_id ? actMap.get(d.activitate_sociala_id) : null
+      if (a) return `${a.cod} · ${a.denumire}`
+      const z = ZONE_SOCIALE.find(zz => zz.cod === d.zona_sociala)
+      return z ? `${z.nr} ${z.titlu}` : (d.zona_sociala || 'Documente')
+    }
+    const nrVal = (d: Doc) => d.nr_inregistrare ?? Number.POSITIVE_INFINITY
+    const lista = [...docs, ...docsZona].filter(alAnului)
+    const minNr = new Map<string, number>() // nr. minim per grup → ordinea grupurilor (nenumerotate la coadă)
+    for (const d of lista) { const k = grupKey(d), n = nrVal(d); if (!minNr.has(k) || n < minNr.get(k)!) minNr.set(k, n) }
+    lista.sort((a, b) => {
+      const ka = grupKey(a), kb = grupKey(b)
+      if (ka !== kb) { const ma = minNr.get(ka)!, mb = minNr.get(kb)!; return ma !== mb ? ma - mb : grupNume(a).localeCompare(grupNume(b)) }
+      return nrVal(a) !== nrVal(b) ? nrVal(a) - nrVal(b) : (a.fisier_nume || '').localeCompare(b.fisier_nume || '')
+    })
+    return lista.map(d => ({ id: d.id, nume: d.fisier_nume, tip: d.fisier_tip, sectiune: grupNume(d) }))
   }
 
   // Raport anual al ÎNTREGII misiuni sociale: adună la zi din toate zonele (indicatori, activități,
@@ -432,7 +451,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
         </select>
         {!!docs.length && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>📎 {docs.length}</span>}
         {!!docs.length && <a href={`${api}&zip=activitate&activitateId=${a.id}`} onClick={e => e.stopPropagation()} title="Descarcă documentele activității (ZIP)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', fontWeight: 700 }}>ZIP</a>}
-        {!!docs.length && <button onClick={e => { e.stopPropagation(); descarcaPdfDocumente(docs.map(d => ({ id: d.id, nume: d.fisier_nume, tip: d.fisier_tip, sectiune: `${a.cod} · ${a.denumire}` })), api, `${a.cod} ${a.denumire}`) }} title="Descarcă documentele activității (PDF, cu foi de separare)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', fontWeight: 700 }}>PDF</button>}
+        {!!docs.length && <button onClick={e => { e.stopPropagation(); descarcaPdfDocumente([...docs].sort((x, y) => ((x.nr_inregistrare ?? 1e9) - (y.nr_inregistrare ?? 1e9)) || (x.fisier_nume || '').localeCompare(y.fisier_nume || '')).map(d => ({ id: d.id, nume: d.fisier_nume, tip: d.fisier_tip, sectiune: `${a.cod} · ${a.denumire}` })), api, `${a.cod} ${a.denumire}`) }} title="Descarcă documentele activității (PDF, în ordinea numerelor)" style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', fontWeight: 700 }}>PDF</button>}
         <button onClick={e => { e.stopPropagation(); onSterge() }} title="Șterge activitatea" aria-label={`Șterge ${a.cod}`} style={{ ...linkBtn, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>×</button>
       </div>
 
