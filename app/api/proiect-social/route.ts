@@ -5,6 +5,7 @@ import { getSablon, caleStorage, VALORI_IMPLICITE, TIP_LUCRU } from '@/lib/proie
 import { umpleSablon } from '@/lib/docxFill'
 import { extrageContextBlanks, umpleBlanks } from '@/lib/docxBlanks'
 import { analizeazaDocument } from '@/lib/ai/pregateste-doc'
+import { extragePerioadaPostari } from '@/lib/ai/perioada-postari'
 import JSZip from 'jszip'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,18 @@ const prefixZona = (firmaId: string, zona: string, an: number) => `${firmaId}/ac
 const numeSigur = (n: string) => n.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '_').slice(-90)
 const azi = () => new Date().toISOString().slice(0, 10)
 const txt = (v: unknown, max = 500) => { const s = String(v ?? '').replace(/\s+/g, ' ').trim(); return s ? s.slice(0, max) : null }
+// aritmetică de date (ISO) pentru „Decizia cu 7 zile înainte / Raportul la o lună după"
+const minusZile = (iso: string, n: number) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10) }
+const plusLuni = (iso: string, n: number) => { const d = new Date(iso + 'T00:00:00Z'); const zi = d.getUTCDate(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + n); const ultima = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); d.setUTCDate(Math.min(zi, ultima)); return d.toISOString().slice(0, 10) }
+const LUNI_RO = ['ianuarie', 'februarie', 'martie', 'aprilie', 'mai', 'iunie', 'iulie', 'august', 'septembrie', 'octombrie', 'noiembrie', 'decembrie']
+function perioadaRo(prima: string, ultima: string | null): string {
+  const f = (iso: string) => { const [y, m, d] = iso.split('-').map(Number); return { y, m, d } }
+  const a = f(prima), b = ultima ? f(ultima) : null
+  if (!b || prima === ultima) return `${a.d} ${LUNI_RO[a.m - 1]} ${a.y}`
+  if (a.y === b.y && a.m === b.m) return `${a.d}–${b.d} ${LUNI_RO[a.m - 1]} ${a.y}`
+  if (a.y === b.y) return `${a.d} ${LUNI_RO[a.m - 1]} – ${b.d} ${LUNI_RO[b.m - 1]} ${a.y}`
+  return `${a.d} ${LUNI_RO[a.m - 1]} ${a.y} – ${b.d} ${LUNI_RO[b.m - 1]} ${b.y}`
+}
 const dataValida = (d: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? String(d) : null
 const intPoz = (v: unknown): number | null => { const n = Math.trunc(Number(v)); return Number.isFinite(n) && n >= 0 ? n : null }
 const anValid = (v: unknown): number | null => { const n = Math.trunc(Number(v)); return n >= 2024 && n <= 2035 ? n : null }
@@ -276,6 +289,74 @@ export async function POST(req: NextRequest) {
     const { data, error } = await q.select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, resetate: data?.length || 0 })
+  }
+
+  // „Date din postări": AI citește Anexele (PDF cu capturi de postări) și propune perioada de implementare,
+  // din care calculează data Deciziei (prima postare − 7 zile) și a Raportului (ultima postare + 1 lună).
+  // NU aplică — doar propune; clientul confirmă cu `aplica-date-postari`.
+  if (b.actiune === 'date-din-postari') {
+    const activitateId = b.activitateId ? String(b.activitateId) : ''
+    const zona = String(b.zona || ''), an0 = anValid(b.an)
+    const pdfDocId = b.pdfDocId ? String(b.pdfDocId) : ''
+    const col = 'id,fisier_nume,fisier_tip,fisier_path,furnizor,tip_document,este_draft'
+    const baseQ = () => { let q = sb.from('documente').select(col).eq('firma_id', firmaId).eq('modul', MODUL); if (activitateId) q = q.eq('activitate_sociala_id', activitateId); else q = q.is('activitate_sociala_id', null).eq('zona_sociala', zona).eq('an_social', an0 as number); return q }
+    if (!activitateId && !(zona && zonaValida(zona) && an0)) return NextResponse.json({ error: 'Date lipsă' }, { status: 400 })
+    const { data: docs } = await baseQ()
+    const lista = (docs || []) as { id: string; fisier_nume: string | null; fisier_tip: string | null; fisier_path: string | null; furnizor: string | null; tip_document: string | null; este_draft: boolean | null }[]
+    const estePdf = (d: typeof lista[number]) => /pdf/.test(d.fisier_tip || '') || /\.pdf$/i.test(d.fisier_nume || '')
+    const esteDocx = (d: typeof lista[number]) => /\.docx$/i.test(d.fisier_nume || '') || /wordprocessing/.test(d.fisier_tip || '')
+    const numeDoc = (d: typeof lista[number]) => (d.furnizor || '') + ' ' + (d.fisier_nume || '')
+    const pdfuri = lista.filter(estePdf)
+    let anexa = pdfDocId ? pdfuri.find(d => d.id === pdfDocId) : undefined
+    if (!anexa) anexa = pdfuri.find(d => /anex|postar|captur|statisti/i.test(numeDoc(d))) || pdfuri[0]
+    if (!anexa || !anexa.fisier_path) return NextResponse.json({ error: 'Nu am găsit un PDF cu anexele (capturi de postări). Încarcă-l întâi în această zonă/activitate.' }, { status: 400 })
+    // Decizia/Raportul: docx non-draft care conține „deciz"/„raport"; preferăm copia pusă în lucru (editabilă)
+    const pick = (re: RegExp) => { const c = lista.filter(d => esteDocx(d) && !d.este_draft && re.test(numeDoc(d))); return c.find(d => d.tip_document === TIP_LUCRU) || c[0] }
+    const decizie = pick(/deciz/i)
+    const raport = pick(/raport/i)
+    const anexaPath = anexa.fisier_path
+    let anc = an0
+    if (!anc && activitateId) { const { data: act } = await sb.from('activitati_sociale').select('an').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle(); anc = (act?.an as number) || null }
+    const { data: file, error: dlErr } = await sb.storage.from('documente').download(anexaPath)
+    if (dlErr || !file) return NextResponse.json({ error: 'Nu am putut citi anexele' }, { status: 500 })
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    if (bytes.length > 20 * 1024 * 1024) return NextResponse.json({ error: 'Anexele sunt prea mari (max 20 MB) pentru citire automată.' }, { status: 400 })
+    const rez = await extragePerioadaPostari(bytes, anexa.fisier_tip || 'application/pdf', anc || undefined)
+    if (!rez || !rez.prima) return NextResponse.json({ error: 'Nu am găsit datele postărilor în anexe. Verifică dacă se văd datele de publicare.', nota: rez?.nota || '' }, { status: 422 })
+    return NextResponse.json({
+      prima: rez.prima, ultima: rez.ultima, dateGasite: rez.dateGasite, nota: rez.nota,
+      perioadaText: perioadaRo(rez.prima, rez.ultima),
+      decizieData: minusZile(rez.prima, 7), raportData: plusLuni(rez.ultima || rez.prima, 1),
+      decizieDocId: decizie?.id || null, decizieNume: decizie ? (decizie.furnizor || decizie.fisier_nume) : null,
+      raportDocId: raport?.id || null, raportNume: raport ? (raport.furnizor || raport.fisier_nume) : null,
+      anexaNume: anexa.furnizor || anexa.fisier_nume,
+    })
+  }
+
+  // Aplică datele propuse de „date-din-postari" (după confirmare): setează data pe Decizie și pe Raport,
+  // iar perioada (text) pe activitate (dacă există), ca să intre în raport la „Pregătește".
+  if (b.actiune === 'aplica-date-postari') {
+    const decizieDocId = b.decizieDocId ? String(b.decizieDocId) : ''
+    const raportDocId = b.raportDocId ? String(b.raportDocId) : ''
+    const decizieData = b.decizieData ? dataValida(b.decizieData) : null
+    const raportData = b.raportData ? dataValida(b.raportData) : null
+    const activitateId = b.activitateId ? String(b.activitateId) : ''
+    const perioadaText = txt(b.perioadaText, 200)
+    const out: Record<string, unknown> = {}
+    if (decizieDocId && decizieData) {
+      const { data } = await sb.from('documente').update({ data_document: decizieData }).eq('id', decizieDocId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
+      out.decizie = data
+    }
+    if (raportDocId && raportData) {
+      const { data } = await sb.from('documente').update({ data_document: raportData }).eq('id', raportDocId).eq('firma_id', firmaId).eq('modul', MODUL).select(COL_DOC + ',zona_sociala,an_social,stare,este_draft').single()
+      out.raport = data
+    }
+    if (activitateId && perioadaText) {
+      const { data: act } = await sb.from('activitati_sociale').select('date_documente').eq('id', activitateId).eq('firma_id', firmaId).maybeSingle()
+      if (act) { const dd = (act.date_documente || {}) as Record<string, string>; dd.PERIOADA = perioadaText; await sb.from('activitati_sociale').update({ date_documente: dd, updated_at: new Date().toISOString() }).eq('id', activitateId).eq('firma_id', firmaId); out.perioada = perioadaText }
+    }
+    if (!out.decizie && !out.raport) return NextResponse.json({ error: 'Nu am găsit Decizia sau Raportul de actualizat.' }, { status: 404 })
+    return NextResponse.json(out)
   }
 
   // Starea documentului: „în lucru" (încă se lucrează) ↔ „emis" (final). null/absent = emis.

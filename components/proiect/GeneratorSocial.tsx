@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { deschideDocument } from '@/lib/vizualizare'
 import { printeazaDocxPdf } from '@/lib/docxPrint'
 import DocLucruCard, { type DocLucru } from './DocLucruCard'
+import DatePostari from './DatePostari'
 import { sabloaneBeneficiar, sabloaneActivitate, campuriComune, campuriBeneficiar, VALORI_IMPLICITE, TIP_LUCRU, type SablonCamp } from '@/lib/proiect-social-sabloane'
 
 // Fabrica de documente a unei activități (strat premium – vezi proiect-theme.css .gsoc-*):
@@ -32,9 +33,9 @@ const initiale = (n: string) => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]?
 const azi = () => new Date().toISOString().slice(0, 10)
 const roData = (iso?: string | null) => iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : ''
 
-export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateDocumente, beneficiari, documente, registruHead, onBeneficiar, onBeneficiarSters, onGenerat, onStergeDoc, onDateComune, onResetNumerotare, disabled }: {
+export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateDocumente, beneficiari, documente, registruHead, areActePostari, onBeneficiar, onBeneficiarSters, onGenerat, onStergeDoc, onDateComune, onResetNumerotare, disabled }: {
   firmaId: string; activitateId: string; an: number; zona: string; dateDocumente: Record<string, string>
-  beneficiari: Beneficiar[]; documente: DocGen[]; registruHead?: { nr: number; data: string | null; urmator: number }
+  beneficiari: Beneficiar[]; documente: DocGen[]; registruHead?: { nr: number; data: string | null; urmator: number }; areActePostari?: boolean
   onBeneficiar: (b: Beneficiar) => void; onBeneficiarSters: (id: string) => void
   onGenerat: (d: DocGen) => void; onNrSchimbat?: (d: DocGen) => void; onStergeDoc?: (id: string) => void; onDateComune: (date: Record<string, string>) => void; onResetNumerotare?: () => void; disabled?: boolean
 }) {
@@ -224,6 +225,9 @@ export default function GeneratorSocial({ firmaId, activitateId, an, zona, dateD
           </div>
         )
       })}
+
+      {/* Date din postări: AI citește Anexele și propune datele (Decizia −7 zile, Raportul +1 lună) */}
+      {!disabled && areActePostari && <div style={{ marginTop: 9 }}><DatePostari firmaId={firmaId} api={api} activitateId={activitateId} onActualizat={d => onGenerat(d as DocGen)} /></div>}
 
       {/* Documente puse în lucru dintr-un draft (ex. Raport anual) — card separat, cu „Pregătește" + zonă de completat */}
       {extra.map(d => (

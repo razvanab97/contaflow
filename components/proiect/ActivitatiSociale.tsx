@@ -10,6 +10,7 @@ import {
 import { getSablon, sabloanePentruZona, TIP_LUCRU } from '@/lib/proiect-social-sabloane'
 import GeneratorSocial, { type Beneficiar, type DocGen } from './GeneratorSocial'
 import DocLucruCard, { type DocLucru } from './DocLucruCard'
+import DatePostari from './DatePostari'
 
 // Modulul „Activități sociale": fiecare zonă (activitate din plan) e o linie în care se adaugă
 // activități (AS-NNN/AN) și documente. Indicatorul se mișcă doar din activitățile VALIDATE.
@@ -337,6 +338,9 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
   const docManual = docs.filter(d => !ptRegistru(d))
   const docGenerate = docs.filter(ptRegistru) as unknown as DocGen[]
   const areGenerator = sabloanePentruZona(zona).length > 0
+  // „Date din postări": activitatea are un PDF (Anexe) + o Decizie sau un Raport puse în lucru
+  const areActePostari = docs.some(d => /pdf/.test(d.fisier_tip || '') || /\.pdf$/i.test(d.fisier_nume))
+    && docs.some(d => d.tip_document === TIP_LUCRU && /deciz|raport/i.test((d.furnizor || '') + ' ' + (d.fisier_nume || '')))
   const [extins, setExtins] = useState(false)
   const [busy, setBusy] = useState(false)
   const [tipDoc, setTipDoc] = useState<string>('dovada')
@@ -393,7 +397,7 @@ function RandActivitate({ a, docs, firmaId, bazaBeneficiari, unitate, zona, an, 
         <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
           {/* Fabrica de documente - vizibilă sus (doar la zonele cu șabloane) */}
           <GeneratorSocial firmaId={firmaId} activitateId={a.id} an={a.an} zona={zona} dateDocumente={a.date_documente || {}}
-            beneficiari={beneficiari} documente={docGenerate} registruHead={registruHead}
+            beneficiari={beneficiari} documente={docGenerate} registruHead={registruHead} areActePostari={areActePostari}
             onBeneficiar={onBeneficiar} onBeneficiarSters={onBeneficiarSters} onGenerat={onGenerat} onNrSchimbat={onNrSchimbat}
             onStergeDoc={onDocSters} onDateComune={date => onDateComune(a.id, date)} onResetNumerotare={onResetNumerotare} />
 
@@ -575,6 +579,9 @@ function DocumenteZona({ firmaId, zona, an, api, activitateId, activitati, docs,
   const lucruDocs = docs.filter(d => !d.este_draft && esteLucru(d))
   const draftDocs = docs.filter(d => d.este_draft)
   const momentDocs = docs.filter(d => !d.este_draft && !esteLucru(d))
+  // „Date din postări": apare dacă există un PDF (Anexe) + o Decizie sau un Raport puse în lucru
+  const arePdfAnexa = docs.some(d => /pdf/.test(d.fisier_tip || '') || /\.pdf$/i.test(d.fisier_nume))
+  const areActePostari = arePdfAnexa && lucruDocs.some(d => /deciz|raport/i.test((d.furnizor || '') + ' ' + (d.fisier_nume || '')))
 
   return (
     <div style={{ marginTop: 10 }}>
@@ -582,6 +589,7 @@ function DocumenteZona({ firmaId, zona, an, api, activitateId, activitati, docs,
       {lucruDocs.length > 0 && (
         <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
           <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Documente în lucru</div>
+          {!disabled && areActePostari && <DatePostari firmaId={firmaId} api={api} activitateId={activitateId} zona={zona} an={an} onActualizat={doc => onAdaugat([doc as Doc])} />}
           {lucruDocs.map(d => (
             <DocLucruCard key={d.id} firmaId={firmaId} api={api} doc={d as unknown as DocLucru}
               activitati={activ} onMutaInActivitate={onMutaInActivitate ? (nd => onMutaInActivitate(nd as unknown as Doc)) : undefined}
