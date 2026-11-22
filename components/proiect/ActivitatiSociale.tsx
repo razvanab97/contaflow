@@ -32,7 +32,7 @@ async function descarcaPdfDocumente(items: { id: string; nume: string; tip?: str
   if (!items.length) { alert('Nu există documente de inclus.'); return }
   const w = window.open('', '_blank')
   if (!w) { alert('Permite ferestrele pop-up pentru a genera PDF-ul.'); return }
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titlu)}</title><style>body{margin:0;font-family:system-ui,sans-serif;color:#111}.sep{page-break-before:always;display:flex;align-items:center;justify-content:center;min-height:70vh;text-align:center}.sep .s{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#888;margin-bottom:8px}.sep h2{font-size:22px;margin:0}.doc{page-break-before:always;padding:0 6mm}.doc:first-child{page-break-before:avoid}img{max-width:100%}@page{margin:14mm}</style></head><body><div id="c" style="padding:20px;font-size:14px;color:#555">Se pregătește… (${items.length} documente)</div></body></html>`)
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titlu)}</title><style>body{margin:0;font-family:system-ui,sans-serif;color:#111}.sep{page-break-before:always;display:flex;align-items:center;justify-content:center;min-height:70vh;text-align:center}.sep .s{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#888;margin-bottom:8px}.sep h2{font-size:22px;margin:0}.doc{page-break-before:always;padding:14mm 16mm}.doc:first-child{page-break-before:avoid}img{max-width:100%}@page{margin:0}</style></head><body><div id="c" style="padding:20px;font-size:14px;color:#555">Se pregătește… (${items.length} documente)</div></body></html>`)
   w.document.close()
   try {
     const { renderAsync } = await import('docx-preview')
@@ -236,7 +236,7 @@ export default function ActivitatiSociale({ firmaId }: { firmaId: string }) {
       + `table{width:100%;border-collapse:collapse;margin-top:4px}th,td{border:1px solid #ccd3cf;padding:5px 7px;text-align:left;vertical-align:top}`
       + `th{background:#eef4f1;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}td{font-size:11px}td.c,th.c{text-align:center}`
       + `.foot{margin-top:22px;color:#889;font-size:10.5px;border-top:1px solid #ddd;padding-top:8px}`
-      + `@media print{.wrap{max-width:none;padding:0}@page{margin:16mm}}`
+      + `@media print{.wrap{max-width:none;padding:16mm}@page{margin:0}}`
       + `</style></head><body><div class="wrap">`
       + `<h1>Raport anual — Misiunea socială</h1>`
       + `<div class="sub">Anul ${an} · generat la ${E(dataAzi)} · date la zi din aplicație</div>`

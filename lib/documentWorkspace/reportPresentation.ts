@@ -27,9 +27,9 @@ export async function printReport(html: string, title: string): Promise<void> {
     doc.open()
     doc.write(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><style>
       ${REPORT_PAGE_CSS}
-      @page { size: A4; margin: 8.4667mm 10.5833mm; }
+      @page { size: A4; margin: 0; }
       body { margin: 0; }
-      .report-page { width: auto; padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .report-page { width: auto; padding: 8.4667mm 10.5833mm; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       thead { display: table-header-group; }
       img, h1, h2, h3 { break-inside: avoid; }
       h1, h2, h3 { break-after: avoid; }

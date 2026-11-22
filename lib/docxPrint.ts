@@ -3,7 +3,7 @@
 export async function printeazaDocxPdf(url: string, nume: string) {
   const w = window.open('', '_blank')
   if (!w) { alert('Permite ferestrele pop-up pentru a salva PDF-ul.'); return }
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${nume.replace(/[<>&]/g, '')}</title><style>body{margin:0}@page{margin:16mm}</style></head><body><div id="c">Se pregătește…</div></body></html>`)
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${nume.replace(/[<>&]/g, '')}</title><style>body{margin:0;padding:14mm 16mm}@page{margin:0}</style></head><body><div id="c">Se pregătește…</div></body></html>`)
   w.document.close()
   try {
     const { renderAsync } = await import('docx-preview')
