@@ -47,13 +47,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Toaster />
         <DocViewer />
         {/* Time tracking: cronometrul „Timp azi” (script partajat, servit de gestiune-stoc; vezi docs/time-tracking.md acolo).
-            Măsoară doar cât tabul ContaFlow e activ (vizibil + focus + input) și salvează în Supabase-ul comun, cu id-ul
-            propriu `contaflow`. Se montează în #tt-mount din subsolul sidebar-ului; lazyOnload = după hidratare. */}
+            Măsoară doar cât tabul ContaFlow e activ (vizibil + focus + input). Salvează în Supabase-ul PROPRIU al ContaFlow
+            (data-supa-url/key), NU în baza comună a gestiune-stoc — ca să nu depindă de egress-ul ei (vezi migration_time_tracking.sql).
+            id-ul proiectului `contaflow`; se montează în #tt-mount din subsolul sidebar-ului; lazyOnload = după hidratare. */}
         <Script
           src="https://gestiune-stoc-pi.vercel.app/time-tracking.js"
           data-project="contaflow"
           data-mount="#tt-mount"
           data-mount-only="true"
+          data-supa-url={process.env.NEXT_PUBLIC_SUPABASE_URL}
+          data-supa-key={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}
           strategy="lazyOnload"
         />
       </body>
