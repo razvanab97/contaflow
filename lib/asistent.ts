@@ -8,6 +8,7 @@ import { getStareFirma } from '@/lib/sistem-lucru'
 import { getRestanteCount } from '@/lib/db'
 import { contextPlatforma } from '@/lib/proiect-context-platforma'
 import { adaugaMemorie, CATEGORII_MEMORIE } from '@/lib/proiect-memorie'
+import { MOTIVE_IGNORARE } from '@/lib/tranzactii-reguli'
 import { GET as cautaGET } from '@/app/api/documente/cautare/route'
 
 // Asistentul AI al ContaFlow (pop-up global): uneltele pe care Claude le poate folosi peste toata
@@ -17,13 +18,17 @@ import { GET as cautaGET } from '@/app/api/documente/cautare/route'
 type Sb = ReturnType<typeof getServiceSupabase>
 type Firma = { id: string; slug: string; nume: string; culoare: string }
 
-export const CU_CONFIRMARE = new Set(['bifeaza_sarcina', 'marcheaza_factura', 'memorie_proiect'])
+export const CU_CONFIRMARE = new Set(['bifeaza_sarcina', 'marcheaza_factura', 'memorie_proiect',
+  'muta_factura', 'schimba_luna_factura', 'marcheaza_tranzactie', 'pune_memento', 'rezolva_memento'])
+
+const MOTIVE_KEYS = MOTIVE_IGNORARE.map(m => m.key)
+const MOTIVE_SET = new Set<string>(MOTIVE_KEYS)
 
 const firmaProp = { type: 'string', description: 'Slug-ul firmei (ex. "ab-textile", "ab-homes-invest", "abxhomes", "proiect-ab-textile"). Vezi lista de firme din instrucțiuni.' }
 const lunaProp = { type: 'string', description: 'Luna de lucru, format AAAA-LL (ex. "2026-10" = lucrat în octombrie pentru perioada contabilă septembrie). Implicit: luna de lucru curentă.' }
 
 export const TOOLS: Anthropic.Tool[] = [
-  { name: 'de_facut', description: 'Lista „De făcut” pentru TOATE firmele pe luna de lucru: termene impozite, tranzacții nedocumentate, facturi în așteptare, restanțe, următorul modul nebifat. Bun ca prim pas la „ce am de făcut?”.',
+  { name: 'de_facut', description: 'Lista „De făcut” pentru TOATE firmele pe luna de lucru: termene impozite, tranzacții nedocumentate, facturi în așteptare, restanțe, mementouri scadente (reminder-e), următorul modul nebifat. Bun ca prim pas la „ce am de făcut?”.',
     input_schema: { type: 'object', properties: { luna: lunaProp }, additionalProperties: false } },
   { name: 'stare_firma', description: 'Situația detaliată a unei firme pe o lună: modulele cu sarcinile bifate/nebifate, extrase, tranzacții fără document, mailuri contabil deschise, impozite.',
     input_schema: { type: 'object', properties: { firma: firmaProp, luna: lunaProp }, required: ['firma'], additionalProperties: false } },
@@ -41,6 +46,18 @@ export const TOOLS: Anthropic.Tool[] = [
     input_schema: { type: 'object', properties: { document_id: { type: 'string' }, platit: { type: 'boolean' }, data_platii: { type: 'string', description: 'AAAA-LL-ZZ, opțional' } }, required: ['document_id', 'platit'], additionalProperties: false } },
   { name: 'memorie_proiect', description: 'MODIFICĂ: adaugă un fapt în Memoria PROIECT AB Textile (ce s-a întâmplat efectiv). Cere confirmarea utilizatorului.',
     input_schema: { type: 'object', properties: { text: { type: 'string' }, categorie: { type: 'string', enum: [...CATEGORII_MEMORIE] }, data: { type: 'string', description: 'AAAA-LL-ZZ, implicit azi' } }, required: ['text'], additionalProperties: false } },
+  { name: 'muta_factura', description: 'MODIFICĂ: mută o factură (document) la ALTĂ firmă. Folosește-o când o factură a intrat la firma greșită (ex. utilități emise pe numele unei persoane, repartizate greșit). Reatribuie firma, o pune în luna contabilă potrivită după data facturii și desface plata greșită de pe firma veche (factura rămâne neplătită până se potrivește cu plata corectă a firmei noi). Cere confirmarea. Document_id din cauta/facturi_neplatite.',
+    input_schema: { type: 'object', properties: { document_id: { type: 'string' }, firma_destinatie: { ...firmaProp, description: 'Slug-ul firmei la care se mută factura.' } }, required: ['document_id', 'firma_destinatie'], additionalProperties: false } },
+  { name: 'schimba_luna_factura', description: 'MODIFICĂ: mută o factură în altă LUNĂ contabilă a ACELEIAȘI firme (nu schimbă firma). Util când factura a intrat în luna greșită. Cere confirmarea.',
+    input_schema: { type: 'object', properties: { document_id: { type: 'string' }, luna: { ...lunaProp, description: 'Luna de lucru țintă, AAAA-LL.' } }, required: ['document_id', 'luna'], additionalProperties: false } },
+  { name: 'marcheaza_tranzactie', description: 'MODIFICĂ: marchează o tranzacție din extras ca „ignorată” (nu are nevoie de document justificativ — ex. comision, transfer propriu, impozit) sau o readuce „de documentat”. La ignorare poți da și motivul. Cere confirmarea. Tranzactie_id din tranzactii.',
+    input_schema: { type: 'object', properties: { tranzactie_id: { type: 'string' }, stare: { type: 'string', enum: ['ignorata', 'de_documentat'] }, motiv: { type: 'string', enum: MOTIVE_KEYS, description: 'Doar la stare=ignorata: motivul ignorării.' } }, required: ['tranzactie_id', 'stare'], additionalProperties: false } },
+  { name: 'pune_memento', description: 'MODIFICĂ: salvează un memento (reminder) — ceva de făcut, opțional la o dată (ex. „plătește factura EON pe 02.12”). Apare în lista „De făcut” de pe Dashboard (și la întrebări gen „ce am de făcut/plătit”) până îl rezolvi. Firma opțională. Cere confirmarea.',
+    input_schema: { type: 'object', properties: { text: { type: 'string', description: 'Ce să-ți amintesc (pe scurt).' }, data: { type: 'string', description: 'AAAA-LL-ZZ, opțional — când e scadent.' }, firma: { ...firmaProp, description: 'Firma la care se leagă mementoul (opțional).' } }, required: ['text'], additionalProperties: false } },
+  { name: 'vezi_memento', description: 'Mementourile (reminder-urile) salvate — implicit doar cele nerezolvate, cu text, data scadentă, firmă și ID. Folosește ID-ul la rezolva_memento.',
+    input_schema: { type: 'object', properties: { doar_deschise: { type: 'boolean', description: 'Implicit true (doar nerezolvate). false = și cele rezolvate.' }, firma: firmaProp }, additionalProperties: false } },
+  { name: 'rezolva_memento', description: 'MODIFICĂ: marchează un memento ca rezolvat (sau îl redeschide). Cere confirmarea. Memento_id din vezi_memento.',
+    input_schema: { type: 'object', properties: { memento_id: { type: 'string' }, rezolvat: { type: 'boolean', description: 'Implicit true (rezolvat). false = redeschide.' } }, required: ['memento_id'], additionalProperties: false } },
 ]
 
 export async function firme(sb: Sb): Promise<Firma[]> {
@@ -57,6 +74,26 @@ async function lunaId(sb: Sb, firmaId: string, luna: string) {
   return ((data || []) as { id: string; luna: string }[]).find(l => String(l.luna).startsWith(luna))?.id || null
 }
 
+const ziRo = (d: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(str(d))
+  ? new Date(str(d) + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+
+// Luna contabila (luna_id) a unei firme in care intra o factura dupa data ei: luna de lucru = luna
+// URMATOARE datei facturii (o factura din septembrie tine de contabilitatea lucrata in octombrie),
+// cu cadere pe cea mai recenta luna deschisa daca aceea nu exista. Fara data: cea mai recenta luna.
+export async function lunaIdPtData(sb: Sb, firmaId: string, dataDocument: string | null): Promise<string | null> {
+  const { data } = await sb.from('luni_contabile').select('id,luna').eq('firma_id', firmaId)
+  const luni = ((data || []) as { id: string; luna: string }[]).sort((a, b) => String(b.luna).localeCompare(String(a.luna)))
+  if (!luni.length) return null
+  const m = /^\d{4}-\d{2}-\d{2}$/.test(String(dataDocument || '')) ? String(dataDocument).slice(0, 7) : null
+  if (!m) return luni[0].id
+  const [y, mo] = m.split('-').map(Number)
+  const d = new Date(Date.UTC(y, mo, 1)) // mo e 1-based -> indexul mo = luna urmatoare
+  const workMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+  return luni.find(l => String(l.luna).startsWith(workMonth))?.id
+    || luni.find(l => String(l.luna).slice(0, 7) <= workMonth)?.id
+    || luni[0].id
+}
+
 // Descrierea pe scurt a unei actiuni care asteapta confirmarea (afisata in pop-up).
 export async function descriereActiune(name: string, input: Record<string, unknown>, lista: Firma[]): Promise<string> {
   const f = lista.find(x => x.slug === input.firma)
@@ -69,6 +106,34 @@ export async function descriereActiune(name: string, input: Record<string, unkno
     return `Marchează ${input.platit ? 'PLĂTITĂ' : 'neplătită'} factura ${data ? `${String(data.furnizor || '').split('|')[0]} ${data.numar_document ? 'nr. ' + data.numar_document : ''} · ${lei(data.suma)} ${data.valuta || 'RON'}` : input.document_id}${input.data_platii ? ` (plătită pe ${input.data_platii})` : ''}`
   }
   if (name === 'memorie_proiect') return `Adaugă în Memoria proiectului (${input.categorie || 'Altele'}${input.data ? ', ' + input.data : ''}): „${str(input.text)}”`
+  if (name === 'muta_factura') {
+    const dest = lista.find(x => x.slug === str(input.firma_destinatie))
+    const { data } = await getServiceSupabase().from('documente').select('furnizor,numar_document,suma,valuta,firma_id').eq('id', str(input.document_id)).maybeSingle()
+    const veche = data ? lista.find(x => x.id === data.firma_id)?.nume : null
+    const et = data ? `${String(data.furnizor || '').split('|')[0]} ${data.numar_document ? 'nr. ' + data.numar_document : ''} · ${lei(data.suma)} ${data.valuta || 'RON'}` : str(input.document_id)
+    return `Mută factura ${et} de la ${veche || '—'} la ${dest?.nume || input.firma_destinatie}`
+  }
+  if (name === 'schimba_luna_factura') {
+    const { data } = await getServiceSupabase().from('documente').select('furnizor,numar_document').eq('id', str(input.document_id)).maybeSingle()
+    const et = data ? `${String(data.furnizor || '').split('|')[0]}${data.numar_document ? ' nr. ' + data.numar_document : ''}` : str(input.document_id)
+    return `Mută factura ${et} în ${workMonthLabel(lunaValida(input.luna))}`
+  }
+  if (name === 'marcheaza_tranzactie') {
+    const { data } = await getServiceSupabase().from('tranzactii').select('data_tranzactie,suma,valuta,descriere_curatata,descriere').eq('id', str(input.tranzactie_id)).maybeSingle()
+    const et = data ? `${data.data_tranzactie} · ${lei(data.suma)} ${data.valuta || 'RON'} · ${String(data.descriere_curatata || data.descriere || '').slice(0, 60)}` : str(input.tranzactie_id)
+    const motiv = MOTIVE_IGNORARE.find(m => m.key === str(input.motiv))
+    return input.stare === 'ignorata'
+      ? `Marchează IGNORATĂ (fără document) tranzacția ${et}${motiv ? ` — ${motiv.label}` : ''}`
+      : `Readu „de documentat” tranzacția ${et}`
+  }
+  if (name === 'pune_memento') {
+    const fm = lista.find(x => x.slug === str(input.firma))
+    return `Pune memento${ziRo(input.data) ? `, scadent ${ziRo(input.data)}` : ''}${fm ? ` (${fm.nume})` : ''}: „${str(input.text)}”`
+  }
+  if (name === 'rezolva_memento') {
+    const { data } = await getServiceSupabase().from('memento').select('text').eq('id', str(input.memento_id)).maybeSingle()
+    return `Marchează memento „${data ? String(data.text).slice(0, 80) : str(input.memento_id)}” ${input.rezolvat === false ? 'nerezolvat (redeschis)' : 'rezolvat'}`
+  }
   return name
 }
 
@@ -157,6 +222,77 @@ export async function executa(name: string, input: Record<string, unknown>, list
       if (!m) throw new Error('Nu am putut salva în memorie (tabelul proiect_memorie lipsește?).')
       return `Gata: reținut în Memoria proiectului (${m.data}, ${m.categorie}).`
     }
+    case 'muta_factura': {
+      const id = str(input.document_id)
+      if (!id) throw new Error('Lipsește document_id.')
+      const dest = lista.find(x => x.slug === str(input.firma_destinatie))
+      if (!dest) throw new Error(`Firmă destinație necunoscută: "${input.firma_destinatie}". Firme valide: ${lista.map(x => x.slug).join(', ')}`)
+      const { data: doc } = await sb.from('documente').select('id,firma_id,data_document,tranzactie_id,furnizor,numar_document,suma,valuta').eq('id', id).maybeSingle()
+      if (!doc) throw new Error('Documentul nu a fost găsit.')
+      if (doc.firma_id === dest.id) return `Factura e deja la ${dest.nume}.`
+      const lunaDest = await lunaIdPtData(sb, dest.id, doc.data_document as string | null)
+      if (!lunaDest) throw new Error(`${dest.nume} nu are nicio lună contabilă începută ca să primească factura. Pornește o lună la ${dest.nume} întâi.`)
+      let plataDesfacuta = false
+      if (doc.tranzactie_id) { await sb.from('tranzactii').update({ document_id: null }).eq('id', doc.tranzactie_id as string); plataDesfacuta = true }
+      const { error } = await sb.from('documente').update({ firma_id: dest.id, luna_id: lunaDest, tranzactie_id: null, platit: false, data_platii: null }).eq('id', id)
+      if (error) throw new Error(error.message)
+      const et = `${String(doc.furnizor || '').split('|')[0]}${doc.numar_document ? ` nr. ${doc.numar_document}` : ''}`
+      return `Gata: factura ${et} a fost mutată la ${dest.nume}, în luna ei contabilă.${plataDesfacuta ? ' Plata greșită de pe firma veche a fost desfăcută — se va potrivi cu plata corectă a lui ' + dest.nume + ' când redeschizi Extrasul.' : ''}`
+    }
+    case 'schimba_luna_factura': {
+      const id = str(input.document_id)
+      if (!id) throw new Error('Lipsește document_id.')
+      const luna = lunaValida(input.luna)
+      const { data: doc } = await sb.from('documente').select('id,firma_id,furnizor,numar_document').eq('id', id).maybeSingle()
+      if (!doc) throw new Error('Documentul nu a fost găsit.')
+      const lid = await lunaId(sb, doc.firma_id as string, luna)
+      if (!lid) throw new Error(`Luna ${workMonthLabel(luna)} nu e deschisă pentru firma acestui document.`)
+      const { error } = await sb.from('documente').update({ luna_id: lid }).eq('id', id)
+      if (error) throw new Error(error.message)
+      return `Gata: factura ${String(doc.furnizor || '').split('|')[0]}${doc.numar_document ? ` nr. ${doc.numar_document}` : ''} a fost mutată în ${workMonthLabel(luna)}.`
+    }
+    case 'marcheaza_tranzactie': {
+      const id = str(input.tranzactie_id)
+      if (!id) throw new Error('Lipsește tranzactie_id.')
+      const stare = str(input.stare)
+      if (stare !== 'ignorata' && stare !== 'de_documentat') throw new Error('stare trebuie să fie "ignorata" sau "de_documentat".')
+      const motiv = stare === 'ignorata' && MOTIVE_SET.has(str(input.motiv)) ? str(input.motiv) : null
+      const patch = stare === 'ignorata' ? { note: 'na', motiv_ignorare: motiv, ignorat_auto: false } : { note: null, motiv_ignorare: null, ignorat_auto: false }
+      let { error } = await sb.from('tranzactii').update(patch).eq('id', id)
+      if (error) { const r = await sb.from('tranzactii').update({ note: stare === 'ignorata' ? 'na' : null }).eq('id', id); error = r.error } // fallback fără coloana motiv_ignorare
+      if (error) throw new Error(error.message)
+      return stare === 'ignorata'
+        ? `Gata: tranzacția a fost marcată ignorată (nu are nevoie de document${motiv ? `, motiv: ${MOTIVE_IGNORARE.find(m => m.key === motiv)?.label || motiv}` : ''}).`
+        : 'Gata: tranzacția a fost readusă „de documentat”.'
+    }
+    case 'pune_memento': {
+      const txt = str(input.text)
+      if (!txt) throw new Error('Scrie ce să-ți amintesc (textul mementoului).')
+      const f = firma(false)
+      const data = /^\d{4}-\d{2}-\d{2}$/.test(str(input.data)) ? str(input.data) : null
+      const { error } = await sb.from('memento').insert({ firma_id: f?.id || null, text: txt.slice(0, 500), data_scadenta: data, sursa: 'chat' })
+      if (error) throw new Error(/relation .*memento.* does not exist|could not find the table|schema cache/i.test(error.message) ? 'Tabelul „memento" nu există încă — rulează migrarea supabase_memento.sql în Supabase.' : error.message)
+      return `Gata: memento salvat${data ? `, scadent ${ziRo(data)}` : ''}${f ? ` (${f.nume})` : ''}. Apare în „De făcut" până îl rezolvi.`
+    }
+    case 'vezi_memento': {
+      const f = firma(false)
+      let q = sb.from('memento').select('id,firma_id,text,data_scadenta,rezolvat,created_at').order('data_scadenta', { ascending: true, nullsFirst: false }).order('created_at', { ascending: true }).limit(100)
+      if (input.doar_deschise !== false) q = q.eq('rezolvat', false)
+      if (f) q = q.eq('firma_id', f.id)
+      const { data, error } = await q
+      if (error) return JSON.stringify({ mesaj: 'Tabelul „memento" nu există încă (rulează supabase_memento.sql).', memento: [] })
+      const numeFirma = (id: unknown) => lista.find(x => x.id === id)?.nume || null
+      return JSON.stringify({ total: (data || []).length, memento: (data || []).map(m => ({ id: m.id, text: m.text, scadenta: m.data_scadenta, firma: numeFirma(m.firma_id), rezolvat: m.rezolvat })) })
+    }
+    case 'rezolva_memento': {
+      const id = str(input.memento_id)
+      if (!id) throw new Error('Lipsește memento_id.')
+      const rez = input.rezolvat !== false
+      const { data, error } = await sb.from('memento').update({ rezolvat: rez, rezolvat_at: rez ? new Date().toISOString() : null }).eq('id', id).select('id,text').maybeSingle()
+      if (error) throw new Error(error.message)
+      if (!data) throw new Error('Mementoul nu a fost găsit.')
+      return `Gata: memento „${String(data.text).slice(0, 60)}" marcat ${rez ? 'rezolvat' : 'nerezolvat'}.`
+    }
   }
   throw new Error(`Unealtă necunoscută: ${name}`)
 }
@@ -174,7 +310,10 @@ CUM LUCREZI
 - Scrie exclusiv în limba română — inclusiv propozițiile scurte de dinainte de a folosi o unealtă.
 - Folosește uneltele ca să afli date reale; nu inventa sume, numere sau stări. Dacă ceva nu există în date, spune clar.
 - Pentru „ce am de făcut” pornește de la de_facut; pentru o firmă anume, stare_firma; pentru facturi/plăți/documente, cauta; pentru PROIECT AB Textile, proiect.
-- Uneltele care modifică date (bifeaza_sarcina, marcheaza_factura, memorie_proiect) cer confirmarea utilizatorului în interfață — propune-le doar când utilizatorul a cerut sau a fost de acord cu acțiunea; după confirmare raportează scurt rezultatul.
+- EȘTI UN ASISTENT CARE LUCREAZĂ, nu doar explică. Pe lângă citiri, POȚI executa acțiuni reale (cu confirmarea utilizatorului): bifezi/debifezi sarcini (bifeaza_sarcina), marchezi o factură plătită/neplătită (marcheaza_factura), MUȚI o factură la altă firmă (muta_factura) sau în altă lună (schimba_luna_factura), marchezi o tranzacție ignorată/de documentat (marcheaza_tranzactie), pui un memento cu dată (pune_memento), vezi/rezolvi mementouri (vezi_memento/rezolva_memento) și adaugi în memoria proiectului (memorie_proiect).
+- NU spune „nu pot / nu am unealtă / trebuie să o faci manual” pentru ceva ce există ca unealtă mai sus — propune direct acțiunea potrivită (cu confirmare) și fă-o. Când utilizatorul descrie un task („mută factura X la firma Y”, „amintește-mi să plătesc pe 02.12”, „ignoră comisionul ăsta”, „factura asta e pe luna greșită”), rezolvă-l tu cu uneltele; întâi găsește obiectul cu o citire (cauta/facturi_neplatite/tranzactii) ca să ai ID-ul corect, apoi propune modificarea.
+- Toate uneltele care MODIFICĂ cer confirmarea utilizatorului în interfață — propune-le doar când utilizatorul a cerut sau a fost de acord; după confirmare raportează scurt rezultatul. Dacă o acțiune are nevoie de ceva ce nu știi sigur (ex. la ce firmă să mut, ce dată are mementoul), întreabă scurt înainte.
+- Mementourile (pune_memento) apar în lista „De făcut” de pe Dashboard; folosește-le ca „reminder” atunci când utilizatorul cere să-i amintești de o plată/un termen.
 - Facturi noi: utilizatorul le atașează în fereastra asistentului și ele intră automat în Inbox Facturi; tu vezi rezultatul în mesaj.
 - Imagini: utilizatorul poate lipi (Ctrl/⌘+V) capturi de ecran sau poze — o factură, un extras, un mail, o eroare din aplicație — iar tu le vezi și lucrezi pe baza lor. Citește tot ce se vede (furnizor, număr, dată, sumă, valută, IBAN), verifică în platformă cu uneltele de citire (cauta, facturi_neplatite, tranzactii) și spune clar ce e sigur și ce nu se vede bine. Imaginile NU se salvează în platformă: dacă e o factură de păstrat, spune-i să o atașeze (PDF/JPG) cu agrafa, ca să intre în Inbox Facturi.
 - Pune linkuri către paginile relevante ca markdown, cu căi relative: [Extras de cont](/ab-textile/2026-10/extras). Linkurile către documente (/api/chitante/document?id=...) la fel, dar se deschid într-o previzualizare (pop-up) în fereastra asistentului, nu se descarcă: scrie-le cu eticheta „Vezi”, nu „Descarcă”.

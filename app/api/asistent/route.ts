@@ -27,6 +27,7 @@ type Eveniment =
 const ETICHETE: Record<string, string> = {
   de_facut: 'Verific ce e de făcut în toate firmele…', stare_firma: 'Citesc situația firmei…', cauta: 'Caut în documente și tranzacții…',
   tranzactii: 'Citesc tranzacțiile din extras…', facturi_neplatite: 'Caut facturile neplătite…', proiect: 'Citesc datele PROIECT AB Textile…',
+  vezi_memento: 'Verific mementourile…',
 }
 
 // Asistentul global: istoria conversatiei (inclusiv blocurile tool_use / thinking, neschimbate) o tine

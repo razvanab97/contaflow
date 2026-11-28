@@ -155,6 +155,26 @@ export async function getDeFacut(firme: { id: string; slug: string; nume: string
     }
   }))
 
+  // Memento-uri (reminder-uri puse din asistent): apar cand sunt scadente curand (<=14 zile), depasite
+  // sau fara data. Tabelul poate lipsi daca migrarea supabase_memento.sql nu a fost rulata -> ignoram.
+  const memRes = await sb.from('memento').select('id,firma_id,text,data_scadenta').eq('rezolvat', false).order('data_scadenta', { ascending: true, nullsFirst: false }).limit(200)
+  if (!memRes.error) {
+    const aziUtc = Date.UTC(azi.getFullYear(), azi.getMonth(), azi.getDate())
+    for (const m of (memRes.data || []) as { id: string; firma_id: string | null; text: string; data_scadenta: string | null }[]) {
+      const dz = /^\d{4}-\d{2}-\d{2}$/.test(String(m.data_scadenta || '')) ? String(m.data_scadenta) : null
+      const zile = dz ? Math.round((Date.UTC(+dz.slice(0, 4), +dz.slice(5, 7) - 1, +dz.slice(8, 10)) - aziUtc) / 86400000) : null
+      if (zile != null && zile > 14) continue // inca departe: nu aglomeram lista
+      const f = m.firma_id ? firme.find(x => x.id === m.firma_id) : null
+      items.push({
+        firmaId: m.firma_id || '', firmaSlug: f?.slug || '', firmaNume: f ? f.nume.replace(' SRL', '') : 'Memento', culoare: f?.culoare || '#6b7280',
+        id: `memento-${m.id}`, titlu: m.text.slice(0, 140),
+        detaliu: dz ? `Memento · ${new Date(dz + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'long' })}` : 'Memento',
+        href: f ? `/${f.slug}/${luna}` : '/dashboard', icon: 'calendar',
+        zile, urgenta: zile == null ? 'normal' : zile < 0 ? 'depasit' : zile <= 5 ? 'curand' : 'normal',
+      })
+    }
+  }
+
   const rang = { depasit: 0, curand: 1, normal: 2 }
   return items.sort((a, b) => rang[a.urgenta] - rang[b.urgenta] || (a.zile ?? 99) - (b.zile ?? 99) || a.firmaNume.localeCompare(b.firmaNume))
 }
