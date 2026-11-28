@@ -7,6 +7,7 @@ import { finalizeazaDocument } from '@/lib/denumire-document'
 import { diferentaSuma, furnizorInDescriere } from '@/lib/tranzactii-potrivire'
 import { cursuriBnrSigur } from '@/lib/curs-bnr'
 import { citesteEfacturiPdf, extractieEfacturaUnica } from '@/lib/efactura-pdf'
+import { getDocumentProxy } from 'unpdf'
 
 type SupabaseService = ReturnType<typeof import('@/lib/supabase/server').getServiceSupabase>
 
@@ -75,6 +76,37 @@ function safePart(value: string, fallback: string) {
 
 function norm(value: string | null | undefined) {
   return String(value || '').replace(/^RO/i, '').replace(/\D/g, '')
+}
+
+// Textul brut al tuturor paginilor dintr-un PDF (stratul de text, fara AI). Null daca PDF-ul nu are
+// strat de text (ex. scanat ca imagine) sau nu poate fi citit.
+async function textDinPdf(bytes: Uint8Array): Promise<string | null> {
+  try {
+    const pdf = await getDocumentProxy(new Uint8Array(bytes))
+    const parti: string[] = []
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const tc = await (await pdf.getPage(p)).getTextContent()
+      parti.push((tc.items as { str?: string }[]).map(i => (typeof i.str === 'string' ? i.str : '')).join(' '))
+    }
+    const text = parti.join('\n')
+    return text.trim() ? text : null
+  } catch {
+    return null
+  }
+}
+
+// Scaneaza textul unui PDF dupa CUI-ul firmelor noastre. Compara pe secvente INTREGI de cifre (nu
+// substring), ca sa nu prinda cifre dintr-un cod de bare / IBAN / numar de client care contin
+// intamplator secventa. Intoarce firma DOAR daca EXACT una dintre firmele noastre are CUI-ul
+// tiparit/scris pe document - util cand firma nu e beneficiarul (ex. utilitati emise pe numele
+// chiriasului, cu CUI-ul firmei adaugat pe factura). null daca nu gaseste niciunul sau daca gaseste
+// mai multe (ambiguu -> se cade pe AI / pe deducerea din plata).
+export async function firmaDupaCuiInText(bytes: Uint8Array, candidates: FirmaCandidate[]): Promise<FirmaCandidate | null> {
+  const text = await textDinPdf(bytes)
+  if (!text) return null
+  const secvente = new Set(text.replace(/[^0-9]+/g, ' ').trim().split(' ').filter(Boolean))
+  const gasite = candidates.filter(f => f.cuiToate.some(c => { const d = norm(c); return d.length >= 6 && secvente.has(d) }))
+  return gasite.length === 1 ? gasite[0] : null
 }
 
 function monthFromIso(date: string | null | undefined) {
@@ -249,7 +281,8 @@ Raspunde DOAR cu JSON:
 {"firmaSlug":"slug-ul firmei sau null","firmaCui":"CUI/CIF gasit pe document pentru firma noastra sau null","incredereFirma":"sigur|posibil|necunoscut","esteFactura":true,"furnizor":"emitent/furnizor sau null","numarDocument":"seria si numarul facturii/documentului sau null","suma":123.45,"moneda":"codul ISO al monedei totalului: RON|EUR|USD|GBP|HUF|BGN|PLN sau null","dataDocument":"AAAA-LL-ZZ sau null","locatie":"apartamentul/adresa/locul de consum daca apare (ex: Ap. 99), altfel null","tipDocument":"factura|chitanta|invoice|altul","motiv":"pe scurt de ce ai ales firma"}.
 Moneda este cea in care e exprimat totalul de plata pe document, NU moneda tarii firmei noastre: simbolul € sau "EUR"/"euro" = EUR, $ sau "USD" = USD, £ = GBP, "lei"/"RON" = RON. Nu converti suma - pastreaz-o exact cum apare, in moneda documentului.
 Nu inventa valori. Daca documentul contine mai multe firme, firma noastra este beneficiarul/cumparatorul, nu furnizorul.
-Accepta furnizori externi/straini (de exemplu ISO/Maxy/Verk/Jumbo/Anthropic/OpenAI), dar numai daca documentul indica una dintre firmele noastre ca beneficiar/cumparator, prin CUI/CIF, nume firma sau adresa. Daca documentul pare personal sau pentru alta entitate, seteaza firmaSlug si firmaCui null, incredereFirma necunoscut.
+Daca pe document apare, oriunde, CUI-ul uneia dintre firmele noastre (vezi "cuiValide"), documentul este AL ACELEI firme chiar daca beneficiarul/destinatarul tiparit este o persoana fizica - de exemplu o factura de utilitati (apa/canal, curent, gaz, internet) emisa pe numele chiriasului, cu CUI-ul firmei adaugat pe ea: in acest caz seteaza firmaSlug, firmaCui (CUI-ul nostru gasit) si incredereFirma "sigur".
+Accepta furnizori externi/straini (de exemplu ISO/Maxy/Verk/Jumbo/Anthropic/OpenAI), dar numai daca documentul indica una dintre firmele noastre ca beneficiar/cumparator, prin CUI/CIF, nume firma sau adresa. Daca documentul pare personal sau pentru alta entitate SI nu apare pe el CUI-ul niciuneia dintre firmele noastre, seteaza firmaSlug si firmaCui null, incredereFirma necunoscut.
 Pentru Maxy si Verk accepta doar facturi reale cu numar/serie care incepe cu "FS"; proformele sau documentele cu alt prefix nu sunt utile si trebuie marcate cu "esteFactura":false.
 Nu importa AWB-uri, etichete de transport, packing list, shipping documents sau delivery notes FARA preturi: pentru acestea seteaza "esteFactura":false si "tipDocument":"altul", chiar daca apar sume sau furnizori.
 EXCEPTIE: "Aviz de insotire a marfii" cu produse, preturi, TVA si total (ex. eMAG / Dante International pentru o comanda platita) ESTE document contabil util - seteaza "esteFactura":true, "tipDocument":"factura", suma = totalul de plata (valoare + TVA), numarDocument = numarul avizului.` },
@@ -399,6 +432,19 @@ export async function importInboxDocument({
   const byCui = candidates.find(f => f.cuiToate.some(c => norm(c) && norm(c) === norm(extracted?.firmaCui)))
   const bySlug = candidates.find(f => f.slug === extracted?.firmaSlug)
   let detected = extracted?.incredereFirma === 'sigur' ? (byCui || bySlug) : byCui || null
+  // Scanare determinista a CUI-ului nostru in textul PDF: daca AI-ul n-a putut atribui sigur firma,
+  // dar CUI-ul uneia dintre firmele noastre apare tiparit/scris pe document (ex. factura de utilitati
+  // emisa pe numele chiriasului, cu CUI-ul firmei adaugat pe ea), o asociem sigur - fara sa depinda de
+  // interpretarea AI a cine e "beneficiarul", si inainte de a mai astepta plata din extras.
+  let detectatDupaCui = false
+  if (!detected && mediaType === 'application/pdf' && extracted?.esteFactura !== false) {
+    const firmaCui = await firmaDupaCuiInText(bytes, candidates)
+    if (firmaCui) {
+      detected = firmaCui
+      detectatDupaCui = true
+      sourceLabel = `${sourceLabel || 'Inbox'} · firmă după CUI pe document`
+    }
+  }
   // Firma nu apare pe factura (ex. utilitati emise pe numele chiriasului): o deducem din plata din
   // extras, daca exact o firma are plata catre acel furnizor (vezi firmaDupaPlata). Valabil pentru
   // orice sursa (folder local, Gmail) si orice firma.
@@ -461,7 +507,7 @@ export async function importInboxDocument({
     : null
   const targetLunaId = matchExtras?.luna_id || dateBasedLunaId
   const extension = mediaType === 'application/pdf' ? 'pdf' : mediaType === 'image/png' ? 'png' : 'jpg'
-  const status = detected ? extracted?.incredereFirma || 'sigur' : 'verifica_firma'
+  const status = detectatDupaCui ? 'sigur' : detected ? extracted?.incredereFirma || 'sigur' : 'verifica_firma'
   const details = [
     extracted?.dataDocument,
     extracted?.furnizor,
